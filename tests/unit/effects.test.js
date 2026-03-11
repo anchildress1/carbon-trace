@@ -118,11 +118,14 @@ describe('effects.js', () => {
       );
     });
 
-    it('does nothing for unknown effect name', () => {
+    it('warns for unknown effect name', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       runEffect('nonexistent', container);
 
       expect(gsap.to).not.toHaveBeenCalled();
       expect(gsap.fromTo).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith('Unknown effect: "nonexistent"');
+      warnSpy.mockRestore();
     });
   });
 

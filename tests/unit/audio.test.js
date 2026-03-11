@@ -1,15 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+let lastHowlOptions = null;
+
 const mockHowlInstance = {
   play: vi.fn(),
   stop: vi.fn(),
   fade: vi.fn(),
   mute: vi.fn(),
+  unload: vi.fn(),
   volume: vi.fn().mockReturnValue(0.15),
 };
 
 vi.mock('howler', () => ({
-  Howl: vi.fn(() => ({ ...mockHowlInstance })),
+  Howl: vi.fn((opts) => {
+    lastHowlOptions = opts;
+    return { ...mockHowlInstance };
+  }),
 }));
 
 import { playAmbient, crossfadeAmbient, playNarration, stopAll, setMuted } from '../../src/audio.js';
@@ -22,7 +28,7 @@ describe('audio.js', () => {
   });
 
   describe('playAmbient', () => {
-    it('creates a Howl with correct options', () => {
+    it('creates a Howl with correct options and error handlers', () => {
       playAmbient('test.mp3', 0.15, true);
 
       expect(Howl).toHaveBeenCalledWith(
@@ -31,6 +37,8 @@ describe('audio.js', () => {
           volume: 0.15,
           loop: true,
           html5: true,
+          onloaderror: expect.any(Function),
+          onplayerror: expect.any(Function),
         }),
       );
     });
@@ -41,11 +49,11 @@ describe('audio.js', () => {
       expect(howl.play).toHaveBeenCalled();
     });
 
-    it('stops previous ambient before playing new one', () => {
+    it('unloads previous ambient before playing new one', () => {
       const first = playAmbient('first.mp3', 0.1, true);
       playAmbient('second.mp3', 0.2, true);
 
-      expect(first.stop).toHaveBeenCalled();
+      expect(first.unload).toHaveBeenCalled();
     });
   });
 
@@ -85,23 +93,57 @@ describe('audio.js', () => {
       );
     });
 
-    it('stops previous narration before playing new one', () => {
+    it('unloads previous narration before playing new one', () => {
       const first = playNarration('first.mp3');
       playNarration('second.mp3');
 
-      expect(first.stop).toHaveBeenCalled();
+      expect(first.unload).toHaveBeenCalled();
+    });
+  });
+
+  describe('error handlers', () => {
+    it('logs warning on ambient load error', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      playAmbient('bad.mp3', 0.1, true);
+      lastHowlOptions.onloaderror(1, 'network error');
+      expect(warnSpy).toHaveBeenCalledWith('Failed to load ambient: bad.mp3', 'network error');
+      warnSpy.mockRestore();
+    });
+
+    it('logs warning on ambient play error', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      playAmbient('bad.mp3', 0.1, true);
+      lastHowlOptions.onplayerror(1, 'decode error');
+      expect(warnSpy).toHaveBeenCalledWith('Failed to play ambient: bad.mp3', 'decode error');
+      warnSpy.mockRestore();
+    });
+
+    it('logs warning on narration load error', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      playNarration('bad.mp3');
+      lastHowlOptions.onloaderror(1, 'not found');
+      expect(warnSpy).toHaveBeenCalledWith('Failed to load narration: bad.mp3', 'not found');
+      warnSpy.mockRestore();
+    });
+
+    it('logs warning on crossfade load error', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      crossfadeAmbient('bad.mp3', 0.2, 800);
+      lastHowlOptions.onloaderror(1, 'timeout');
+      expect(warnSpy).toHaveBeenCalledWith('Failed to load ambient: bad.mp3', 'timeout');
+      warnSpy.mockRestore();
     });
   });
 
   describe('stopAll', () => {
-    it('stops both ambient and narration', () => {
+    it('unloads both ambient and narration', () => {
       const ambient = playAmbient('ambient.mp3', 0.1, true);
       const narration = playNarration('narration.mp3');
 
       stopAll();
 
-      expect(ambient.stop).toHaveBeenCalled();
-      expect(narration.stop).toHaveBeenCalled();
+      expect(ambient.unload).toHaveBeenCalled();
+      expect(narration.unload).toHaveBeenCalled();
     });
 
     it('handles no active audio gracefully', () => {

@@ -20,6 +20,25 @@ export function createApp() {
   let muted = false;
   let phaseTimer = null;
 
+  const requiredIds = [
+    'loading-screen',
+    'scene-stage',
+    'scene-image',
+    'trace-overlay',
+    'effects-layer',
+    'narration-layer',
+    'accessible-narration',
+    'overlay-controls',
+    'btn-replay',
+    'btn-mute',
+  ];
+
+  for (const id of requiredIds) {
+    if (!document.getElementById(id)) {
+      throw new Error(`Required element #${id} not found in DOM`);
+    }
+  }
+
   const els = {
     loadingScreen: document.getElementById('loading-screen'),
     sceneStage: document.getElementById('scene-stage'),
@@ -42,7 +61,10 @@ export function createApp() {
         new Promise((resolve) => {
           const img = new Image();
           img.onload = resolve;
-          img.onerror = resolve;
+          img.onerror = () => {
+            console.warn(`Failed to load image: ${frame.image}`);
+            resolve();
+          };
           img.src = frame.image;
         }),
     );
@@ -50,6 +72,11 @@ export function createApp() {
   }
 
   function showFrame(index) {
+    if (phaseTimer) {
+      clearTimeout(phaseTimer);
+      phaseTimer = null;
+    }
+
     const frame = frames[index];
     els.sceneImage.src = frame.image;
     els.sceneImage.alt = `Scene: ${frame.id}`;
@@ -80,9 +107,14 @@ export function createApp() {
       els.accessibleNarration.textContent = narrationText;
 
       if (frame.narration.audio) {
+        els.btnReplay.hidden = false;
         const delay = frame.narration.delay || 0;
         setTimeout(() => playNarration(frame.narration.audio), delay);
+      } else {
+        els.btnReplay.hidden = true;
       }
+    } else {
+      els.btnReplay.hidden = true;
     }
 
     if (frame.ambient) {
@@ -146,27 +178,35 @@ export function createApp() {
     const toFrame = frames[toIndex];
     const transitionConfig = toFrame.transition || scenesData.meta.defaultTransition;
 
+    function resolveState() {
+      if (toFrame.frameType === 'credits') {
+        state = State.CREDITS;
+      } else if (toFrame.frameType === 'title') {
+        state = State.TITLE;
+      } else {
+        state = State.SCENE_ACTIVE;
+      }
+    }
+
     gsap.to(els.sceneStage, {
       opacity: 0,
       duration: transitionConfig.duration / 2000,
       ease: 'power2.inOut',
       onComplete: () => {
-        currentIndex = toIndex;
-        showFrame(toIndex);
+        try {
+          currentIndex = toIndex;
+          showFrame(toIndex);
+        } catch (err) {
+          console.error('Error during scene transition:', err);
+          resolveState();
+          return;
+        }
 
         gsap.to(els.sceneStage, {
           opacity: 1,
           duration: transitionConfig.duration / 2000,
           ease: 'power2.inOut',
-          onComplete: () => {
-            if (toFrame.frameType === 'credits') {
-              state = State.CREDITS;
-            } else if (toFrame.frameType === 'title') {
-              state = State.TITLE;
-            } else {
-              state = State.SCENE_ACTIVE;
-            }
-          },
+          onComplete: resolveState,
         });
       },
     });
@@ -197,28 +237,33 @@ export function createApp() {
   }
 
   function init() {
-    preloadAssets().then(() => {
-      els.loadingScreen.hidden = true;
-      els.sceneStage.hidden = false;
-      showControls();
+    preloadAssets()
+      .then(() => {
+        els.loadingScreen.hidden = true;
+        els.sceneStage.hidden = false;
+        showControls();
 
-      showFrame(0);
-      state = State.TITLE;
+        showFrame(0);
+        state = State.TITLE;
 
-      document.addEventListener('click', handleInput);
-      document.addEventListener('keydown', handleInput);
-      els.btnMute.addEventListener('click', (e) => {
-        e.stopPropagation();
-        toggleMute();
+        document.addEventListener('click', handleInput);
+        document.addEventListener('keydown', handleInput);
+        els.btnMute.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleMute();
+        });
+        els.btnReplay.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const frame = frames[currentIndex];
+          if (frame.narration && frame.narration.audio) {
+            playNarration(frame.narration.audio);
+          }
+        });
+      })
+      .catch((err) => {
+        console.error('Failed to initialize:', err);
+        els.loadingScreen.textContent = 'Something went wrong. Please refresh.';
       });
-      els.btnReplay.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const frame = frames[currentIndex];
-        if (frame.narration && frame.narration.audio) {
-          playNarration(frame.narration.audio);
-        }
-      });
-    });
   }
 
   init();

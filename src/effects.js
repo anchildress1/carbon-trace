@@ -141,6 +141,8 @@ export function runEffect(name, container) {
   const fn = effects[name];
   if (fn) {
     fn(container);
+  } else {
+    console.warn(`Unknown effect: "${name}"`);
   }
 }
 

@@ -6,7 +6,7 @@ let globalMuted = false;
 
 export function playAmbient(src, volume, loop) {
   if (currentAmbient) {
-    currentAmbient.stop();
+    currentAmbient.unload();
   }
 
   currentAmbient = new Howl({
@@ -14,6 +14,8 @@ export function playAmbient(src, volume, loop) {
     volume: globalMuted ? 0 : volume,
     loop: loop,
     html5: true,
+    onloaderror: (_id, err) => console.warn(`Failed to load ambient: ${src}`, err),
+    onplayerror: (_id, err) => console.warn(`Failed to play ambient: ${src}`, err),
   });
 
   currentAmbient.play();
@@ -28,6 +30,8 @@ export function crossfadeAmbient(newSrc, volume, durationMs) {
     volume: 0,
     loop: true,
     html5: true,
+    onloaderror: (_id, err) => console.warn(`Failed to load ambient: ${newSrc}`, err),
+    onplayerror: (_id, err) => console.warn(`Failed to play ambient: ${newSrc}`, err),
   });
 
   currentAmbient.play();
@@ -35,7 +39,7 @@ export function crossfadeAmbient(newSrc, volume, durationMs) {
 
   if (oldAmbient) {
     oldAmbient.fade(oldAmbient.volume(), 0, durationMs);
-    setTimeout(() => oldAmbient.stop(), durationMs + 100);
+    setTimeout(() => oldAmbient.unload(), durationMs + 100);
   }
 
   return currentAmbient;
@@ -43,13 +47,15 @@ export function crossfadeAmbient(newSrc, volume, durationMs) {
 
 export function playNarration(src) {
   if (currentNarration) {
-    currentNarration.stop();
+    currentNarration.unload();
   }
 
   currentNarration = new Howl({
     src: [src],
     volume: globalMuted ? 0 : 1,
     html5: true,
+    onloaderror: (_id, err) => console.warn(`Failed to load narration: ${src}`, err),
+    onplayerror: (_id, err) => console.warn(`Failed to play narration: ${src}`, err),
   });
 
   currentNarration.play();
@@ -57,8 +63,8 @@ export function playNarration(src) {
 }
 
 export function stopAll() {
-  if (currentAmbient) currentAmbient.stop();
-  if (currentNarration) currentNarration.stop();
+  if (currentAmbient) currentAmbient.unload();
+  if (currentNarration) currentNarration.unload();
   currentAmbient = null;
   currentNarration = null;
 }
