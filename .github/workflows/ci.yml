@@ -35,11 +35,6 @@ jobs:
           node-version: 22
           cache: 'pnpm'
 
-      - name: Lint Workflows
-        uses: raven-actions/actionlint@205b530c5d9fa8f44ae9ed59f341a0db994aa6f8 # v2.1.2
-        with:
-          fail-on-error: true
-
       - name: Install dependencies
         run: make install
 

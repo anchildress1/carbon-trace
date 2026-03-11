@@ -13,6 +13,50 @@ const State = Object.freeze({
   CREDITS: 'CREDITS',
 });
 
+function prefersReducedMotion() {
+  return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function preloadImage(src) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = resolve;
+    img.onerror = () => {
+      console.warn(`Failed to load image: ${src}`);
+      resolve();
+    };
+    img.src = src;
+  });
+}
+
+function preloadAudio(src) {
+  return new Promise((resolve) => {
+    const audio = new Audio();
+    audio.preload = 'auto';
+    audio.oncanplaythrough = resolve;
+    audio.onerror = () => {
+      console.warn(`Failed to preload audio: ${src}`);
+      resolve();
+    };
+    audio.src = src;
+  });
+}
+
+function collectAudioSrcs(frames) {
+  const srcs = new Set();
+  for (const frame of frames) {
+    if (frame.ambient?.src) srcs.add(frame.ambient.src);
+    if (frame.narration?.audio) srcs.add(frame.narration.audio);
+    if (frame.phases) {
+      for (const phase of frame.phases) {
+        if (phase.ambient?.src) srcs.add(phase.ambient.src);
+        if (phase.narration?.audio) srcs.add(phase.narration.audio);
+      }
+    }
+  }
+  return srcs;
+}
+
 export function createApp() {
   const frames = scenesData.frames;
   let currentIndex = 0;
@@ -56,50 +100,9 @@ export function createApp() {
   initOverlay(narrativeSceneCount);
 
   function preloadAssets() {
-    const imagePromises = frames.map(
-      (frame) =>
-        new Promise((resolve) => {
-          const img = new Image();
-          img.onload = resolve;
-          img.onerror = () => {
-            console.warn(`Failed to load image: ${frame.image}`);
-            resolve();
-          };
-          img.src = frame.image;
-        }),
-    );
-
-    const audioSrcs = new Set();
-    for (const frame of frames) {
-      if (frame.ambient?.src) audioSrcs.add(frame.ambient.src);
-      if (frame.narration?.audio) audioSrcs.add(frame.narration.audio);
-      if (frame.phases) {
-        for (const phase of frame.phases) {
-          if (phase.ambient?.src) audioSrcs.add(phase.ambient.src);
-          if (phase.narration?.audio) audioSrcs.add(phase.narration.audio);
-        }
-      }
-    }
-
-    const audioPromises = [...audioSrcs].map(
-      (src) =>
-        new Promise((resolve) => {
-          const audio = new Audio();
-          audio.preload = 'auto';
-          audio.oncanplaythrough = resolve;
-          audio.onerror = () => {
-            console.warn(`Failed to preload audio: ${src}`);
-            resolve();
-          };
-          audio.src = src;
-        }),
-    );
-
+    const imagePromises = frames.map((frame) => preloadImage(frame.image));
+    const audioPromises = [...collectAudioSrcs(frames)].map(preloadAudio);
     return Promise.all([...imagePromises, ...audioPromises]);
-  }
-
-  function prefersReducedMotion() {
-    return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
   }
 
   function applyNarration(frame) {
