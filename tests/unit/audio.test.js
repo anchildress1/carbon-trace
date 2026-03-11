@@ -37,6 +37,7 @@ describe('audio.js', () => {
           volume: 0.15,
           loop: true,
           html5: true,
+          mute: false,
           onloaderror: expect.any(Function),
           onplayerror: expect.any(Function),
         }),

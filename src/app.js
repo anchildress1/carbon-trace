@@ -68,7 +68,34 @@ export function createApp() {
           img.src = frame.image;
         }),
     );
-    return Promise.all(imagePromises);
+
+    const audioSrcs = new Set();
+    for (const frame of frames) {
+      if (frame.ambient && frame.ambient.src) audioSrcs.add(frame.ambient.src);
+      if (frame.narration && frame.narration.audio) audioSrcs.add(frame.narration.audio);
+      if (frame.phases) {
+        for (const phase of frame.phases) {
+          if (phase.ambient && phase.ambient.src) audioSrcs.add(phase.ambient.src);
+          if (phase.narration && phase.narration.audio) audioSrcs.add(phase.narration.audio);
+        }
+      }
+    }
+
+    const audioPromises = [...audioSrcs].map(
+      (src) =>
+        new Promise((resolve) => {
+          const audio = new Audio();
+          audio.preload = 'auto';
+          audio.oncanplaythrough = resolve;
+          audio.onerror = () => {
+            console.warn(`Failed to preload audio: ${src}`);
+            resolve();
+          };
+          audio.src = src;
+        }),
+    );
+
+    return Promise.all([...imagePromises, ...audioPromises]);
   }
 
   function showFrame(index) {
@@ -99,12 +126,18 @@ export function createApp() {
       updateProgress(sceneIndex);
     }
 
-    if (frame.narration && frame.narration.lines && frame.narration.lines.length > 0) {
-      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      buildTextTimeline(frame.narration.lines, els.narrationLayer, reducedMotion);
+    if (frame.narration) {
+      const hasLines = Array.isArray(frame.narration.lines) && frame.narration.lines.length > 0;
 
-      const narrationText = frame.narration.lines.map((l) => l.text).join(' ');
-      els.accessibleNarration.textContent = narrationText;
+      if (hasLines) {
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        buildTextTimeline(frame.narration.lines, els.narrationLayer, reducedMotion);
+
+        const narrationText = frame.narration.lines.map((l) => l.text).join(' ');
+        els.accessibleNarration.textContent = narrationText;
+      } else {
+        els.accessibleNarration.textContent = '';
+      }
 
       if (frame.narration.audio) {
         els.btnReplay.hidden = false;
@@ -114,6 +147,7 @@ export function createApp() {
         els.btnReplay.hidden = true;
       }
     } else {
+      els.accessibleNarration.textContent = '';
       els.btnReplay.hidden = true;
     }
 

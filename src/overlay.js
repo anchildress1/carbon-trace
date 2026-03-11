@@ -12,7 +12,7 @@ export function initOverlay(sceneCount) {
   for (let i = 0; i < sceneCount; i++) {
     const dot = document.createElement('span');
     dot.className = 'progress-dot';
-    dot.setAttribute('aria-label', `Scene ${i + 1}`);
+    dot.setAttribute('aria-hidden', 'true');
     dotsContainer.appendChild(dot);
     dotElements.push(dot);
   }

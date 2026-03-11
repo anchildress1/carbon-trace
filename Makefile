@@ -80,7 +80,8 @@ secret-scan:
 	elif command -v detect-secrets > /dev/null; then \
 		_run_scan "detect-secrets" || exit 1; \
 	else \
-		echo "detect-secrets not found. Skipping scan."; \
+		echo "detect-secrets not found. Install via 'uv tool install detect-secrets' or 'pipx install detect-secrets'."; \
+		exit 1; \
 	fi
 
 # Remove build artifacts and dependencies

@@ -32,12 +32,12 @@ describe('overlay.js', () => {
       expect(dots.length).toBe(5);
     });
 
-    it('adds aria-label to each dot', () => {
+    it('marks each dot as aria-hidden', () => {
       initOverlay(3);
 
       const dots = dotsContainer.querySelectorAll('.progress-dot');
-      expect(dots[0].getAttribute('aria-label')).toBe('Scene 1');
-      expect(dots[2].getAttribute('aria-label')).toBe('Scene 3');
+      expect(dots[0].getAttribute('aria-hidden')).toBe('true');
+      expect(dots[2].getAttribute('aria-hidden')).toBe('true');
     });
 
     it('clears existing dots before creating new ones', () => {

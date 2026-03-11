@@ -11,9 +11,10 @@ export function playAmbient(src, volume, loop) {
 
   currentAmbient = new Howl({
     src: [src],
-    volume: globalMuted ? 0 : volume,
+    volume: volume,
     loop: loop,
     html5: true,
+    mute: globalMuted,
     onloaderror: (_id, err) => console.warn(`Failed to load ambient: ${src}`, err),
     onplayerror: (_id, err) => console.warn(`Failed to play ambient: ${src}`, err),
   });
@@ -30,12 +31,13 @@ export function crossfadeAmbient(newSrc, volume, durationMs) {
     volume: 0,
     loop: true,
     html5: true,
+    mute: globalMuted,
     onloaderror: (_id, err) => console.warn(`Failed to load ambient: ${newSrc}`, err),
     onplayerror: (_id, err) => console.warn(`Failed to play ambient: ${newSrc}`, err),
   });
 
   currentAmbient.play();
-  currentAmbient.fade(0, globalMuted ? 0 : volume, durationMs);
+  currentAmbient.fade(0, volume, durationMs);
 
   if (oldAmbient) {
     oldAmbient.fade(oldAmbient.volume(), 0, durationMs);
@@ -52,8 +54,9 @@ export function playNarration(src) {
 
   currentNarration = new Howl({
     src: [src],
-    volume: globalMuted ? 0 : 1,
+    volume: 1,
     html5: true,
+    mute: globalMuted,
     onloaderror: (_id, err) => console.warn(`Failed to load narration: ${src}`, err),
     onplayerror: (_id, err) => console.warn(`Failed to play narration: ${src}`, err),
   });
