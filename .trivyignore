@@ -1,0 +1,2 @@
+# Trivy ignore rules
+# Add CVE IDs or package names to suppress known false positives
