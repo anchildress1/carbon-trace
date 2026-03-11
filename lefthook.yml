@@ -1,0 +1,28 @@
+# lefthook.yml
+pre-commit:
+  parallel: false
+  commands:
+    format:
+      run: make format
+      stage_fixed: true
+    lint:
+      run: make lint
+      stage_fixed: true
+    scan-secrets:
+      run: make secret-scan
+      stage_fixed: true
+
+commit-msg:
+  commands:
+    commitlint:
+      run: npx --no-install commitlint --edit {1}
+
+pre-push:
+  parallel: true
+  commands:
+    unit-tests:
+      run: make test
+    e2e:
+      run: make e2e
+    perf:
+      run: make perf

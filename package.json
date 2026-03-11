@@ -1,0 +1,51 @@
+{
+  "name": "carbon-trace",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Immersive visual narrative — WeCoded 2026 Frontend Art Entry",
+  "author": "Ashley Childress",
+  "license": "SEE LICENSE IN LICENSE",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "format": "prettier --write 'src/**/*.{js,css,html,json}' '*.{js,json,html,yml,yaml,md}'",
+    "format:check": "prettier --check 'src/**/*.{js,css,html,json}' '*.{js,json,html,yml,yaml,md}'",
+    "perf": "lhci autorun"
+  },
+  "dependencies": {
+    "gsap": "^3.12.7",
+    "howler": "^2.2.4"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.0",
+    "@commitlint/config-conventional": "^19.8.0",
+    "@checkmarkdevtools/commitlint-plugin-rai": "^0.1.6",
+    "@lhci/cli": "^0.14.0",
+    "@playwright/test": "^1.52.0",
+    "@vitest/coverage-v8": "^3.2.0",
+    "eslint": "^9.27.0",
+    "globals": "^16.1.0",
+    "happy-dom": "^18.0.0",
+    "lefthook": "^1.11.0",
+    "prettier": "^3.5.0",
+    "vite": "^6.3.0",
+    "vitest": "^3.2.0"
+  },
+  "volta": {
+    "node": "22.16.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "lefthook"
+    ]
+  }
+}
