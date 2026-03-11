@@ -35,6 +35,9 @@ jobs:
           node-version: 22
           cache: 'pnpm'
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
+
       - name: Install dependencies
         run: make install
 
