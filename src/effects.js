@@ -149,8 +149,6 @@ export function runEffect(name, container) {
 export function clearEffects(container) {
   gsap.killTweensOf(container);
   gsap.killTweensOf(container.children);
-  while (container.firstChild) {
-    container.removeChild(container.firstChild);
-  }
+  container.replaceChildren();
   gsap.set(container, { clearProps: 'all' });
 }

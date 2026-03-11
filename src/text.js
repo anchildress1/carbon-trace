@@ -35,7 +35,5 @@ export function buildTextTimeline(lines, container, reducedMotion = false) {
 
 export function clearNarrationLayer(container) {
   gsap.killTweensOf(container.children);
-  while (container.firstChild) {
-    container.removeChild(container.firstChild);
-  }
+  container.replaceChildren();
 }

@@ -124,12 +124,12 @@ body {
 }
 
 .control-buttons button {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 50%;
   width: 36px;
   height: 36px;
-  color: #e8e4df;
+  color: #fff;
   font-size: 1rem;
   cursor: pointer;
   transition: background 0.2s ease;

@@ -71,12 +71,12 @@ export function createApp() {
 
     const audioSrcs = new Set();
     for (const frame of frames) {
-      if (frame.ambient && frame.ambient.src) audioSrcs.add(frame.ambient.src);
-      if (frame.narration && frame.narration.audio) audioSrcs.add(frame.narration.audio);
+      if (frame.ambient?.src) audioSrcs.add(frame.ambient.src);
+      if (frame.narration?.audio) audioSrcs.add(frame.narration.audio);
       if (frame.phases) {
         for (const phase of frame.phases) {
-          if (phase.ambient && phase.ambient.src) audioSrcs.add(phase.ambient.src);
-          if (phase.narration && phase.narration.audio) audioSrcs.add(phase.narration.audio);
+          if (phase.ambient?.src) audioSrcs.add(phase.ambient.src);
+          if (phase.narration?.audio) audioSrcs.add(phase.narration.audio);
         }
       }
     }
@@ -98,6 +98,45 @@ export function createApp() {
     return Promise.all([...imagePromises, ...audioPromises]);
   }
 
+  function prefersReducedMotion() {
+    return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+
+  function applyNarration(frame) {
+    if (!frame.narration) {
+      els.accessibleNarration.textContent = '';
+      els.btnReplay.hidden = true;
+      return;
+    }
+
+    const hasLines = Array.isArray(frame.narration.lines) && frame.narration.lines.length > 0;
+
+    if (hasLines) {
+      buildTextTimeline(frame.narration.lines, els.narrationLayer, prefersReducedMotion());
+      els.accessibleNarration.textContent = frame.narration.lines.map((l) => l.text).join(' ');
+    } else {
+      els.accessibleNarration.textContent = '';
+    }
+
+    if (frame.narration.audio) {
+      els.btnReplay.hidden = false;
+      const delay = frame.narration.delay || 0;
+      setTimeout(() => playNarration(frame.narration.audio), delay);
+    } else {
+      els.btnReplay.hidden = true;
+    }
+  }
+
+  function applyAmbient(frame) {
+    if (!frame.ambient) return;
+
+    if (currentIndex === 0) {
+      playAmbient(frame.ambient.src, frame.ambient.volume, frame.ambient.loop);
+    } else {
+      crossfadeAmbient(frame.ambient.src, frame.ambient.volume, 800);
+    }
+  }
+
   function showFrame(index) {
     if (phaseTimer) {
       clearTimeout(phaseTimer);
@@ -107,17 +146,12 @@ export function createApp() {
     const frame = frames[index];
     els.sceneImage.src = frame.image;
     els.sceneImage.alt = `Scene: ${frame.id}`;
-
-    if (frame.traceOverlay) {
-      els.traceOverlay.style.opacity = frame.traceOverlay.opacity;
-    } else {
-      els.traceOverlay.style.opacity = 0;
-    }
+    els.traceOverlay.style.opacity = frame.traceOverlay?.opacity ?? 0;
 
     clearEffects(els.effectsLayer);
     clearNarrationLayer(els.narrationLayer);
 
-    if (frame.effects && frame.effects.idle) {
+    if (frame.effects?.idle) {
       runEffect(frame.effects.idle, els.effectsLayer);
     }
 
@@ -126,38 +160,8 @@ export function createApp() {
       updateProgress(sceneIndex);
     }
 
-    if (frame.narration) {
-      const hasLines = Array.isArray(frame.narration.lines) && frame.narration.lines.length > 0;
-
-      if (hasLines) {
-        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        buildTextTimeline(frame.narration.lines, els.narrationLayer, reducedMotion);
-
-        const narrationText = frame.narration.lines.map((l) => l.text).join(' ');
-        els.accessibleNarration.textContent = narrationText;
-      } else {
-        els.accessibleNarration.textContent = '';
-      }
-
-      if (frame.narration.audio) {
-        els.btnReplay.hidden = false;
-        const delay = frame.narration.delay || 0;
-        setTimeout(() => playNarration(frame.narration.audio), delay);
-      } else {
-        els.btnReplay.hidden = true;
-      }
-    } else {
-      els.accessibleNarration.textContent = '';
-      els.btnReplay.hidden = true;
-    }
-
-    if (frame.ambient) {
-      if (currentIndex === 0) {
-        playAmbient(frame.ambient.src, frame.ambient.volume, frame.ambient.loop);
-      } else {
-        crossfadeAmbient(frame.ambient.src, frame.ambient.volume, 800);
-      }
-    }
+    applyNarration(frame);
+    applyAmbient(frame);
 
     if (frame.phases) {
       runPhases(frame);
@@ -173,12 +177,9 @@ export function createApp() {
 
       clearNarrationLayer(els.narrationLayer);
 
-      if (phase.narration && phase.narration.lines && phase.narration.lines.length > 0) {
-        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        buildTextTimeline(phase.narration.lines, els.narrationLayer, reducedMotion);
-
-        const narrationText = phase.narration.lines.map((l) => l.text).join(' ');
-        els.accessibleNarration.textContent = narrationText;
+      if (phase.narration?.lines?.length > 0) {
+        buildTextTimeline(phase.narration.lines, els.narrationLayer, prefersReducedMotion());
+        els.accessibleNarration.textContent = phase.narration.lines.map((l) => l.text).join(' ');
 
         if (phase.narration.audio) {
           playNarration(phase.narration.audio);
@@ -289,7 +290,7 @@ export function createApp() {
         els.btnReplay.addEventListener('click', (e) => {
           e.stopPropagation();
           const frame = frames[currentIndex];
-          if (frame.narration && frame.narration.audio) {
+          if (frame.narration?.audio) {
             playNarration(frame.narration.audio);
           }
         });

@@ -4,9 +4,7 @@ export function initOverlay(sceneCount) {
   const dotsContainer = document.getElementById('progress-dots');
   if (!dotsContainer) return;
 
-  while (dotsContainer.firstChild) {
-    dotsContainer.removeChild(dotsContainer.firstChild);
-  }
+  dotsContainer.replaceChildren();
   dotElements = [];
 
   for (let i = 0; i < sceneCount; i++) {
