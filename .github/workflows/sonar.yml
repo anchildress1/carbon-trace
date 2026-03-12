@@ -21,9 +21,6 @@ jobs:
       contents: read
       pull-requests: write
 
-    env:
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
