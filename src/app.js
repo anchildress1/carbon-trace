@@ -47,16 +47,19 @@ function preloadAudio(src) {
   });
 }
 
+function audioSrcsFromEntry(entry) {
+  const srcs = [];
+  if (entry.ambient?.src) srcs.push(entry.ambient.src);
+  if (entry.narration?.audio) srcs.push(entry.narration.audio);
+  return srcs;
+}
+
 function collectAudioSrcs(frames) {
   const srcs = new Set();
-  for (const frame of frames) {
-    if (frame.ambient?.src) srcs.add(frame.ambient.src);
-    if (frame.narration?.audio) srcs.add(frame.narration.audio);
-    if (frame.phases) {
-      for (const phase of frame.phases) {
-        if (phase.ambient?.src) srcs.add(phase.ambient.src);
-        if (phase.narration?.audio) srcs.add(phase.narration.audio);
-      }
+  const entries = frames.flatMap((f) => [f, ...(f.phases || [])]);
+  for (const entry of entries) {
+    for (const src of audioSrcsFromEntry(entry)) {
+      srcs.add(src);
     }
   }
   return srcs;
