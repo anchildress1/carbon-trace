@@ -219,18 +219,38 @@
       "traceOverlay": { "opacity": 0.2, "animation": "tin-glow" }
     },
     {
-      "id": "scene-09-return",
+      "id": "scene-09-stillness",
       "frameType": "scene",
-      "image": "assets/images/scene-09-return.webp",
+      "image": "assets/images/scene-09-stillness.webp",
       "advanceMode": "click",
       "textMode": "ghost-drift",
       "narration": {
         "lines": [],
-        "audio": "assets/audio/narration/scene-09-return.mp3",
+        "audio": "assets/audio/narration/scene-09-stillness.mp3",
         "delay": 500
       },
       "ambient": {
-        "src": "assets/audio/ambient/scene-09-return.mp3",
+        "src": "assets/audio/ambient/scene-09-stillness.mp3",
+        "volume": 0.08,
+        "loop": true
+      },
+      "effects": { "idle": "near-still-pulse", "entry": "fade-in" },
+      "transition": { "type": "fade", "duration": 1200 },
+      "traceOverlay": { "opacity": 0.1, "animation": "near-still-pulse" }
+    },
+    {
+      "id": "scene-10-return",
+      "frameType": "scene",
+      "image": "assets/images/scene-10-return.webp",
+      "advanceMode": "click",
+      "textMode": "ghost-drift",
+      "narration": {
+        "lines": [],
+        "audio": "assets/audio/narration/scene-10-return.mp3",
+        "delay": 500
+      },
+      "ambient": {
+        "src": "assets/audio/ambient/scene-10-return.mp3",
         "volume": 0.12,
         "loop": true
       },
@@ -239,18 +259,18 @@
       "traceOverlay": { "opacity": 0.25, "animation": "light-crack" }
     },
     {
-      "id": "scene-10-device",
+      "id": "scene-11-device",
       "frameType": "scene",
-      "image": "assets/images/scene-10-device.webp",
+      "image": "assets/images/scene-11-device.webp",
       "advanceMode": "click",
       "textMode": "ghost-drift",
       "narration": {
         "lines": [],
-        "audio": "assets/audio/narration/scene-10-device.mp3",
+        "audio": "assets/audio/narration/scene-11-device.mp3",
         "delay": 500
       },
       "ambient": {
-        "src": "assets/audio/ambient/scene-10-device.mp3",
+        "src": "assets/audio/ambient/scene-11-device.mp3",
         "volume": 0.15,
         "loop": true
       },
@@ -259,18 +279,18 @@
       "traceOverlay": { "opacity": 0.3, "animation": "assembly-micro" }
     },
     {
-      "id": "scene-11-activation",
+      "id": "scene-12-activation",
       "frameType": "scene",
-      "image": "assets/images/scene-11-activation.webp",
+      "image": "assets/images/scene-12-activation.webp",
       "advanceMode": "click",
       "textMode": "ghost-drift",
       "narration": {
         "lines": [],
-        "audio": "assets/audio/narration/scene-11-activation.mp3",
+        "audio": "assets/audio/narration/scene-12-activation.mp3",
         "delay": 500
       },
       "ambient": {
-        "src": "assets/audio/ambient/scene-11-activation.mp3",
+        "src": "assets/audio/ambient/scene-12-activation.mp3",
         "volume": 0.18,
         "loop": true
       },
@@ -279,18 +299,18 @@
       "traceOverlay": { "opacity": 0.35, "animation": "illumination-spread" }
     },
     {
-      "id": "scene-12-gathering",
+      "id": "scene-13-gathering",
       "frameType": "scene",
-      "image": "assets/images/scene-12-gathering.webp",
+      "image": "assets/images/scene-13-gathering.webp",
       "advanceMode": "click",
       "textMode": "ghost-drift",
       "narration": {
         "lines": [],
-        "audio": "assets/audio/narration/scene-12-gathering.mp3",
+        "audio": "assets/audio/narration/scene-13-gathering.mp3",
         "delay": 500
       },
       "ambient": {
-        "src": "assets/audio/ambient/scene-12-gathering.mp3",
+        "src": "assets/audio/ambient/scene-13-gathering.mp3",
         "volume": 0.2,
         "loop": true
       },
@@ -299,9 +319,9 @@
       "traceOverlay": { "opacity": 0.4, "animation": "room-carry" }
     },
     {
-      "id": "frame-13-credits",
+      "id": "frame-15-credits",
       "frameType": "credits",
-      "image": "assets/images/frame-13-credits.webp",
+      "image": "assets/images/frame-15-credits.webp",
       "advanceMode": "disabled",
       "textMode": "static",
       "persistentVisualState": "machine-running",
