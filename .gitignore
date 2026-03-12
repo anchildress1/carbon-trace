@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Coverage
+coverage/
+
+# Playwright
+playwright-report/
+playwright-results/
+
+# Lighthouse
+.lighthouseci/
+
+# Secrets baseline
+.secrets.baseline
+.secrets.baseline.tmp
+
+# Trivy
+results.sarif
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Originals (high-res source images, not deployed)
+originals/

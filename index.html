@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="carbon-trace — an immersive visual narrative" />
+    <title>carbon-trace</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="app" role="application" aria-label="carbon-trace visual narrative">
+      <div class="loading-screen" id="loading-screen">
+        <p>Loading...</p>
+      </div>
+
+      <div class="scene-stage" id="scene-stage" hidden>
+        <img class="scene-image" id="scene-image" alt="" />
+        <div class="trace-overlay" id="trace-overlay"></div>
+        <div class="effects-layer" id="effects-layer"></div>
+        <div class="narration-layer" id="narration-layer"></div>
+      </div>
+
+      <div class="overlay-controls" id="overlay-controls" hidden>
+        <div
+          class="progress-dots"
+          id="progress-dots"
+          role="group"
+          aria-label="Scene progress"
+        ></div>
+        <div class="control-buttons">
+          <button class="btn-replay" id="btn-replay" aria-label="Replay narration" hidden>
+            <span aria-hidden="true">&#x21bb;</span>
+          </button>
+          <button class="btn-mute" id="btn-mute" aria-label="Mute audio">
+            <span aria-hidden="true">&#x1f50a;</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="sr-only" aria-live="polite" id="accessible-narration"></div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
