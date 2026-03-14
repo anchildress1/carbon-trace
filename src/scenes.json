@@ -299,29 +299,9 @@
       "traceOverlay": { "opacity": 0.35, "animation": "illumination-spread" }
     },
     {
-      "id": "scene-13-gathering",
-      "frameType": "scene",
-      "image": "assets/images/scene-13-gathering.webp",
-      "advanceMode": "click",
-      "textMode": "ghost-drift",
-      "narration": {
-        "lines": [],
-        "audio": "assets/audio/narration/scene-13-gathering.mp3",
-        "delay": 500
-      },
-      "ambient": {
-        "src": "assets/audio/ambient/scene-13-gathering.mp3",
-        "volume": 0.2,
-        "loop": true
-      },
-      "effects": { "idle": "room-carry", "entry": "fade-in" },
-      "transition": { "type": "fade", "duration": 1200 },
-      "traceOverlay": { "opacity": 0.4, "animation": "room-carry" }
-    },
-    {
-      "id": "frame-15-credits",
+      "id": "frame-14-credits",
       "frameType": "credits",
-      "image": "assets/images/frame-15-credits.webp",
+      "image": "assets/images/frame-14-credits.webp",
       "advanceMode": "disabled",
       "textMode": "static",
       "persistentVisualState": "machine-running",
