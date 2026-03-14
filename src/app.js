@@ -38,10 +38,10 @@ function preloadAudio(src) {
   return new Promise((resolve) => {
     const audio = new Audio();
     audio.preload = 'auto';
-    audio.oncanplaythrough = resolve;
+    audio.oncanplaythrough = () => resolve(src);
     audio.onerror = () => {
       console.warn(`Failed to preload audio: ${src}`);
-      resolve();
+      resolve(null);
     };
     audio.src = src;
   });
@@ -67,11 +67,20 @@ function collectAudioSrcs(frames) {
 
 function preloadAssets(app) {
   const imagePromises = app.frames.map((frame) => preloadImage(frame.image));
-  const audioPromises = [...collectAudioSrcs(app.frames)].map(preloadAudio);
+  const audioPromises = [...collectAudioSrcs(app.frames)].map((src) =>
+    preloadAudio(src).then((loaded) => {
+      if (loaded) app.availableAudio.add(loaded);
+    }),
+  );
   return Promise.all([...imagePromises, ...audioPromises]);
 }
 
 function applyNarration(app, frame) {
+  if (app.narrationTimer) {
+    clearTimeout(app.narrationTimer);
+    app.narrationTimer = null;
+  }
+
   if (!frame.narration) {
     app.els.accessibleNarration.textContent = '';
     app.els.btnReplay.hidden = true;
@@ -79,6 +88,7 @@ function applyNarration(app, frame) {
   }
 
   const hasLines = Array.isArray(frame.narration.lines) && frame.narration.lines.length > 0;
+  const hasAudio = Boolean(frame.narration.audio && app.availableAudio.has(frame.narration.audio));
 
   if (hasLines) {
     buildTextTimeline(frame.narration.lines, app.els.narrationLayer, prefersReducedMotion());
@@ -87,10 +97,19 @@ function applyNarration(app, frame) {
     app.els.accessibleNarration.textContent = '';
   }
 
-  if (frame.narration.audio) {
+  if (hasLines || hasAudio) {
     app.els.btnReplay.hidden = false;
-    const delay = frame.narration.delay || 0;
-    setTimeout(() => playNarration(frame.narration.audio), delay);
+    if (hasAudio) {
+      const delay = frame.narration.delay || 0;
+      if (delay > 0) {
+        app.narrationTimer = setTimeout(() => {
+          app.narrationTimer = null;
+          playNarration(frame.narration.audio);
+        }, delay);
+      } else {
+        playNarration(frame.narration.audio);
+      }
+    }
   } else {
     if (document.activeElement === app.els.btnReplay) {
       app.els.btnMute.focus();
@@ -175,6 +194,11 @@ function transition(app, toIndex) {
   if (app.phaseTimer) {
     clearTimeout(app.phaseTimer);
     app.phaseTimer = null;
+  }
+
+  if (app.narrationTimer) {
+    clearTimeout(app.narrationTimer);
+    app.narrationTimer = null;
   }
 
   const toFrame = app.frames[toIndex];
@@ -262,14 +286,10 @@ function initApp(app) {
       app.els.btnReplay.addEventListener('click', (e) => {
         e.stopPropagation();
         const frame = app.frames[app.currentIndex];
-        if (frame.narration?.audio) {
-          if (frame.narration.lines?.length > 0) {
-            buildTextTimeline(
-              frame.narration.lines,
-              app.els.narrationLayer,
-              prefersReducedMotion(),
-            );
-          }
+        if (frame.narration?.lines?.length > 0) {
+          buildTextTimeline(frame.narration.lines, app.els.narrationLayer, prefersReducedMotion());
+        }
+        if (frame.narration?.audio && app.availableAudio.has(frame.narration.audio)) {
           playNarration(frame.narration.audio);
         }
       });
@@ -306,6 +326,8 @@ export function createApp() {
     state: State.LOADING,
     muted: false,
     phaseTimer: null,
+    narrationTimer: null,
+    availableAudio: new Set(),
     els: {
       loadingScreen: document.getElementById('loading-screen'),
       sceneStage: document.getElementById('scene-stage'),

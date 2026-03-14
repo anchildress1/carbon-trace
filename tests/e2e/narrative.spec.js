@@ -70,6 +70,17 @@ test.describe('carbon-trace narrative', () => {
     await expect(replayBtn).toBeVisible();
   });
 
+  test('replay button is hidden after advancing to audio-only scene', async ({ page }) => {
+    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+
+    // scene-02 has narration.audio but no lines and no audio files — button must be hidden
+    await page.click('#app');
+    await page.waitForTimeout(1500); // wait for transition
+
+    const replayBtn = page.locator('#btn-replay');
+    await expect(replayBtn).toBeHidden();
+  });
+
   test('clicking replay button does not advance the scene', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
     await page.locator('#btn-replay').waitFor({ state: 'visible', timeout: 3000 });
