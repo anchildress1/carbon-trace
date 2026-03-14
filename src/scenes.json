@@ -9,6 +9,7 @@
     {
       "id": "frame-00-title",
       "frameType": "title",
+      "description": "carbon-trace — title screen",
       "image": "assets/images/frame-00-title.webp",
       "advanceMode": "click",
       "textMode": "static",
@@ -21,6 +22,7 @@
     {
       "id": "scene-01-buried",
       "frameType": "scene",
+      "description": "A compressed coal seam layered deep in the earth — carbon buried under immense pressure",
       "image": "assets/images/scene-01-seam.webp",
       "advanceMode": "click",
       "textMode": "ghost-drift",
@@ -52,6 +54,7 @@
     {
       "id": "scene-02-moved",
       "frameType": "scene",
+      "description": "Carbon in transit — materials moving across landscape and distance",
       "image": "assets/images/scene-02-travel.webp",
       "advanceMode": "click",
       "textMode": "ghost-drift",
@@ -72,6 +75,7 @@
     {
       "id": "scene-03-oven-threshold",
       "frameType": "scene",
+      "description": "A hand reaching toward an oven — carbon released as heat at the threshold of use",
       "image": "assets/images/scene-03-reach.webp",
       "advanceMode": "click",
       "textMode": "ghost-drift",
@@ -92,6 +96,7 @@
     {
       "id": "scene-04-pocket",
       "frameType": "scene",
+      "description": "An object held close in a pocket — carbon carried as something personal and small",
       "image": "assets/images/scene-04-pocket.webp",
       "advanceMode": "click",
       "textMode": "ghost-drift",
@@ -112,6 +117,7 @@
     {
       "id": "scene-05-keeper",
       "frameType": "scene",
+      "description": "Keeping and tending — carbon held in the hands of someone who preserves it",
       "image": "assets/images/scene-05-keeper.webp",
       "advanceMode": "click",
       "textMode": "ghost-drift",
@@ -132,6 +138,7 @@
     {
       "id": "scene-06-rinse",
       "frameType": "scene",
+      "description": "Water flowing over surfaces — carbon entering the water cycle through daily use",
       "image": "assets/images/scene-06-rinse.webp",
       "advanceMode": "click",
       "textMode": "ghost-drift",
@@ -152,6 +159,7 @@
     {
       "id": "scene-07-storage",
       "frameType": "scene",
+      "description": "Dusty containers in a storage space — carbon quietly accumulated and set aside",
       "image": "assets/images/scene-07-storage.webp",
       "advanceMode": "click",
       "textMode": "ghost-drift",
@@ -172,6 +180,7 @@
     {
       "id": "scene-08-passage",
       "frameType": "scene",
+      "description": "A passage through time — carbon carried across generations as a family story",
       "image": "assets/images/scene-08-passage.webp",
       "advanceMode": "auto-hold",
       "textMode": "ghost-drift",
@@ -221,6 +230,7 @@
     {
       "id": "scene-09-stillness",
       "frameType": "scene",
+      "description": "A still and quiet moment — carbon suspended in silence, barely moving",
       "image": "assets/images/scene-09-stillness.webp",
       "advanceMode": "click",
       "textMode": "ghost-drift",
@@ -241,6 +251,7 @@
     {
       "id": "scene-10-return",
       "frameType": "scene",
+      "description": "A return journey — carbon cycling back, tracing the path it came from",
       "image": "assets/images/scene-10-return.webp",
       "advanceMode": "click",
       "textMode": "ghost-drift",
@@ -261,6 +272,7 @@
     {
       "id": "scene-11-device",
       "frameType": "scene",
+      "description": "Electronic assembly in a building — carbon embedded into devices and infrastructure",
       "image": "assets/images/scene-11-building.webp",
       "advanceMode": "click",
       "textMode": "ghost-drift",
@@ -281,6 +293,7 @@
     {
       "id": "scene-12-activation",
       "frameType": "scene",
+      "description": "Light and music spreading outward — carbon activated and released into the world",
       "image": "assets/images/scene-12-music.webp",
       "advanceMode": "click",
       "textMode": "ghost-drift",
@@ -301,6 +314,7 @@
     {
       "id": "frame-14-credits",
       "frameType": "credits",
+      "description": "carbon-trace credits — end of the visual narrative",
       "image": "assets/images/frame-14-credits.webp",
       "advanceMode": "disabled",
       "textMode": "static",

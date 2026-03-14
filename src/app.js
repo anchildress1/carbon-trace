@@ -117,7 +117,7 @@ function showFrame(app, index) {
 
   const frame = app.frames[index];
   app.els.sceneImage.src = frame.image;
-  app.els.sceneImage.alt = `Scene: ${frame.id}`;
+  app.els.sceneImage.alt = frame.description || '';
   app.els.traceOverlay.style.opacity = frame.traceOverlay?.opacity ?? 0;
 
   clearEffects(app.els.effectsLayer);

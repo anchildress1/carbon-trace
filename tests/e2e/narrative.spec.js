@@ -79,6 +79,31 @@ test.describe('carbon-trace narrative', () => {
     await expect(replayBtn).toBeVisible({ timeout: 3000 });
   });
 
+  test('clicking replay button does not advance the scene', async ({ page }) => {
+    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+
+    // Advance to first scene so replay button is visible
+    await page.click('#app');
+    await page.locator('#btn-replay').waitFor({ state: 'visible', timeout: 3000 });
+
+    const image = page.locator('#scene-image');
+    const srcBeforeReplay = await image.getAttribute('src');
+
+    await page.click('#btn-replay');
+
+    // src must not change — replay does not navigate
+    await expect(image).toHaveAttribute('src', srcBeforeReplay);
+  });
+
+  test('scene image has non-empty alt text after advancing to first scene', async ({ page }) => {
+    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+
+    await page.click('#app');
+
+    const image = page.locator('#scene-image');
+    await expect(image).not.toHaveAttribute('alt', '');
+  });
+
   test('mute button aria-label toggles between mute and unmute', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
