@@ -92,6 +92,9 @@ function applyNarration(app, frame) {
     const delay = frame.narration.delay || 0;
     setTimeout(() => playNarration(frame.narration.audio), delay);
   } else {
+    if (document.activeElement === app.els.btnReplay) {
+      app.els.btnMute.focus();
+    }
     app.els.btnReplay.hidden = true;
   }
 }
@@ -175,6 +178,18 @@ function transition(app, toIndex) {
   }
 
   const toFrame = app.frames[toIndex];
+
+  if (prefersReducedMotion()) {
+    try {
+      app.currentIndex = toIndex;
+      showFrame(app, toIndex);
+    } catch (err) {
+      console.error('Error during scene transition:', err);
+    }
+    app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
+    return;
+  }
+
   const transitionConfig = toFrame.transition || scenesData.meta.defaultTransition;
   const halfDuration = transitionConfig.duration / 2000;
 
