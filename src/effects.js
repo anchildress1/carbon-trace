@@ -135,6 +135,49 @@ const effects = {
   'fade-in': (container) => {
     gsap.fromTo(container, { opacity: 0 }, { opacity: 1, duration: 0.8, ease: 'power2.out' });
   },
+
+  'dust-settle': (container) => {
+    for (let i = 0; i < 10; i++) {
+      const particle = document.createElement('div');
+      particle.style.cssText = `
+        position: absolute;
+        width: 2px;
+        height: 2px;
+        background: rgba(200, 190, 170, 0.2);
+        border-radius: 50%;
+        left: ${Math.random() * 100}%;
+        top: ${Math.random() * 50}%;
+      `;
+      container.appendChild(particle);
+
+      gsap.to(particle, {
+        x: `+=${(Math.random() - 0.5) * 20}`,
+        y: `+=${20 + Math.random() * 30}`,
+        opacity: 0,
+        duration: 5 + Math.random() * 4,
+        repeat: -1,
+        ease: 'none',
+      });
+    }
+  },
+
+  'water-run': (container) => {
+    const stream = document.createElement('div');
+    stream.style.cssText = `
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, transparent 40%);
+      transform: translateY(-100%);
+    `;
+    container.appendChild(stream);
+
+    gsap.to(stream, {
+      y: '200%',
+      duration: 3,
+      repeat: -1,
+      ease: 'none',
+    });
+  },
 };
 
 export function runEffect(name, container) {

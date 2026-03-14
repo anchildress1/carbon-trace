@@ -14,7 +14,7 @@ test.describe('carbon-trace narrative', () => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
     const dots = page.locator('.progress-dot');
-    await expect(dots).toHaveCount(10);
+    await expect(dots).toHaveCount(13);
   });
 
   test('has accessible narration region', async ({ page }) => {
@@ -37,10 +37,8 @@ test.describe('carbon-trace narrative', () => {
     const initialSrc = await image.getAttribute('src');
 
     await page.click('#app');
-    await page.waitForTimeout(2000);
 
-    const newSrc = await image.getAttribute('src');
-    expect(newSrc).not.toBe(initialSrc);
+    await expect(image).not.toHaveAttribute('src', initialSrc);
   });
 
   test('advances scene on keyboard Space', async ({ page }) => {
@@ -50,9 +48,7 @@ test.describe('carbon-trace narrative', () => {
     const initialSrc = await image.getAttribute('src');
 
     await page.keyboard.press('Space');
-    await page.waitForTimeout(2000);
 
-    const newSrc = await image.getAttribute('src');
-    expect(newSrc).not.toBe(initialSrc);
+    await expect(image).not.toHaveAttribute('src', initialSrc);
   });
 });

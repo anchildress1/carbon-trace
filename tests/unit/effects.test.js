@@ -118,6 +118,20 @@ describe('effects.js', () => {
       );
     });
 
+    it('runs dust-settle effect and creates particles', () => {
+      runEffect('dust-settle', container);
+
+      expect(container.children.length).toBe(10);
+      expect(gsap.to).toHaveBeenCalled();
+    });
+
+    it('runs water-run effect and creates stream element', () => {
+      runEffect('water-run', container);
+
+      expect(container.children.length).toBe(1);
+      expect(gsap.to).toHaveBeenCalled();
+    });
+
     it('warns for unknown effect name', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       runEffect('nonexistent', container);

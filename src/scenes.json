@@ -21,7 +21,7 @@
     {
       "id": "scene-01-buried",
       "frameType": "scene",
-      "image": "assets/images/scene-01-buried.webp",
+      "image": "assets/images/scene-01-seam.jpg",
       "advanceMode": "click",
       "textMode": "ghost-drift",
       "narration": {
@@ -52,7 +52,7 @@
     {
       "id": "scene-02-moved",
       "frameType": "scene",
-      "image": "assets/images/scene-02-moved.webp",
+      "image": "assets/images/scene-02-travel.jpg",
       "advanceMode": "click",
       "textMode": "ghost-drift",
       "narration": {
@@ -72,7 +72,7 @@
     {
       "id": "scene-03-oven-threshold",
       "frameType": "scene",
-      "image": "assets/images/scene-03-oven-threshold.webp",
+      "image": "assets/images/scene-03-reach.jpg",
       "advanceMode": "click",
       "textMode": "ghost-drift",
       "narration": {
@@ -261,7 +261,7 @@
     {
       "id": "scene-11-device",
       "frameType": "scene",
-      "image": "assets/images/scene-11-device.webp",
+      "image": "assets/images/scene-11-building.jpg",
       "advanceMode": "click",
       "textMode": "ghost-drift",
       "narration": {
@@ -281,7 +281,7 @@
     {
       "id": "scene-12-activation",
       "frameType": "scene",
-      "image": "assets/images/scene-12-activation.webp",
+      "image": "assets/images/scene-12-music.jpg",
       "advanceMode": "click",
       "textMode": "ghost-drift",
       "narration": {
