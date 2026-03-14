@@ -14,7 +14,7 @@ test.describe('carbon-trace narrative', () => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
     const dots = page.locator('.progress-dot');
-    await expect(dots).toHaveCount(12);
+    await expect(dots).toHaveCount(11);
   });
 
   test('has accessible narration region', async ({ page }) => {

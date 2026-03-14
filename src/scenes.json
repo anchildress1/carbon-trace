@@ -165,69 +165,19 @@
       "traceOverlay": { "opacity": 0.2, "animation": "dust-settle" }
     },
     {
-      "id": "scene-08-passage",
-      "frameType": "scene",
-      "description": "A passage through time — carbon carried across generations as a family story",
-      "image": "assets/images/scene-08-passage.webp",
-      "advanceMode": "auto-hold",
-      "textMode": "ghost-drift",
-      "narration": null,
-      "ambient": null,
-      "effects": null,
-      "phases": [
-        {
-          "id": "story",
-          "duration": 8000,
-          "textMode": "ghost-drift",
-          "narration": {
-            "lines": [
-              {
-                "text": "She told the story the way her mother told it.",
-                "enter": 0,
-                "exit": 4000
-              },
-              { "text": "Then her daughter told it differently.", "enter": 3000, "exit": 7000 }
-            ],
-            "audio": "assets/audio/narration/scene-08-story.mp3"
-          },
-          "ambient": { "src": "assets/audio/ambient/house-night.mp3", "volume": 0.1, "loop": true }
-        },
-        {
-          "id": "time-passing",
-          "duration": 10000,
-          "textMode": "ghost-drift",
-          "narration": {
-            "lines": [{ "text": "Years wore the telling thin.", "enter": 0, "exit": 5000 }],
-            "audio": "assets/audio/narration/scene-08-time.mp3"
-          },
-          "ambient": { "src": "assets/audio/ambient/house-aging.mp3", "volume": 0.08, "loop": true }
-        },
-        {
-          "id": "stillness",
-          "duration": 5000,
-          "textMode": "none",
-          "narration": null,
-          "ambient": null,
-          "effects": []
-        }
-      ],
-      "transition": { "type": "fade", "duration": 1500 },
-      "traceOverlay": { "opacity": 0.2, "animation": "tin-glow" }
-    },
-    {
-      "id": "scene-09-stillness",
+      "id": "scene-08-stillness",
       "frameType": "scene",
       "description": "A still and quiet moment — carbon suspended in silence, barely moving",
-      "image": "assets/images/scene-09-stillness.webp",
+      "image": "assets/images/scene-08-stillness.webp",
       "advanceMode": "click",
       "textMode": "ghost-drift",
       "narration": {
         "lines": [],
-        "audio": "assets/audio/narration/scene-09-stillness.mp3",
+        "audio": "assets/audio/narration/scene-08-stillness.mp3",
         "delay": 500
       },
       "ambient": {
-        "src": "assets/audio/ambient/scene-09-stillness.mp3",
+        "src": "assets/audio/ambient/scene-08-stillness.mp3",
         "volume": 0.08,
         "loop": true
       },
@@ -236,19 +186,19 @@
       "traceOverlay": { "opacity": 0.1, "animation": "near-still-pulse" }
     },
     {
-      "id": "scene-10-return",
+      "id": "scene-09-return",
       "frameType": "scene",
       "description": "A return journey — carbon cycling back, tracing the path it came from",
-      "image": "assets/images/scene-10-return.webp",
+      "image": "assets/images/scene-09-return.webp",
       "advanceMode": "click",
       "textMode": "ghost-drift",
       "narration": {
         "lines": [],
-        "audio": "assets/audio/narration/scene-10-return.mp3",
+        "audio": "assets/audio/narration/scene-09-return.mp3",
         "delay": 500
       },
       "ambient": {
-        "src": "assets/audio/ambient/scene-10-return.mp3",
+        "src": "assets/audio/ambient/scene-09-return.mp3",
         "volume": 0.12,
         "loop": true
       },
@@ -257,19 +207,19 @@
       "traceOverlay": { "opacity": 0.25, "animation": "light-crack" }
     },
     {
-      "id": "scene-11-device",
+      "id": "scene-10-device",
       "frameType": "scene",
       "description": "Electronic assembly in a building — carbon embedded into devices and infrastructure",
-      "image": "assets/images/scene-11-building.webp",
+      "image": "assets/images/scene-10-building.webp",
       "advanceMode": "click",
       "textMode": "ghost-drift",
       "narration": {
         "lines": [],
-        "audio": "assets/audio/narration/scene-11-device.mp3",
+        "audio": "assets/audio/narration/scene-10-device.mp3",
         "delay": 500
       },
       "ambient": {
-        "src": "assets/audio/ambient/scene-11-device.mp3",
+        "src": "assets/audio/ambient/scene-10-device.mp3",
         "volume": 0.15,
         "loop": true
       },
@@ -278,19 +228,19 @@
       "traceOverlay": { "opacity": 0.3, "animation": "assembly-micro" }
     },
     {
-      "id": "scene-12-activation",
+      "id": "scene-11-activation",
       "frameType": "scene",
       "description": "Light and music spreading outward — carbon activated and released into the world",
-      "image": "assets/images/scene-12-music.webp",
+      "image": "assets/images/scene-11-music.webp",
       "advanceMode": "click",
       "textMode": "ghost-drift",
       "narration": {
         "lines": [],
-        "audio": "assets/audio/narration/scene-12-activation.mp3",
+        "audio": "assets/audio/narration/scene-11-activation.mp3",
         "delay": 500
       },
       "ambient": {
-        "src": "assets/audio/ambient/scene-12-activation.mp3",
+        "src": "assets/audio/ambient/scene-11-activation.mp3",
         "volume": 0.18,
         "loop": true
       },
@@ -299,10 +249,10 @@
       "traceOverlay": { "opacity": 0.35, "animation": "illumination-spread" }
     },
     {
-      "id": "frame-14-credits",
+      "id": "frame-12-credits",
       "frameType": "credits",
       "description": "carbon-trace credits — end of the visual narrative",
-      "image": "assets/images/frame-14-credits.webp",
+      "image": "assets/images/frame-12-credits.webp",
       "advanceMode": "disabled",
       "textMode": "static",
       "persistentVisualState": "machine-running",
