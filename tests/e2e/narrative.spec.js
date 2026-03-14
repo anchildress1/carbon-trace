@@ -63,27 +63,15 @@ test.describe('carbon-trace narrative', () => {
     expect(content).toContain("connect-src 'none'");
   });
 
-  test('replay button is hidden on title frame', async ({ page }) => {
+  test('replay button is visible on initial scene load', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
     const replayBtn = page.locator('#btn-replay');
-    await expect(replayBtn).toBeHidden();
-  });
-
-  test('replay button appears after advancing to first scene', async ({ page }) => {
-    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
-
-    await page.click('#app');
-
-    const replayBtn = page.locator('#btn-replay');
-    await expect(replayBtn).toBeVisible({ timeout: 3000 });
+    await expect(replayBtn).toBeVisible();
   });
 
   test('clicking replay button does not advance the scene', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
-
-    // Advance to first scene so replay button is visible
-    await page.click('#app');
     await page.locator('#btn-replay').waitFor({ state: 'visible', timeout: 3000 });
 
     const image = page.locator('#scene-image');
@@ -95,13 +83,33 @@ test.describe('carbon-trace narrative', () => {
     await expect(image).toHaveAttribute('src', srcBeforeReplay);
   });
 
-  test('scene image has non-empty alt text after advancing to first scene', async ({ page }) => {
+  test('clicking replay restores narration text elements', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await page.locator('#btn-replay').waitFor({ state: 'visible', timeout: 3000 });
 
-    await page.click('#app');
+    // Scene 1 has narration lines — after replay, lines must be present in the DOM
+    await page.click('#btn-replay');
+
+    const lines = page.locator('.narration-line');
+    await expect(lines).not.toHaveCount(0);
+  });
+
+  test('scene image has non-empty alt text on initial load', async ({ page }) => {
+    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
     const image = page.locator('#scene-image');
     await expect(image).not.toHaveAttribute('alt', '');
+  });
+
+  test('scene image alt text changes when scene advances', async ({ page }) => {
+    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+
+    const image = page.locator('#scene-image');
+    const initialAlt = await image.getAttribute('alt');
+
+    await page.click('#app');
+
+    await expect(image).not.toHaveAttribute('alt', initialAlt ?? '');
   });
 
   test('mute button aria-label toggles between mute and unmute', async ({ page }) => {

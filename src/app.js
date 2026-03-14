@@ -251,7 +251,7 @@ function initApp(app) {
       showControls();
 
       showFrame(app, 0);
-      app.state = State.TITLE;
+      app.state = State.SCENE_ACTIVE;
 
       document.addEventListener('click', (e) => handleInput(app, e));
       document.addEventListener('keydown', (e) => handleInput(app, e));
@@ -263,6 +263,13 @@ function initApp(app) {
         e.stopPropagation();
         const frame = app.frames[app.currentIndex];
         if (frame.narration?.audio) {
+          if (frame.narration.lines?.length > 0) {
+            buildTextTimeline(
+              frame.narration.lines,
+              app.els.narrationLayer,
+              prefersReducedMotion(),
+            );
+          }
           playNarration(frame.narration.audio);
         }
       });

@@ -7,19 +7,6 @@
   },
   "frames": [
     {
-      "id": "frame-00-title",
-      "frameType": "title",
-      "description": "carbon-trace — title screen",
-      "image": "assets/images/frame-00-title.webp",
-      "advanceMode": "click",
-      "textMode": "static",
-      "narration": null,
-      "ambient": null,
-      "effects": null,
-      "transition": { "type": "fade", "duration": 1500 },
-      "traceOverlay": null
-    },
-    {
       "id": "scene-01-buried",
       "frameType": "scene",
       "description": "A compressed coal seam layered deep in the earth — carbon buried under immense pressure",
