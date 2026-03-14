@@ -135,8 +135,12 @@ function showFrame(app, index) {
   }
 
   const frame = app.frames[index];
-  app.els.sceneImage.src = frame.image;
   app.els.sceneImage.alt = frame.description || '';
+  if (frame.image) {
+    app.els.sceneImage.src = frame.image;
+  } else {
+    app.els.sceneImage.removeAttribute('src');
+  }
   app.els.traceOverlay.style.opacity = frame.traceOverlay?.opacity ?? 0;
 
   clearEffects(app.els.effectsLayer);
@@ -169,7 +173,7 @@ function startPhase(app, frame, pi) {
     buildTextTimeline(phase.narration.lines, app.els.narrationLayer, prefersReducedMotion());
     app.els.accessibleNarration.textContent = phase.narration.lines.map((l) => l.text).join(' ');
 
-    if (phase.narration.audio) {
+    if (phase.narration.audio && app.availableAudio.has(phase.narration.audio)) {
       playNarration(phase.narration.audio);
     }
   }
@@ -260,19 +264,24 @@ function handleInput(app, e) {
 function toggleMute(app) {
   app.muted = !app.muted;
   setMuted(app.muted);
-  const icon = app.els.btnMute.querySelector('span');
-  if (icon) {
-    icon.textContent = app.muted ? '\u{1F507}' : '\u{1F50A}';
-  }
+  app.els.btnMute.classList.toggle('muted', app.muted);
   app.els.btnMute.setAttribute('aria-label', app.muted ? 'Unmute audio' : 'Mute audio');
 }
 
 function initApp(app) {
+  app.els.sceneImage.addEventListener('error', () => {
+    app.els.sceneImage.removeAttribute('src');
+  });
+
   preloadAssets(app)
     .then(() => {
       app.els.loadingScreen.hidden = true;
       app.els.sceneStage.hidden = false;
       showControls();
+
+      if (app.availableAudio.size > 0) {
+        app.els.btnMute.disabled = false;
+      }
 
       showFrame(app, 0);
       app.state = State.SCENE_ACTIVE;

@@ -56,6 +56,11 @@ body {
   inset: 0;
 }
 
+.scene-image:not([src]),
+.scene-image[src=''] {
+  display: none;
+}
+
 .trace-overlay {
   position: absolute;
   inset: 0;
@@ -128,25 +133,51 @@ body {
 }
 
 .control-buttons button {
-  background: rgba(0, 0, 0, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(8, 8, 8, 0.6);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 50%;
-  width: 36px;
-  height: 36px;
-  color: #fff;
-  font-size: 1rem;
+  width: 40px;
+  height: 40px;
+  color: rgba(232, 228, 223, 0.9);
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition:
+    background 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease,
+    opacity 0.25s ease;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.control-buttons button:hover,
-.control-buttons button:focus-visible {
-  background: rgba(0, 0, 0, 0.5);
-  outline: 2px solid rgba(255, 255, 255, 0.5);
-  outline-offset: 2px;
+.control-buttons button:hover:not(:disabled),
+.control-buttons button:focus-visible:not(:disabled) {
+  background: rgba(30, 28, 25, 0.75);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.control-buttons button:focus-visible:not(:disabled) {
+  outline: 2px solid rgba(255, 255, 255, 0.45);
+  outline-offset: 3px;
+}
+
+.control-buttons button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.btn-mute .icon-muted {
+  display: none;
+}
+
+.btn-mute.muted .icon-on {
+  display: none;
+}
+
+.btn-mute.muted .icon-muted {
+  display: flex;
 }
 
 /* Accessibility */
