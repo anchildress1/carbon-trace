@@ -41,33 +41,33 @@ test.describe('carbon-trace narrative', () => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
     const image = page.locator('#scene-image');
-    const initialSrc = await image.getAttribute('src');
+    const srcBefore = await image.getAttribute('src');
 
     await page.click('#scene-stage');
 
-    await expect(image).toHaveAttribute('src', initialSrc ?? '');
+    // src must remain unchanged — click triggers effect, not navigation
+    const srcAfter = await image.getAttribute('src');
+    expect(srcAfter).toBe(srcBefore);
   });
 
   test('forward button advances scene', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
-    const image = page.locator('#scene-image');
-    const initialSrc = await image.getAttribute('src');
-
+    // Title frame has no image — advancing should load scene-01 image
     await page.click('#btn-next');
 
-    await expect(image).not.toHaveAttribute('src', initialSrc ?? '');
+    const image = page.locator('#scene-image');
+    await expect(image).toHaveAttribute('src', /scene-01/);
   });
 
   test('advances scene on keyboard Space', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
-    const image = page.locator('#scene-image');
-    const initialSrc = await image.getAttribute('src');
-
+    // Title frame has no image — Space should advance to scene-01
     await page.keyboard.press('Space');
 
-    await expect(image).not.toHaveAttribute('src', initialSrc);
+    const image = page.locator('#scene-image');
+    await expect(image).toHaveAttribute('src', /scene-01/);
   });
 
   test('has Content-Security-Policy meta tag with required directives', async ({ page }) => {
@@ -106,12 +106,13 @@ test.describe('carbon-trace narrative', () => {
     await page.locator('#btn-replay').waitFor({ state: 'visible', timeout: 3000 });
 
     const image = page.locator('#scene-image');
-    const srcBeforeReplay = await image.getAttribute('src');
+    const srcBefore = await image.getAttribute('src');
 
     await page.click('#btn-replay');
 
     // src must not change — replay does not navigate
-    await expect(image).toHaveAttribute('src', srcBeforeReplay);
+    const srcAfter = await image.getAttribute('src');
+    expect(srcAfter).toBe(srcBefore);
   });
 
   test('clicking replay restores narration text elements', async ({ page }) => {
@@ -167,22 +168,20 @@ test.describe('carbon-trace narrative — prefers-reduced-motion', () => {
   test('forward button advances scene when reduced motion is set', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
-    const image = page.locator('#scene-image');
-    const initialSrc = await image.getAttribute('src');
-
+    // Title frame has no image — advancing should load scene-01 image
     await page.click('#btn-next');
 
-    await expect(image).not.toHaveAttribute('src', initialSrc ?? '');
+    const image = page.locator('#scene-image');
+    await expect(image).toHaveAttribute('src', /scene-01/);
   });
 
   test('advances scene on keyboard Space when reduced motion is set', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
-    const image = page.locator('#scene-image');
-    const initialSrc = await image.getAttribute('src');
-
+    // Title frame has no image — Space should advance to scene-01
     await page.keyboard.press('Space');
 
-    await expect(image).not.toHaveAttribute('src', initialSrc);
+    const image = page.locator('#scene-image');
+    await expect(image).toHaveAttribute('src', /scene-01/);
   });
 });
