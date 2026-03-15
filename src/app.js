@@ -257,6 +257,7 @@ function transition(app, toIndex) {
         showFrame(app, toIndex);
       } catch (err) {
         console.error('Error during scene transition:', err);
+        gsap.set(app.els.sceneStage, { opacity: 1 });
         app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
         return;
       }
