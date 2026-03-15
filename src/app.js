@@ -80,7 +80,9 @@ function collectAudioSrcs(frames) {
 }
 
 function preloadAssets(app) {
-  const imagePromises = app.frames.map((frame) => preloadImage(frame.image));
+  const imagePromises = app.frames
+    .filter((frame) => frame.image)
+    .map((frame) => preloadImage(frame.image));
   const audioPromises = [...collectAudioSrcs(app.frames)].map((src) =>
     preloadAudio(src).then((loaded) => {
       if (loaded) app.availableAudio.add(loaded);
