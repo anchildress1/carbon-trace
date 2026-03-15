@@ -1,4 +1,11 @@
+import { readFileSync } from 'fs';
+import { dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
 import { test, expect } from '@playwright/test';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const scenesData = JSON.parse(readFileSync(resolve(__dirname, '../../src/scenes.json'), 'utf8'));
+const SCENE_COUNT = scenesData.frames.filter((f) => f.frameType === 'scene').length;
 
 test.describe('carbon-trace narrative', () => {
   test.beforeEach(async ({ page }) => {
@@ -14,7 +21,7 @@ test.describe('carbon-trace narrative', () => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
     const dots = page.locator('.progress-dot');
-    await expect(dots).toHaveCount(11);
+    await expect(dots).toHaveCount(SCENE_COUNT);
   });
 
   test('has accessible narration region', async ({ page }) => {

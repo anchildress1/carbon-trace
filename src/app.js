@@ -128,6 +128,15 @@ function applyAmbient(app, frame) {
   }
 }
 
+function buildSceneIndexMap(frames) {
+  const map = new Map();
+  let count = 0;
+  frames.forEach((frame, i) => {
+    if (frame.frameType === 'scene') map.set(i, ++count);
+  });
+  return map;
+}
+
 function showFrame(app, index) {
   if (app.phaseTimer) {
     clearTimeout(app.phaseTimer);
@@ -150,9 +159,9 @@ function showFrame(app, index) {
     runEffect(frame.effects.idle, app.els.effectsLayer);
   }
 
-  if (frame.frameType === 'scene') {
-    const sceneIndex = app.frames.slice(0, index + 1).filter((f) => f.frameType === 'scene').length;
-    updateProgress(sceneIndex);
+  const sceneIdx = app.sceneIndexByFrame.get(index);
+  if (sceneIdx !== undefined) {
+    updateProgress(sceneIdx);
   }
 
   updateNavButtons(app);
@@ -373,6 +382,7 @@ export function createApp() {
 
   const app = {
     frames: scenesData.frames,
+    sceneIndexByFrame: buildSceneIndexMap(scenesData.frames),
     currentIndex: 0,
     state: State.LOADING,
     muted: false,
@@ -395,8 +405,7 @@ export function createApp() {
     },
   };
 
-  const narrativeSceneCount = app.frames.filter((f) => f.frameType === 'scene').length;
-  initOverlay(narrativeSceneCount);
+  initOverlay(app.sceneIndexByFrame.size);
 
   initApp(app);
 

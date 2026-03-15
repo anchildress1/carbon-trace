@@ -11,6 +11,8 @@ export function initOverlay(sceneCount) {
     const dot = document.createElement('span');
     dot.className = 'progress-dot';
     dot.setAttribute('aria-hidden', 'true');
+    dot.dataset.sceneIndex = String(i + 1);
+    dot.setAttribute('title', `Scene ${i + 1} of ${sceneCount}`);
     dotsContainer.appendChild(dot);
     dotElements.push(dot);
   }

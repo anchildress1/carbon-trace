@@ -40,6 +40,16 @@ describe('overlay.js', () => {
       expect(dots[2].getAttribute('aria-hidden')).toBe('true');
     });
 
+    it('sets data-scene-index and title on each dot', () => {
+      initOverlay(3);
+
+      const dots = dotsContainer.querySelectorAll('.progress-dot');
+      expect(dots[0].dataset.sceneIndex).toBe('1');
+      expect(dots[2].dataset.sceneIndex).toBe('3');
+      expect(dots[0].getAttribute('title')).toBe('Scene 1 of 3');
+      expect(dots[2].getAttribute('title')).toBe('Scene 3 of 3');
+    });
+
     it('clears existing dots before creating new ones', () => {
       initOverlay(5);
       initOverlay(3);
