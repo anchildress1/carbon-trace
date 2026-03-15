@@ -14,6 +14,38 @@
   },
   "frames": [
     {
+      "id": "frame-00-title",
+      "frameType": "title",
+      "description": "Title card — opening narration on a dark field",
+      "narration": {
+        "lines": [
+          {
+            "text": "Ima tell you a story.",
+            "enter": 500,
+            "exit": 4500
+          },
+          {
+            "text": "Not because it's special. But 'cause it's mine.",
+            "enter": 2500,
+            "exit": 7000
+          },
+          {
+            "text": "And I was raised to finish what I start.",
+            "enter": 5000,
+            "exit": 9500
+          }
+        ],
+        "delay": 0
+      },
+      "ambient": null,
+      "effects": null,
+      "transition": {
+        "type": "fade",
+        "duration": 1500
+      },
+      "traceOverlay": null
+    },
+    {
       "id": "scene-01-buried",
       "frameType": "scene",
       "description": "A compressed coal seam layered deep in the earth — carbon buried under immense pressure",
