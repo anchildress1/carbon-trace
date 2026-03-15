@@ -50,16 +50,6 @@ describe('effects.js', () => {
       );
     });
 
-    it('runs water-clarity effect', () => {
-      runEffect('water-clarity', container);
-
-      expect(gsap.fromTo).toHaveBeenCalledWith(
-        container,
-        expect.objectContaining({ filter: 'blur(3px)' }),
-        expect.objectContaining({ filter: 'blur(0px)' }),
-      );
-    });
-
     it('runs near-still-pulse effect', () => {
       runEffect('near-still-pulse', container);
 

@@ -65,14 +65,6 @@ const effects = {
     });
   },
 
-  'water-clarity': (container) => {
-    gsap.fromTo(
-      container,
-      { filter: 'blur(3px)' },
-      { filter: 'blur(0px)', duration: 2, ease: 'power2.out' },
-    );
-  },
-
   'light-crack': (container) => {
     const flash = document.createElement('div');
     flash.style.cssText = `
