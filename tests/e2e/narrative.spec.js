@@ -70,6 +70,40 @@ test.describe('carbon-trace narrative', () => {
     await expect(image).toHaveAttribute('src', /scene-01/);
   });
 
+  test('previous button is disabled on first frame', async ({ page }) => {
+    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+
+    const prevBtn = page.locator('#btn-prev');
+    await expect(prevBtn).toBeDisabled();
+  });
+
+  test('previous button navigates back after advancing', async ({ page }) => {
+    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+
+    await page.click('#btn-next');
+    const image = page.locator('#scene-image');
+    await expect(image).toHaveAttribute('src', /scene-01/);
+
+    await page.click('#btn-prev');
+    // Back on title frame — image src is removed
+    const srcAfter = await image.getAttribute('src');
+    expect(srcAfter).toBeNull();
+  });
+
+  test('ArrowLeft navigates back after advancing', async ({ page }) => {
+    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+
+    await page.keyboard.press('ArrowRight');
+    const image = page.locator('#scene-image');
+    await expect(image).toHaveAttribute('src', /scene-01/);
+
+    await page.keyboard.press('ArrowLeft');
+    const srcAfter = await image.getAttribute('src');
+    expect(srcAfter).toBeNull();
+  });
+
   test('has Content-Security-Policy meta tag with required directives', async ({ page }) => {
     const csp = page.locator('meta[http-equiv="Content-Security-Policy"]');
     await expect(csp).toHaveCount(1);
@@ -90,12 +124,17 @@ test.describe('carbon-trace narrative', () => {
 
   test('replay button is hidden after advancing to audio-only scene', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
 
-    // advance past title and scene-01 to reach scene-02 (audio-only, no lines, no audio files)
+    const image = page.locator('#scene-image');
+
+    // advance past title to scene-01
     await page.click('#btn-next');
-    await page.waitForTimeout(1500);
+    await expect(image).toHaveAttribute('src', /scene-01/);
+
+    // advance to scene-02 (no narration lines, audio unavailable in test)
     await page.click('#btn-next');
-    await page.waitForTimeout(1500);
+    await expect(image).toHaveAttribute('src', /scene-02/);
 
     const replayBtn = page.locator('#btn-replay');
     await expect(replayBtn).toBeHidden();
@@ -142,6 +181,30 @@ test.describe('carbon-trace narrative', () => {
     await page.click('#btn-next');
 
     await expect(image).not.toHaveAttribute('alt', initialAlt ?? '');
+  });
+
+  test('forward button is disabled on credits frame', async ({ page }) => {
+    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+
+    // Navigate to credits (last frame) by pressing ArrowRight for each frame
+    for (let i = 0; i < SCENE_COUNT + 1; i++) {
+      await page.keyboard.press('ArrowRight');
+    }
+
+    const nextBtn = page.locator('#btn-next');
+    await expect(nextBtn).toBeDisabled();
+  });
+
+  test('progress dots gain active class as scenes advance', async ({ page }) => {
+    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+
+    const firstDot = page.locator('.progress-dot').first();
+    await expect(firstDot).not.toHaveClass(/active/);
+
+    // Advance past title to scene-01
+    await page.click('#btn-next');
+    await expect(firstDot).toHaveClass(/active/);
   });
 
   test('mute button aria-label toggles between mute and unmute', async ({ page }) => {
