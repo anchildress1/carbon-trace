@@ -360,13 +360,7 @@ function initApp(app) {
       });
       app.els.btnReplay.addEventListener('click', (e) => {
         e.stopPropagation();
-        const frame = app.frames[app.currentIndex];
-        if (frame.narration?.lines?.length > 0) {
-          buildTextTimeline(frame.narration.lines, app.els.narrationLayer, prefersReducedMotion());
-        }
-        if (frame.narration?.audio && app.availableAudio.has(frame.narration.audio)) {
-          playNarration(frame.narration.audio);
-        }
+        applyNarration(app, app.frames[app.currentIndex]);
       });
     })
     .catch((err) => {
