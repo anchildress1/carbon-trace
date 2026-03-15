@@ -104,24 +104,6 @@ const effects = {
     gsap.to(glow, { opacity: 1, scale: 1.5, duration: 3, ease: 'power2.out' });
   },
 
-  'room-carry': (container) => {
-    const sweep = document.createElement('div');
-    sweep.style.cssText = `
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(90deg, rgba(255,255,255,0.08) 0%, transparent 30%);
-      transform: translateX(-100%);
-    `;
-    container.appendChild(sweep);
-
-    gsap.to(sweep, {
-      x: '200%',
-      duration: 5,
-      repeat: -1,
-      ease: 'none',
-    });
-  },
-
   'machine-steady': (container) => {
     gsap.to(container, {
       opacity: 0.95,

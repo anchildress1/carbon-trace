@@ -7,7 +7,6 @@ import { initOverlay, updateProgress, showControls } from './overlay.js';
 
 const State = Object.freeze({
   LOADING: 'LOADING',
-  TITLE: 'TITLE',
   SCENE_ACTIVE: 'SCENE_ACTIVE',
   TRANSITIONING: 'TRANSITIONING',
   CREDITS: 'CREDITS',
@@ -15,7 +14,6 @@ const State = Object.freeze({
 
 const STATE_BY_FRAME_TYPE = {
   credits: State.CREDITS,
-  title: State.TITLE,
 };
 
 function prefersReducedMotion() {

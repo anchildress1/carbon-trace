@@ -92,13 +92,6 @@ describe('effects.js', () => {
       expect(gsap.to).toHaveBeenCalled();
     });
 
-    it('runs room-carry effect', () => {
-      runEffect('room-carry', container);
-
-      expect(container.children.length).toBe(1);
-      expect(gsap.to).toHaveBeenCalled();
-    });
-
     it('runs machine-steady effect', () => {
       runEffect('machine-steady', container);
 
