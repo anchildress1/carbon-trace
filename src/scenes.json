@@ -194,7 +194,7 @@
       "id": "scene-07-stillness",
       "frameType": "scene",
       "description": "A still and quiet moment — carbon suspended in silence, barely moving",
-      "image": "assets/images/scene-07-stillness.webp",
+      "image": "assets/images/scene-07-empty.webp",
       "narration": {
         "lines": [],
         "audio": "assets/audio/narration/scene-07-stillness.mp3",
@@ -248,7 +248,7 @@
       "id": "scene-09-device",
       "frameType": "scene",
       "description": "Electronic assembly in a building — carbon embedded into devices and infrastructure",
-      "image": "assets/images/scene-09-device.webp",
+      "image": "assets/images/scene-09-return.webp",
       "narration": {
         "lines": [],
         "audio": "assets/audio/narration/scene-09-device.mp3",
