@@ -379,6 +379,7 @@ export function createApp() {
     'narration-layer',
     'accessible-narration',
     'overlay-controls',
+    'progress-dots',
     'btn-prev',
     'btn-next',
     'btn-replay',
