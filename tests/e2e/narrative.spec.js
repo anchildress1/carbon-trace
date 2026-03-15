@@ -127,6 +127,9 @@ test.describe('carbon-trace narrative', () => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
     const muteBtn = page.locator('#btn-mute');
+    // Simulate audio being available (no audio files in test environment)
+    await page.evaluate(() => document.getElementById('btn-mute').removeAttribute('aria-disabled'));
+
     await muteBtn.click();
     await expect(muteBtn).toHaveAttribute('aria-label', 'Unmute audio');
 

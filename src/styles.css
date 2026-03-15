@@ -163,7 +163,8 @@ body {
   outline-offset: 3px;
 }
 
-.control-buttons button:disabled {
+.control-buttons button:disabled,
+.control-buttons button[aria-disabled='true'] {
   opacity: 0.3;
   cursor: default;
 }

@@ -300,7 +300,7 @@ function initApp(app) {
       showControls();
 
       if (app.availableAudio.size > 0) {
-        app.els.btnMute.disabled = false;
+        app.els.btnMute.removeAttribute('aria-disabled');
       }
 
       showFrame(app, 0);
@@ -310,6 +310,7 @@ function initApp(app) {
       document.addEventListener('keydown', (e) => handleInput(app, e));
       app.els.btnMute.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (app.els.btnMute.getAttribute('aria-disabled') === 'true') return;
         toggleMute(app);
       });
       app.els.btnPrev.addEventListener('click', (e) => {

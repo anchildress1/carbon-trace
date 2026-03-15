@@ -39,8 +39,8 @@ build:
 	@echo "Building project..."
 	pnpm build
 
-# Run Playwright E2E tests
-e2e:
+# Run Playwright E2E tests (builds first so preview server serves current source)
+e2e: build
 	@echo "Running E2E tests..."
 	pnpm e2e
 
