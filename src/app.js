@@ -52,8 +52,18 @@ function preloadAudio(src) {
   return new Promise((resolve) => {
     const audio = new Audio();
     audio.preload = 'auto';
-    audio.oncanplaythrough = () => resolve(src);
+
+    const timeout = setTimeout(() => {
+      console.warn(`Audio preload timed out: ${src}`);
+      resolve(null);
+    }, 5000);
+
+    audio.oncanplaythrough = () => {
+      clearTimeout(timeout);
+      resolve(src);
+    };
     audio.onerror = () => {
+      clearTimeout(timeout);
       console.warn(`Failed to preload audio: ${src}`);
       resolve(null);
     };
