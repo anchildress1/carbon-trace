@@ -253,7 +253,7 @@
       "id": "scene-08-return",
       "frameType": "scene",
       "description": "A return journey — carbon cycling back, tracing the path it came from",
-      "image": "assets/images/scene-09-return.webp",
+      "image": "assets/images/scene-08-return.webp",
       "narration": {
         "lines": [],
         "audio": "assets/audio/narration/scene-08-return.mp3",
@@ -280,7 +280,7 @@
       "id": "scene-09-device",
       "frameType": "scene",
       "description": "Electronic assembly in a building — carbon embedded into devices and infrastructure",
-      "image": "assets/images/scene-08-stillness.webp",
+      "image": "assets/images/scene-09-device.webp",
       "narration": {
         "lines": [],
         "audio": "assets/audio/narration/scene-09-device.mp3",
