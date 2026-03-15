@@ -88,6 +88,18 @@ function preloadAssets(app) {
   return Promise.all([...imagePromises, ...audioPromises]);
 }
 
+function scheduleNarrationAudio(app, narration) {
+  const delay = narration.delay || 0;
+  if (delay > 0) {
+    app.narrationTimer = setTimeout(() => {
+      app.narrationTimer = null;
+      playNarration(narration.audio);
+    }, delay);
+  } else {
+    playNarration(narration.audio);
+  }
+}
+
 function applyNarration(app, frame) {
   if (app.narrationTimer) {
     clearTimeout(app.narrationTimer);
@@ -113,15 +125,7 @@ function applyNarration(app, frame) {
   if (hasLines || hasAudio) {
     app.els.btnReplay.hidden = false;
     if (hasAudio) {
-      const delay = frame.narration.delay || 0;
-      if (delay > 0) {
-        app.narrationTimer = setTimeout(() => {
-          app.narrationTimer = null;
-          playNarration(frame.narration.audio);
-        }, delay);
-      } else {
-        playNarration(frame.narration.audio);
-      }
+      scheduleNarrationAudio(app, frame.narration);
     }
   } else {
     if (document.activeElement === app.els.btnReplay) {
