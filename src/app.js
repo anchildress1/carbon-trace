@@ -16,6 +16,11 @@ const STATE_BY_FRAME_TYPE = {
   credits: State.CREDITS,
 };
 
+function applyFrameDefaults(scenesJson) {
+  const defaults = scenesJson.meta.frameDefaults || {};
+  return scenesJson.frames.map((frame) => ({ ...defaults, ...frame }));
+}
+
 function prefersReducedMotion() {
   return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
@@ -378,9 +383,11 @@ export function createApp() {
     }
   }
 
+  const frames = applyFrameDefaults(scenesData);
+
   const app = {
-    frames: scenesData.frames,
-    sceneIndexByFrame: buildSceneIndexMap(scenesData.frames),
+    frames,
+    sceneIndexByFrame: buildSceneIndexMap(frames),
     currentIndex: 0,
     state: State.LOADING,
     muted: false,
