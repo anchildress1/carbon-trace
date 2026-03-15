@@ -2,7 +2,7 @@ import { gsap } from 'gsap';
 import scenesData from './scenes.json';
 import { playAmbient, crossfadeAmbient, playNarration, setMuted } from './audio.js';
 import { buildTextTimeline, clearNarrationLayer } from './text.js';
-import { runEffect, clearEffects } from './effects.js';
+import { runEffect, clearEffects, effectExists } from './effects.js';
 import { initOverlay, updateProgress, showControls } from './overlay.js';
 
 const State = Object.freeze({
@@ -15,6 +15,17 @@ const State = Object.freeze({
 const STATE_BY_FRAME_TYPE = {
   credits: State.CREDITS,
 };
+
+function validateEffects(frames) {
+  for (const frame of frames) {
+    for (const key of ['idle', 'entry']) {
+      const name = frame.effects?.[key];
+      if (name && !effectExists(name)) {
+        console.error(`Frame "${frame.id}" references unknown effect "${name}"`);
+      }
+    }
+  }
+}
 
 function applyFrameDefaults(scenesJson) {
   const defaults = scenesJson.meta.frameDefaults || {};
@@ -384,6 +395,7 @@ export function createApp() {
   }
 
   const frames = applyFrameDefaults(scenesData);
+  validateEffects(frames);
 
   const app = {
     frames,

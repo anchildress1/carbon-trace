@@ -9,7 +9,7 @@ vi.mock('gsap', () => ({
   },
 }));
 
-import { runEffect, clearEffects } from '../../src/effects.js';
+import { runEffect, clearEffects, effectExists } from '../../src/effects.js';
 import { gsap } from 'gsap';
 
 describe('effects.js', () => {
@@ -163,6 +163,19 @@ describe('effects.js', () => {
 
     it('handles empty container', () => {
       expect(() => clearEffects(container)).not.toThrow();
+    });
+  });
+
+  describe('effectExists', () => {
+    it('returns true for registered effects', () => {
+      expect(effectExists('dust-drift')).toBe(true);
+      expect(effectExists('fade-in')).toBe(true);
+      expect(effectExists('machine-steady')).toBe(true);
+    });
+
+    it('returns false for unknown effects', () => {
+      expect(effectExists('nonexistent')).toBe(false);
+      expect(effectExists('')).toBe(false);
     });
   });
 });

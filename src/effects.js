@@ -162,6 +162,10 @@ const effects = {
   },
 };
 
+export function effectExists(name) {
+  return name in effects;
+}
+
 export function runEffect(name, container) {
   const fn = effects[name];
   if (fn) {
