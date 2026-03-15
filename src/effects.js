@@ -1,30 +1,41 @@
 import { gsap } from 'gsap';
 
-const effects = {
-  'dust-drift': (container) => {
-    for (let i = 0; i < 12; i++) {
+function particleEffect({ count, color, topRange, xSpread, yDrift, durationRange }) {
+  return (container) => {
+    for (let i = 0; i < count; i++) {
       const particle = document.createElement('div');
       particle.style.cssText = `
         position: absolute;
         width: 2px;
         height: 2px;
-        background: rgba(255, 255, 255, 0.15);
+        background: ${color};
         border-radius: 50%;
         left: ${Math.random() * 100}%;
-        top: ${Math.random() * 100}%;
+        top: ${Math.random() * topRange}%;
       `;
       container.appendChild(particle);
 
       gsap.to(particle, {
-        x: `+=${(Math.random() - 0.5) * 40}`,
-        y: `+=${-20 - Math.random() * 30}`,
+        x: `+=${(Math.random() - 0.5) * xSpread}`,
+        y: `+=${yDrift[0] + Math.random() * yDrift[1]}`,
         opacity: 0,
-        duration: 4 + Math.random() * 4,
+        duration: durationRange[0] + Math.random() * durationRange[1],
         repeat: -1,
         ease: 'none',
       });
     }
-  },
+  };
+}
+
+const effects = {
+  'dust-drift': particleEffect({
+    count: 12,
+    color: 'rgba(255, 255, 255, 0.15)',
+    topRange: 100,
+    xSpread: 40,
+    yDrift: [-20, -30],
+    durationRange: [4, 4],
+  }),
 
   'motion-drag': (container) => {
     gsap.fromTo(
@@ -118,30 +129,14 @@ const effects = {
     gsap.fromTo(container, { opacity: 0 }, { opacity: 1, duration: 0.8, ease: 'power2.out' });
   },
 
-  'dust-settle': (container) => {
-    for (let i = 0; i < 10; i++) {
-      const particle = document.createElement('div');
-      particle.style.cssText = `
-        position: absolute;
-        width: 2px;
-        height: 2px;
-        background: rgba(200, 190, 170, 0.2);
-        border-radius: 50%;
-        left: ${Math.random() * 100}%;
-        top: ${Math.random() * 50}%;
-      `;
-      container.appendChild(particle);
-
-      gsap.to(particle, {
-        x: `+=${(Math.random() - 0.5) * 20}`,
-        y: `+=${20 + Math.random() * 30}`,
-        opacity: 0,
-        duration: 5 + Math.random() * 4,
-        repeat: -1,
-        ease: 'none',
-      });
-    }
-  },
+  'dust-settle': particleEffect({
+    count: 10,
+    color: 'rgba(200, 190, 170, 0.2)',
+    topRange: 50,
+    xSpread: 20,
+    yDrift: [20, 30],
+    durationRange: [5, 4],
+  }),
 
   'water-run': (container) => {
     const stream = document.createElement('div');
