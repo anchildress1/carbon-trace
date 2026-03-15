@@ -30,15 +30,26 @@ test.describe('carbon-trace narrative', () => {
     await expect(muteBtn).toHaveAttribute('aria-label', 'Mute audio');
   });
 
-  test('advances scene on click', async ({ page }) => {
+  test('clicking scene area does not advance the scene', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
     const image = page.locator('#scene-image');
     const initialSrc = await image.getAttribute('src');
 
-    await page.click('#app');
+    await page.click('#scene-stage');
 
-    await expect(image).not.toHaveAttribute('src', initialSrc);
+    await expect(image).toHaveAttribute('src', initialSrc ?? '');
+  });
+
+  test('forward button advances scene', async ({ page }) => {
+    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+
+    const image = page.locator('#scene-image');
+    const initialSrc = await image.getAttribute('src');
+
+    await page.click('#btn-next');
+
+    await expect(image).not.toHaveAttribute('src', initialSrc ?? '');
   });
 
   test('advances scene on keyboard Space', async ({ page }) => {
@@ -74,7 +85,7 @@ test.describe('carbon-trace narrative', () => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
     // scene-02 has narration.audio but no lines and no audio files — button must be hidden
-    await page.click('#app');
+    await page.click('#btn-next');
     await page.waitForTimeout(1500); // wait for transition
 
     const replayBtn = page.locator('#btn-replay');
@@ -118,7 +129,7 @@ test.describe('carbon-trace narrative', () => {
     const image = page.locator('#scene-image');
     const initialAlt = await image.getAttribute('alt');
 
-    await page.click('#app');
+    await page.click('#btn-next');
 
     await expect(image).not.toHaveAttribute('alt', initialAlt ?? '');
   });
@@ -144,15 +155,15 @@ test.describe('carbon-trace narrative — prefers-reduced-motion', () => {
     await page.goto('/');
   });
 
-  test('advances scene on click when reduced motion is set', async ({ page }) => {
+  test('forward button advances scene when reduced motion is set', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
     const image = page.locator('#scene-image');
     const initialSrc = await image.getAttribute('src');
 
-    await page.click('#app');
+    await page.click('#btn-next');
 
-    await expect(image).not.toHaveAttribute('src', initialSrc);
+    await expect(image).not.toHaveAttribute('src', initialSrc ?? '');
   });
 
   test('advances scene on keyboard Space when reduced motion is set', async ({ page }) => {

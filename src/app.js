@@ -262,23 +262,31 @@ function retreat(app) {
   transition(app, app.currentIndex - 1);
 }
 
-function updateNavButtons(app) {
-  app.els.btnPrev.disabled = app.currentIndex === 0;
+function triggerEffect(app) {
+  if (prefersReducedMotion()) return;
+  if (app.state === State.TRANSITIONING || app.state === State.CREDITS) return;
+  const frame = app.frames[app.currentIndex];
+  if (!frame.effects?.idle) return;
+  clearEffects(app.els.effectsLayer);
+  if (frame.effects.entry) runEffect(frame.effects.entry, app.els.effectsLayer);
+  runEffect(frame.effects.idle, app.els.effectsLayer);
 }
 
-function handleInput(app, e) {
-  if (e.type === 'keydown') {
-    if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      retreat(app);
-    } else if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') {
-      e.preventDefault();
-      advance(app);
-    }
-    return;
-  }
+function updateNavButtons(app) {
+  const frame = app.frames[app.currentIndex];
+  app.els.btnPrev.disabled = app.currentIndex === 0;
+  app.els.btnNext.disabled =
+    app.currentIndex >= app.frames.length - 1 || frame.advanceMode === 'disabled';
+}
 
-  advance(app);
+function handleKeydown(app, e) {
+  if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    retreat(app);
+  } else if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') {
+    e.preventDefault();
+    advance(app);
+  }
 }
 
 function toggleMute(app) {
@@ -306,16 +314,23 @@ function initApp(app) {
       showFrame(app, 0);
       app.state = State.SCENE_ACTIVE;
 
-      document.addEventListener('click', (e) => handleInput(app, e));
-      document.addEventListener('keydown', (e) => handleInput(app, e));
+      document.addEventListener('click', (e) => {
+        if (e.target.closest('#overlay-controls')) return;
+        triggerEffect(app);
+      });
+      document.addEventListener('keydown', (e) => handleKeydown(app, e));
+      app.els.btnPrev.addEventListener('click', (e) => {
+        e.stopPropagation();
+        retreat(app);
+      });
+      app.els.btnNext.addEventListener('click', (e) => {
+        e.stopPropagation();
+        advance(app);
+      });
       app.els.btnMute.addEventListener('click', (e) => {
         e.stopPropagation();
         if (app.els.btnMute.getAttribute('aria-disabled') === 'true') return;
         toggleMute(app);
-      });
-      app.els.btnPrev.addEventListener('click', (e) => {
-        e.stopPropagation();
-        retreat(app);
       });
       app.els.btnReplay.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -345,6 +360,7 @@ export function createApp() {
     'accessible-narration',
     'overlay-controls',
     'btn-prev',
+    'btn-next',
     'btn-replay',
     'btn-mute',
   ];
@@ -373,6 +389,7 @@ export function createApp() {
       accessibleNarration: document.getElementById('accessible-narration'),
       controls: document.getElementById('overlay-controls'),
       btnPrev: document.getElementById('btn-prev'),
+      btnNext: document.getElementById('btn-next'),
       btnReplay: document.getElementById('btn-replay'),
       btnMute: document.getElementById('btn-mute'),
     },
