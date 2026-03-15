@@ -9,16 +9,22 @@ export function playAmbient(src, volume, loop) {
     currentAmbient.unload();
   }
 
-  currentAmbient = new Howl({
+  const howl = new Howl({
     src: [src],
     volume: volume,
     loop: loop,
     html5: true,
     mute: globalMuted,
-    onloaderror: (_id, err) => console.warn(`Failed to load ambient: ${src}`, err),
-    onplayerror: (_id, err) => console.warn(`Failed to play ambient: ${src}`, err),
+    onloaderror: (_id, err) => {
+      console.warn(`Failed to load ambient: ${src}`, err);
+      if (currentAmbient === howl) currentAmbient = null;
+    },
+    onplayerror: (_id, err) => {
+      console.warn(`Failed to play ambient: ${src}`, err);
+    },
   });
 
+  currentAmbient = howl;
   currentAmbient.play();
   return currentAmbient;
 }
@@ -26,16 +32,22 @@ export function playAmbient(src, volume, loop) {
 export function crossfadeAmbient(newSrc, volume, durationMs) {
   const oldAmbient = currentAmbient;
 
-  currentAmbient = new Howl({
+  const howl = new Howl({
     src: [newSrc],
     volume: 0,
     loop: true,
     html5: true,
     mute: globalMuted,
-    onloaderror: (_id, err) => console.warn(`Failed to load ambient: ${newSrc}`, err),
-    onplayerror: (_id, err) => console.warn(`Failed to play ambient: ${newSrc}`, err),
+    onloaderror: (_id, err) => {
+      console.warn(`Failed to load ambient: ${newSrc}`, err);
+      if (currentAmbient === howl) currentAmbient = null;
+    },
+    onplayerror: (_id, err) => {
+      console.warn(`Failed to play ambient: ${newSrc}`, err);
+    },
   });
 
+  currentAmbient = howl;
   currentAmbient.play();
   currentAmbient.fade(0, volume, durationMs);
 
@@ -52,15 +64,21 @@ export function playNarration(src) {
     currentNarration.unload();
   }
 
-  currentNarration = new Howl({
+  const howl = new Howl({
     src: [src],
     volume: 1,
     html5: true,
     mute: globalMuted,
-    onloaderror: (_id, err) => console.warn(`Failed to load narration: ${src}`, err),
-    onplayerror: (_id, err) => console.warn(`Failed to play narration: ${src}`, err),
+    onloaderror: (_id, err) => {
+      console.warn(`Failed to load narration: ${src}`, err);
+      if (currentNarration === howl) currentNarration = null;
+    },
+    onplayerror: (_id, err) => {
+      console.warn(`Failed to play narration: ${src}`, err);
+    },
   });
 
+  currentNarration = howl;
   currentNarration.play();
   return currentNarration;
 }
