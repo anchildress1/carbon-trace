@@ -38,7 +38,7 @@ body {
   color: #888;
 }
 
-/* Scene stage — 16:9 letterboxed */
+/* Scene stage — full-bleed image container */
 .scene-stage {
   position: absolute;
   inset: 0;

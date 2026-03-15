@@ -158,7 +158,7 @@ test.describe('carbon-trace narrative', () => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
     await page.locator('#btn-replay').waitFor({ state: 'visible', timeout: 3000 });
 
-    // Scene 1 has narration lines — after replay, lines must be present in the DOM
+    // Title frame has narration lines — after replay, lines must be present in the DOM
     await page.click('#btn-replay');
 
     const lines = page.locator('.narration-line');
