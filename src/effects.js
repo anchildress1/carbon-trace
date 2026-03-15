@@ -166,16 +166,16 @@ const effects = {
     stream.style.cssText = `
       position: absolute;
       inset: 0;
-      background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, transparent 40%);
+      background: linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%);
       transform: translateY(-100%);
     `;
     container.appendChild(stream);
 
     gsap.to(stream, {
       y: '200%',
-      duration: 3,
+      duration: 5,
       repeat: -1,
-      ease: 'none',
+      ease: 'sine.inOut',
     });
   },
 };

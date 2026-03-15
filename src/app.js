@@ -155,6 +155,7 @@ function showFrame(app, index) {
     updateProgress(sceneIndex);
   }
 
+  updateNavButtons(app);
   applyNarration(app, frame);
   applyAmbient(app, frame);
 
@@ -254,9 +255,28 @@ function advance(app) {
   transition(app, app.currentIndex + 1);
 }
 
+function retreat(app) {
+  if (app.state === State.TRANSITIONING) return;
+  if (app.currentIndex <= 0) return;
+
+  transition(app, app.currentIndex - 1);
+}
+
+function updateNavButtons(app) {
+  app.els.btnPrev.disabled = app.currentIndex === 0;
+}
+
 function handleInput(app, e) {
-  if (e.type === 'keydown' && e.key !== ' ' && e.key !== 'Enter') return;
-  if (e.type === 'keydown') e.preventDefault();
+  if (e.type === 'keydown') {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      retreat(app);
+    } else if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      advance(app);
+    }
+    return;
+  }
 
   advance(app);
 }
@@ -292,6 +312,10 @@ function initApp(app) {
         e.stopPropagation();
         toggleMute(app);
       });
+      app.els.btnPrev.addEventListener('click', (e) => {
+        e.stopPropagation();
+        retreat(app);
+      });
       app.els.btnReplay.addEventListener('click', (e) => {
         e.stopPropagation();
         const frame = app.frames[app.currentIndex];
@@ -319,6 +343,7 @@ export function createApp() {
     'narration-layer',
     'accessible-narration',
     'overlay-controls',
+    'btn-prev',
     'btn-replay',
     'btn-mute',
   ];
@@ -346,6 +371,7 @@ export function createApp() {
       narrationLayer: document.getElementById('narration-layer'),
       accessibleNarration: document.getElementById('accessible-narration'),
       controls: document.getElementById('overlay-controls'),
+      btnPrev: document.getElementById('btn-prev'),
       btnReplay: document.getElementById('btn-replay'),
       btnMute: document.getElementById('btn-mute'),
     },
