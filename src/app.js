@@ -62,10 +62,7 @@ function preloadAudio(src) {
 }
 
 function audioSrcsFromEntry(entry) {
-  const srcs = [];
-  if (entry.ambient?.src) srcs.push(entry.ambient.src);
-  if (entry.narration?.audio) srcs.push(entry.narration.audio);
-  return srcs;
+  return [entry.ambient?.src, entry.narration?.audio].filter(Boolean);
 }
 
 function collectAudioSrcs(frames) {
@@ -185,7 +182,7 @@ function showFrame(app, index) {
   applyAmbient(app, frame);
 
   if (frame.phases) {
-    runPhases(app, frame);
+    startPhase(app, frame, 0);
   }
 }
 
@@ -211,10 +208,6 @@ function startPhase(app, frame, pi) {
   if (phase.duration && pi < frame.phases.length - 1) {
     app.phaseTimer = setTimeout(() => startPhase(app, frame, pi + 1), phase.duration);
   }
-}
-
-function runPhases(app, frame) {
-  startPhase(app, frame, 0);
 }
 
 function transition(app, toIndex) {

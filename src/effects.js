@@ -1,5 +1,11 @@
 import { gsap } from 'gsap';
 
+function opacityPulse(opacity, duration) {
+  return (container) => {
+    gsap.to(container, { opacity, duration, repeat: -1, yoyo: true, ease: 'sine.inOut' });
+  };
+}
+
 function particleEffect({ count, color, topRange, xSpread, yDrift, durationRange }) {
   return (container) => {
     for (let i = 0; i < count; i++) {
@@ -55,15 +61,7 @@ const effects = {
     });
   },
 
-  'near-still-pulse': (container) => {
-    gsap.to(container, {
-      opacity: 0.97,
-      duration: 3,
-      repeat: -1,
-      yoyo: true,
-      ease: 'sine.inOut',
-    });
-  },
+  'near-still-pulse': opacityPulse(0.97, 3),
 
   'light-crack': (container) => {
     const flash = document.createElement('div');
@@ -107,15 +105,7 @@ const effects = {
     gsap.to(glow, { opacity: 1, scale: 1.5, duration: 3, ease: 'power2.out' });
   },
 
-  'machine-steady': (container) => {
-    gsap.to(container, {
-      opacity: 0.95,
-      duration: 1.5,
-      repeat: -1,
-      yoyo: true,
-      ease: 'sine.inOut',
-    });
-  },
+  'machine-steady': opacityPulse(0.95, 1.5),
 
   'fade-in': (container) => {
     gsap.fromTo(container, { opacity: 0 }, { opacity: 1, duration: 0.8, ease: 'power2.out' });
