@@ -36,7 +36,7 @@
       },
       "effects": { "idle": "dust-drift", "entry": "fade-in" },
       "transition": { "type": "zoom-in", "duration": 1200, "scale": { "from": 1.0, "to": 1.15 } },
-      "traceOverlay": { "opacity": 0.05, "animation": "shimmer" }
+      "traceOverlay": { "opacity": 0.05 }
     },
     {
       "id": "scene-02-moved",
@@ -57,7 +57,7 @@
       },
       "effects": { "idle": "motion-drag", "entry": "fade-in" },
       "transition": { "type": "fade", "duration": 1200 },
-      "traceOverlay": { "opacity": 0.08, "animation": "light-catch" }
+      "traceOverlay": { "opacity": 0.08 }
     },
     {
       "id": "scene-03-oven-threshold",
@@ -78,7 +78,7 @@
       },
       "effects": { "idle": "heat-pulse", "entry": "fade-in" },
       "transition": { "type": "fade", "duration": 1200 },
-      "traceOverlay": { "opacity": 0.15, "animation": "heat-pulse" }
+      "traceOverlay": { "opacity": 0.15 }
     },
     {
       "id": "scene-04-pocket",
@@ -99,7 +99,7 @@
       },
       "effects": { "idle": "near-still-pulse", "entry": "fade-in" },
       "transition": { "type": "fade", "duration": 1200 },
-      "traceOverlay": { "opacity": 0.03, "animation": "near-still-pulse" }
+      "traceOverlay": { "opacity": 0.03 }
     },
     {
       "id": "scene-05-keeper",
@@ -120,7 +120,7 @@
       },
       "effects": { "idle": "water-clarity", "entry": "fade-in" },
       "transition": { "type": "fade", "duration": 1200 },
-      "traceOverlay": { "opacity": 0.2, "animation": "water-clarity" }
+      "traceOverlay": { "opacity": 0.2 }
     },
     {
       "id": "scene-06-rinse",
@@ -141,7 +141,7 @@
       },
       "effects": { "idle": "water-run", "entry": "fade-in" },
       "transition": { "type": "fade", "duration": 1200 },
-      "traceOverlay": { "opacity": 0.15, "animation": "water-run" }
+      "traceOverlay": { "opacity": 0.15 }
     },
     {
       "id": "scene-07-storage",
@@ -162,7 +162,7 @@
       },
       "effects": { "idle": "dust-settle", "entry": "fade-in" },
       "transition": { "type": "fade", "duration": 1200 },
-      "traceOverlay": { "opacity": 0.2, "animation": "dust-settle" }
+      "traceOverlay": { "opacity": 0.2 }
     },
     {
       "id": "scene-08-stillness",
@@ -183,7 +183,7 @@
       },
       "effects": { "idle": "near-still-pulse", "entry": "fade-in" },
       "transition": { "type": "fade", "duration": 1200 },
-      "traceOverlay": { "opacity": 0.1, "animation": "near-still-pulse" }
+      "traceOverlay": { "opacity": 0.1 }
     },
     {
       "id": "scene-09-return",
@@ -204,7 +204,7 @@
       },
       "effects": { "idle": "light-crack", "entry": "fade-in" },
       "transition": { "type": "fade", "duration": 1200 },
-      "traceOverlay": { "opacity": 0.25, "animation": "light-crack" }
+      "traceOverlay": { "opacity": 0.25 }
     },
     {
       "id": "scene-10-device",
@@ -225,7 +225,7 @@
       },
       "effects": { "idle": "assembly-micro", "entry": "fade-in" },
       "transition": { "type": "fade", "duration": 1200 },
-      "traceOverlay": { "opacity": 0.3, "animation": "assembly-micro" }
+      "traceOverlay": { "opacity": 0.3 }
     },
     {
       "id": "scene-11-activation",
@@ -246,7 +246,7 @@
       },
       "effects": { "idle": "illumination-spread", "entry": "fade-in" },
       "transition": { "type": "fade", "duration": 1200 },
-      "traceOverlay": { "opacity": 0.35, "animation": "illumination-spread" }
+      "traceOverlay": { "opacity": 0.35 }
     },
     {
       "id": "frame-12-credits",
@@ -260,7 +260,7 @@
       "ambient": { "src": "assets/audio/ambient/machine-hum.mp3", "volume": 0.2, "loop": true },
       "effects": { "idle": "machine-steady" },
       "transition": { "type": "fade", "duration": 1500 },
-      "traceOverlay": { "opacity": 0.5, "animation": "machine-steady" }
+      "traceOverlay": { "opacity": 0.5 }
     }
   ]
 }
