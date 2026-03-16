@@ -26,8 +26,10 @@ Canonical instruction source for this repository. Treat this file as authoritati
 - All other actions must be pinned to a commit SHA with the version in a comment
   (e.g., `@abc123 # v4.1.0`).
 
-### Commit format (when committing is requested)
+### Commit strategy
 
+- Make small, atomic commits as you go — one logical change per commit.
+- Do not batch unrelated changes into a single commit.
 - Use Conventional Commits.
 - Include required RAI footer:
   ```
@@ -69,4 +71,5 @@ Deployed as a static site to GitHub Pages.
 
 ## Documentation
 
-- Do not add docs to project unless specifically asked.
+- Keep docs in `docs/` aligned with the codebase — update them whenever code changes affect architecture, audio system, or accessibility behavior.
+- Prefer Mermaid diagrams whenever a visual would clarify architecture, data flow, or state machines.

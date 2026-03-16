@@ -56,6 +56,29 @@ body {
   inset: 0;
 }
 
+/* Buffering indicator */
+.scene-stage.buffering::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 32px;
+  height: 32px;
+  margin: -16px 0 0 -16px;
+  border: 2px solid rgba(232, 228, 223, 0.15);
+  border-top-color: rgba(232, 228, 223, 0.6);
+  border-radius: 50%;
+  animation: buffer-spin 0.8s linear infinite;
+  z-index: 8;
+  pointer-events: none;
+}
+
+@keyframes buffer-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .scene-image:not([src]),
 .scene-image[src=''] {
   display: none;
@@ -78,22 +101,32 @@ body {
 
 .narration-layer {
   position: absolute;
-  bottom: 10%;
-  left: 5%;
-  right: 5%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5em;
+  inset: 0;
   pointer-events: none;
 }
 
-.narration-line {
-  font-size: clamp(1rem, 2.5vw, 1.75rem);
-  line-height: 1.6;
+.narration-line:not(.narration-line--positioned) {
+  position: absolute;
+  bottom: 10%;
+  left: 5%;
+  right: 5%;
   text-align: center;
-  color: #e8e4df;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+}
+
+.narration-line {
+  font-family: 'Lora', Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(1rem, 2.5vw, 1.75rem);
+  line-height: 1.7;
+  letter-spacing: 0.03em;
+  text-align: center;
+  color: rgba(232, 228, 223, 0.88);
+  text-shadow:
+    0 0 20px rgba(232, 228, 223, 0.15),
+    0 0 40px rgba(232, 228, 223, 0.06),
+    0 1px 3px rgba(0, 0, 0, 0.6);
+  filter: blur(0px);
   opacity: 0;
 }
 
@@ -193,6 +226,42 @@ body {
   cursor: default;
 }
 
+/* Caption layer */
+.caption-layer {
+  position: absolute;
+  bottom: 12%;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 80%;
+  text-align: center;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.caption-text {
+  background: rgba(0, 0, 0, 0.85);
+  color: #e8e4df;
+  font-size: clamp(0.875rem, 2vw, 1.25rem);
+  line-height: 1.5;
+  padding: 0.4em 0.8em;
+  border-radius: 4px;
+  margin-bottom: 0.25em;
+}
+
+/* Pause button icon toggle */
+.btn-pause .icon-play {
+  display: none;
+}
+
+.btn-pause.paused .icon-pause {
+  display: none;
+}
+
+.btn-pause.paused .icon-play {
+  display: flex;
+}
+
+/* Mute button icon toggle */
 .btn-mute .icon-muted {
   display: none;
 }
@@ -226,5 +295,13 @@ body {
 
   .trace-overlay {
     transition: opacity 0.3s ease;
+  }
+
+  .caption-text {
+    transition: none;
+  }
+
+  .scene-stage.buffering::after {
+    animation: none;
   }
 }

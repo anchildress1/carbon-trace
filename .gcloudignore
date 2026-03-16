@@ -1,0 +1,46 @@
+# Version control
+.git
+.github
+.gitignore
+
+# Dependencies (rebuilt in container)
+node_modules
+
+# Build artifacts (rebuilt in container)
+dist
+coverage
+.lighthouseci
+
+# Test artifacts
+test-results
+playwright-report
+playwright-results
+
+# Local environment
+.env
+.env.*
+.env*.local
+
+# Editor / AI settings
+.claude/
+.mcp/
+.vscode/
+.idea/
+
+# Local tooling config (not needed for build)
+lefthook.yml
+commitlint.config.js
+eslint.config.js
+vitest.config.js
+playwright.config.js
+sonar-project.properties
+.secrets.baseline
+
+# Documentation (not needed in image)
+docs/
+*.md
+LICENSE
+
+# Temp files
+*.log
+*.tmp

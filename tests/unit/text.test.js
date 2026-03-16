@@ -60,6 +60,64 @@ describe('text.js', () => {
       expect(container.children.length).toBe(3);
       expect(container.children[2].textContent).toBe('Third');
     });
+
+    it('applies absolute positioning when x and y are provided', () => {
+      const el = createLineElement('Positioned', container, { x: 10, y: 70 });
+
+      expect(el.style.position).toBe('absolute');
+      expect(el.style.left).toBe('10vw');
+      expect(el.style.top).toBe('70vh');
+      expect(el.classList.contains('narration-line--positioned')).toBe(true);
+    });
+
+    it('applies left alignment by default when positioned', () => {
+      const el = createLineElement('Left text', container, { x: 10, y: 50 });
+
+      expect(el.style.textAlign).toBe('left');
+      expect(el.style.transform).toBe('translateY(-50%)');
+    });
+
+    it('applies center alignment with translate(-50%, -50%)', () => {
+      const el = createLineElement('Center text', container, { x: 50, y: 50, align: 'center' });
+
+      expect(el.style.textAlign).toBe('center');
+      expect(el.style.transform).toBe('translate(-50%, -50%)');
+    });
+
+    it('applies right alignment with translate(-100%, -50%)', () => {
+      const el = createLineElement('Right text', container, { x: 75, y: 88, align: 'right' });
+
+      expect(el.style.textAlign).toBe('right');
+      expect(el.style.transform).toBe('translate(-100%, -50%)');
+    });
+
+    it('does not apply positioning when x/y are not provided', () => {
+      const el = createLineElement('Default', container);
+
+      expect(el.style.position).toBe('');
+      expect(el.classList.contains('narration-line--positioned')).toBe(false);
+    });
+
+    it('does not apply positioning when options is empty object', () => {
+      const el = createLineElement('Default', container, {});
+
+      expect(el.style.position).toBe('');
+    });
+
+    it('handles x=0 and y=0 as valid positions', () => {
+      const el = createLineElement('Origin', container, { x: 0, y: 0 });
+
+      expect(el.style.position).toBe('absolute');
+      expect(el.style.left).toBe('0vw');
+      expect(el.style.top).toBe('0vh');
+    });
+
+    it('defaults to left alignment when align is unrecognized', () => {
+      const el = createLineElement('Fallback', container, { x: 50, y: 50, align: 'justify' });
+
+      expect(el.style.textAlign).toBe('left');
+      expect(el.style.transform).toBe('translateY(-50%)');
+    });
   });
 
   describe('buildTextTimeline', () => {
@@ -93,8 +151,8 @@ describe('text.js', () => {
       const tl = buildTextTimeline(lines, container, false);
 
       const fromToCall = tl.fromTo.mock.calls[0];
-      expect(fromToCall[1]).toEqual({ opacity: 0, y: 8 });
-      expect(fromToCall[2]).toMatchObject({ duration: 0.8, ease: 'power2.out' });
+      expect(fromToCall[1]).toEqual({ opacity: 0, y: 18, filter: 'blur(4px)' });
+      expect(fromToCall[2]).toMatchObject({ duration: 1.2, ease: 'power3.out' });
     });
 
     it('clears existing content before building', () => {
@@ -144,13 +202,102 @@ describe('text.js', () => {
       expect(toCall[1]).toMatchObject({ opacity: 0, duration: 0.3, ease: 'none' });
     });
 
-    it('uses ghost-drift exit animation with y offset', () => {
+    it('uses ghost-drift exit animation with y offset and blur', () => {
       const lines = [{ text: 'Exit drift', enter: 0, exit: 3000 }];
 
       const tl = buildTextTimeline(lines, container, false);
 
       const toCall = tl.to.mock.calls[0];
-      expect(toCall[1]).toMatchObject({ opacity: 0, y: -6, duration: 0.6, ease: 'power2.in' });
+      expect(toCall[1]).toMatchObject({
+        opacity: 0,
+        y: -10,
+        filter: 'blur(3px)',
+        duration: 0.9,
+        ease: 'power2.in',
+      });
+    });
+
+    it('passes position data to createLineElement', () => {
+      const lines = [
+        { text: 'Positioned', enter: 0, exit: 1000, x: 10, y: 70, align: 'left' },
+        { text: 'Centered', enter: 500, exit: 2000, x: 50, y: 50, align: 'center' },
+      ];
+
+      buildTextTimeline(lines, container);
+
+      const first = container.children[0];
+      expect(first.style.position).toBe('absolute');
+      expect(first.style.left).toBe('10vw');
+      expect(first.style.top).toBe('70vh');
+      expect(first.style.textAlign).toBe('left');
+
+      const second = container.children[1];
+      expect(second.style.left).toBe('50vw');
+      expect(second.style.textAlign).toBe('center');
+    });
+
+    it('handles lines without position data (backward-compatible)', () => {
+      const lines = [{ text: 'No position', enter: 0, exit: 1000 }];
+
+      buildTextTimeline(lines, container);
+
+      const el = container.children[0];
+      expect(el.style.position).toBe('');
+      expect(el.classList.contains('narration-line--positioned')).toBe(false);
+    });
+
+    it('skips lines with missing enter timing', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const lines = [
+        { text: 'Valid', enter: 0, exit: 1000 },
+        { text: 'No enter', exit: 2000 },
+        { text: 'Also valid', enter: 1000, exit: 3000 },
+      ];
+
+      const tl = buildTextTimeline(lines, container);
+
+      expect(container.children.length).toBe(2);
+      expect(tl.fromTo).toHaveBeenCalledTimes(2);
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Narration line 1 has invalid enter/exit timing:',
+        expect.objectContaining({ text: 'No enter' }),
+      );
+      errorSpy.mockRestore();
+    });
+
+    it('skips lines with missing exit timing', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const lines = [{ text: 'No exit', enter: 500 }];
+
+      const tl = buildTextTimeline(lines, container);
+
+      expect(container.children.length).toBe(0);
+      expect(tl.fromTo).not.toHaveBeenCalled();
+      expect(errorSpy).toHaveBeenCalled();
+      errorSpy.mockRestore();
+    });
+
+    it('skips lines with non-numeric enter/exit values', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const lines = [{ text: 'Bad timing', enter: 'foo', exit: 'bar' }];
+
+      buildTextTimeline(lines, container);
+
+      expect(container.children.length).toBe(0);
+      expect(errorSpy).toHaveBeenCalled();
+      errorSpy.mockRestore();
+    });
+
+    it('handles mixed positioned and non-positioned lines', () => {
+      const lines = [
+        { text: 'Positioned', enter: 0, exit: 1000, x: 10, y: 70, align: 'left' },
+        { text: 'Default', enter: 500, exit: 2000 },
+      ];
+
+      buildTextTimeline(lines, container);
+
+      expect(container.children[0].classList.contains('narration-line--positioned')).toBe(true);
+      expect(container.children[1].classList.contains('narration-line--positioned')).toBe(false);
     });
   });
 
