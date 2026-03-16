@@ -1,4 +1,4 @@
-.PHONY: install dev format format-check lint typecheck unit test build e2e perf secret-scan clean
+.PHONY: install dev format format-check lint typecheck unit test build e2e perf secret-scan deploy clean
 
 # Install all dependencies
 install:
@@ -95,6 +95,11 @@ secret-scan:
 		echo "detect-secrets not found. Install via 'uv tool install detect-secrets' or 'pipx install detect-secrets'."; \
 		exit 1; \
 	fi
+
+# Deploy to Cloud Run
+deploy:
+	@echo "Deploying to Cloud Run..."
+	./deploy.sh
 
 # Remove build artifacts and dependencies
 clean:
