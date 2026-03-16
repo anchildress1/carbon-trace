@@ -65,8 +65,8 @@ describe('text.js', () => {
       const el = createLineElement('Positioned', container, { x: 10, y: 70 });
 
       expect(el.style.position).toBe('absolute');
-      expect(el.style.left).toBe('10%');
-      expect(el.style.top).toBe('70%');
+      expect(el.style.left).toBe('10vw');
+      expect(el.style.top).toBe('70vh');
       expect(el.classList.contains('narration-line--positioned')).toBe(true);
     });
 
@@ -108,8 +108,8 @@ describe('text.js', () => {
       const el = createLineElement('Origin', container, { x: 0, y: 0 });
 
       expect(el.style.position).toBe('absolute');
-      expect(el.style.left).toBe('0%');
-      expect(el.style.top).toBe('0%');
+      expect(el.style.left).toBe('0vw');
+      expect(el.style.top).toBe('0vh');
     });
 
     it('defaults to left alignment when align is unrecognized', () => {
@@ -221,12 +221,12 @@ describe('text.js', () => {
 
       const first = container.children[0];
       expect(first.style.position).toBe('absolute');
-      expect(first.style.left).toBe('10%');
-      expect(first.style.top).toBe('70%');
+      expect(first.style.left).toBe('10vw');
+      expect(first.style.top).toBe('70vh');
       expect(first.style.textAlign).toBe('left');
 
       const second = container.children[1];
-      expect(second.style.left).toBe('50%');
+      expect(second.style.left).toBe('50vw');
       expect(second.style.textAlign).toBe('center');
     });
 

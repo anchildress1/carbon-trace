@@ -454,6 +454,9 @@ function togglePause(app) {
 
     if (firstPlay) {
       const frame = app.frames[app.currentIndex];
+      if (app.textTimeline) {
+        app.textTimeline.restart();
+      }
       if (frame.narration?.audio && app.availableAudio.has(frame.narration.audio)) {
         scheduleNarrationAudio(app, frame.narration);
       }

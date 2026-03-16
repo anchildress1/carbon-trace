@@ -10,8 +10,8 @@ export function createLineElement(text, container, options = {}) {
   if (x !== undefined && x !== null && y !== undefined && y !== null) {
     el.classList.add('narration-line--positioned');
     el.style.position = 'absolute';
-    el.style.left = `${x}%`;
-    el.style.top = `${y}%`;
+    el.style.left = `${x}vw`;
+    el.style.top = `${y}vh`;
 
     if (align === 'center') {
       el.style.textAlign = 'center';
