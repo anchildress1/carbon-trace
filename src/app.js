@@ -202,9 +202,15 @@ function scheduleNarrationAudio(app, narration) {
 }
 
 function scheduleCaptionDisplay(app, frame) {
+  if (app.captionDelayTimer) {
+    clearTimeout(app.captionDelayTimer);
+    app.captionDelayTimer = null;
+  }
+
   const captionDelay = frame.narration.delay || 0;
   if (captionDelay > 0) {
-    setTimeout(() => {
+    app.captionDelayTimer = setTimeout(() => {
+      app.captionDelayTimer = null;
       if (app.frames[app.currentIndex] === frame && !app.paused) {
         showCaptions(frame.narration.captions, app.els.captionLayer);
       }
@@ -220,6 +226,10 @@ function applyNarration(app, frame) {
     app.narrationTimer = null;
     app.narrationTimerStart = null;
     app.narrationTimerDelay = null;
+  }
+  if (app.captionDelayTimer) {
+    clearTimeout(app.captionDelayTimer);
+    app.captionDelayTimer = null;
   }
 
   clearCaptions();
@@ -417,6 +427,10 @@ function transition(app, toIndex) {
   }
 
   clearCaptions();
+  if (app.captionDelayTimer) {
+    clearTimeout(app.captionDelayTimer);
+    app.captionDelayTimer = null;
+  }
   app.textTimeline = null;
 
   clearMusicTimer(app);
@@ -427,6 +441,9 @@ function transition(app, toIndex) {
     app.musicExitTimerDelay = null;
   }
   app.musicExitTimerRemaining = null;
+  app.musicTimerRemaining = null;
+  app.narrationTimerRemaining = null;
+  app.phaseTimerRemaining = null;
   stopMusic();
 
   const toFrame = app.frames[toIndex];
@@ -437,8 +454,8 @@ function transition(app, toIndex) {
 
   if (prefersReducedMotion()) {
     try {
-      app.currentIndex = toIndex;
       showFrame(app, toIndex);
+      app.currentIndex = toIndex;
     } catch (err) {
       console.error('Error during scene transition:', err);
     }
@@ -455,8 +472,8 @@ function transition(app, toIndex) {
     ease: 'power2.inOut',
     onComplete: () => {
       try {
-        app.currentIndex = toIndex;
         showFrame(app, toIndex);
+        app.currentIndex = toIndex;
       } catch (err) {
         console.error('Error during scene transition:', err);
         gsap.set(app.els.sceneStage, { opacity: 1 });
@@ -510,7 +527,7 @@ function updateNavButtons(app) {
 }
 
 function resumeDelayedNarration(app) {
-  if (app.narrationTimerRemaining <= 0) return;
+  if (!app.narrationTimerRemaining || app.narrationTimerRemaining <= 0) return;
   const frame = app.frames[app.currentIndex];
   app.narrationTimerStart = Date.now();
   app.narrationTimerDelay = app.narrationTimerRemaining;
@@ -541,7 +558,7 @@ function resumeMusicExitTimer(app) {
 }
 
 function resumeDelayedMusic(app) {
-  if (app.musicTimerRemaining <= 0) return;
+  if (!app.musicTimerRemaining || app.musicTimerRemaining <= 0) return;
   const frame = app.frames[app.currentIndex];
   if (!frame.music) return;
   app.musicTimerStart = Date.now();
@@ -572,7 +589,7 @@ function resumeDelayedMusic(app) {
 }
 
 function resumeDelayedPhase(app) {
-  if (app.phaseTimerRemaining <= 0) return;
+  if (!app.phaseTimerRemaining || app.phaseTimerRemaining <= 0) return;
   const frame = app.frames[app.currentIndex];
   const pi = app.pausedPhaseIndex;
   app.phaseTimer = setTimeout(() => startPhase(app, frame, pi + 1), app.phaseTimerRemaining);
@@ -592,7 +609,7 @@ function handleFirstPlay(app) {
     scheduleNarrationAudio(app, frame.narration);
   }
   if (areCaptionsEnabled() && frame.narration?.captions?.length > 0) {
-    showCaptions(frame.narration.captions, app.els.captionLayer);
+    scheduleCaptionDisplay(app, frame);
   }
 }
 
@@ -820,6 +837,7 @@ function toggleCaptions(app) {
 
 function initApp(app) {
   app.els.sceneImage.addEventListener('error', () => {
+    console.warn(`Scene image failed to load: ${app.els.sceneImage.src}`);
     app.els.sceneImage.removeAttribute('src');
   });
 
@@ -957,6 +975,7 @@ export function createApp() {
     phaseTimerDelay: null,
     phaseTimerRemaining: null,
     pausedPhaseIndex: null,
+    captionDelayTimer: null,
     narrationTimer: null,
     narrationTimerStart: null,
     narrationTimerDelay: null,
