@@ -14,9 +14,6 @@ importers:
       howler:
         specifier: ^2.2.4
         version: 2.2.4
-      vite:
-        specifier: ^6.3.0
-        version: 6.4.1(@types/node@25.4.0)(jiti@2.6.1)
     devDependencies:
       '@checkmarkdevtools/commitlint-plugin-rai':
         specifier: ^0.1.6
@@ -51,6 +48,9 @@ importers:
       prettier:
         specifier: ^3.5.0
         version: 3.8.1
+      vite:
+        specifier: ^6.3.0
+        version: 6.4.1(@types/node@25.4.0)(jiti@2.6.1)
       vitest:
         specifier: ^3.2.0
         version: 3.2.4(@types/node@25.4.0)(happy-dom@20.8.3)(jiti@2.6.1)
