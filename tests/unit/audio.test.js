@@ -2,6 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 let lastHowlOptions = null;
 
+const mockNode = {
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+  buffered: { length: 0, end: vi.fn() },
+  currentTime: 0,
+  duration: 60,
+  play: vi.fn().mockResolvedValue(undefined),
+  src: '',
+};
+
 const mockHowlInstance = {
   play: vi.fn(),
   stop: vi.fn(),
@@ -10,6 +20,9 @@ const mockHowlInstance = {
   pause: vi.fn(),
   unload: vi.fn(),
   volume: vi.fn().mockReturnValue(0.15),
+  once: vi.fn(),
+  on: vi.fn(),
+  _sounds: [{ _node: mockNode }],
 };
 
 vi.mock('howler', () => ({
@@ -30,12 +43,18 @@ import {
   resumeAmbient,
   stopAll,
   setMuted,
+  onNarrationBufferChange,
+  isNarrationBuffering,
+  preloadNarrationAhead,
+  clearNarrationCache,
 } from '../../src/audio.js';
 import { Howl } from 'howler';
 
 describe('audio.js', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockNode.addEventListener.mockClear();
+    mockNode.removeEventListener.mockClear();
     stopAll();
   });
 
@@ -154,6 +173,44 @@ describe('audio.js', () => {
 
       expect(lastHowlOptions.onend).toBeUndefined();
     });
+
+    it('uses cached Howl when available from preloadNarrationAhead', () => {
+      preloadNarrationAhead('cached.m4a');
+      const preloadCallCount = Howl.mock.calls.length;
+
+      playNarration('cached.m4a');
+
+      // Should NOT create a new Howl — reuses the cached one
+      expect(Howl.mock.calls.length).toBe(preloadCallCount);
+    });
+
+    it('creates new Howl when src is not in cache', () => {
+      playNarration('uncached.m4a');
+
+      expect(Howl).toHaveBeenCalledWith(
+        expect.objectContaining({
+          src: ['uncached.m4a'],
+        }),
+      );
+    });
+
+    it('applies current mute state to cached Howl', () => {
+      setMuted(true);
+      preloadNarrationAhead('cached.m4a');
+      const cachedHowl = Howl.mock.results[Howl.mock.results.length - 1].value;
+
+      playNarration('cached.m4a');
+
+      expect(cachedHowl.mute).toHaveBeenCalledWith(true);
+    });
+
+    it('attaches buffer monitoring to audio node', () => {
+      playNarration('narration.m4a');
+
+      // Should have added waiting and playing listeners
+      expect(mockNode.addEventListener).toHaveBeenCalledWith('waiting', expect.any(Function));
+      expect(mockNode.addEventListener).toHaveBeenCalledWith('playing', expect.any(Function));
+    });
   });
 
   describe('stopNarration', () => {
@@ -175,6 +232,19 @@ describe('audio.js', () => {
 
       // Calling pause after stop should not throw (no active narration)
       expect(() => pauseNarration()).not.toThrow();
+    });
+
+    it('cleans up buffer monitoring on stop', () => {
+      playNarration('narration.m4a');
+
+      // Buffer listeners were attached
+      expect(mockNode.addEventListener).toHaveBeenCalledWith('waiting', expect.any(Function));
+
+      stopNarration();
+
+      // Listeners should be removed
+      expect(mockNode.removeEventListener).toHaveBeenCalledWith('waiting', expect.any(Function));
+      expect(mockNode.removeEventListener).toHaveBeenCalledWith('playing', expect.any(Function));
     });
   });
 
@@ -302,6 +372,17 @@ describe('audio.js', () => {
       expect(() => setMuted(true)).not.toThrow();
       warnSpy.mockRestore();
     });
+
+    it('logs warning on preload narration load error', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      preloadNarrationAhead('fail.m4a');
+      lastHowlOptions.onloaderror(1, 'not found');
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Failed to preload narration: fail.m4a',
+        'not found',
+      );
+      warnSpy.mockRestore();
+    });
   });
 
   describe('stopAll', () => {
@@ -359,6 +440,190 @@ describe('audio.js', () => {
       playAmbient('new.mp3', 0.1, true);
 
       expect(Howl).toHaveBeenCalledWith(expect.objectContaining({ mute: true }));
+    });
+  });
+
+  describe('buffer monitoring', () => {
+    it('onNarrationBufferChange registers callback', () => {
+      const cb = vi.fn();
+      onNarrationBufferChange(cb);
+
+      expect(isNarrationBuffering()).toBe(false);
+    });
+
+    it('isNarrationBuffering returns false by default', () => {
+      expect(isNarrationBuffering()).toBe(false);
+    });
+
+    it('buffer callback fires true on waiting event', () => {
+      const cb = vi.fn();
+      onNarrationBufferChange(cb);
+
+      playNarration('test.m4a');
+
+      // Find the waiting handler registered on the mock node
+      const waitingCall = mockNode.addEventListener.mock.calls.find(
+        ([event]) => event === 'waiting',
+      );
+      expect(waitingCall).toBeDefined();
+
+      // Simulate waiting event
+      waitingCall[1]();
+
+      expect(cb).toHaveBeenCalledWith(true);
+      expect(isNarrationBuffering()).toBe(true);
+    });
+
+    it('buffer callback fires false on playing event after waiting', () => {
+      vi.useFakeTimers();
+      const cb = vi.fn();
+      onNarrationBufferChange(cb);
+
+      playNarration('test.m4a');
+
+      const waitingCall = mockNode.addEventListener.mock.calls.find(
+        ([event]) => event === 'waiting',
+      );
+      const playingCall = mockNode.addEventListener.mock.calls.find(
+        ([event]) => event === 'playing',
+      );
+
+      // Simulate buffer underrun then recovery
+      waitingCall[1]();
+      expect(cb).toHaveBeenCalledWith(true);
+
+      playingCall[1]();
+      expect(cb).toHaveBeenCalledWith(false);
+      expect(isNarrationBuffering()).toBe(false);
+
+      vi.useRealTimers();
+    });
+
+    it('ignores duplicate waiting events', () => {
+      vi.useFakeTimers();
+      const cb = vi.fn();
+      onNarrationBufferChange(cb);
+
+      playNarration('test.m4a');
+
+      const waitingCall = mockNode.addEventListener.mock.calls.find(
+        ([event]) => event === 'waiting',
+      );
+
+      waitingCall[1]();
+      waitingCall[1]();
+
+      // Should only fire once
+      expect(cb).toHaveBeenCalledTimes(1);
+
+      vi.useRealTimers();
+    });
+
+    it('ignores playing event when not buffering', () => {
+      const cb = vi.fn();
+      onNarrationBufferChange(cb);
+
+      playNarration('test.m4a');
+
+      const playingCall = mockNode.addEventListener.mock.calls.find(
+        ([event]) => event === 'playing',
+      );
+
+      // Playing without prior waiting — should be ignored
+      playingCall[1]();
+      expect(cb).not.toHaveBeenCalled();
+    });
+
+    it('cleanup fires false callback if currently buffering', () => {
+      vi.useFakeTimers();
+      const cb = vi.fn();
+      onNarrationBufferChange(cb);
+
+      playNarration('test.m4a');
+
+      const waitingCall = mockNode.addEventListener.mock.calls.find(
+        ([event]) => event === 'waiting',
+      );
+      waitingCall[1]();
+      cb.mockClear();
+
+      stopNarration();
+
+      // Cleanup should fire false to clear buffering state
+      expect(cb).toHaveBeenCalledWith(false);
+      expect(isNarrationBuffering()).toBe(false);
+
+      vi.useRealTimers();
+    });
+  });
+
+  describe('preloadNarrationAhead', () => {
+    it('creates a Howl with preload enabled', () => {
+      preloadNarrationAhead('next-scene.m4a');
+
+      expect(Howl).toHaveBeenCalledWith(
+        expect.objectContaining({
+          src: ['next-scene.m4a'],
+          html5: true,
+          preload: true,
+          volume: 1,
+        }),
+      );
+    });
+
+    it('does not create duplicate Howl for same src', () => {
+      preloadNarrationAhead('next-scene.m4a');
+      const callCount = Howl.mock.calls.length;
+
+      preloadNarrationAhead('next-scene.m4a');
+      expect(Howl.mock.calls.length).toBe(callCount);
+    });
+
+    it('applies current mute state to preloaded Howl', () => {
+      setMuted(true);
+      preloadNarrationAhead('next-scene.m4a');
+
+      expect(Howl).toHaveBeenCalledWith(
+        expect.objectContaining({ mute: true }),
+      );
+    });
+
+    it('removes from cache on load error', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      preloadNarrationAhead('missing.m4a');
+      lastHowlOptions.onloaderror(1, 'not found');
+
+      // After error, trying to play should create new Howl (not from cache)
+      const callCountBefore = Howl.mock.calls.length;
+      playNarration('missing.m4a');
+      expect(Howl.mock.calls.length).toBe(callCountBefore + 1);
+
+      warnSpy.mockRestore();
+    });
+  });
+
+  describe('clearNarrationCache', () => {
+    it('unloads all cached Howls', () => {
+      preloadNarrationAhead('scene-a.m4a');
+      const cachedHowl = Howl.mock.results[Howl.mock.results.length - 1].value;
+
+      clearNarrationCache();
+
+      expect(cachedHowl.unload).toHaveBeenCalled();
+    });
+
+    it('handles empty cache gracefully', () => {
+      expect(() => clearNarrationCache()).not.toThrow();
+    });
+
+    it('cache is empty after clearing', () => {
+      preloadNarrationAhead('scene-a.m4a');
+      clearNarrationCache();
+
+      // Playing should create new Howl since cache is empty
+      const callCountBefore = Howl.mock.calls.length;
+      playNarration('scene-a.m4a');
+      expect(Howl.mock.calls.length).toBe(callCountBefore + 1);
     });
   });
 });

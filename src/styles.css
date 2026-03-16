@@ -56,6 +56,29 @@ body {
   inset: 0;
 }
 
+/* Buffering indicator */
+.scene-stage.buffering::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 32px;
+  height: 32px;
+  margin: -16px 0 0 -16px;
+  border: 2px solid rgba(232, 228, 223, 0.15);
+  border-top-color: rgba(232, 228, 223, 0.6);
+  border-radius: 50%;
+  animation: buffer-spin 0.8s linear infinite;
+  z-index: 8;
+  pointer-events: none;
+}
+
+@keyframes buffer-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .scene-image:not([src]),
 .scene-image[src=''] {
   display: none;
@@ -276,5 +299,9 @@ body {
 
   .caption-text {
     transition: none;
+  }
+
+  .scene-stage.buffering::after {
+    animation: none;
   }
 }

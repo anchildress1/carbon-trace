@@ -10,6 +10,9 @@ import {
   pauseAmbient,
   resumeAmbient,
   setMuted,
+  onNarrationBufferChange,
+  preloadNarrationAhead,
+  clearNarrationCache,
 } from './audio.js';
 import { buildTextTimeline, clearNarrationLayer } from './text.js';
 import { runEffect, clearEffects, effectExists } from './effects.js';
@@ -167,7 +170,6 @@ function applyNarration(app, frame) {
   const hasCaptions =
     Array.isArray(frame.narration.captions) && frame.narration.captions.length > 0;
   const hasAudioRef = Boolean(frame.narration.audio);
-  const audioReady = hasAudioRef && app.availableAudio.has(frame.narration.audio);
 
   if (hasLines) {
     app.textTimeline = buildTextTimeline(
@@ -190,7 +192,7 @@ function applyNarration(app, frame) {
 
   app.els.btnReplay.disabled = !(hasLines || hasAudioRef);
 
-  if (audioReady) {
+  if (hasAudioRef) {
     scheduleNarrationAudio(app, frame.narration);
   }
 }
@@ -253,6 +255,13 @@ function showFrame(app, index) {
   if (frame.phases) {
     startPhase(app, frame, 0);
   }
+
+  // Pre-buffer next scene's narration audio while current scene plays
+  clearNarrationCache();
+  const nextFrame = app.frames[index + 1];
+  if (nextFrame?.narration?.audio) {
+    preloadNarrationAhead(nextFrame.narration.audio);
+  }
 }
 
 function startPhase(app, frame, pi) {
@@ -269,7 +278,7 @@ function startPhase(app, frame, pi) {
     );
     app.els.accessibleNarration.textContent = phase.narration.lines.map((l) => l.text).join(' ');
 
-    if (phase.narration.audio && app.availableAudio.has(phase.narration.audio)) {
+    if (phase.narration.audio) {
       playNarration(phase.narration.audio);
     }
   }
@@ -292,6 +301,24 @@ function clearPauseState(app) {
   }
 }
 
+function handleBufferChange(app, isBuffering) {
+  app.buffering = isBuffering;
+
+  if (isBuffering) {
+    if (!app.paused) {
+      if (app.textTimeline) app.textTimeline.pause();
+      pauseCaptions();
+    }
+    app.els.sceneStage.classList.add('buffering');
+  } else {
+    if (!app.paused) {
+      if (app.textTimeline) app.textTimeline.resume();
+      resumeCaptions();
+    }
+    app.els.sceneStage.classList.remove('buffering');
+  }
+}
+
 function transition(app, toIndex) {
   if (app.state === State.TRANSITIONING) return;
 
@@ -302,6 +329,8 @@ function transition(app, toIndex) {
   }
 
   app.state = State.TRANSITIONING;
+  app.buffering = false;
+  app.els.sceneStage.classList.remove('buffering');
 
   if (app.phaseTimer) {
     clearTimeout(app.phaseTimer);
@@ -414,7 +443,7 @@ function togglePause(app) {
     resumeNarration();
     resumeAmbient();
 
-    if (app.textTimeline) {
+    if (app.textTimeline && !app.buffering) {
       app.textTimeline.resume();
     }
 
@@ -422,7 +451,9 @@ function togglePause(app) {
     const childTweens = gsap.getTweensOf(app.els.effectsLayer.children);
     [...effectsTweens, ...childTweens].forEach((tw) => tw.resume());
 
-    if (areCaptionsEnabled()) {
+    if (app.buffering) {
+      // Text and captions stay paused — buffer monitor will resume them
+    } else if (areCaptionsEnabled()) {
       resumeCaptions();
     } else {
       clearCaptions();
@@ -457,7 +488,7 @@ function togglePause(app) {
       if (app.textTimeline) {
         app.textTimeline.restart();
       }
-      if (frame.narration?.audio && app.availableAudio.has(frame.narration.audio)) {
+      if (frame.narration?.audio) {
         scheduleNarrationAudio(app, frame.narration);
       }
       if (areCaptionsEnabled() && frame.narration?.captions?.length > 0) {
@@ -516,6 +547,9 @@ function replayNarration(app) {
     app.state = app.pausedFromState || State.SCENE_ACTIVE;
   }
 
+  app.buffering = false;
+  app.els.sceneStage.classList.remove('buffering');
+
   const frame = app.frames[app.currentIndex];
 
   if (app.narrationTimer) {
@@ -535,7 +569,6 @@ function replayNarration(app) {
   const hasCaptions =
     Array.isArray(frame.narration.captions) && frame.narration.captions.length > 0;
   const hasAudioRef = Boolean(frame.narration.audio);
-  const audioReady = hasAudioRef && app.availableAudio.has(frame.narration.audio);
 
   if (hasLines) {
     app.textTimeline = buildTextTimeline(
@@ -549,7 +582,7 @@ function replayNarration(app) {
     showCaptions(frame.narration.captions, app.els.captionLayer);
   }
 
-  if (audioReady) {
+  if (hasAudioRef) {
     playNarration(frame.narration.audio);
   }
 
@@ -604,6 +637,7 @@ function initApp(app) {
   });
 
   preloadFirstFrameAudio(app);
+  onNarrationBufferChange((isBuffering) => handleBufferChange(app, isBuffering));
 
   preloadAssets(app)
     .then(() => {
@@ -734,6 +768,7 @@ export function createApp() {
     narrationTimerStart: null,
     narrationTimerDelay: null,
     narrationTimerRemaining: null,
+    buffering: false,
     availableAudio: new Set(),
     els: {
       loadingScreen: document.getElementById('loading-screen'),

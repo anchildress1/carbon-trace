@@ -775,16 +775,16 @@
           {
             "text": "All of them should still be here.",
             "enter": 0,
-            "exit": 5000,
-            "x": 50,
+            "exit": 2000,
+            "x": 40,
             "y": 45,
             "align": "center"
           },
           {
             "text": "It's not supposed to be this quiet.",
-            "enter": 8000,
-            "exit": 15000,
-            "x": 50,
+            "enter": 1500,
+            "exit": 4000,
+            "x": 45,
             "y": 55,
             "align": "center"
           }
