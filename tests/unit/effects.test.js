@@ -58,7 +58,7 @@ describe('effects.js', () => {
 
       expect(gsap.to).toHaveBeenCalledWith(
         scene,
-        expect.objectContaining({ opacity: 0.85, repeat: -1 }),
+        expect.objectContaining({ filter: 'brightness(0.85)', repeat: -1 }),
       );
     });
 
@@ -90,7 +90,7 @@ describe('effects.js', () => {
 
       expect(gsap.to).toHaveBeenCalledWith(
         scene,
-        expect.objectContaining({ repeat: -1, yoyo: true }),
+        expect.objectContaining({ filter: 'brightness(0.85)', repeat: -1, yoyo: true }),
       );
     });
 

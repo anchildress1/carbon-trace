@@ -6,9 +6,15 @@ import { gsap } from 'gsap';
  * - scene: the #scene-image element for applying filters, opacity, and transforms
  */
 
-function scenePulse(opacity, duration) {
+function scenePulse(brightness, duration) {
   return ({ scene }) => {
-    gsap.to(scene, { opacity, duration, repeat: -1, yoyo: true, ease: 'sine.inOut' });
+    gsap.to(scene, {
+      filter: `brightness(${brightness})`,
+      duration,
+      repeat: -1,
+      yoyo: true,
+      ease: 'sine.inOut',
+    });
   };
 }
 
