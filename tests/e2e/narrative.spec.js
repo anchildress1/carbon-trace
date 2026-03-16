@@ -264,20 +264,21 @@ test.describe('carbon-trace — pause/play', () => {
   test('pause button aria-pressed toggles on click', async ({ page }) => {
     const pauseBtn = page.locator('#btn-pause');
 
-    await expect(pauseBtn).toHaveAttribute('aria-pressed', 'false');
-
-    await pauseBtn.click();
+    // Starts in paused state (play button shown)
     await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
 
-    await pauseBtn.click();
+    await pauseBtn.click(); // Play (unpause)
     await expect(pauseBtn).toHaveAttribute('aria-pressed', 'false');
+
+    await pauseBtn.click(); // Pause
+    await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
   });
 
   test('navigation while paused unpauses and advances', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
 
     const pauseBtn = page.locator('#btn-pause');
-    await pauseBtn.click();
+    // Starts in paused state
     await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
 
     await page.click('#btn-next');
@@ -317,6 +318,9 @@ test.describe('carbon-trace — captions', () => {
   test('caption text appears when enabled and scene has captions', async ({ page }) => {
     const captionBtn = page.locator('#btn-captions');
     await captionBtn.click();
+
+    // Press play to start (app loads paused)
+    await page.click('#btn-pause');
 
     // Title frame has captions — some should appear
     const captionText = page.locator('.caption-text');

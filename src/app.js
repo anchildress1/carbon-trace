@@ -106,16 +106,30 @@ function collectAudioSrcs(frames) {
   return srcs;
 }
 
-function preloadAssets(app) {
-  const imagePromises = app.frames
-    .filter((frame) => frame.image)
-    .map((frame) => preloadImage(frame.image));
-  const audioPromises = [...collectAudioSrcs(app.frames)].map((src) =>
+function preloadAudioInBackground(app) {
+  const audioSrcs = [...collectAudioSrcs(app.frames)];
+  for (const src of audioSrcs) {
     preloadAudio(src).then((loaded) => {
-      if (loaded) app.availableAudio.add(loaded);
-    }),
-  );
-  return Promise.all([...imagePromises, ...audioPromises]);
+      if (loaded) {
+        app.availableAudio.add(loaded);
+        if (app.availableAudio.size === 1) {
+          app.els.btnMute.removeAttribute('aria-disabled');
+        }
+      }
+    });
+  }
+}
+
+function preloadRemainingImages(app) {
+  app.frames
+    .slice(1)
+    .filter((frame) => frame.image)
+    .forEach((frame) => preloadImage(frame.image));
+}
+
+function preloadAssets(app) {
+  const firstFrame = app.frames[0];
+  return firstFrame?.image ? preloadImage(firstFrame.image) : Promise.resolve();
 }
 
 function scheduleNarrationAudio(app, narration) {
@@ -392,6 +406,11 @@ function togglePause(app) {
   if (app.state === State.TRANSITIONING || app.state === State.LOADING) return;
 
   if (app.paused) {
+    const firstPlay = !app.userHasInteracted;
+    if (firstPlay) {
+      app.userHasInteracted = true;
+    }
+
     app.paused = false;
     app.state = app.pausedFromState;
     app.pausedFromState = null;
@@ -431,6 +450,16 @@ function togglePause(app) {
       app.phaseTimer = setTimeout(() => startPhase(app, frame, pi + 1), app.phaseTimerRemaining);
       app.phaseTimerRemaining = null;
       app.pausedPhaseIndex = null;
+    }
+
+    if (firstPlay) {
+      const frame = app.frames[app.currentIndex];
+      if (frame.narration?.audio && app.availableAudio.has(frame.narration.audio)) {
+        scheduleNarrationAudio(app, frame.narration);
+      }
+      if (areCaptionsEnabled() && frame.narration?.captions?.length > 0) {
+        showCaptions(frame.narration.captions, app.els.captionLayer);
+      }
     }
 
     app.els.btnPause.setAttribute('aria-pressed', 'false');
@@ -474,6 +503,8 @@ function togglePause(app) {
 
 function replayNarration(app) {
   if (app.state === State.TRANSITIONING || app.state === State.LOADING) return;
+
+  app.userHasInteracted = true;
 
   if (app.paused) {
     clearPauseState(app);
@@ -549,6 +580,8 @@ function toggleCaptions(app) {
   setCaptionsEnabled(enabled);
   app.els.btnCaptions.setAttribute('aria-pressed', String(enabled));
 
+  if (!app.userHasInteracted) return;
+
   if (enabled) {
     const frame = app.frames[app.currentIndex];
     const hasCaptions =
@@ -580,7 +613,22 @@ function initApp(app) {
       app.els.btnCaptions.setAttribute('aria-pressed', String(captionsEnabled));
 
       showFrame(app, 0);
-      app.state = State.SCENE_ACTIVE;
+
+      // Start awaiting first play — text animates silently as a visual hook,
+      // but audio and captions are gated until user presses play.
+      app.paused = true;
+      app.pausedFromState = State.SCENE_ACTIVE;
+      app.state = State.PAUSED;
+      clearCaptions();
+      app.els.btnPause.setAttribute('aria-pressed', 'true');
+      app.els.btnPause.classList.add('paused');
+
+      // Defer background preloads to avoid network contention during initial render.
+      // Ensures GSAP text animation and LCP complete before loading remaining assets.
+      setTimeout(() => {
+        preloadRemainingImages(app);
+        preloadAudioInBackground(app);
+      }, 4000);
 
       const markInteracted = () => {
         app.userHasInteracted = true;
