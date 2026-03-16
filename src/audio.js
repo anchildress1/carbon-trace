@@ -43,66 +43,79 @@ function cleanupBufferMonitoring() {
   }
 }
 
+function nudgeStall(node) {
+  // Force the browser to re-evaluate its buffer position by seeking
+  // to the current time. This is an intentional no-op seek that
+  // unsticks stalled HTML5 audio in some browsers.
+  const pos = node.currentTime;
+  node.currentTime = pos;
+}
+
+function reloadFromPosition(node) {
+  const time = node.currentTime;
+  const src = node.src;
+  node.src = '';
+  node.src = src;
+  node.currentTime = time;
+  node.play().catch(() => {});
+}
+
+function checkBufferProgress(node, state) {
+  if (!narrationBuffering) {
+    clearInterval(bufferCheckTimer);
+    bufferCheckTimer = null;
+    return;
+  }
+
+  const currentEnd = getBufferedEnd(node);
+  if (currentEnd > state.lastBufferedEnd) {
+    state.lastBufferedEnd = currentEnd;
+    state.stallChecks = 0;
+    const ahead = currentEnd - node.currentTime;
+    const nearEnd = node.duration > 0 && node.duration - node.currentTime < 3;
+    if (ahead >= 3 || nearEnd) {
+      node.play().catch(() => {});
+    }
+  } else {
+    state.stallChecks++;
+    if (state.stallChecks === 2) {
+      nudgeStall(node);
+    } else if (state.stallChecks >= 4) {
+      reloadFromPosition(node);
+      state.stallChecks = 0;
+    }
+  }
+}
+
+function handleWaiting(node, state) {
+  if (narrationBuffering) return;
+  narrationBuffering = true;
+  bufferChangeCallback?.(true);
+
+  state.stallChecks = 0;
+  state.lastBufferedEnd = getBufferedEnd(node);
+  bufferCheckTimer = setInterval(() => checkBufferProgress(node, state), 4000);
+}
+
+function handlePlaying() {
+  if (!narrationBuffering) return;
+  narrationBuffering = false;
+  bufferChangeCallback?.(false);
+  if (bufferCheckTimer) {
+    clearInterval(bufferCheckTimer);
+    bufferCheckTimer = null;
+  }
+}
+
 function monitorNarrationBuffer(howl) {
   const attachListeners = () => {
     const node = howl._sounds?.[0]?._node;
     if (!node) return;
 
-    let lastBufferedEnd = 0;
-    let stallChecks = 0;
+    const state = { lastBufferedEnd: 0, stallChecks: 0 };
 
-    const onWaiting = () => {
-      if (narrationBuffering) return;
-      narrationBuffering = true;
-      bufferChangeCallback?.(true);
-
-      stallChecks = 0;
-      lastBufferedEnd = getBufferedEnd(node);
-      bufferCheckTimer = setInterval(() => {
-        if (!narrationBuffering) {
-          clearInterval(bufferCheckTimer);
-          bufferCheckTimer = null;
-          return;
-        }
-
-        const currentEnd = getBufferedEnd(node);
-        if (currentEnd > lastBufferedEnd) {
-          // Buffer growing — resume when enough is buffered ahead
-          lastBufferedEnd = currentEnd;
-          stallChecks = 0;
-          const ahead = currentEnd - node.currentTime;
-          const nearEnd = node.duration > 0 && node.duration - node.currentTime < 3;
-          if (ahead >= 3 || nearEnd) {
-            node.play().catch(() => {});
-          }
-        } else {
-          stallChecks++;
-          if (stallChecks === 2) {
-            // ~8s no progress — nudge with seek-to-same-position
-            node.currentTime = node.currentTime;
-          } else if (stallChecks >= 4) {
-            // ~16s no progress — reload source from current position
-            const time = node.currentTime;
-            const src = node.src;
-            node.src = '';
-            node.src = src;
-            node.currentTime = time;
-            node.play().catch(() => {});
-            stallChecks = 0;
-          }
-        }
-      }, 4000);
-    };
-
-    const onPlaying = () => {
-      if (!narrationBuffering) return;
-      narrationBuffering = false;
-      bufferChangeCallback?.(false);
-      if (bufferCheckTimer) {
-        clearInterval(bufferCheckTimer);
-        bufferCheckTimer = null;
-      }
-    };
+    const onWaiting = () => handleWaiting(node, state);
+    const onPlaying = () => handlePlaying();
 
     node.addEventListener('waiting', onWaiting);
     node.addEventListener('playing', onPlaying);

@@ -484,144 +484,174 @@ function updateNavButtons(app) {
     app.currentIndex >= app.frames.length - 1 || frame.advanceMode === 'disabled';
 }
 
-function togglePause(app) {
-  if (app.state === State.TRANSITIONING || app.state === State.LOADING) return;
-
-  if (app.paused) {
-    const firstPlay = !app.userHasInteracted;
-    if (firstPlay) {
-      app.userHasInteracted = true;
+function resumeDelayedNarration(app) {
+  if (app.narrationTimerRemaining <= 0) return;
+  const frame = app.frames[app.currentIndex];
+  app.narrationTimerStart = Date.now();
+  app.narrationTimerDelay = app.narrationTimerRemaining;
+  app.narrationTimer = setTimeout(() => {
+    app.narrationTimer = null;
+    app.narrationTimerStart = null;
+    app.narrationTimerDelay = null;
+    app.narrationTimerRemaining = null;
+    if (frame.narration?.audio) {
+      playNarration(frame.narration.audio);
     }
+  }, app.narrationTimerRemaining);
+  app.narrationTimerRemaining = null;
+}
 
-    app.paused = false;
-    app.state = app.pausedFromState;
-    app.pausedFromState = null;
+function resumeDelayedMusic(app) {
+  if (app.musicTimerRemaining <= 0) return;
+  const frame = app.frames[app.currentIndex];
+  if (!frame.music) return;
+  app.musicTimerStart = Date.now();
+  app.musicTimerDelay = app.musicTimerRemaining;
+  app.musicTimer = setTimeout(() => {
+    app.musicTimer = null;
+    app.musicTimerStart = null;
+    app.musicTimerDelay = null;
+    app.musicTimerRemaining = null;
+    playMusic(frame.music.src, frame.music.startVolume);
+    fadeMusic(frame.music.fullVolume, frame.music.crescendoMs);
+  }, app.musicTimerRemaining);
+  app.musicTimerRemaining = null;
+}
 
-    resumeNarration();
-    resumeAmbient();
-    resumeMusic();
+function resumeDelayedPhase(app) {
+  if (app.phaseTimerRemaining <= 0) return;
+  const frame = app.frames[app.currentIndex];
+  const pi = app.pausedPhaseIndex;
+  app.phaseTimer = setTimeout(() => startPhase(app, frame, pi + 1), app.phaseTimerRemaining);
+  app.phaseTimerRemaining = null;
+  app.pausedPhaseIndex = null;
+}
 
-    if (app.textTimeline && !app.buffering) {
-      app.textTimeline.resume();
-    }
+function handleFirstPlay(app) {
+  const frame = app.frames[app.currentIndex];
+  if (app.textTimeline) {
+    app.textTimeline.restart();
+  }
+  if (frame.music) {
+    scheduleMusic(app, frame.music);
+  }
+  if (frame.narration?.audio) {
+    scheduleNarrationAudio(app, frame.narration);
+  }
+  if (areCaptionsEnabled() && frame.narration?.captions?.length > 0) {
+    showCaptions(frame.narration.captions, app.els.captionLayer);
+  }
+}
 
-    const effectsTweens = gsap.getTweensOf(app.els.effectsLayer);
-    const childTweens = gsap.getTweensOf(app.els.effectsLayer.children);
-    [...effectsTweens, ...childTweens].forEach((tw) => tw.resume());
+function resumeEffects(app) {
+  const effectsTweens = gsap.getTweensOf(app.els.effectsLayer);
+  const childTweens = gsap.getTweensOf(app.els.effectsLayer.children);
+  [...effectsTweens, ...childTweens].forEach((tw) => tw.resume());
+}
 
-    if (app.buffering) {
-      // Text and captions stay paused — buffer monitor will resume them
-    } else if (areCaptionsEnabled()) {
+function pauseEffects(app) {
+  const effectsTweens = gsap.getTweensOf(app.els.effectsLayer);
+  const childTweens = gsap.getTweensOf(app.els.effectsLayer.children);
+  [...effectsTweens, ...childTweens].forEach((tw) => tw.pause());
+}
+
+function doResume(app) {
+  const firstPlay = !app.userHasInteracted;
+  if (firstPlay) {
+    app.userHasInteracted = true;
+  }
+
+  app.paused = false;
+  app.state = app.pausedFromState;
+  app.pausedFromState = null;
+
+  resumeNarration();
+  resumeAmbient();
+  resumeMusic();
+
+  if (app.textTimeline && !app.buffering) {
+    app.textTimeline.resume();
+  }
+
+  resumeEffects(app);
+
+  if (!app.buffering) {
+    if (areCaptionsEnabled()) {
       resumeCaptions();
     } else {
       clearCaptions();
     }
+  }
 
-    if (app.narrationTimerRemaining > 0) {
-      const frame = app.frames[app.currentIndex];
-      app.narrationTimerStart = Date.now();
-      app.narrationTimerDelay = app.narrationTimerRemaining;
-      app.narrationTimer = setTimeout(() => {
-        app.narrationTimer = null;
-        app.narrationTimerStart = null;
-        app.narrationTimerDelay = null;
-        app.narrationTimerRemaining = null;
-        if (frame.narration?.audio) {
-          playNarration(frame.narration.audio);
-        }
-      }, app.narrationTimerRemaining);
-      app.narrationTimerRemaining = null;
-    }
+  resumeDelayedNarration(app);
+  resumeDelayedMusic(app);
+  resumeDelayedPhase(app);
 
-    if (app.musicTimerRemaining > 0) {
-      const frame = app.frames[app.currentIndex];
-      if (frame.music) {
-        app.musicTimerStart = Date.now();
-        app.musicTimerDelay = app.musicTimerRemaining;
-        app.musicTimer = setTimeout(() => {
-          app.musicTimer = null;
-          app.musicTimerStart = null;
-          app.musicTimerDelay = null;
-          app.musicTimerRemaining = null;
-          playMusic(frame.music.src, frame.music.startVolume);
-          fadeMusic(frame.music.fullVolume, frame.music.crescendoMs);
-        }, app.musicTimerRemaining);
-        app.musicTimerRemaining = null;
-      }
-    }
+  if (firstPlay) {
+    handleFirstPlay(app);
+  }
 
-    if (app.phaseTimerRemaining > 0) {
-      const frame = app.frames[app.currentIndex];
-      const pi = app.pausedPhaseIndex;
-      app.phaseTimer = setTimeout(() => startPhase(app, frame, pi + 1), app.phaseTimerRemaining);
-      app.phaseTimerRemaining = null;
-      app.pausedPhaseIndex = null;
-    }
+  app.els.btnPause.setAttribute('aria-pressed', 'false');
+  app.els.btnPause.classList.remove('paused');
+}
 
-    if (firstPlay) {
-      const frame = app.frames[app.currentIndex];
-      if (app.textTimeline) {
-        app.textTimeline.restart();
-      }
-      if (frame.music) {
-        scheduleMusic(app, frame.music);
-      }
-      if (frame.narration?.audio) {
-        scheduleNarrationAudio(app, frame.narration);
-      }
-      if (areCaptionsEnabled() && frame.narration?.captions?.length > 0) {
-        showCaptions(frame.narration.captions, app.els.captionLayer);
-      }
-    }
+function saveNarrationTimerRemaining(app) {
+  if (!app.narrationTimer) return;
+  const elapsed = Date.now() - app.narrationTimerStart;
+  app.narrationTimerRemaining = Math.max(0, app.narrationTimerDelay - elapsed);
+  clearTimeout(app.narrationTimer);
+  app.narrationTimer = null;
+  app.narrationTimerStart = null;
+  app.narrationTimerDelay = null;
+}
 
-    app.els.btnPause.setAttribute('aria-pressed', 'false');
-    app.els.btnPause.classList.remove('paused');
+function saveMusicTimerRemaining(app) {
+  if (!app.musicTimer) return;
+  const elapsed = Date.now() - app.musicTimerStart;
+  app.musicTimerRemaining = Math.max(0, app.musicTimerDelay - elapsed);
+  clearMusicTimer(app);
+}
+
+function doPause(app) {
+  app.paused = true;
+  app.pausedFromState = app.state;
+  app.state = State.PAUSED;
+
+  pauseNarration();
+  pauseAmbient();
+  pauseMusic();
+
+  if (app.textTimeline) {
+    app.textTimeline.pause();
+  }
+
+  pauseEffects(app);
+  pauseCaptions();
+
+  saveNarrationTimerRemaining(app);
+  saveMusicTimerRemaining(app);
+
+  if (app.musicExitTimer) {
+    clearTimeout(app.musicExitTimer);
+    app.musicExitTimer = null;
+  }
+
+  if (app.phaseTimer) {
+    clearTimeout(app.phaseTimer);
+    app.phaseTimer = null;
+  }
+
+  app.els.btnPause.setAttribute('aria-pressed', 'true');
+  app.els.btnPause.classList.add('paused');
+}
+
+function togglePause(app) {
+  if (app.state === State.TRANSITIONING || app.state === State.LOADING) return;
+
+  if (app.paused) {
+    doResume(app);
   } else {
-    app.paused = true;
-    app.pausedFromState = app.state;
-    app.state = State.PAUSED;
-
-    pauseNarration();
-    pauseAmbient();
-    pauseMusic();
-
-    if (app.textTimeline) {
-      app.textTimeline.pause();
-    }
-
-    const effectsTweens = gsap.getTweensOf(app.els.effectsLayer);
-    const childTweens = gsap.getTweensOf(app.els.effectsLayer.children);
-    [...effectsTweens, ...childTweens].forEach((tw) => tw.pause());
-
-    pauseCaptions();
-
-    if (app.narrationTimer) {
-      const elapsed = Date.now() - app.narrationTimerStart;
-      app.narrationTimerRemaining = Math.max(0, app.narrationTimerDelay - elapsed);
-      clearTimeout(app.narrationTimer);
-      app.narrationTimer = null;
-      app.narrationTimerStart = null;
-      app.narrationTimerDelay = null;
-    }
-
-    if (app.musicTimer) {
-      const elapsed = Date.now() - app.musicTimerStart;
-      app.musicTimerRemaining = Math.max(0, app.musicTimerDelay - elapsed);
-      clearMusicTimer(app);
-    }
-
-    if (app.musicExitTimer) {
-      clearTimeout(app.musicExitTimer);
-      app.musicExitTimer = null;
-    }
-
-    if (app.phaseTimer) {
-      clearTimeout(app.phaseTimer);
-      app.phaseTimer = null;
-    }
-
-    app.els.btnPause.setAttribute('aria-pressed', 'true');
-    app.els.btnPause.classList.add('paused');
+    doPause(app);
   }
 }
 

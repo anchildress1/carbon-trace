@@ -45,7 +45,7 @@ function scheduleCaptionsFromOffset(captions, container, offsetMs) {
       activeElements.push(el);
 
       const hideId = setTimeout(() => {
-        if (el.parentNode) el.parentNode.removeChild(el);
+        el.remove();
         const idx = activeElements.indexOf(el);
         if (idx >= 0) activeElements.splice(idx, 1);
       }, hideDelay);
@@ -59,7 +59,7 @@ function scheduleCaptionsFromOffset(captions, container, offsetMs) {
         activeElements.push(el);
 
         const hideId = setTimeout(() => {
-          if (el.parentNode) el.parentNode.removeChild(el);
+          el.remove();
           const idx = activeElements.indexOf(el);
           if (idx >= 0) activeElements.splice(idx, 1);
         }, caption.end - caption.start);
@@ -90,7 +90,7 @@ export function clearCaptions() {
   activeTimers = [];
 
   for (const el of activeElements) {
-    if (el.parentNode) el.parentNode.removeChild(el);
+    el.remove();
   }
   activeElements = [];
 
@@ -118,7 +118,7 @@ export function resumeCaptions() {
   playbackStartedAt = Date.now();
 
   for (const el of activeElements) {
-    if (el.parentNode) el.parentNode.removeChild(el);
+    el.remove();
   }
   activeElements = [];
 
