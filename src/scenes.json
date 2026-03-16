@@ -85,8 +85,8 @@
           },
           {
             "text": "Miner or miner's wife.",
-            "enter": 9000,
-            "exit": 14000,
+            "enter": 10000,
+            "exit": 15000,
             "x": 10,
             "y": 82,
             "align": "left"
@@ -181,7 +181,7 @@
             "align": "left"
           },
           {
-            "text": "Nobody called it much of nothing but being a good wife.",
+            "text": "Nobody called that much of nothing but being a good wife.",
             "enter": 29000,
             "exit": 33000,
             "x": 75,
