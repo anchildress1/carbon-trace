@@ -223,17 +223,17 @@
       }
     },
     {
-      "id": "scene-07-stillness",
+      "id": "scene-07-empty",
       "frameType": "scene",
       "description": "A still and quiet moment — carbon suspended in silence, barely moving",
       "image": "assets/images/scene-07-empty.webp",
       "narration": {
         "lines": [],
-        "audio": "assets/audio/narration/scene-07-stillness.mp3",
+        "audio": "assets/audio/narration/scene-07-empty.mp3",
         "delay": 500
       },
       "ambient": {
-        "src": "assets/audio/ambient/scene-07-stillness.mp3",
+        "src": "assets/audio/ambient/scene-07-empty.mp3",
         "volume": 0.08,
         "loop": true
       },
