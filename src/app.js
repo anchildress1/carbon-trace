@@ -115,7 +115,9 @@ function registerAudio(app, loaded) {
 function preloadFirstFrameAudio(app) {
   const srcs = audioSrcsFromEntry(app.frames[0]);
   for (const src of srcs) {
-    preloadAudio(src).then((loaded) => registerAudio(app, loaded));
+    preloadAudio(src)
+      .then((loaded) => registerAudio(app, loaded))
+      .catch((err) => console.warn('First frame audio preload failed:', err));
   }
 }
 
@@ -338,6 +340,9 @@ function startPhase(app, frame, pi) {
   }
 
   if (phase.duration && pi < frame.phases.length - 1) {
+    app.phaseTimerStart = Date.now();
+    app.phaseTimerDelay = phase.duration;
+    app.pausedPhaseIndex = pi;
     app.phaseTimer = setTimeout(() => startPhase(app, frame, pi + 1), phase.duration);
   }
 }
@@ -637,8 +642,12 @@ function doPause(app) {
   }
 
   if (app.phaseTimer) {
+    const elapsed = Date.now() - app.phaseTimerStart;
+    app.phaseTimerRemaining = Math.max(0, app.phaseTimerDelay - elapsed);
     clearTimeout(app.phaseTimer);
     app.phaseTimer = null;
+    app.phaseTimerStart = null;
+    app.phaseTimerDelay = null;
   }
 
   app.els.btnPause.setAttribute('aria-pressed', 'true');
@@ -661,10 +670,11 @@ function replayNarration(app) {
   app.userHasInteracted = true;
 
   if (app.paused) {
+    const resumeState = app.pausedFromState || State.SCENE_ACTIVE;
     clearPauseState(app);
     resumeNarration();
     resumeAmbient();
-    app.state = app.pausedFromState || State.SCENE_ACTIVE;
+    app.state = resumeState;
   }
 
   app.buffering = false;
@@ -773,7 +783,7 @@ function initApp(app) {
         app.els.btnMute.removeAttribute('aria-disabled');
       }
 
-      const captionsEnabled = initCaptions(app.els.captionLayer);
+      const captionsEnabled = initCaptions();
       app.els.btnCaptions.setAttribute('aria-pressed', String(captionsEnabled));
 
       showFrame(app, 0);
@@ -799,7 +809,11 @@ function initApp(app) {
 
       // Defer background asset preloads to avoid network contention.
       // Loads sequentially: each scene's image then audio, in order.
-      setTimeout(() => preloadBackgroundAssets(app), 4000);
+      setTimeout(() => {
+        preloadBackgroundAssets(app).catch((err) =>
+          console.warn('Background asset preload failed:', err),
+        );
+      }, 4000);
 
       const markInteracted = () => {
         app.userHasInteracted = true;
@@ -886,6 +900,8 @@ export function createApp() {
     userHasInteracted: false,
     textTimeline: null,
     phaseTimer: null,
+    phaseTimerStart: null,
+    phaseTimerDelay: null,
     phaseTimerRemaining: null,
     pausedPhaseIndex: null,
     narrationTimer: null,

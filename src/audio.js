@@ -57,7 +57,9 @@ function reloadFromPosition(node) {
   node.src = '';
   node.src = src;
   node.currentTime = time;
-  node.play().catch(() => {});
+  node.play().catch((err) => {
+    console.warn('Buffer recovery play() failed:', err.message);
+  });
 }
 
 function checkBufferProgress(node, state) {
@@ -74,7 +76,9 @@ function checkBufferProgress(node, state) {
     const ahead = currentEnd - node.currentTime;
     const nearEnd = node.duration > 0 && node.duration - node.currentTime < 3;
     if (ahead >= 3 || nearEnd) {
-      node.play().catch(() => {});
+      node.play().catch((err) => {
+        console.warn('Buffer recovery play() failed:', err.message);
+      });
     }
   } else {
     state.stallChecks++;

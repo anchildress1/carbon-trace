@@ -11,7 +11,8 @@ let elapsedBeforePause = 0;
 export function initCaptions() {
   try {
     enabled = localStorage.getItem(STORAGE_KEY) === 'true';
-  } catch {
+  } catch (err) {
+    console.warn('Could not read captions preference:', err.message);
     enabled = false;
   }
   return enabled;
@@ -21,8 +22,8 @@ export function setCaptionsEnabled(value) {
   enabled = value;
   try {
     localStorage.setItem(STORAGE_KEY, String(value));
-  } catch {
-    /* localStorage unavailable */
+  } catch (err) {
+    console.warn('Could not save captions preference:', err.message);
   }
 }
 
