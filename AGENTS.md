@@ -71,4 +71,5 @@ Deployed as a static site to GitHub Pages.
 
 ## Documentation
 
-- Do not add docs to project unless specifically asked.
+- Keep docs in `docs/` aligned with the codebase — update them whenever code changes affect architecture, audio system, or accessibility behavior.
+- Prefer Mermaid diagrams whenever a visual would clarify architecture, data flow, or state machines.
