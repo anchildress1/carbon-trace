@@ -1,7 +1,7 @@
 import { createApp } from './app.js';
 
-if (!window.__carbonTraceInitialized) {
-  window.__carbonTraceInitialized = true;
+if (!globalThis.__carbonTraceInitialized) {
+  globalThis.__carbonTraceInitialized = true;
 
   document.addEventListener('DOMContentLoaded', () => {
     try {

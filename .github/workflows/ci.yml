@@ -63,7 +63,7 @@ jobs:
         run: make lint
 
       - name: Run Unit Tests
-        run: make test
+        run: make unit
 
       - name: Store Unit Test Coverage
         uses: actions/upload-artifact@v6
