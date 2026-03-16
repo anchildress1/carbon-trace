@@ -71,14 +71,14 @@ function preloadImage(src) {
 function preloadAudio(src) {
   return new Promise((resolve) => {
     const audio = new Audio();
-    audio.preload = 'auto';
+    audio.preload = 'metadata';
 
     const timeout = setTimeout(() => {
       console.warn(`Audio preload timed out: ${src}`);
       resolve(null);
     }, 5000);
 
-    audio.oncanplaythrough = () => {
+    audio.onloadedmetadata = () => {
       clearTimeout(timeout);
       resolve(src);
     };
@@ -95,54 +95,34 @@ function audioSrcsFromEntry(entry) {
   return [entry.ambient?.src, entry.narration?.audio].filter(Boolean);
 }
 
-function collectAudioSrcs(frames) {
-  const srcs = new Set();
-  const entries = frames.flatMap((f) => [f, ...(f.phases || [])]);
-  for (const entry of entries) {
-    for (const src of audioSrcsFromEntry(entry)) {
-      srcs.add(src);
+function registerAudio(app, loaded) {
+  if (loaded) {
+    app.availableAudio.add(loaded);
+    if (app.availableAudio.size === 1) {
+      app.els.btnMute.removeAttribute('aria-disabled');
     }
   }
-  return srcs;
 }
 
 function preloadFirstFrameAudio(app) {
-  const firstFrame = app.frames[0];
-  const srcs = audioSrcsFromEntry(firstFrame);
-  return Promise.all(
-    srcs.map((src) =>
-      preloadAudio(src).then((loaded) => {
-        if (loaded) {
-          app.availableAudio.add(loaded);
-          if (app.availableAudio.size === 1) {
-            app.els.btnMute.removeAttribute('aria-disabled');
-          }
-        }
-      }),
-    ),
-  );
-}
-
-function preloadRemainingAudio(app) {
-  const firstFrameSrcs = new Set(audioSrcsFromEntry(app.frames[0]));
-  const audioSrcs = [...collectAudioSrcs(app.frames)].filter((src) => !firstFrameSrcs.has(src));
-  for (const src of audioSrcs) {
-    preloadAudio(src).then((loaded) => {
-      if (loaded) {
-        app.availableAudio.add(loaded);
-        if (app.availableAudio.size === 1) {
-          app.els.btnMute.removeAttribute('aria-disabled');
-        }
-      }
-    });
+  const srcs = audioSrcsFromEntry(app.frames[0]);
+  for (const src of srcs) {
+    preloadAudio(src).then((loaded) => registerAudio(app, loaded));
   }
 }
 
-function preloadRemainingImages(app) {
-  app.frames
-    .slice(1)
-    .filter((frame) => frame.image)
-    .forEach((frame) => preloadImage(frame.image));
+async function preloadBackgroundAssets(app) {
+  const firstFrameSrcs = new Set(audioSrcsFromEntry(app.frames[0]));
+
+  for (const frame of app.frames.slice(1)) {
+    if (frame.image) await preloadImage(frame.image);
+    for (const src of audioSrcsFromEntry(frame)) {
+      if (!firstFrameSrcs.has(src)) {
+        const loaded = await preloadAudio(src);
+        registerAudio(app, loaded);
+      }
+    }
+  }
 }
 
 function preloadAssets(app) {
@@ -623,7 +603,9 @@ function initApp(app) {
     app.els.sceneImage.removeAttribute('src');
   });
 
-  Promise.all([preloadAssets(app), preloadFirstFrameAudio(app)])
+  preloadFirstFrameAudio(app);
+
+  preloadAssets(app)
     .then(() => {
       app.els.loadingScreen.hidden = true;
       app.els.sceneStage.hidden = false;
@@ -639,24 +621,27 @@ function initApp(app) {
       showFrame(app, 0);
 
       // Start paused — everything waits for the user to press play.
-      // Text timeline paused at t=0 so no text is visible before play.
-      // Stop any audio/captions that showFrame may have triggered.
+      // Seek the text timeline past the first line's entrance animation
+      // so it's visible as a static title card (also provides an LCP
+      // element for Lighthouse). On play, textTimeline.restart() replays
+      // from t=0 with the full ghost-drift entrance.
       stopNarration();
       clearCaptions();
       app.paused = true;
       app.pausedFromState = State.SCENE_ACTIVE;
       app.state = State.PAUSED;
       if (app.textTimeline) {
+        const firstLine = app.frames[0].narration?.lines?.[0];
+        const seekTime = firstLine ? firstLine.enter / 1000 + 1.3 : 0;
+        app.textTimeline.seek(seekTime);
         app.textTimeline.pause();
       }
       app.els.btnPause.setAttribute('aria-pressed', 'true');
       app.els.btnPause.classList.add('paused');
 
-      // Defer remaining asset preloads to avoid network contention.
-      setTimeout(() => {
-        preloadRemainingImages(app);
-        preloadRemainingAudio(app);
-      }, 4000);
+      // Defer background asset preloads to avoid network contention.
+      // Loads sequentially: each scene's image then audio, in order.
+      setTimeout(() => preloadBackgroundAssets(app), 4000);
 
       const markInteracted = () => {
         app.userHasInteracted = true;
