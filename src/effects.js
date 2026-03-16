@@ -6,18 +6,19 @@ function opacityPulse(opacity, duration) {
   };
 }
 
-function particleEffect({ count, color, topRange, xSpread, yDrift, durationRange }) {
+function particleEffect({ count, color, size, glow, topRange, xSpread, yDrift, durationRange }) {
   return (container) => {
     for (let i = 0; i < count; i++) {
       const particle = document.createElement('div');
       particle.style.cssText = `
         position: absolute;
-        width: 2px;
-        height: 2px;
+        width: ${size}px;
+        height: ${size}px;
         background: ${color};
         border-radius: 50%;
         left: ${Math.random() * 100}%;
         top: ${Math.random() * topRange}%;
+        ${glow ? `box-shadow: 0 0 ${glow}px ${color};` : ''}
       `;
       container.appendChild(particle);
 
@@ -35,58 +36,61 @@ function particleEffect({ count, color, topRange, xSpread, yDrift, durationRange
 
 const effects = {
   'dust-drift': particleEffect({
-    count: 12,
-    color: 'rgba(255, 255, 255, 0.15)',
+    count: 18,
+    color: 'rgba(255, 255, 255, 0.4)',
+    size: 4,
+    glow: 6,
     topRange: 100,
-    xSpread: 40,
-    yDrift: [-20, -30],
+    xSpread: 60,
+    yDrift: [-30, -50],
     durationRange: [4, 4],
   }),
 
   'motion-drag': (container) => {
     gsap.fromTo(
       container,
-      { filter: 'blur(2px)' },
-      { filter: 'blur(0px)', duration: 1.5, ease: 'power2.out' },
+      { filter: 'blur(6px)' },
+      { filter: 'blur(0px)', duration: 3, ease: 'power2.out' },
     );
   },
 
   'heat-pulse': (container) => {
     gsap.to(container, {
-      filter: 'blur(0.5px) brightness(1.08)',
-      duration: 1.5,
+      filter: 'blur(1px) brightness(1.2)',
+      duration: 2,
       repeat: -1,
       yoyo: true,
       ease: 'sine.inOut',
     });
   },
 
-  'near-still-pulse': opacityPulse(0.97, 3),
+  'near-still-pulse': opacityPulse(0.85, 3),
 
   'light-crack': (container) => {
     const flash = document.createElement('div');
     flash.style.cssText = `
       position: absolute;
       inset: 0;
-      background: linear-gradient(90deg, transparent 40%, rgba(255,255,255,0.15) 50%, transparent 60%);
+      background: linear-gradient(90deg, transparent 30%, rgba(255,255,255,0.5) 50%, transparent 70%);
       opacity: 0;
     `;
     container.appendChild(flash);
 
     gsap.fromTo(
       flash,
-      { opacity: 0, scaleX: 0.5 },
-      { opacity: 1, scaleX: 1.2, duration: 0.4, ease: 'power3.out' },
+      { opacity: 0, scaleX: 0.3 },
+      { opacity: 1, scaleX: 1.5, duration: 0.5, ease: 'power3.out' },
     );
-    gsap.to(flash, { opacity: 0, duration: 0.8, delay: 0.4, ease: 'power2.in' });
+    gsap.to(flash, { opacity: 0, duration: 1.2, delay: 0.5, ease: 'power2.in' });
   },
 
   'assembly-micro': (container) => {
     gsap.to(container, {
-      x: () => `+=${(Math.random() - 0.5) * 2}`,
-      y: () => `+=${(Math.random() - 0.5) * 1}`,
+      x: () => (Math.random() - 0.5) * 4,
+      y: () => (Math.random() - 0.5) * 2,
       duration: 0.15,
       repeat: -1,
+      repeatRefresh: true,
       ease: 'none',
     });
   },
@@ -96,7 +100,7 @@ const effects = {
     glow.style.cssText = `
       position: absolute;
       inset: 0;
-      background: radial-gradient(circle at center, rgba(255,255,255,0.1) 0%, transparent 70%);
+      background: radial-gradient(circle at center, rgba(255,255,255,0.25) 0%, transparent 70%);
       opacity: 0;
       transform: scale(0.3);
     `;
@@ -105,18 +109,20 @@ const effects = {
     gsap.to(glow, { opacity: 1, scale: 1.5, duration: 3, ease: 'power2.out' });
   },
 
-  'machine-steady': opacityPulse(0.95, 1.5),
+  'machine-steady': opacityPulse(0.85, 1.5),
 
   'fade-in': (container) => {
     gsap.fromTo(container, { opacity: 0 }, { opacity: 1, duration: 0.8, ease: 'power2.out' });
   },
 
   'dust-settle': particleEffect({
-    count: 10,
-    color: 'rgba(200, 190, 170, 0.2)',
+    count: 14,
+    color: 'rgba(200, 190, 170, 0.4)',
+    size: 5,
+    glow: 4,
     topRange: 50,
-    xSpread: 20,
-    yDrift: [20, 30],
+    xSpread: 30,
+    yDrift: [25, 40],
     durationRange: [5, 4],
   }),
 
@@ -125,7 +131,7 @@ const effects = {
     stream.style.cssText = `
       position: absolute;
       inset: 0;
-      background: linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.04) 50%, transparent 100%);
+      background: linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.12) 50%, transparent 100%);
       transform: translateY(-100%);
     `;
     container.appendChild(stream);

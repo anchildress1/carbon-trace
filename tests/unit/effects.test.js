@@ -24,7 +24,7 @@ describe('effects.js', () => {
     it('runs dust-drift effect and creates particles', () => {
       runEffect('dust-drift', container);
 
-      expect(container.children.length).toBe(12);
+      expect(container.children.length).toBe(18);
       expect(gsap.to).toHaveBeenCalled();
     });
 
@@ -45,7 +45,7 @@ describe('effects.js', () => {
 
       expect(gsap.fromTo).toHaveBeenCalledWith(
         container,
-        expect.objectContaining({ filter: 'blur(2px)' }),
+        expect.objectContaining({ filter: 'blur(6px)' }),
         expect.objectContaining({ filter: 'blur(0px)' }),
       );
     });
@@ -55,7 +55,7 @@ describe('effects.js', () => {
 
       expect(gsap.to).toHaveBeenCalledWith(
         container,
-        expect.objectContaining({ opacity: 0.97, repeat: -1 }),
+        expect.objectContaining({ opacity: 0.85, repeat: -1 }),
       );
     });
 
@@ -104,7 +104,7 @@ describe('effects.js', () => {
     it('runs dust-settle effect and creates particles', () => {
       runEffect('dust-settle', container);
 
-      expect(container.children.length).toBe(10);
+      expect(container.children.length).toBe(14);
       expect(gsap.to).toHaveBeenCalled();
     });
 
@@ -199,7 +199,7 @@ describe('effects.js', () => {
       const particle = container.children[0];
       expect(particle.style.position).toBe('absolute');
       expect(particle.style.borderRadius).toBe('50%');
-      expect(particle.style.width).toBe('2px');
+      expect(particle.style.width).toBe('4px');
     });
 
     it('dust-settle creates particles with distinct color', () => {
@@ -207,7 +207,7 @@ describe('effects.js', () => {
 
       const particle = container.children[0];
       expect(particle.style.position).toBe('absolute');
-      expect(particle.style.height).toBe('2px');
+      expect(particle.style.height).toBe('5px');
     });
   });
 

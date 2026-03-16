@@ -76,18 +76,18 @@ describe('performance budgets', () => {
   });
 
   describe('effects creation', () => {
-    it(`creates dust-drift (12 particles) within ${BUDGET_MS}ms`, () => {
+    it(`creates dust-drift (18 particles) within ${BUDGET_MS}ms`, () => {
       const elapsed = measure(() => runEffect('dust-drift', container));
 
       expect(elapsed).toBeLessThan(BUDGET_MS);
-      expect(container.children.length).toBe(12);
+      expect(container.children.length).toBe(18);
     });
 
-    it(`creates dust-settle (10 particles) within ${BUDGET_MS}ms`, () => {
+    it(`creates dust-settle (14 particles) within ${BUDGET_MS}ms`, () => {
       const elapsed = measure(() => runEffect('dust-settle', container));
 
       expect(elapsed).toBeLessThan(BUDGET_MS);
-      expect(container.children.length).toBe(10);
+      expect(container.children.length).toBe(14);
     });
 
     it.each([
