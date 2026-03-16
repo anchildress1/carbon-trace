@@ -1064,11 +1064,11 @@
       },
       "music": {
         "src": "assets/audio/sfx/BridgeCitySinners_BreakTheChain.mp3",
-        "enter": 15000,
+        "enter": 20000,
         "exit": null,
         "startVolume": 0.01,
         "fullVolume": 0.25,
-        "crescendoMs": 27000
+        "crescendoMs": 45000
       },
       "ambient": null,
       "effects": {
