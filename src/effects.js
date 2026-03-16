@@ -139,21 +139,101 @@ const effects = {
   }),
 
   'water-run': ({ overlay }) => {
-    const stream = document.createElement('div');
-    stream.style.cssText = `
+    // Faucet stream — narrow column from top to diamond center
+    const faucet = document.createElement('div');
+    faucet.style.cssText = `
       position: absolute;
-      inset: 0;
-      background: linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.12) 50%, transparent 100%);
+      left: 47%;
+      top: 0;
+      width: 6%;
+      height: 45%;
+      background: linear-gradient(180deg,
+        rgba(200, 220, 255, 0.18) 0%,
+        rgba(200, 220, 255, 0.12) 60%,
+        rgba(255, 255, 255, 0.06) 100%);
+      mask-image: linear-gradient(180deg, white 0%, white 80%, transparent 100%);
+      -webkit-mask-image: linear-gradient(180deg, white 0%, white 80%, transparent 100%);
+    `;
+    overlay.appendChild(faucet);
+
+    // Shimmer moving down the faucet stream
+    const shimmer = document.createElement('div');
+    shimmer.style.cssText = `
+      position: absolute;
+      left: 47%;
+      top: 0;
+      width: 6%;
+      height: 45%;
+      background: linear-gradient(180deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.15) 30%,
+        transparent 60%);
       transform: translateY(-100%);
     `;
-    overlay.appendChild(stream);
+    overlay.appendChild(shimmer);
+    gsap.to(shimmer, { y: '220%', duration: 1.2, repeat: -1, ease: 'none' });
 
-    gsap.to(stream, {
-      y: '200%',
-      duration: 5,
-      repeat: -1,
-      ease: 'sine.inOut',
-    });
+    // Splash droplets radiating from where water hits the diamond (~50%, 40%)
+    const splashCount = 10;
+    for (let i = 0; i < splashCount; i++) {
+      const drop = document.createElement('div');
+      const size = 2 + Math.random() * 3;
+      drop.style.cssText = `
+        position: absolute;
+        width: ${size}px;
+        height: ${size}px;
+        background: rgba(200, 220, 255, 0.35);
+        border-radius: 50%;
+        left: 50%;
+        top: 40%;
+        box-shadow: 0 0 4px rgba(200, 220, 255, 0.25);
+      `;
+      overlay.appendChild(drop);
+
+      const angle = (Math.PI * 2 * i) / splashCount + (Math.random() - 0.5) * 0.6;
+      const dist = 30 + Math.random() * 60;
+      gsap.to(drop, {
+        x: Math.cos(angle) * dist,
+        y: Math.sin(angle) * dist * 0.6 + 15,
+        opacity: 0,
+        duration: 1 + Math.random() * 1.5,
+        delay: Math.random() * 1.5,
+        repeat: -1,
+        ease: 'power2.out',
+      });
+    }
+
+    // Rivulets — thin streams cascading down from diamond to basin
+    const rivulets = [
+      { left: 38, width: 2, delay: 0 },
+      { left: 44, width: 3, delay: 0.4 },
+      { left: 52, width: 2, delay: 0.8 },
+      { left: 58, width: 3, delay: 0.2 },
+      { left: 48, width: 2, delay: 0.6 },
+    ];
+    for (const r of rivulets) {
+      const riv = document.createElement('div');
+      riv.style.cssText = `
+        position: absolute;
+        left: ${r.left}%;
+        top: 42%;
+        width: ${r.width}px;
+        height: 25%;
+        background: linear-gradient(180deg,
+          rgba(200, 220, 255, 0.12) 0%,
+          rgba(200, 220, 255, 0.06) 70%,
+          transparent 100%);
+        transform: translateY(-100%);
+      `;
+      overlay.appendChild(riv);
+      gsap.to(riv, {
+        y: '400%',
+        duration: 2 + Math.random(),
+        delay: r.delay,
+        repeat: -1,
+        ease: 'power1.in',
+      });
+    }
   },
 };
 

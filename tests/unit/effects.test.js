@@ -111,10 +111,11 @@ describe('effects.js', () => {
       expect(gsap.to).toHaveBeenCalled();
     });
 
-    it('runs water-run effect and creates stream element in overlay', () => {
+    it('runs water-run effect and creates faucet, splash, and rivulet elements', () => {
       runEffect('water-run', overlay, scene);
 
-      expect(overlay.children.length).toBe(1);
+      // 1 faucet + 1 shimmer + 10 splash drops + 5 rivulets = 17
+      expect(overlay.children.length).toBe(17);
       expect(gsap.to).toHaveBeenCalled();
     });
 
@@ -239,11 +240,13 @@ describe('effects.js', () => {
       expect(glow.style.position).toBe('absolute');
     });
 
-    it('water-run stream has translateY(-100%) transform', () => {
+    it('water-run faucet stream is positioned at top-center', () => {
       runEffect('water-run', overlay, scene);
 
-      const stream = overlay.children[0];
-      expect(stream.style.position).toBe('absolute');
+      const faucet = overlay.children[0];
+      expect(faucet.style.position).toBe('absolute');
+      expect(faucet.style.left).toBe('47%');
+      expect(faucet.style.top).toBe('0px');
     });
   });
 });
