@@ -44,6 +44,22 @@ describe('text.js', () => {
 
       expect(el.textContent).toBe('');
     });
+
+    it('preserves HTML special characters as text content', () => {
+      const el = createLineElement('<b>bold</b> & "quoted"', container);
+
+      expect(el.textContent).toBe('<b>bold</b> & "quoted"');
+      expect(el.children.length).toBe(0);
+    });
+
+    it('appends multiple elements sequentially', () => {
+      createLineElement('First', container);
+      createLineElement('Second', container);
+      createLineElement('Third', container);
+
+      expect(container.children.length).toBe(3);
+      expect(container.children[2].textContent).toBe('Third');
+    });
   });
 
   describe('buildTextTimeline', () => {
@@ -109,6 +125,33 @@ describe('text.js', () => {
       const toCall = tl.to.mock.calls[0];
       expect(toCall[2]).toBe(5);
     });
+
+    it('converts zero enter/exit to 0 seconds', () => {
+      const lines = [{ text: 'Instant', enter: 0, exit: 0 }];
+
+      const tl = buildTextTimeline(lines, container);
+
+      expect(tl.fromTo.mock.calls[0][3]).toBe(0);
+      expect(tl.to.mock.calls[0][2]).toBe(0);
+    });
+
+    it('uses reduced motion exit animation with short duration', () => {
+      const lines = [{ text: 'Exit test', enter: 0, exit: 3000 }];
+
+      const tl = buildTextTimeline(lines, container, true);
+
+      const toCall = tl.to.mock.calls[0];
+      expect(toCall[1]).toMatchObject({ opacity: 0, duration: 0.3, ease: 'none' });
+    });
+
+    it('uses ghost-drift exit animation with y offset', () => {
+      const lines = [{ text: 'Exit drift', enter: 0, exit: 3000 }];
+
+      const tl = buildTextTimeline(lines, container, false);
+
+      const toCall = tl.to.mock.calls[0];
+      expect(toCall[1]).toMatchObject({ opacity: 0, y: -6, duration: 0.6, ease: 'power2.in' });
+    });
   });
 
   describe('clearNarrationLayer', () => {
@@ -121,12 +164,13 @@ describe('text.js', () => {
       expect(container.children.length).toBe(0);
     });
 
-    it('kills GSAP tweens on children', () => {
+    it('kills GSAP tweens on children collection', () => {
+      container.appendChild(document.createElement('p'));
       container.appendChild(document.createElement('p'));
 
       clearNarrationLayer(container);
 
-      expect(gsap.killTweensOf).toHaveBeenCalled();
+      expect(gsap.killTweensOf).toHaveBeenCalledWith(container.children);
     });
 
     it('handles empty container', () => {

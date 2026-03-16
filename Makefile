@@ -1,4 +1,4 @@
-.PHONY: install dev format format-check lint typecheck test build e2e perf secret-scan clean
+.PHONY: install dev format format-check lint typecheck unit test build e2e perf secret-scan clean
 
 # Install all dependencies
 install:
@@ -29,8 +29,8 @@ lint:
 typecheck:
 	@echo "Skipping type check (vanilla JS project)."
 
-# Run unit tests
-test:
+# Run unit tests only
+unit:
 	@echo "Running unit tests..."
 	pnpm test
 
@@ -39,15 +39,27 @@ build:
 	@echo "Building project..."
 	pnpm build
 
-# Run Playwright E2E tests
-e2e:
+# Run Playwright E2E tests (builds first so preview server serves current source)
+e2e: build
 	@echo "Running E2E tests..."
 	pnpm e2e
 
-# Run performance / Lighthouse tests
-perf:
+# Run performance / Lighthouse tests (builds first so preview server serves current source)
+perf: build
 	@echo "Running performance tests..."
 	pnpm perf
+
+# Run all tests: build first, then unit + e2e + perf in parallel
+test: build
+	@echo "Running unit, E2E, and performance tests in parallel..."
+	@FAIL=0; \
+		pnpm test & UNIT_PID=$$!; \
+		pnpm e2e & E2E_PID=$$!; \
+		pnpm perf & PERF_PID=$$!; \
+		wait $$UNIT_PID || { echo "FAIL: unit tests failed"; FAIL=1; }; \
+		wait $$E2E_PID || { echo "FAIL: E2E tests failed"; FAIL=1; }; \
+		wait $$PERF_PID || { echo "FAIL: performance tests failed"; FAIL=1; }; \
+		if [ $$FAIL -ne 0 ]; then exit 1; fi
 
 # Scan for secrets
 secret-scan:

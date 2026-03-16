@@ -2,12 +2,11 @@ import { gsap } from 'gsap';
 import scenesData from './scenes.json';
 import { playAmbient, crossfadeAmbient, playNarration, setMuted } from './audio.js';
 import { buildTextTimeline, clearNarrationLayer } from './text.js';
-import { runEffect, clearEffects } from './effects.js';
+import { runEffect, clearEffects, effectExists } from './effects.js';
 import { initOverlay, updateProgress, showControls } from './overlay.js';
 
 const State = Object.freeze({
   LOADING: 'LOADING',
-  TITLE: 'TITLE',
   SCENE_ACTIVE: 'SCENE_ACTIVE',
   TRANSITIONING: 'TRANSITIONING',
   CREDITS: 'CREDITS',
@@ -15,8 +14,23 @@ const State = Object.freeze({
 
 const STATE_BY_FRAME_TYPE = {
   credits: State.CREDITS,
-  title: State.TITLE,
 };
+
+function validateEffects(frames) {
+  for (const frame of frames) {
+    for (const key of ['idle', 'entry']) {
+      const name = frame.effects?.[key];
+      if (name && !effectExists(name)) {
+        console.error(`Frame "${frame.id}" references unknown effect "${name}"`);
+      }
+    }
+  }
+}
+
+function applyFrameDefaults(scenesJson) {
+  const defaults = scenesJson.meta.frameDefaults || {};
+  return scenesJson.frames.map((frame) => ({ ...defaults, ...frame }));
+}
 
 function prefersReducedMotion() {
   return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -38,20 +52,27 @@ function preloadAudio(src) {
   return new Promise((resolve) => {
     const audio = new Audio();
     audio.preload = 'auto';
-    audio.oncanplaythrough = resolve;
+
+    const timeout = setTimeout(() => {
+      console.warn(`Audio preload timed out: ${src}`);
+      resolve(null);
+    }, 5000);
+
+    audio.oncanplaythrough = () => {
+      clearTimeout(timeout);
+      resolve(src);
+    };
     audio.onerror = () => {
+      clearTimeout(timeout);
       console.warn(`Failed to preload audio: ${src}`);
-      resolve();
+      resolve(null);
     };
     audio.src = src;
   });
 }
 
 function audioSrcsFromEntry(entry) {
-  const srcs = [];
-  if (entry.ambient?.src) srcs.push(entry.ambient.src);
-  if (entry.narration?.audio) srcs.push(entry.narration.audio);
-  return srcs;
+  return [entry.ambient?.src, entry.narration?.audio].filter(Boolean);
 }
 
 function collectAudioSrcs(frames) {
@@ -66,19 +87,44 @@ function collectAudioSrcs(frames) {
 }
 
 function preloadAssets(app) {
-  const imagePromises = app.frames.map((frame) => preloadImage(frame.image));
-  const audioPromises = [...collectAudioSrcs(app.frames)].map(preloadAudio);
+  const imagePromises = app.frames
+    .filter((frame) => frame.image)
+    .map((frame) => preloadImage(frame.image));
+  const audioPromises = [...collectAudioSrcs(app.frames)].map((src) =>
+    preloadAudio(src).then((loaded) => {
+      if (loaded) app.availableAudio.add(loaded);
+    }),
+  );
   return Promise.all([...imagePromises, ...audioPromises]);
 }
 
+function scheduleNarrationAudio(app, narration) {
+  const delay = narration.delay || 0;
+  if (delay > 0) {
+    app.narrationTimer = setTimeout(() => {
+      app.narrationTimer = null;
+      playNarration(narration.audio);
+    }, delay);
+  } else {
+    playNarration(narration.audio);
+  }
+}
+
 function applyNarration(app, frame) {
+  if (app.narrationTimer) {
+    clearTimeout(app.narrationTimer);
+    app.narrationTimer = null;
+  }
+
   if (!frame.narration) {
     app.els.accessibleNarration.textContent = '';
-    app.els.btnReplay.hidden = true;
+    app.els.btnReplay.disabled = true;
     return;
   }
 
   const hasLines = Array.isArray(frame.narration.lines) && frame.narration.lines.length > 0;
+  const hasAudioRef = Boolean(frame.narration.audio);
+  const audioReady = hasAudioRef && app.availableAudio.has(frame.narration.audio);
 
   if (hasLines) {
     buildTextTimeline(frame.narration.lines, app.els.narrationLayer, prefersReducedMotion());
@@ -87,12 +133,10 @@ function applyNarration(app, frame) {
     app.els.accessibleNarration.textContent = '';
   }
 
-  if (frame.narration.audio) {
-    app.els.btnReplay.hidden = false;
-    const delay = frame.narration.delay || 0;
-    setTimeout(() => playNarration(frame.narration.audio), delay);
-  } else {
-    app.els.btnReplay.hidden = true;
+  app.els.btnReplay.disabled = !(hasLines || hasAudioRef);
+
+  if (audioReady) {
+    scheduleNarrationAudio(app, frame.narration);
   }
 }
 
@@ -106,6 +150,20 @@ function applyAmbient(app, frame) {
   }
 }
 
+function buildSceneIndexMap(frames) {
+  const byFrame = new Map();
+  const byScene = new Map();
+  let count = 0;
+  frames.forEach((frame, i) => {
+    if (frame.frameType === 'scene' || frame.frameType === 'credits') {
+      const sceneIdx = ++count;
+      byFrame.set(i, sceneIdx);
+      byScene.set(sceneIdx, i);
+    }
+  });
+  return { byFrame, byScene };
+}
+
 function showFrame(app, index) {
   if (app.phaseTimer) {
     clearTimeout(app.phaseTimer);
@@ -113,8 +171,12 @@ function showFrame(app, index) {
   }
 
   const frame = app.frames[index];
-  app.els.sceneImage.src = frame.image;
-  app.els.sceneImage.alt = `Scene: ${frame.id}`;
+  app.els.sceneImage.alt = frame.description || '';
+  if (frame.image) {
+    app.els.sceneImage.src = frame.image;
+  } else {
+    app.els.sceneImage.removeAttribute('src');
+  }
   app.els.traceOverlay.style.opacity = frame.traceOverlay?.opacity ?? 0;
 
   clearEffects(app.els.effectsLayer);
@@ -124,16 +186,17 @@ function showFrame(app, index) {
     runEffect(frame.effects.idle, app.els.effectsLayer);
   }
 
-  if (frame.frameType === 'scene') {
-    const sceneIndex = app.frames.slice(0, index + 1).filter((f) => f.frameType === 'scene').length;
-    updateProgress(sceneIndex);
+  const sceneIdx = app.sceneMap.byFrame.get(index);
+  if (sceneIdx !== undefined) {
+    updateProgress(sceneIdx);
   }
 
+  updateNavButtons(app);
   applyNarration(app, frame);
   applyAmbient(app, frame);
 
   if (frame.phases) {
-    runPhases(app, frame);
+    startPhase(app, frame, 0);
   }
 }
 
@@ -147,7 +210,7 @@ function startPhase(app, frame, pi) {
     buildTextTimeline(phase.narration.lines, app.els.narrationLayer, prefersReducedMotion());
     app.els.accessibleNarration.textContent = phase.narration.lines.map((l) => l.text).join(' ');
 
-    if (phase.narration.audio) {
+    if (phase.narration.audio && app.availableAudio.has(phase.narration.audio)) {
       playNarration(phase.narration.audio);
     }
   }
@@ -161,10 +224,6 @@ function startPhase(app, frame, pi) {
   }
 }
 
-function runPhases(app, frame) {
-  startPhase(app, frame, 0);
-}
-
 function transition(app, toIndex) {
   if (app.state === State.TRANSITIONING) return;
   app.state = State.TRANSITIONING;
@@ -174,7 +233,24 @@ function transition(app, toIndex) {
     app.phaseTimer = null;
   }
 
+  if (app.narrationTimer) {
+    clearTimeout(app.narrationTimer);
+    app.narrationTimer = null;
+  }
+
   const toFrame = app.frames[toIndex];
+
+  if (prefersReducedMotion()) {
+    try {
+      app.currentIndex = toIndex;
+      showFrame(app, toIndex);
+    } catch (err) {
+      console.error('Error during scene transition:', err);
+    }
+    app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
+    return;
+  }
+
   const transitionConfig = toFrame.transition || scenesData.meta.defaultTransition;
   const halfDuration = transitionConfig.duration / 2000;
 
@@ -188,6 +264,7 @@ function transition(app, toIndex) {
         showFrame(app, toIndex);
       } catch (err) {
         console.error('Error during scene transition:', err);
+        gsap.set(app.els.sceneStage, { opacity: 1 });
         app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
         return;
       }
@@ -211,45 +288,86 @@ function advance(app) {
   transition(app, app.currentIndex + 1);
 }
 
-function handleInput(app, e) {
-  if (e.type === 'keydown' && e.key !== ' ' && e.key !== 'Enter') return;
-  if (e.type === 'keydown') e.preventDefault();
+function retreat(app) {
+  if (app.state === State.TRANSITIONING) return;
+  if (app.currentIndex <= 0) return;
 
-  advance(app);
+  transition(app, app.currentIndex - 1);
+}
+
+function triggerEffect(app) {
+  if (prefersReducedMotion()) return;
+  if (app.state === State.TRANSITIONING || app.state === State.CREDITS) return;
+  const frame = app.frames[app.currentIndex];
+  if (!frame.effects?.idle) return;
+  clearEffects(app.els.effectsLayer);
+  if (frame.effects.entry) runEffect(frame.effects.entry, app.els.effectsLayer);
+  runEffect(frame.effects.idle, app.els.effectsLayer);
+}
+
+function updateNavButtons(app) {
+  const frame = app.frames[app.currentIndex];
+  app.els.btnPrev.disabled = app.currentIndex === 0;
+  app.els.btnNext.disabled =
+    app.currentIndex >= app.frames.length - 1 || frame.advanceMode === 'disabled';
+}
+
+function handleKeydown(app, e) {
+  if (e.key === 'ArrowLeft') {
+    e.preventDefault();
+    retreat(app);
+  } else if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') {
+    e.preventDefault();
+    advance(app);
+  }
 }
 
 function toggleMute(app) {
   app.muted = !app.muted;
   setMuted(app.muted);
-  const icon = app.els.btnMute.querySelector('span');
-  if (icon) {
-    icon.textContent = app.muted ? '\u{1F507}' : '\u{1F50A}';
-  }
+  app.els.btnMute.classList.toggle('muted', app.muted);
   app.els.btnMute.setAttribute('aria-label', app.muted ? 'Unmute audio' : 'Mute audio');
 }
 
 function initApp(app) {
+  app.els.sceneImage.addEventListener('error', () => {
+    app.els.sceneImage.removeAttribute('src');
+  });
+
   preloadAssets(app)
     .then(() => {
       app.els.loadingScreen.hidden = true;
       app.els.sceneStage.hidden = false;
       showControls();
 
-      showFrame(app, 0);
-      app.state = State.TITLE;
+      if (app.availableAudio.size > 0) {
+        app.els.btnMute.removeAttribute('aria-disabled');
+      }
 
-      document.addEventListener('click', (e) => handleInput(app, e));
-      document.addEventListener('keydown', (e) => handleInput(app, e));
+      showFrame(app, 0);
+      app.state = State.SCENE_ACTIVE;
+
+      document.addEventListener('click', (e) => {
+        if (e.target.closest('#overlay-controls')) return;
+        triggerEffect(app);
+      });
+      document.addEventListener('keydown', (e) => handleKeydown(app, e));
+      app.els.btnPrev.addEventListener('click', (e) => {
+        e.stopPropagation();
+        retreat(app);
+      });
+      app.els.btnNext.addEventListener('click', (e) => {
+        e.stopPropagation();
+        advance(app);
+      });
       app.els.btnMute.addEventListener('click', (e) => {
         e.stopPropagation();
+        if (app.els.btnMute.getAttribute('aria-disabled') === 'true') return;
         toggleMute(app);
       });
       app.els.btnReplay.addEventListener('click', (e) => {
         e.stopPropagation();
-        const frame = app.frames[app.currentIndex];
-        if (frame.narration?.audio) {
-          playNarration(frame.narration.audio);
-        }
+        applyNarration(app, app.frames[app.currentIndex]);
       });
     })
     .catch((err) => {
@@ -268,6 +386,9 @@ export function createApp() {
     'narration-layer',
     'accessible-narration',
     'overlay-controls',
+    'progress-dots',
+    'btn-prev',
+    'btn-next',
     'btn-replay',
     'btn-mute',
   ];
@@ -278,12 +399,18 @@ export function createApp() {
     }
   }
 
+  const frames = applyFrameDefaults(scenesData);
+  validateEffects(frames);
+
   const app = {
-    frames: scenesData.frames,
+    frames,
+    sceneMap: buildSceneIndexMap(frames),
     currentIndex: 0,
     state: State.LOADING,
     muted: false,
     phaseTimer: null,
+    narrationTimer: null,
+    availableAudio: new Set(),
     els: {
       loadingScreen: document.getElementById('loading-screen'),
       sceneStage: document.getElementById('scene-stage'),
@@ -293,13 +420,19 @@ export function createApp() {
       narrationLayer: document.getElementById('narration-layer'),
       accessibleNarration: document.getElementById('accessible-narration'),
       controls: document.getElementById('overlay-controls'),
+      btnPrev: document.getElementById('btn-prev'),
+      btnNext: document.getElementById('btn-next'),
       btnReplay: document.getElementById('btn-replay'),
       btnMute: document.getElementById('btn-mute'),
     },
   };
 
-  const narrativeSceneCount = app.frames.filter((f) => f.frameType === 'scene').length;
-  initOverlay(narrativeSceneCount);
+  initOverlay(app.sceneMap.byFrame.size, (sceneIndex) => {
+    const frameIndex = app.sceneMap.byScene.get(sceneIndex);
+    if (frameIndex !== undefined && frameIndex !== app.currentIndex) {
+      transition(app, frameIndex);
+    }
+  });
 
   initApp(app);
 

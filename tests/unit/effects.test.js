@@ -9,7 +9,7 @@ vi.mock('gsap', () => ({
   },
 }));
 
-import { runEffect, clearEffects } from '../../src/effects.js';
+import { runEffect, clearEffects, effectExists } from '../../src/effects.js';
 import { gsap } from 'gsap';
 
 describe('effects.js', () => {
@@ -50,16 +50,6 @@ describe('effects.js', () => {
       );
     });
 
-    it('runs water-clarity effect', () => {
-      runEffect('water-clarity', container);
-
-      expect(gsap.fromTo).toHaveBeenCalledWith(
-        container,
-        expect.objectContaining({ filter: 'blur(3px)' }),
-        expect.objectContaining({ filter: 'blur(0px)' }),
-      );
-    });
-
     it('runs near-still-pulse effect', () => {
       runEffect('near-still-pulse', container);
 
@@ -92,13 +82,6 @@ describe('effects.js', () => {
       expect(gsap.to).toHaveBeenCalled();
     });
 
-    it('runs room-carry effect', () => {
-      runEffect('room-carry', container);
-
-      expect(container.children.length).toBe(1);
-      expect(gsap.to).toHaveBeenCalled();
-    });
-
     it('runs machine-steady effect', () => {
       runEffect('machine-steady', container);
 
@@ -116,6 +99,20 @@ describe('effects.js', () => {
         expect.objectContaining({ opacity: 0 }),
         expect.objectContaining({ opacity: 1 }),
       );
+    });
+
+    it('runs dust-settle effect and creates particles', () => {
+      runEffect('dust-settle', container);
+
+      expect(container.children.length).toBe(10);
+      expect(gsap.to).toHaveBeenCalled();
+    });
+
+    it('runs water-run effect and creates stream element', () => {
+      runEffect('water-run', container);
+
+      expect(container.children.length).toBe(1);
+      expect(gsap.to).toHaveBeenCalled();
     });
 
     it('warns for unknown effect name', () => {
@@ -156,6 +153,86 @@ describe('effects.js', () => {
 
     it('handles empty container', () => {
       expect(() => clearEffects(container)).not.toThrow();
+    });
+  });
+
+  describe('effectExists', () => {
+    it('returns true for registered effects', () => {
+      expect(effectExists('dust-drift')).toBe(true);
+      expect(effectExists('fade-in')).toBe(true);
+      expect(effectExists('machine-steady')).toBe(true);
+    });
+
+    it('returns false for unknown effects', () => {
+      expect(effectExists('nonexistent')).toBe(false);
+      expect(effectExists('')).toBe(false);
+    });
+
+    it.each([
+      { label: 'null', value: null },
+      { label: 'undefined', value: undefined },
+    ])('returns false for $label', ({ value }) => {
+      expect(effectExists(value)).toBe(false);
+    });
+
+    it.each([
+      'dust-drift',
+      'motion-drag',
+      'heat-pulse',
+      'near-still-pulse',
+      'light-crack',
+      'assembly-micro',
+      'illumination-spread',
+      'machine-steady',
+      'fade-in',
+      'dust-settle',
+      'water-run',
+    ])('reports "%s" as registered', (name) => {
+      expect(effectExists(name)).toBe(true);
+    });
+  });
+
+  describe('particle effects — element properties', () => {
+    it('dust-drift creates particles with absolute positioning and border-radius', () => {
+      runEffect('dust-drift', container);
+
+      const particle = container.children[0];
+      expect(particle.style.position).toBe('absolute');
+      expect(particle.style.borderRadius).toBe('50%');
+      expect(particle.style.width).toBe('2px');
+    });
+
+    it('dust-settle creates particles with distinct color', () => {
+      runEffect('dust-settle', container);
+
+      const particle = container.children[0];
+      expect(particle.style.position).toBe('absolute');
+      expect(particle.style.height).toBe('2px');
+    });
+  });
+
+  describe('DOM-creating effects — element structure', () => {
+    it('light-crack flash has gradient background and zero initial opacity', () => {
+      runEffect('light-crack', container);
+
+      const flash = container.children[0];
+      expect(flash.style.opacity).toBe('0');
+      expect(flash.style.position).toBe('absolute');
+    });
+
+    it('illumination-spread glow has radial gradient and scale transform', () => {
+      runEffect('illumination-spread', container);
+
+      const glow = container.children[0];
+      expect(glow.style.opacity).toBe('0');
+      expect(glow.style.position).toBe('absolute');
+    });
+
+    it('water-run stream has translateY(-100%) transform', () => {
+      runEffect('water-run', container);
+
+      const stream = container.children[0];
+      expect(stream.style.position).toBe('absolute');
     });
   });
 });

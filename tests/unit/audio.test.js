@@ -79,6 +79,31 @@ describe('audio.js', () => {
 
       expect(old.fade).toHaveBeenCalled();
     });
+
+    it('handles no previous ambient gracefully', () => {
+      stopAll();
+
+      expect(() => crossfadeAmbient('new.mp3', 0.2, 800)).not.toThrow();
+    });
+
+    it('fades new ambient from 0 to target volume', () => {
+      const howl = crossfadeAmbient('new.mp3', 0.3, 600);
+
+      expect(howl.fade).toHaveBeenCalledWith(0, 0.3, 600);
+    });
+
+    it('schedules old ambient unload after fade duration', () => {
+      vi.useFakeTimers();
+      const old = playAmbient('old.mp3', 0.15, true);
+      vi.clearAllMocks();
+
+      crossfadeAmbient('new.mp3', 0.2, 800);
+
+      expect(old.unload).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(900);
+      expect(old.unload).toHaveBeenCalled();
+      vi.useRealTimers();
+    });
   });
 
   describe('playNarration', () => {
@@ -134,6 +159,40 @@ describe('audio.js', () => {
       expect(warnSpy).toHaveBeenCalledWith('Failed to load ambient: bad.mp3', 'timeout');
       warnSpy.mockRestore();
     });
+
+    it('logs warning on crossfade play error', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      crossfadeAmbient('bad.mp3', 0.2, 800);
+      lastHowlOptions.onplayerror(1, 'codec error');
+      expect(warnSpy).toHaveBeenCalledWith('Failed to play ambient: bad.mp3', 'codec error');
+      warnSpy.mockRestore();
+    });
+
+    it('logs warning on narration play error', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      playNarration('bad.mp3');
+      lastHowlOptions.onplayerror(1, 'decode error');
+      expect(warnSpy).toHaveBeenCalledWith('Failed to play narration: bad.mp3', 'decode error');
+      warnSpy.mockRestore();
+    });
+
+    it('nullifies currentAmbient on load error when howl is still current', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      playAmbient('fail.mp3', 0.1, true);
+      lastHowlOptions.onloaderror(1, 'error');
+
+      expect(() => setMuted(true)).not.toThrow();
+      warnSpy.mockRestore();
+    });
+
+    it('nullifies currentNarration on load error when howl is still current', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      playNarration('fail.mp3');
+      lastHowlOptions.onloaderror(1, 'error');
+
+      expect(() => setMuted(true)).not.toThrow();
+      warnSpy.mockRestore();
+    });
   });
 
   describe('stopAll', () => {
@@ -175,6 +234,24 @@ describe('audio.js', () => {
     it('handles no active audio gracefully', () => {
       stopAll();
       expect(() => setMuted(true)).not.toThrow();
+    });
+
+    it('applies muted state to only narration when no ambient is active', () => {
+      stopAll();
+      const narration = playNarration('nar.mp3');
+
+      setMuted(true);
+
+      expect(narration.mute).toHaveBeenCalledWith(true);
+    });
+
+    it('persists muted state to newly created Howl instances', () => {
+      setMuted(true);
+      playAmbient('new.mp3', 0.1, true);
+
+      expect(Howl).toHaveBeenCalledWith(
+        expect.objectContaining({ mute: true }),
+      );
     });
   });
 });

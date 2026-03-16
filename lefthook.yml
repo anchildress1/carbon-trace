@@ -21,9 +21,6 @@ commit-msg:
       run: npx --no-install commitlint --edit {1}
 
 pre-push:
-  parallel: true
   commands:
-    unit-tests:
+    test:
       run: make test
-    e2e:
-      run: make e2e

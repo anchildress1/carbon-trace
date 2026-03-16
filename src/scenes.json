@@ -3,27 +3,53 @@
     "title": "carbon-trace",
     "author": "Ashley Childress",
     "aspectRatio": "16:9",
-    "defaultTransition": { "type": "fade", "duration": 1200 }
+    "defaultTransition": {
+      "type": "fade",
+      "duration": 1200
+    },
+    "frameDefaults": {
+      "advanceMode": "click",
+      "textMode": "ghost-drift"
+    }
   },
   "frames": [
     {
       "id": "frame-00-title",
       "frameType": "title",
-      "image": "assets/images/frame-00-title.webp",
-      "advanceMode": "click",
-      "textMode": "static",
-      "narration": null,
+      "description": "Title card — opening narration on a dark field",
+      "narration": {
+        "lines": [
+          {
+            "text": "I'm gonna tell you a story.",
+            "enter": 500,
+            "exit": 4500
+          },
+          {
+            "text": "Not because it's special. But 'cause it's mine.",
+            "enter": 2500,
+            "exit": 7000
+          },
+          {
+            "text": "And I was raised to finish what I start.",
+            "enter": 5000,
+            "exit": 9500
+          }
+        ],
+        "delay": 0
+      },
       "ambient": null,
       "effects": null,
-      "transition": { "type": "fade", "duration": 1500 },
+      "transition": {
+        "type": "fade",
+        "duration": 1500
+      },
       "traceOverlay": null
     },
     {
       "id": "scene-01-buried",
       "frameType": "scene",
-      "image": "assets/images/scene-01-buried.webp",
-      "advanceMode": "click",
-      "textMode": "ghost-drift",
+      "description": "A compressed coal seam layered deep in the earth — carbon buried under immense pressure",
+      "image": "assets/images/scene-01-seam.webp",
       "narration": {
         "lines": [
           {
@@ -45,16 +71,27 @@
         "volume": 0.15,
         "loop": true
       },
-      "effects": { "idle": "dust-drift", "entry": "fade-in" },
-      "transition": { "type": "zoom-in", "duration": 1200, "scale": { "from": 1.0, "to": 1.15 } },
-      "traceOverlay": { "opacity": 0.05, "animation": "shimmer" }
+      "effects": {
+        "idle": "dust-drift",
+        "entry": "fade-in"
+      },
+      "transition": {
+        "type": "zoom-in",
+        "duration": 1200,
+        "scale": {
+          "from": 1.0,
+          "to": 1.15
+        }
+      },
+      "traceOverlay": {
+        "opacity": 0.05
+      }
     },
     {
       "id": "scene-02-moved",
       "frameType": "scene",
-      "image": "assets/images/scene-02-moved.webp",
-      "advanceMode": "click",
-      "textMode": "ghost-drift",
+      "description": "Carbon in transit — materials moving across landscape and distance",
+      "image": "assets/images/scene-02-travel.webp",
       "narration": {
         "lines": [],
         "audio": "assets/audio/narration/scene-02-moved.mp3",
@@ -65,16 +102,23 @@
         "volume": 0.12,
         "loop": true
       },
-      "effects": { "idle": "motion-drag", "entry": "fade-in" },
-      "transition": { "type": "fade", "duration": 1200 },
-      "traceOverlay": { "opacity": 0.08, "animation": "light-catch" }
+      "effects": {
+        "idle": "motion-drag",
+        "entry": "fade-in"
+      },
+      "transition": {
+        "type": "fade",
+        "duration": 1200
+      },
+      "traceOverlay": {
+        "opacity": 0.08
+      }
     },
     {
       "id": "scene-03-oven-threshold",
       "frameType": "scene",
-      "image": "assets/images/scene-03-oven-threshold.webp",
-      "advanceMode": "click",
-      "textMode": "ghost-drift",
+      "description": "A hand reaching toward an oven — carbon released as heat at the threshold of use",
+      "image": "assets/images/scene-03-reach.webp",
       "narration": {
         "lines": [],
         "audio": "assets/audio/narration/scene-03-oven-threshold.mp3",
@@ -85,16 +129,23 @@
         "volume": 0.15,
         "loop": true
       },
-      "effects": { "idle": "heat-pulse", "entry": "fade-in" },
-      "transition": { "type": "fade", "duration": 1200 },
-      "traceOverlay": { "opacity": 0.15, "animation": "heat-pulse" }
+      "effects": {
+        "idle": "heat-pulse",
+        "entry": "fade-in"
+      },
+      "transition": {
+        "type": "fade",
+        "duration": 1200
+      },
+      "traceOverlay": {
+        "opacity": 0.15
+      }
     },
     {
       "id": "scene-04-pocket",
       "frameType": "scene",
+      "description": "An object held close in a pocket — carbon carried as something personal and small",
       "image": "assets/images/scene-04-pocket.webp",
-      "advanceMode": "click",
-      "textMode": "ghost-drift",
       "narration": {
         "lines": [],
         "audio": "assets/audio/narration/scene-04-pocket.mp3",
@@ -105,171 +156,204 @@
         "volume": 0.08,
         "loop": true
       },
-      "effects": { "idle": "near-still-pulse", "entry": "fade-in" },
-      "transition": { "type": "fade", "duration": 1200 },
-      "traceOverlay": { "opacity": 0.03, "animation": "near-still-pulse" }
+      "effects": {
+        "idle": "near-still-pulse",
+        "entry": "fade-in"
+      },
+      "transition": {
+        "type": "fade",
+        "duration": 1200
+      },
+      "traceOverlay": {
+        "opacity": 0.03
+      }
     },
     {
-      "id": "scene-05-keeper",
+      "id": "scene-05-rinse",
       "frameType": "scene",
-      "image": "assets/images/scene-05-keeper.webp",
-      "advanceMode": "click",
-      "textMode": "ghost-drift",
+      "description": "Water flowing over surfaces — carbon entering the water cycle through daily use",
+      "image": "assets/images/scene-05-rinse.webp",
       "narration": {
         "lines": [],
-        "audio": "assets/audio/narration/scene-05-keeper.mp3",
+        "audio": "assets/audio/narration/scene-05-rinse.mp3",
         "delay": 500
       },
       "ambient": {
-        "src": "assets/audio/ambient/scene-05-keeper.mp3",
+        "src": "assets/audio/ambient/scene-05-rinse.mp3",
         "volume": 0.12,
         "loop": true
       },
-      "effects": { "idle": "water-clarity", "entry": "fade-in" },
-      "transition": { "type": "fade", "duration": 1200 },
-      "traceOverlay": { "opacity": 0.2, "animation": "water-clarity" }
+      "effects": {
+        "idle": "water-run",
+        "entry": "fade-in"
+      },
+      "transition": {
+        "type": "fade",
+        "duration": 1200
+      },
+      "traceOverlay": {
+        "opacity": 0.15
+      }
     },
     {
-      "id": "scene-06-passage",
+      "id": "scene-06-storage",
       "frameType": "scene",
-      "image": "assets/images/scene-06-passage.webp",
-      "advanceMode": "auto-hold",
-      "textMode": "ghost-drift",
-      "narration": null,
-      "ambient": null,
-      "effects": null,
-      "phases": [
-        {
-          "id": "story",
-          "duration": 8000,
-          "textMode": "ghost-drift",
-          "narration": {
-            "lines": [
-              {
-                "text": "She told the story the way her mother told it.",
-                "enter": 0,
-                "exit": 4000
-              },
-              { "text": "Then her daughter told it differently.", "enter": 3000, "exit": 7000 }
-            ],
-            "audio": "assets/audio/narration/scene-06-story.mp3"
-          },
-          "ambient": { "src": "assets/audio/ambient/house-night.mp3", "volume": 0.1, "loop": true }
-        },
-        {
-          "id": "time-passing",
-          "duration": 10000,
-          "textMode": "ghost-drift",
-          "narration": {
-            "lines": [{ "text": "Years wore the telling thin.", "enter": 0, "exit": 5000 }],
-            "audio": "assets/audio/narration/scene-06-time.mp3"
-          },
-          "ambient": { "src": "assets/audio/ambient/house-aging.mp3", "volume": 0.08, "loop": true }
-        },
-        {
-          "id": "stillness",
-          "duration": 5000,
-          "textMode": "none",
-          "narration": null,
-          "ambient": null,
-          "effects": []
-        }
-      ],
-      "transition": { "type": "fade", "duration": 1500 },
-      "traceOverlay": { "opacity": 0.2, "animation": "tin-glow" }
-    },
-    {
-      "id": "scene-07-return",
-      "frameType": "scene",
-      "image": "assets/images/scene-07-return.webp",
-      "advanceMode": "click",
-      "textMode": "ghost-drift",
+      "description": "Dusty containers in a storage space — carbon quietly accumulated and set aside",
+      "image": "assets/images/scene-06-storage.webp",
       "narration": {
         "lines": [],
-        "audio": "assets/audio/narration/scene-07-return.mp3",
+        "audio": "assets/audio/narration/scene-06-storage.mp3",
         "delay": 500
       },
       "ambient": {
-        "src": "assets/audio/ambient/scene-07-return.mp3",
-        "volume": 0.12,
+        "src": "assets/audio/ambient/scene-06-storage.mp3",
+        "volume": 0.1,
         "loop": true
       },
-      "effects": { "idle": "light-crack", "entry": "fade-in" },
-      "transition": { "type": "fade", "duration": 1200 },
-      "traceOverlay": { "opacity": 0.25, "animation": "light-crack" }
+      "effects": {
+        "idle": "dust-settle",
+        "entry": "fade-in"
+      },
+      "transition": {
+        "type": "fade",
+        "duration": 1200
+      },
+      "traceOverlay": {
+        "opacity": 0.2
+      }
     },
     {
-      "id": "scene-08-device",
+      "id": "scene-07-empty",
       "frameType": "scene",
-      "image": "assets/images/scene-08-device.webp",
-      "advanceMode": "click",
-      "textMode": "ghost-drift",
+      "description": "A still and quiet moment — carbon suspended in silence, barely moving",
+      "image": "assets/images/scene-07-empty.webp",
       "narration": {
         "lines": [],
-        "audio": "assets/audio/narration/scene-08-device.mp3",
+        "audio": "assets/audio/narration/scene-07-empty.mp3",
         "delay": 500
       },
       "ambient": {
-        "src": "assets/audio/ambient/scene-08-device.mp3",
+        "src": "assets/audio/ambient/scene-07-empty.mp3",
+        "volume": 0.08,
+        "loop": true
+      },
+      "effects": {
+        "idle": "near-still-pulse",
+        "entry": "fade-in"
+      },
+      "transition": {
+        "type": "fade",
+        "duration": 1200
+      },
+      "traceOverlay": {
+        "opacity": 0.1
+      }
+    },
+    {
+      "id": "scene-08-stillness",
+      "frameType": "scene",
+      "description": "Electronic assembly in a building — carbon embedded into devices and infrastructure",
+      "image": "assets/images/scene-08-stillness.webp",
+      "narration": {
+        "lines": [],
+        "audio": "assets/audio/narration/scene-08-stillness.mp3",
+        "delay": 500
+      },
+      "ambient": {
+        "src": "assets/audio/ambient/scene-08-stillness.mp3",
         "volume": 0.15,
         "loop": true
       },
-      "effects": { "idle": "assembly-micro", "entry": "fade-in" },
-      "transition": { "type": "fade", "duration": 1200 },
-      "traceOverlay": { "opacity": 0.3, "animation": "assembly-micro" }
+      "effects": {
+        "idle": "assembly-micro",
+        "entry": "fade-in"
+      },
+      "transition": {
+        "type": "fade",
+        "duration": 1200
+      },
+      "traceOverlay": {
+        "opacity": 0.3
+      }
     },
     {
-      "id": "scene-09-activation",
+      "id": "scene-09-return",
       "frameType": "scene",
-      "image": "assets/images/scene-09-activation.webp",
-      "advanceMode": "click",
-      "textMode": "ghost-drift",
+      "description": "A return journey — carbon cycling back, tracing the path it came from",
+      "image": "assets/images/scene-09-return.webp",
       "narration": {
         "lines": [],
-        "audio": "assets/audio/narration/scene-09-activation.mp3",
+        "audio": "assets/audio/narration/scene-09-return.mp3",
         "delay": 500
       },
       "ambient": {
-        "src": "assets/audio/ambient/scene-09-activation.mp3",
+        "src": "assets/audio/ambient/scene-09-return.mp3",
+        "volume": 0.12,
+        "loop": true
+      },
+      "effects": {
+        "idle": "light-crack",
+        "entry": "fade-in"
+      },
+      "transition": {
+        "type": "fade",
+        "duration": 1200
+      },
+      "traceOverlay": {
+        "opacity": 0.25
+      }
+    },
+    {
+      "id": "scene-10-activation",
+      "frameType": "scene",
+      "description": "Light and music spreading outward — carbon activated and released into the world",
+      "image": "assets/images/scene-10-building.webp",
+      "narration": {
+        "lines": [],
+        "audio": "assets/audio/narration/scene-10-activation.mp3",
+        "delay": 500
+      },
+      "ambient": {
+        "src": "assets/audio/ambient/scene-10-activation.mp3",
         "volume": 0.18,
         "loop": true
       },
-      "effects": { "idle": "illumination-spread", "entry": "fade-in" },
-      "transition": { "type": "fade", "duration": 1200 },
-      "traceOverlay": { "opacity": 0.35, "animation": "illumination-spread" }
-    },
-    {
-      "id": "scene-10-gathering",
-      "frameType": "scene",
-      "image": "assets/images/scene-10-gathering.webp",
-      "advanceMode": "click",
-      "textMode": "ghost-drift",
-      "narration": {
-        "lines": [],
-        "audio": "assets/audio/narration/scene-10-gathering.mp3",
-        "delay": 500
+      "effects": {
+        "idle": "illumination-spread",
+        "entry": "fade-in"
       },
-      "ambient": {
-        "src": "assets/audio/ambient/scene-10-gathering.mp3",
-        "volume": 0.2,
-        "loop": true
+      "transition": {
+        "type": "fade",
+        "duration": 1200
       },
-      "effects": { "idle": "room-carry", "entry": "fade-in" },
-      "transition": { "type": "fade", "duration": 1200 },
-      "traceOverlay": { "opacity": 0.4, "animation": "room-carry" }
+      "traceOverlay": {
+        "opacity": 0.35
+      }
     },
     {
       "id": "frame-11-credits",
       "frameType": "credits",
-      "image": "assets/images/frame-11-credits.webp",
+      "description": "carbon-trace credits — end of the visual narrative",
+      "image": "assets/images/scene-11-music.webp",
       "advanceMode": "disabled",
       "textMode": "static",
       "persistentVisualState": "machine-running",
       "narration": null,
-      "ambient": { "src": "assets/audio/ambient/machine-hum.mp3", "volume": 0.2, "loop": true },
-      "effects": { "idle": "machine-steady" },
-      "transition": { "type": "fade", "duration": 1500 },
-      "traceOverlay": { "opacity": 0.5, "animation": "machine-steady" }
+      "ambient": {
+        "src": "assets/audio/ambient/machine-hum.mp3",
+        "volume": 0.2,
+        "loop": true
+      },
+      "effects": {
+        "idle": "machine-steady"
+      },
+      "transition": {
+        "type": "fade",
+        "duration": 1500
+      },
+      "traceOverlay": {
+        "opacity": 0.5
+      }
     }
   ]
 }
