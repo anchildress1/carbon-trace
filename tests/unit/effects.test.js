@@ -94,11 +94,11 @@ describe('effects.js', () => {
       );
     });
 
-    it('runs fade-in effect on scene element', () => {
+    it('runs fade-in effect on overlay element', () => {
       runEffect('fade-in', overlay, scene);
 
       expect(gsap.fromTo).toHaveBeenCalledWith(
-        scene,
+        overlay,
         expect.objectContaining({ opacity: 0 }),
         expect.objectContaining({ opacity: 1 }),
       );

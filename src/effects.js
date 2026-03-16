@@ -117,8 +117,8 @@ const effects = {
 
   'machine-steady': scenePulse(0.85, 1.5),
 
-  'fade-in': ({ scene }) => {
-    gsap.fromTo(scene, { opacity: 0 }, { opacity: 1, duration: 0.8, ease: 'power2.out' });
+  'fade-in': ({ overlay }) => {
+    gsap.fromTo(overlay, { opacity: 0 }, { opacity: 1, duration: 0.8, ease: 'power2.out' });
   },
 
   'dust-settle': particleEffect({
