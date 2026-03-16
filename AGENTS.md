@@ -26,8 +26,10 @@ Canonical instruction source for this repository. Treat this file as authoritati
 - All other actions must be pinned to a commit SHA with the version in a comment
   (e.g., `@abc123 # v4.1.0`).
 
-### Commit format (when committing is requested)
+### Commit strategy
 
+- Make small, atomic commits as you go — one logical change per commit.
+- Do not batch unrelated changes into a single commit.
 - Use Conventional Commits.
 - Include required RAI footer:
   ```
