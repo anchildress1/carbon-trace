@@ -34,7 +34,12 @@ export function buildTextTimeline(lines, container, reducedMotion = false) {
 
   const tl = gsap.timeline();
 
-  lines.forEach((line) => {
+  lines.forEach((line, i) => {
+    if (typeof line.enter !== 'number' || typeof line.exit !== 'number') {
+      console.error(`Narration line ${i} has invalid enter/exit timing:`, line);
+      return;
+    }
+
     const el = createLineElement(line.text, container, {
       x: line.x,
       y: line.y,
