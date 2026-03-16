@@ -2,11 +2,9 @@
 set -euo pipefail
 
 # ─── Configuration ──────────────────────────────────────────────────────────────
-SERVICE_NAME="carbon-trace"
+SERVICE_NAME="carbon-trace-unstable"
 REGION="us-east1"
 PORT="8080"
-BASE_PATH="/carbon-trace/"
-DOMAIN="unstable.anchildress1.dev"
 
 # ─── Preflight checks ──────────────────────────────────────────────────────────
 if ! command -v gcloud &> /dev/null; then
@@ -21,7 +19,6 @@ if [ -z "$PROJECT_ID" ]; then
 fi
 
 echo "Deploying ${SERVICE_NAME} to project ${PROJECT_ID} in ${REGION}"
-echo "  Path: https://${DOMAIN}${BASE_PATH}"
 echo "──────────────────────────────────────────────────────────"
 
 # ─── Enable required APIs ───────────────────────────────────────────────────────
@@ -75,13 +72,8 @@ SERVICE_URL=$(gcloud run services describe "${SERVICE_NAME}" \
 echo ""
 echo "──────────────────────────────────────────────────────────"
 echo "Deployed successfully!"
-echo "  Service URL: ${SERVICE_URL}"
-echo "  Public URL:  https://${DOMAIN}${BASE_PATH}"
+echo "  URL: ${SERVICE_URL}"
 echo ""
 echo "Smoke test:"
 echo "  curl -s ${SERVICE_URL}/health"
-echo "  curl -s ${SERVICE_URL}${BASE_PATH}"
-echo ""
-echo "Load balancer routing required:"
-echo "  Route ${DOMAIN}${BASE_PATH}* → ${SERVICE_NAME} (serverless NEG)"
 echo "──────────────────────────────────────────────────────────"

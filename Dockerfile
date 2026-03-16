@@ -12,8 +12,6 @@ COPY index.html vite.config.js ./
 COPY src/ src/
 COPY public/ public/
 
-ARG VITE_BASE_PATH=/carbon-trace/
-ENV VITE_BASE_PATH=${VITE_BASE_PATH}
 RUN pnpm build
 
 # Production stage — serve static files with nginx
@@ -22,8 +20,8 @@ FROM nginx:1-alpine
 # Remove default nginx site
 RUN rm -rf /usr/share/nginx/html/*
 
-# Copy built assets from builder into the path-prefixed directory
-COPY --from=builder /app/dist /usr/share/nginx/html/carbon-trace
+# Copy built assets from builder
+COPY --from=builder /app/dist /usr/share/nginx/html
 
 # Copy custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf

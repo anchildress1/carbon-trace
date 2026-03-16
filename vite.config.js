@@ -18,7 +18,6 @@ function relaxCspInDev() {
 export default defineConfig({
   root: '.',
   publicDir: 'public',
-  base: process.env.VITE_BASE_PATH || '/',
   plugins: [relaxCspInDev()],
   build: {
     outDir: 'dist',
