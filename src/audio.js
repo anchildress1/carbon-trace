@@ -59,6 +59,7 @@ function reloadFromPosition(node) {
   node.currentTime = time;
   node.play().catch((err) => {
     console.warn('Buffer recovery play() failed:', err.message);
+    cleanupBufferMonitoring();
   });
 }
 
@@ -73,11 +74,13 @@ function checkBufferProgress(node, state) {
   if (currentEnd > state.lastBufferedEnd) {
     state.lastBufferedEnd = currentEnd;
     state.stallChecks = 0;
+    state.recoveryAttempts = 0;
     const ahead = currentEnd - node.currentTime;
     const nearEnd = node.duration > 0 && node.duration - node.currentTime < 3;
     if (ahead >= 3 || nearEnd) {
       node.play().catch((err) => {
         console.warn('Buffer recovery play() failed:', err.message);
+        cleanupBufferMonitoring();
       });
     }
   } else {
@@ -85,6 +88,12 @@ function checkBufferProgress(node, state) {
     if (state.stallChecks === 2) {
       nudgeStall(node);
     } else if (state.stallChecks >= 4) {
+      state.recoveryAttempts = (state.recoveryAttempts || 0) + 1;
+      if (state.recoveryAttempts >= 3) {
+        console.warn('Buffer recovery exhausted after 3 attempts');
+        cleanupBufferMonitoring();
+        return;
+      }
       reloadFromPosition(node);
       state.stallChecks = 0;
     }
@@ -114,7 +123,10 @@ function handlePlaying() {
 function monitorNarrationBuffer(howl) {
   const attachListeners = () => {
     const node = howl._sounds?.[0]?._node;
-    if (!node) return;
+    if (!node || typeof node.addEventListener !== 'function') {
+      console.warn('Cannot monitor narration buffer: audio node unavailable');
+      return;
+    }
 
     const state = { lastBufferedEnd: 0, stallChecks: 0 };
 
