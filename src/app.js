@@ -453,11 +453,13 @@ function transition(app, toIndex) {
   }
 
   if (prefersReducedMotion()) {
+    const prevIndex = app.currentIndex;
+    app.currentIndex = toIndex;
     try {
       showFrame(app, toIndex);
-      app.currentIndex = toIndex;
     } catch (err) {
       console.error('Error during scene transition:', err);
+      app.currentIndex = prevIndex;
     }
     app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
     return;
@@ -471,11 +473,13 @@ function transition(app, toIndex) {
     duration: halfDuration,
     ease: 'power2.inOut',
     onComplete: () => {
+      const prevIndex = app.currentIndex;
+      app.currentIndex = toIndex;
       try {
         showFrame(app, toIndex);
-        app.currentIndex = toIndex;
       } catch (err) {
         console.error('Error during scene transition:', err);
+        app.currentIndex = prevIndex;
         gsap.set(app.els.sceneStage, { opacity: 1 });
         app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
         return;
