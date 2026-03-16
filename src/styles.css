@@ -195,6 +195,42 @@ body {
   cursor: default;
 }
 
+/* Caption layer */
+.caption-layer {
+  position: absolute;
+  bottom: 12%;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 80%;
+  text-align: center;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.caption-text {
+  background: rgba(0, 0, 0, 0.85);
+  color: #e8e4df;
+  font-size: clamp(0.875rem, 2vw, 1.25rem);
+  line-height: 1.5;
+  padding: 0.4em 0.8em;
+  border-radius: 4px;
+  margin-bottom: 0.25em;
+}
+
+/* Pause button icon toggle */
+.btn-pause .icon-play {
+  display: none;
+}
+
+.btn-pause.paused .icon-pause {
+  display: none;
+}
+
+.btn-pause.paused .icon-play {
+  display: flex;
+}
+
+/* Mute button icon toggle */
 .btn-mute .icon-muted {
   display: none;
 }
@@ -228,5 +264,9 @@ body {
 
   .trace-overlay {
     transition: opacity 0.3s ease;
+  }
+
+  .caption-text {
+    transition: none;
   }
 }

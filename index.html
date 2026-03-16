@@ -22,6 +22,7 @@
         <div class="trace-overlay" id="trace-overlay"></div>
         <div class="effects-layer" id="effects-layer"></div>
         <div class="narration-layer" id="narration-layer" aria-hidden="true"></div>
+        <div class="caption-layer" id="caption-layer" aria-hidden="true"></div>
       </div>
 
       <div class="overlay-controls" id="overlay-controls" hidden>
@@ -41,6 +42,39 @@
               focusable="false"
             >
               <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+          <button class="btn-pause" id="btn-pause" aria-label="Pause" aria-pressed="false">
+            <svg
+              class="icon-pause"
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <rect x="6" y="4" width="4" height="16" />
+              <rect x="14" y="4" width="4" height="16" />
+            </svg>
+            <svg
+              class="icon-play"
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <polygon points="5 3 19 12 5 21 5 3" />
             </svg>
           </button>
           <button class="btn-mute" id="btn-mute" aria-label="Mute audio" aria-disabled="true">
@@ -76,6 +110,25 @@
               <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
               <line x1="23" y1="9" x2="17" y2="15" />
               <line x1="17" y1="9" x2="23" y2="15" />
+            </svg>
+          </button>
+          <button class="btn-captions" id="btn-captions" aria-label="Captions" aria-pressed="false">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <rect x="2" y="4" width="20" height="16" rx="2" />
+              <path d="M7 15h4" />
+              <path d="M13 15h4" />
+              <path d="M7 11h10" />
             </svg>
           </button>
           <button class="btn-replay" id="btn-replay" aria-label="Replay narration" disabled>
