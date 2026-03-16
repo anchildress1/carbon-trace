@@ -201,6 +201,19 @@ function scheduleNarrationAudio(app, narration) {
   }
 }
 
+function scheduleCaptionDisplay(app, frame) {
+  const captionDelay = frame.narration.delay || 0;
+  if (captionDelay > 0) {
+    setTimeout(() => {
+      if (app.frames[app.currentIndex] === frame && !app.paused) {
+        showCaptions(frame.narration.captions, app.els.captionLayer);
+      }
+    }, captionDelay);
+  } else {
+    showCaptions(frame.narration.captions, app.els.captionLayer);
+  }
+}
+
 function applyNarration(app, frame) {
   if (app.narrationTimer) {
     clearTimeout(app.narrationTimer);
@@ -236,16 +249,7 @@ function applyNarration(app, frame) {
   if (hasCaptions) {
     app.els.accessibleNarration.textContent = frame.narration.captions.map((c) => c.text).join(' ');
     if (areCaptionsEnabled()) {
-      const captionDelay = frame.narration.delay || 0;
-      if (captionDelay > 0) {
-        setTimeout(() => {
-          if (app.frames[app.currentIndex] === frame && !app.paused) {
-            showCaptions(frame.narration.captions, app.els.captionLayer);
-          }
-        }, captionDelay);
-      } else {
-        showCaptions(frame.narration.captions, app.els.captionLayer);
-      }
+      scheduleCaptionDisplay(app, frame);
     }
   } else {
     app.els.accessibleNarration.textContent = '';
