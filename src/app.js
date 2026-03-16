@@ -138,6 +138,47 @@ function preloadAssets(app) {
   return firstFrame?.image ? preloadImage(firstFrame.image) : Promise.resolve();
 }
 
+function clearMusicTimer(app) {
+  if (app.musicTimer) {
+    clearTimeout(app.musicTimer);
+    app.musicTimer = null;
+    app.musicTimerStart = null;
+    app.musicTimerDelay = null;
+  }
+}
+
+function scheduleMusic(app, music) {
+  clearMusicTimer(app);
+  stopMusic();
+
+  const enter = music.enter || 0;
+  const startPlayback = () => {
+    app.musicTimer = null;
+    app.musicTimerStart = null;
+    app.musicTimerDelay = null;
+    playMusic(music.src, music.startVolume);
+    fadeMusic(music.fullVolume, music.crescendoMs);
+
+    if (music.exit !== null && music.exit !== undefined) {
+      const fadeOutDelay = music.exit - enter;
+      if (fadeOutDelay > 0) {
+        app.musicExitTimer = setTimeout(() => {
+          app.musicExitTimer = null;
+          fadeMusic(0, 2000);
+        }, fadeOutDelay);
+      }
+    }
+  };
+
+  if (enter > 0) {
+    app.musicTimerStart = Date.now();
+    app.musicTimerDelay = enter;
+    app.musicTimer = setTimeout(startPlayback, enter);
+  } else {
+    startPlayback();
+  }
+}
+
 function scheduleNarrationAudio(app, narration) {
   const delay = narration.delay || 0;
   if (delay > 0) {
@@ -198,8 +239,7 @@ function applyNarration(app, frame) {
   app.els.btnReplay.disabled = !(hasLines || hasAudioRef);
 
   if (frame.music) {
-    playMusic(frame.music.src, frame.music.startVolume);
-    fadeMusic(frame.music.fullVolume, frame.music.crescendoMs);
+    scheduleMusic(app, frame.music);
   }
 
   if (hasAudioRef) {
@@ -357,6 +397,11 @@ function transition(app, toIndex) {
   clearCaptions();
   app.textTimeline = null;
 
+  clearMusicTimer(app);
+  if (app.musicExitTimer) {
+    clearTimeout(app.musicExitTimer);
+    app.musicExitTimer = null;
+  }
   stopMusic();
 
   const toFrame = app.frames[toIndex];
@@ -488,6 +533,23 @@ function togglePause(app) {
       app.narrationTimerRemaining = null;
     }
 
+    if (app.musicTimerRemaining > 0) {
+      const frame = app.frames[app.currentIndex];
+      if (frame.music) {
+        app.musicTimerStart = Date.now();
+        app.musicTimerDelay = app.musicTimerRemaining;
+        app.musicTimer = setTimeout(() => {
+          app.musicTimer = null;
+          app.musicTimerStart = null;
+          app.musicTimerDelay = null;
+          app.musicTimerRemaining = null;
+          playMusic(frame.music.src, frame.music.startVolume);
+          fadeMusic(frame.music.fullVolume, frame.music.crescendoMs);
+        }, app.musicTimerRemaining);
+        app.musicTimerRemaining = null;
+      }
+    }
+
     if (app.phaseTimerRemaining > 0) {
       const frame = app.frames[app.currentIndex];
       const pi = app.pausedPhaseIndex;
@@ -502,8 +564,7 @@ function togglePause(app) {
         app.textTimeline.restart();
       }
       if (frame.music) {
-        playMusic(frame.music.src, frame.music.startVolume);
-        fadeMusic(frame.music.fullVolume, frame.music.crescendoMs);
+        scheduleMusic(app, frame.music);
       }
       if (frame.narration?.audio) {
         scheduleNarrationAudio(app, frame.narration);
@@ -541,6 +602,17 @@ function togglePause(app) {
       app.narrationTimer = null;
       app.narrationTimerStart = null;
       app.narrationTimerDelay = null;
+    }
+
+    if (app.musicTimer) {
+      const elapsed = Date.now() - app.musicTimerStart;
+      app.musicTimerRemaining = Math.max(0, app.musicTimerDelay - elapsed);
+      clearMusicTimer(app);
+    }
+
+    if (app.musicExitTimer) {
+      clearTimeout(app.musicExitTimer);
+      app.musicExitTimer = null;
     }
 
     if (app.phaseTimer) {
@@ -601,8 +673,7 @@ function replayNarration(app) {
   }
 
   if (frame.music) {
-    playMusic(frame.music.src, frame.music.startVolume);
-    fadeMusic(frame.music.fullVolume, frame.music.crescendoMs);
+    scheduleMusic(app, frame.music);
   }
 
   if (hasAudioRef) {
@@ -791,6 +862,11 @@ export function createApp() {
     narrationTimerStart: null,
     narrationTimerDelay: null,
     narrationTimerRemaining: null,
+    musicTimer: null,
+    musicTimerStart: null,
+    musicTimerDelay: null,
+    musicTimerRemaining: null,
+    musicExitTimer: null,
     buffering: false,
     availableAudio: new Set(),
     els: {
