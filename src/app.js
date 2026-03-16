@@ -315,11 +315,11 @@ function showFrame(app, index) {
   }
   app.els.traceOverlay.style.opacity = frame.traceOverlay?.opacity ?? 0;
 
-  clearEffects(app.els.effectsLayer);
+  clearEffects(app.els.effectsLayer, app.els.sceneImage);
   clearNarrationLayer(app.els.narrationLayer);
 
   if (frame.effects?.idle) {
-    runEffect(frame.effects.idle, app.els.effectsLayer);
+    runEffect(frame.effects.idle, app.els.effectsLayer, app.els.sceneImage);
   }
 
   const sceneIdx = app.sceneMap.byFrame.get(index);
@@ -518,9 +518,9 @@ function triggerEffect(app) {
   if (app.state === State.TRANSITIONING || app.state === State.CREDITS) return;
   const frame = app.frames[app.currentIndex];
   if (!frame.effects?.idle) return;
-  clearEffects(app.els.effectsLayer);
-  if (frame.effects.entry) runEffect(frame.effects.entry, app.els.effectsLayer);
-  runEffect(frame.effects.idle, app.els.effectsLayer);
+  clearEffects(app.els.effectsLayer, app.els.sceneImage);
+  if (frame.effects.entry) runEffect(frame.effects.entry, app.els.effectsLayer, app.els.sceneImage);
+  runEffect(frame.effects.idle, app.els.effectsLayer, app.els.sceneImage);
 }
 
 function updateNavButtons(app) {
@@ -618,15 +618,17 @@ function handleFirstPlay(app) {
 }
 
 function resumeEffects(app) {
-  const effectsTweens = gsap.getTweensOf(app.els.effectsLayer);
+  const overlayTweens = gsap.getTweensOf(app.els.effectsLayer);
   const childTweens = gsap.getTweensOf(app.els.effectsLayer.children);
-  [...effectsTweens, ...childTweens].forEach((tw) => tw.resume());
+  const sceneTweens = gsap.getTweensOf(app.els.sceneImage);
+  [...overlayTweens, ...childTweens, ...sceneTweens].forEach((tw) => tw.resume());
 }
 
 function pauseEffects(app) {
-  const effectsTweens = gsap.getTweensOf(app.els.effectsLayer);
+  const overlayTweens = gsap.getTweensOf(app.els.effectsLayer);
   const childTweens = gsap.getTweensOf(app.els.effectsLayer.children);
-  [...effectsTweens, ...childTweens].forEach((tw) => tw.pause());
+  const sceneTweens = gsap.getTweensOf(app.els.sceneImage);
+  [...overlayTweens, ...childTweens, ...sceneTweens].forEach((tw) => tw.pause());
 }
 
 function doResume(app) {
@@ -795,7 +797,7 @@ function replayNarration(app) {
   }
 
   if (frame.effects?.entry) {
-    runEffect(frame.effects.entry, app.els.effectsLayer);
+    runEffect(frame.effects.entry, app.els.effectsLayer, app.els.sceneImage);
   }
 }
 

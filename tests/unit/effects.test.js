@@ -6,6 +6,7 @@ vi.mock('gsap', () => ({
     fromTo: vi.fn(),
     set: vi.fn(),
     killTweensOf: vi.fn(),
+    getTweensOf: vi.fn(() => []),
   },
 }));
 
@@ -13,26 +14,28 @@ import { runEffect, clearEffects, effectExists } from '../../src/effects.js';
 import { gsap } from 'gsap';
 
 describe('effects.js', () => {
-  let container;
+  let overlay;
+  let scene;
 
   beforeEach(() => {
-    container = document.createElement('div');
+    overlay = document.createElement('div');
+    scene = document.createElement('img');
     vi.clearAllMocks();
   });
 
   describe('runEffect', () => {
-    it('runs dust-drift effect and creates particles', () => {
-      runEffect('dust-drift', container);
+    it('runs dust-drift effect and creates particles in overlay', () => {
+      runEffect('dust-drift', overlay, scene);
 
-      expect(container.children.length).toBe(18);
+      expect(overlay.children.length).toBe(18);
       expect(gsap.to).toHaveBeenCalled();
     });
 
-    it('runs heat-pulse effect', () => {
-      runEffect('heat-pulse', container);
+    it('runs heat-pulse effect on scene element', () => {
+      runEffect('heat-pulse', overlay, scene);
 
       expect(gsap.to).toHaveBeenCalledWith(
-        container,
+        scene,
         expect.objectContaining({
           repeat: -1,
           yoyo: true,
@@ -40,84 +43,84 @@ describe('effects.js', () => {
       );
     });
 
-    it('runs motion-drag effect', () => {
-      runEffect('motion-drag', container);
+    it('runs motion-drag effect on scene element', () => {
+      runEffect('motion-drag', overlay, scene);
 
       expect(gsap.fromTo).toHaveBeenCalledWith(
-        container,
+        scene,
         expect.objectContaining({ filter: 'blur(6px)' }),
         expect.objectContaining({ filter: 'blur(0px)' }),
       );
     });
 
-    it('runs near-still-pulse effect', () => {
-      runEffect('near-still-pulse', container);
+    it('runs near-still-pulse effect on scene element', () => {
+      runEffect('near-still-pulse', overlay, scene);
 
       expect(gsap.to).toHaveBeenCalledWith(
-        container,
+        scene,
         expect.objectContaining({ opacity: 0.85, repeat: -1 }),
       );
     });
 
-    it('runs light-crack effect and creates flash element', () => {
-      runEffect('light-crack', container);
+    it('runs light-crack effect and creates flash element in overlay', () => {
+      runEffect('light-crack', overlay, scene);
 
-      expect(container.children.length).toBe(1);
+      expect(overlay.children.length).toBe(1);
       expect(gsap.fromTo).toHaveBeenCalled();
     });
 
-    it('runs assembly-micro effect', () => {
-      runEffect('assembly-micro', container);
+    it('runs assembly-micro effect on scene element', () => {
+      runEffect('assembly-micro', overlay, scene);
 
       expect(gsap.to).toHaveBeenCalledWith(
-        container,
+        scene,
         expect.objectContaining({ repeat: -1 }),
       );
     });
 
-    it('runs illumination-spread effect', () => {
-      runEffect('illumination-spread', container);
+    it('runs illumination-spread effect and creates glow in overlay', () => {
+      runEffect('illumination-spread', overlay, scene);
 
-      expect(container.children.length).toBe(1);
+      expect(overlay.children.length).toBe(1);
       expect(gsap.to).toHaveBeenCalled();
     });
 
-    it('runs machine-steady effect', () => {
-      runEffect('machine-steady', container);
+    it('runs machine-steady effect on scene element', () => {
+      runEffect('machine-steady', overlay, scene);
 
       expect(gsap.to).toHaveBeenCalledWith(
-        container,
+        scene,
         expect.objectContaining({ repeat: -1, yoyo: true }),
       );
     });
 
-    it('runs fade-in effect', () => {
-      runEffect('fade-in', container);
+    it('runs fade-in effect on scene element', () => {
+      runEffect('fade-in', overlay, scene);
 
       expect(gsap.fromTo).toHaveBeenCalledWith(
-        container,
+        scene,
         expect.objectContaining({ opacity: 0 }),
         expect.objectContaining({ opacity: 1 }),
       );
     });
 
-    it('runs dust-settle effect and creates particles', () => {
-      runEffect('dust-settle', container);
+    it('runs dust-settle effect and creates particles in overlay', () => {
+      runEffect('dust-settle', overlay, scene);
 
-      expect(container.children.length).toBe(14);
+      expect(overlay.children.length).toBe(14);
       expect(gsap.to).toHaveBeenCalled();
     });
 
-    it('runs water-run effect and creates stream element', () => {
-      runEffect('water-run', container);
+    it('runs water-run effect and creates stream element in overlay', () => {
+      runEffect('water-run', overlay, scene);
 
-      expect(container.children.length).toBe(1);
+      expect(overlay.children.length).toBe(1);
       expect(gsap.to).toHaveBeenCalled();
     });
 
     it('warns for unknown effect name', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      runEffect('nonexistent', container);
+      runEffect('nonexistent', overlay, scene);
 
       expect(gsap.to).not.toHaveBeenCalled();
       expect(gsap.fromTo).not.toHaveBeenCalled();
@@ -127,32 +130,40 @@ describe('effects.js', () => {
   });
 
   describe('clearEffects', () => {
-    it('kills GSAP tweens on container and children', () => {
-      container.appendChild(document.createElement('div'));
+    it('kills GSAP tweens on overlay, children, and scene', () => {
+      overlay.appendChild(document.createElement('div'));
 
-      clearEffects(container);
+      clearEffects(overlay, scene);
 
-      expect(gsap.killTweensOf).toHaveBeenCalledWith(container);
-      expect(gsap.killTweensOf).toHaveBeenCalledWith(container.children);
+      expect(gsap.killTweensOf).toHaveBeenCalledWith(overlay);
+      expect(gsap.killTweensOf).toHaveBeenCalledWith(overlay.children);
+      expect(gsap.killTweensOf).toHaveBeenCalledWith(scene);
     });
 
-    it('removes all children from container', () => {
-      container.appendChild(document.createElement('div'));
-      container.appendChild(document.createElement('div'));
+    it('removes all children from overlay', () => {
+      overlay.appendChild(document.createElement('div'));
+      overlay.appendChild(document.createElement('div'));
 
-      clearEffects(container);
+      clearEffects(overlay, scene);
 
-      expect(container.children.length).toBe(0);
+      expect(overlay.children.length).toBe(0);
     });
 
-    it('resets GSAP inline styles', () => {
-      clearEffects(container);
+    it('resets GSAP inline styles on overlay and scene', () => {
+      clearEffects(overlay, scene);
 
-      expect(gsap.set).toHaveBeenCalledWith(container, { clearProps: 'all' });
+      expect(gsap.set).toHaveBeenCalledWith(overlay, { clearProps: 'all' });
+      expect(gsap.set).toHaveBeenCalledWith(scene, {
+        clearProps: 'filter,opacity,transform',
+      });
     });
 
-    it('handles empty container', () => {
-      expect(() => clearEffects(container)).not.toThrow();
+    it('handles missing scene gracefully', () => {
+      expect(() => clearEffects(overlay)).not.toThrow();
+    });
+
+    it('handles empty overlay', () => {
+      expect(() => clearEffects(overlay, scene)).not.toThrow();
     });
   });
 
@@ -194,18 +205,18 @@ describe('effects.js', () => {
 
   describe('particle effects — element properties', () => {
     it('dust-drift creates particles with absolute positioning and border-radius', () => {
-      runEffect('dust-drift', container);
+      runEffect('dust-drift', overlay, scene);
 
-      const particle = container.children[0];
+      const particle = overlay.children[0];
       expect(particle.style.position).toBe('absolute');
       expect(particle.style.borderRadius).toBe('50%');
       expect(particle.style.width).toBe('4px');
     });
 
     it('dust-settle creates particles with distinct color', () => {
-      runEffect('dust-settle', container);
+      runEffect('dust-settle', overlay, scene);
 
-      const particle = container.children[0];
+      const particle = overlay.children[0];
       expect(particle.style.position).toBe('absolute');
       expect(particle.style.height).toBe('5px');
     });
@@ -213,25 +224,25 @@ describe('effects.js', () => {
 
   describe('DOM-creating effects — element structure', () => {
     it('light-crack flash has gradient background and zero initial opacity', () => {
-      runEffect('light-crack', container);
+      runEffect('light-crack', overlay, scene);
 
-      const flash = container.children[0];
+      const flash = overlay.children[0];
       expect(flash.style.opacity).toBe('0');
       expect(flash.style.position).toBe('absolute');
     });
 
     it('illumination-spread glow has radial gradient and scale transform', () => {
-      runEffect('illumination-spread', container);
+      runEffect('illumination-spread', overlay, scene);
 
-      const glow = container.children[0];
+      const glow = overlay.children[0];
       expect(glow.style.opacity).toBe('0');
       expect(glow.style.position).toBe('absolute');
     });
 
     it('water-run stream has translateY(-100%) transform', () => {
-      runEffect('water-run', container);
+      runEffect('water-run', overlay, scene);
 
-      const stream = container.children[0];
+      const stream = overlay.children[0];
       expect(stream.style.position).toBe('absolute');
     });
   });

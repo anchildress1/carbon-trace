@@ -1,13 +1,19 @@
 import { gsap } from 'gsap';
 
-function opacityPulse(opacity, duration) {
-  return (container) => {
-    gsap.to(container, { opacity, duration, repeat: -1, yoyo: true, ease: 'sine.inOut' });
+/**
+ * Effects receive { overlay, scene } where:
+ * - overlay: the #effects-layer div for adding child elements (particles, gradients)
+ * - scene: the #scene-image element for applying filters, opacity, and transforms
+ */
+
+function scenePulse(opacity, duration) {
+  return ({ scene }) => {
+    gsap.to(scene, { opacity, duration, repeat: -1, yoyo: true, ease: 'sine.inOut' });
   };
 }
 
 function particleEffect({ count, color, size, glow, topRange, xSpread, yDrift, durationRange }) {
-  return (container) => {
+  return ({ overlay }) => {
     for (let i = 0; i < count; i++) {
       const particle = document.createElement('div');
       particle.style.cssText = `
@@ -20,7 +26,7 @@ function particleEffect({ count, color, size, glow, topRange, xSpread, yDrift, d
         top: ${Math.random() * topRange}%;
         ${glow ? `box-shadow: 0 0 ${glow}px ${color};` : ''}
       `;
-      container.appendChild(particle);
+      overlay.appendChild(particle);
 
       gsap.to(particle, {
         x: `+=${(Math.random() - 0.5) * xSpread}`,
@@ -46,16 +52,16 @@ const effects = {
     durationRange: [4, 4],
   }),
 
-  'motion-drag': (container) => {
+  'motion-drag': ({ scene }) => {
     gsap.fromTo(
-      container,
+      scene,
       { filter: 'blur(6px)' },
       { filter: 'blur(0px)', duration: 3, ease: 'power2.out' },
     );
   },
 
-  'heat-pulse': (container) => {
-    gsap.to(container, {
+  'heat-pulse': ({ scene }) => {
+    gsap.to(scene, {
       filter: 'blur(1px) brightness(1.2)',
       duration: 2,
       repeat: -1,
@@ -64,9 +70,9 @@ const effects = {
     });
   },
 
-  'near-still-pulse': opacityPulse(0.85, 3),
+  'near-still-pulse': scenePulse(0.85, 3),
 
-  'light-crack': (container) => {
+  'light-crack': ({ overlay }) => {
     const flash = document.createElement('div');
     flash.style.cssText = `
       position: absolute;
@@ -74,7 +80,7 @@ const effects = {
       background: linear-gradient(90deg, transparent 30%, rgba(255,255,255,0.5) 50%, transparent 70%);
       opacity: 0;
     `;
-    container.appendChild(flash);
+    overlay.appendChild(flash);
 
     gsap.fromTo(
       flash,
@@ -84,8 +90,8 @@ const effects = {
     gsap.to(flash, { opacity: 0, duration: 1.2, delay: 0.5, ease: 'power2.in' });
   },
 
-  'assembly-micro': (container) => {
-    gsap.to(container, {
+  'assembly-micro': ({ scene }) => {
+    gsap.to(scene, {
       x: () => (Math.random() - 0.5) * 4,
       y: () => (Math.random() - 0.5) * 2,
       duration: 0.15,
@@ -95,7 +101,7 @@ const effects = {
     });
   },
 
-  'illumination-spread': (container) => {
+  'illumination-spread': ({ overlay }) => {
     const glow = document.createElement('div');
     glow.style.cssText = `
       position: absolute;
@@ -104,15 +110,15 @@ const effects = {
       opacity: 0;
       transform: scale(0.3);
     `;
-    container.appendChild(glow);
+    overlay.appendChild(glow);
 
     gsap.to(glow, { opacity: 1, scale: 1.5, duration: 3, ease: 'power2.out' });
   },
 
-  'machine-steady': opacityPulse(0.85, 1.5),
+  'machine-steady': scenePulse(0.85, 1.5),
 
-  'fade-in': (container) => {
-    gsap.fromTo(container, { opacity: 0 }, { opacity: 1, duration: 0.8, ease: 'power2.out' });
+  'fade-in': ({ scene }) => {
+    gsap.fromTo(scene, { opacity: 0 }, { opacity: 1, duration: 0.8, ease: 'power2.out' });
   },
 
   'dust-settle': particleEffect({
@@ -126,7 +132,7 @@ const effects = {
     durationRange: [5, 4],
   }),
 
-  'water-run': (container) => {
+  'water-run': ({ overlay }) => {
     const stream = document.createElement('div');
     stream.style.cssText = `
       position: absolute;
@@ -134,7 +140,7 @@ const effects = {
       background: linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.12) 50%, transparent 100%);
       transform: translateY(-100%);
     `;
-    container.appendChild(stream);
+    overlay.appendChild(stream);
 
     gsap.to(stream, {
       y: '200%',
@@ -149,18 +155,23 @@ export function effectExists(name) {
   return name in effects;
 }
 
-export function runEffect(name, container) {
+export function runEffect(name, overlay, scene) {
   const fn = effects[name];
   if (fn) {
-    fn(container);
+    fn({ overlay, scene });
   } else {
     console.warn(`Unknown effect: "${name}"`);
   }
 }
 
-export function clearEffects(container) {
-  gsap.killTweensOf(container);
-  gsap.killTweensOf(container.children);
-  container.replaceChildren();
-  gsap.set(container, { clearProps: 'all' });
+export function clearEffects(overlay, scene) {
+  gsap.killTweensOf(overlay);
+  gsap.killTweensOf(overlay.children);
+  overlay.replaceChildren();
+  gsap.set(overlay, { clearProps: 'all' });
+
+  if (scene) {
+    gsap.killTweensOf(scene);
+    gsap.set(scene, { clearProps: 'filter,opacity,transform' });
+  }
 }

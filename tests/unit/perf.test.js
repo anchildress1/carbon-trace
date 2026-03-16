@@ -29,10 +29,12 @@ function measure(fn) {
 }
 
 describe('performance budgets', () => {
-  let container;
+  let overlay;
+  let scene;
 
   beforeEach(() => {
-    container = document.createElement('div');
+    overlay = document.createElement('div');
+    scene = document.createElement('img');
     vi.clearAllMocks();
   });
 
@@ -44,7 +46,7 @@ describe('performance budgets', () => {
         exit: (i + 1) * 1000,
       }));
 
-      const elapsed = measure(() => buildTextTimeline(lines, container));
+      const elapsed = measure(() => buildTextTimeline(lines, overlay));
 
       expect(elapsed).toBeLessThan(BUDGET_MS);
     });
@@ -56,7 +58,7 @@ describe('performance budgets', () => {
         exit: (i + 1) * 500,
       }));
 
-      const elapsed = measure(() => buildTextTimeline(lines, container));
+      const elapsed = measure(() => buildTextTimeline(lines, overlay));
 
       expect(elapsed).toBeLessThan(BUDGET_MS);
     });
@@ -65,29 +67,29 @@ describe('performance budgets', () => {
   describe('clearNarrationLayer', () => {
     it(`clears 50 children within ${BUDGET_MS}ms`, () => {
       for (let i = 0; i < 50; i++) {
-        container.appendChild(document.createElement('p'));
+        overlay.appendChild(document.createElement('p'));
       }
 
-      const elapsed = measure(() => clearNarrationLayer(container));
+      const elapsed = measure(() => clearNarrationLayer(overlay));
 
       expect(elapsed).toBeLessThan(BUDGET_MS);
-      expect(container.children.length).toBe(0);
+      expect(overlay.children.length).toBe(0);
     });
   });
 
   describe('effects creation', () => {
     it(`creates dust-drift (18 particles) within ${BUDGET_MS}ms`, () => {
-      const elapsed = measure(() => runEffect('dust-drift', container));
+      const elapsed = measure(() => runEffect('dust-drift', overlay, scene));
 
       expect(elapsed).toBeLessThan(BUDGET_MS);
-      expect(container.children.length).toBe(18);
+      expect(overlay.children.length).toBe(18);
     });
 
     it(`creates dust-settle (14 particles) within ${BUDGET_MS}ms`, () => {
-      const elapsed = measure(() => runEffect('dust-settle', container));
+      const elapsed = measure(() => runEffect('dust-settle', overlay, scene));
 
       expect(elapsed).toBeLessThan(BUDGET_MS);
-      expect(container.children.length).toBe(14);
+      expect(overlay.children.length).toBe(14);
     });
 
     it.each([
@@ -101,7 +103,7 @@ describe('performance budgets', () => {
       'fade-in',
       'water-run',
     ])('creates %s effect within budget', (effectName) => {
-      const elapsed = measure(() => runEffect(effectName, container));
+      const elapsed = measure(() => runEffect(effectName, overlay, scene));
 
       expect(elapsed).toBeLessThan(BUDGET_MS);
     });
@@ -110,13 +112,13 @@ describe('performance budgets', () => {
   describe('clearEffects', () => {
     it(`clears 50 effect children within ${BUDGET_MS}ms`, () => {
       for (let i = 0; i < 50; i++) {
-        container.appendChild(document.createElement('div'));
+        overlay.appendChild(document.createElement('div'));
       }
 
-      const elapsed = measure(() => clearEffects(container));
+      const elapsed = measure(() => clearEffects(overlay, scene));
 
       expect(elapsed).toBeLessThan(BUDGET_MS);
-      expect(container.children.length).toBe(0);
+      expect(overlay.children.length).toBe(0);
     });
   });
 
@@ -159,13 +161,13 @@ describe('performance budgets', () => {
     it(`runs 10 create-clear cycles within ${BUDGET_MS * 3}ms`, () => {
       const elapsed = measure(() => {
         for (let i = 0; i < 10; i++) {
-          runEffect('dust-drift', container);
-          clearEffects(container);
+          runEffect('dust-drift', overlay, scene);
+          clearEffects(overlay, scene);
         }
       });
 
       expect(elapsed).toBeLessThan(BUDGET_MS * 3);
-      expect(container.children.length).toBe(0);
+      expect(overlay.children.length).toBe(0);
     });
   });
 });
