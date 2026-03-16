@@ -72,6 +72,26 @@ describe('overlay.js', () => {
 
       expect(onClick).toHaveBeenCalledWith(2);
     });
+
+    it('creates dots as button elements', () => {
+      initOverlay(3);
+
+      const dots = dotsContainer.querySelectorAll('.progress-dot');
+      expect(dots[0].tagName).toBe('BUTTON');
+    });
+
+    it('returns early when progress-dots container is missing', () => {
+      dotsContainer.remove();
+
+      expect(() => initOverlay(5)).not.toThrow();
+    });
+
+    it('creates dots without click handler when onDotClick is omitted', () => {
+      initOverlay(3);
+
+      const dots = dotsContainer.querySelectorAll('.progress-dot');
+      expect(() => dots[0].click()).not.toThrow();
+    });
   });
 
   describe('updateProgress', () => {
@@ -104,11 +124,31 @@ describe('overlay.js', () => {
     });
   });
 
+  describe('updateProgress — edge cases', () => {
+    it('handles being called before initOverlay without throwing', () => {
+      expect(() => updateProgress(3)).not.toThrow();
+    });
+
+    it('handles sceneIndex beyond total dot count', () => {
+      initOverlay(3);
+      updateProgress(10);
+
+      const activeDots = dotsContainer.querySelectorAll('.active');
+      expect(activeDots.length).toBe(3);
+    });
+  });
+
   describe('showControls', () => {
     it('shows the overlay controls', () => {
       showControls();
 
       expect(controlsEl.hidden).toBe(false);
+    });
+
+    it('handles missing overlay-controls element gracefully', () => {
+      controlsEl.remove();
+
+      expect(() => showControls()).not.toThrow();
     });
   });
 });
