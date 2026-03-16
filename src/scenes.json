@@ -1062,6 +1062,11 @@
         "audio": "assets/audio/narration/11-music.m4a",
         "delay": 500
       },
+      "music": {
+        "src": "assets/audio/sfx/BridgeCitySinners_BreakTheChain.mp3",
+        "startVolume": 0.1,
+        "fullVolume": 0.3
+      },
       "ambient": null,
       "effects": {
         "idle": "machine-steady"

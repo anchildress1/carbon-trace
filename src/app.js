@@ -13,6 +13,11 @@ import {
   onNarrationBufferChange,
   preloadNarrationAhead,
   clearNarrationCache,
+  playMusic,
+  fadeMusic,
+  pauseMusic,
+  resumeMusic,
+  stopMusic,
 } from './audio.js';
 import { buildTextTimeline, clearNarrationLayer } from './text.js';
 import { runEffect, clearEffects, effectExists } from './effects.js';
@@ -95,7 +100,7 @@ function preloadAudio(src) {
 }
 
 function audioSrcsFromEntry(entry) {
-  return [entry.ambient?.src, entry.narration?.audio].filter(Boolean);
+  return [entry.ambient?.src, entry.narration?.audio, entry.music?.src].filter(Boolean);
 }
 
 function registerAudio(app, loaded) {
@@ -133,7 +138,7 @@ function preloadAssets(app) {
   return firstFrame?.image ? preloadImage(firstFrame.image) : Promise.resolve();
 }
 
-function scheduleNarrationAudio(app, narration) {
+function scheduleNarrationAudio(app, narration, onend) {
   const delay = narration.delay || 0;
   if (delay > 0) {
     app.narrationTimerStart = Date.now();
@@ -142,10 +147,10 @@ function scheduleNarrationAudio(app, narration) {
       app.narrationTimer = null;
       app.narrationTimerStart = null;
       app.narrationTimerDelay = null;
-      playNarration(narration.audio);
+      playNarration(narration.audio, onend);
     }, delay);
   } else {
-    playNarration(narration.audio);
+    playNarration(narration.audio, onend);
   }
 }
 
@@ -192,8 +197,13 @@ function applyNarration(app, frame) {
 
   app.els.btnReplay.disabled = !(hasLines || hasAudioRef);
 
+  if (frame.music) {
+    playMusic(frame.music.src, frame.music.startVolume);
+  }
+
   if (hasAudioRef) {
-    scheduleNarrationAudio(app, frame.narration);
+    const onNarrationEnd = frame.music ? () => fadeMusic(frame.music.fullVolume, 2000) : undefined;
+    scheduleNarrationAudio(app, frame.narration, onNarrationEnd);
   }
 }
 
@@ -347,6 +357,8 @@ function transition(app, toIndex) {
   clearCaptions();
   app.textTimeline = null;
 
+  stopMusic();
+
   const toFrame = app.frames[toIndex];
   const hasNarrationAudio = Boolean(toFrame.narration?.audio);
   if (!hasNarrationAudio) {
@@ -442,6 +454,7 @@ function togglePause(app) {
 
     resumeNarration();
     resumeAmbient();
+    resumeMusic();
 
     if (app.textTimeline && !app.buffering) {
       app.textTimeline.resume();
@@ -469,7 +482,8 @@ function togglePause(app) {
         app.narrationTimerDelay = null;
         app.narrationTimerRemaining = null;
         if (frame.narration?.audio) {
-          playNarration(frame.narration.audio);
+          const onEnd = frame.music ? () => fadeMusic(frame.music.fullVolume, 2000) : undefined;
+          playNarration(frame.narration.audio, onEnd);
         }
       }, app.narrationTimerRemaining);
       app.narrationTimerRemaining = null;
@@ -488,8 +502,14 @@ function togglePause(app) {
       if (app.textTimeline) {
         app.textTimeline.restart();
       }
+      if (frame.music) {
+        playMusic(frame.music.src, frame.music.startVolume);
+      }
       if (frame.narration?.audio) {
-        scheduleNarrationAudio(app, frame.narration);
+        const onNarrationEnd = frame.music
+          ? () => fadeMusic(frame.music.fullVolume, 2000)
+          : undefined;
+        scheduleNarrationAudio(app, frame.narration, onNarrationEnd);
       }
       if (areCaptionsEnabled() && frame.narration?.captions?.length > 0) {
         showCaptions(frame.narration.captions, app.els.captionLayer);
@@ -505,6 +525,7 @@ function togglePause(app) {
 
     pauseNarration();
     pauseAmbient();
+    pauseMusic();
 
     if (app.textTimeline) {
       app.textTimeline.pause();
@@ -582,8 +603,13 @@ function replayNarration(app) {
     showCaptions(frame.narration.captions, app.els.captionLayer);
   }
 
+  if (frame.music) {
+    playMusic(frame.music.src, frame.music.startVolume);
+  }
+
   if (hasAudioRef) {
-    playNarration(frame.narration.audio);
+    const onNarrationEnd = frame.music ? () => fadeMusic(frame.music.fullVolume, 2000) : undefined;
+    playNarration(frame.narration.audio, onNarrationEnd);
   }
 
   if (frame.effects?.entry) {

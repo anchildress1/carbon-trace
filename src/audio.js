@@ -2,6 +2,7 @@ import { Howl } from 'howler';
 
 let currentAmbient = null;
 let currentNarration = null;
+let currentMusic = null;
 let globalMuted = false;
 
 // Buffer monitoring state
@@ -272,13 +273,65 @@ export function resumeAmbient() {
   }
 }
 
+export function playMusic(src, volume) {
+  if (currentMusic) {
+    currentMusic.unload();
+  }
+
+  const howl = new Howl({
+    src: [src],
+    volume: volume,
+    loop: true,
+    html5: true,
+    mute: globalMuted,
+    onloaderror: (_id, err) => {
+      console.warn(`Failed to load music: ${src}`, err);
+      if (currentMusic === howl) currentMusic = null;
+    },
+    onplayerror: (_id, err) => {
+      console.warn(`Failed to play music: ${src}`, err);
+    },
+  });
+
+  currentMusic = howl;
+  currentMusic.play();
+  return currentMusic;
+}
+
+export function fadeMusic(toVolume, durationMs) {
+  if (currentMusic) {
+    currentMusic.fade(currentMusic.volume(), toVolume, durationMs);
+  }
+}
+
+export function pauseMusic() {
+  if (currentMusic) {
+    currentMusic.pause();
+  }
+}
+
+export function resumeMusic() {
+  if (currentMusic) {
+    currentMusic.play();
+  }
+}
+
+export function stopMusic() {
+  if (currentMusic) {
+    currentMusic.unload();
+    currentMusic = null;
+  }
+}
+
 export function stopAll() {
   cleanupBufferMonitoring();
   clearNarrationCache();
   if (currentAmbient) currentAmbient.unload();
   if (currentNarration) currentNarration.unload();
+  if (currentMusic) currentMusic.unload();
   currentAmbient = null;
   currentNarration = null;
+  currentMusic = null;
 }
 
 export function setMuted(muted) {
@@ -288,5 +341,8 @@ export function setMuted(muted) {
   }
   if (currentNarration) {
     currentNarration.mute(muted);
+  }
+  if (currentMusic) {
+    currentMusic.mute(muted);
   }
 }

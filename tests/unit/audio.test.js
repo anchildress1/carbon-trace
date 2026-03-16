@@ -47,6 +47,11 @@ import {
   isNarrationBuffering,
   preloadNarrationAhead,
   clearNarrationCache,
+  playMusic,
+  fadeMusic,
+  pauseMusic,
+  resumeMusic,
+  stopMusic,
 } from '../../src/audio.js';
 import { Howl } from 'howler';
 
@@ -624,6 +629,158 @@ describe('audio.js', () => {
       const callCountBefore = Howl.mock.calls.length;
       playNarration('scene-a.m4a');
       expect(Howl.mock.calls.length).toBe(callCountBefore + 1);
+    });
+  });
+
+  describe('playMusic', () => {
+    it('creates a looping Howl at the specified volume', () => {
+      setMuted(false);
+      playMusic('song.mp3', 0.1);
+
+      expect(Howl).toHaveBeenCalledWith(
+        expect.objectContaining({
+          src: ['song.mp3'],
+          volume: 0.1,
+          loop: true,
+          html5: true,
+          mute: false,
+        }),
+      );
+    });
+
+    it('plays the music immediately', () => {
+      const howl = playMusic('song.mp3', 0.1);
+
+      expect(howl.play).toHaveBeenCalled();
+    });
+
+    it('unloads previous music before playing new one', () => {
+      const first = playMusic('first.mp3', 0.1);
+      playMusic('second.mp3', 0.2);
+
+      expect(first.unload).toHaveBeenCalled();
+    });
+
+    it('applies current mute state', () => {
+      setMuted(true);
+      playMusic('song.mp3', 0.1);
+
+      expect(Howl).toHaveBeenCalledWith(expect.objectContaining({ mute: true }));
+    });
+
+    it('logs warning on load error', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      playMusic('bad.mp3', 0.1);
+      lastHowlOptions.onloaderror(1, 'not found');
+
+      expect(warnSpy).toHaveBeenCalledWith('Failed to load music: bad.mp3', 'not found');
+      warnSpy.mockRestore();
+    });
+
+    it('logs warning on play error', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      playMusic('bad.mp3', 0.1);
+      lastHowlOptions.onplayerror(1, 'decode error');
+
+      expect(warnSpy).toHaveBeenCalledWith('Failed to play music: bad.mp3', 'decode error');
+      warnSpy.mockRestore();
+    });
+
+    it('nullifies currentMusic on load error', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      playMusic('fail.mp3', 0.1);
+      lastHowlOptions.onloaderror(1, 'error');
+
+      expect(() => setMuted(true)).not.toThrow();
+      warnSpy.mockRestore();
+    });
+  });
+
+  describe('fadeMusic', () => {
+    it('fades music to the target volume', () => {
+      const howl = playMusic('song.mp3', 0.1);
+      fadeMusic(0.3, 2000);
+
+      expect(howl.fade).toHaveBeenCalledWith(0.15, 0.3, 2000);
+    });
+
+    it('handles no active music gracefully', () => {
+      stopAll();
+      expect(() => fadeMusic(0.3, 2000)).not.toThrow();
+    });
+  });
+
+  describe('pauseMusic', () => {
+    it('pauses current music', () => {
+      const howl = playMusic('song.mp3', 0.1);
+      pauseMusic();
+
+      expect(howl.pause).toHaveBeenCalled();
+    });
+
+    it('handles no active music gracefully', () => {
+      stopAll();
+      expect(() => pauseMusic()).not.toThrow();
+    });
+  });
+
+  describe('resumeMusic', () => {
+    it('resumes paused music', () => {
+      const howl = playMusic('song.mp3', 0.1);
+      vi.clearAllMocks();
+      resumeMusic();
+
+      expect(howl.play).toHaveBeenCalled();
+    });
+
+    it('handles no active music gracefully', () => {
+      stopAll();
+      expect(() => resumeMusic()).not.toThrow();
+    });
+  });
+
+  describe('stopMusic', () => {
+    it('unloads current music', () => {
+      const howl = playMusic('song.mp3', 0.1);
+      stopMusic();
+
+      expect(howl.unload).toHaveBeenCalled();
+    });
+
+    it('handles no active music gracefully', () => {
+      stopAll();
+      expect(() => stopMusic()).not.toThrow();
+    });
+  });
+
+  describe('setMuted with music', () => {
+    it('mutes active music along with ambient and narration', () => {
+      const music = playMusic('song.mp3', 0.1);
+      setMuted(true);
+
+      expect(music.mute).toHaveBeenCalledWith(true);
+    });
+
+    it('unmutes active music', () => {
+      const music = playMusic('song.mp3', 0.1);
+      setMuted(true);
+      setMuted(false);
+
+      expect(music.mute).toHaveBeenCalledWith(false);
+    });
+  });
+
+  describe('stopAll with music', () => {
+    it('unloads music along with ambient and narration', () => {
+      const ambient = playAmbient('ambient.mp3', 0.1, true);
+      const narration = playNarration('narration.mp3');
+      const music = playMusic('song.mp3', 0.1);
+
+      stopAll();
+
+      expect(ambient.unload).toHaveBeenCalled();
+      expect(narration.unload).toHaveBeenCalled();
+      expect(music.unload).toHaveBeenCalled();
     });
   });
 });
