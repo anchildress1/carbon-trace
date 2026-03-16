@@ -55,21 +55,21 @@ test.describe('carbon-trace narrative', () => {
   test('forward button advances scene', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
-    // Title frame has no image — advancing should load scene-01 image
+    // Title frame has no image — advancing should load scene-01-seam image
     await page.click('#btn-next');
 
     const image = page.locator('#scene-image');
-    await expect(image).toHaveAttribute('src', /scene-01/);
+    await expect(image).toHaveAttribute('src', /scene-01-seam/);
   });
 
   test('advances scene on keyboard Space', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
-    // Title frame has no image — Space should advance to scene-01
+    // Title frame has no image — Space should advance to scene-01-seam
     await page.keyboard.press('Space');
 
     const image = page.locator('#scene-image');
-    await expect(image).toHaveAttribute('src', /scene-01/);
+    await expect(image).toHaveAttribute('src', /scene-01-seam/);
   });
 
   test('previous button is disabled on first frame', async ({ page }) => {
@@ -85,7 +85,7 @@ test.describe('carbon-trace narrative', () => {
 
     await page.click('#btn-next');
     const image = page.locator('#scene-image');
-    await expect(image).toHaveAttribute('src', /scene-01/);
+    await expect(image).toHaveAttribute('src', /scene-01-seam/);
 
     await page.click('#btn-prev');
     // Back on title frame — image src is removed
@@ -99,7 +99,7 @@ test.describe('carbon-trace narrative', () => {
 
     await page.keyboard.press('ArrowRight');
     const image = page.locator('#scene-image');
-    await expect(image).toHaveAttribute('src', /scene-01/);
+    await expect(image).toHaveAttribute('src', /scene-01-seam/);
 
     await page.keyboard.press('ArrowLeft');
     const srcAfter = await image.getAttribute('src');
@@ -124,7 +124,7 @@ test.describe('carbon-trace narrative', () => {
     await expect(replayBtn).toBeEnabled();
   });
 
-  test('replay button is disabled on credits frame', async ({ page }) => {
+  test('replay button is disabled on scene with no narration content', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
     await page.emulateMedia({ reducedMotion: 'reduce' });
 
@@ -134,8 +134,9 @@ test.describe('carbon-trace narrative', () => {
       await page.keyboard.press('ArrowRight');
     }
 
+    // Credits frame has narration now — replay should be enabled
     const replayBtn = page.locator('#btn-replay');
-    await expect(replayBtn).toBeDisabled();
+    await expect(replayBtn).toBeEnabled();
   });
 
   test('clicking replay button does not advance the scene', async ({ page }) => {
@@ -201,7 +202,7 @@ test.describe('carbon-trace narrative', () => {
     const firstDot = page.locator('.progress-dot').first();
     await expect(firstDot).not.toHaveClass(/active/);
 
-    // Advance past title to scene-01
+    // Advance past title to scene-01-seam
     await page.click('#btn-next');
     await expect(firstDot).toHaveClass(/active/);
   });
@@ -230,20 +231,20 @@ test.describe('carbon-trace narrative — prefers-reduced-motion', () => {
   test('forward button advances scene when reduced motion is set', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
-    // Title frame has no image — advancing should load scene-01 image
+    // Title frame has no image — advancing should load scene-01-seam image
     await page.click('#btn-next');
 
     const image = page.locator('#scene-image');
-    await expect(image).toHaveAttribute('src', /scene-01/);
+    await expect(image).toHaveAttribute('src', /scene-01-seam/);
   });
 
   test('advances scene on keyboard Space when reduced motion is set', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
-    // Title frame has no image — Space should advance to scene-01
+    // Title frame has no image — Space should advance to scene-01-seam
     await page.keyboard.press('Space');
 
     const image = page.locator('#scene-image');
-    await expect(image).toHaveAttribute('src', /scene-01/);
+    await expect(image).toHaveAttribute('src', /scene-01-seam/);
   });
 });
