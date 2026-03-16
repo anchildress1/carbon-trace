@@ -2,7 +2,7 @@
 
 ## Narration Pipeline
 
-1. **Preload** — `preloadAudio()` uses `new Audio()` with `canplaythrough` event and 5s timeout
+1. **Preload** — `preloadAudio()` uses `new Audio()` with `preload='metadata'` and `onloadedmetadata` event (5s timeout)
 2. **Schedule** — `scheduleNarrationAudio()` respects `narration.delay` (ms)
 3. **Play** — `playNarration()` creates a Howl (`html5: true`), unloads any previous narration
 4. **End** — Optional `onend` callback for post-playback actions

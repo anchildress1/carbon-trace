@@ -34,7 +34,7 @@ Pause is blocked during `TRANSITIONING` and `LOADING`. Navigation from `PAUSED` 
 
 ## Frame Lifecycle
 
-1. **Preload** — `preloadAssets()` loads all images and audio in parallel via `Promise.all`
+1. **Preload** — `preloadAssets()` loads the first frame image; remaining images and audio are deferred to `preloadBackgroundAssets()` which loads sequentially after a 4s delay
 2. **showFrame()** — Sets image, alt text, trace overlay opacity; clears effects and narration
 3. **applyNarration()** — Builds GSAP text timeline from `narration.lines[]`, schedules audio with delay, shows captions, populates `#accessible-narration`
 4. **applyAmbient()** — Plays or crossfades ambient audio (currently null on all scenes)

@@ -164,8 +164,12 @@ function scheduleMusic(app, music) {
     if (music.exit !== null && music.exit !== undefined) {
       const fadeOutDelay = music.exit - enter;
       if (fadeOutDelay > 0) {
+        app.musicExitTimerStart = Date.now();
+        app.musicExitTimerDelay = fadeOutDelay;
         app.musicExitTimer = setTimeout(() => {
           app.musicExitTimer = null;
+          app.musicExitTimerStart = null;
+          app.musicExitTimerDelay = null;
           fadeMusic(0, 2000);
         }, fadeOutDelay);
       }
@@ -232,7 +236,16 @@ function applyNarration(app, frame) {
   if (hasCaptions) {
     app.els.accessibleNarration.textContent = frame.narration.captions.map((c) => c.text).join(' ');
     if (areCaptionsEnabled()) {
-      showCaptions(frame.narration.captions, app.els.captionLayer);
+      const captionDelay = frame.narration.delay || 0;
+      if (captionDelay > 0) {
+        setTimeout(() => {
+          if (app.frames[app.currentIndex] === frame && !app.paused) {
+            showCaptions(frame.narration.captions, app.els.captionLayer);
+          }
+        }, captionDelay);
+      } else {
+        showCaptions(frame.narration.captions, app.els.captionLayer);
+      }
     }
   } else {
     app.els.accessibleNarration.textContent = '';
@@ -406,7 +419,10 @@ function transition(app, toIndex) {
   if (app.musicExitTimer) {
     clearTimeout(app.musicExitTimer);
     app.musicExitTimer = null;
+    app.musicExitTimerStart = null;
+    app.musicExitTimerDelay = null;
   }
+  app.musicExitTimerRemaining = null;
   stopMusic();
 
   const toFrame = app.frames[toIndex];
@@ -506,6 +522,20 @@ function resumeDelayedNarration(app) {
   app.narrationTimerRemaining = null;
 }
 
+function resumeMusicExitTimer(app) {
+  if (!app.musicExitTimerRemaining || app.musicExitTimerRemaining <= 0) return;
+  app.musicExitTimerStart = Date.now();
+  app.musicExitTimerDelay = app.musicExitTimerRemaining;
+  app.musicExitTimer = setTimeout(() => {
+    app.musicExitTimer = null;
+    app.musicExitTimerStart = null;
+    app.musicExitTimerDelay = null;
+    app.musicExitTimerRemaining = null;
+    fadeMusic(0, 2000);
+  }, app.musicExitTimerRemaining);
+  app.musicExitTimerRemaining = null;
+}
+
 function resumeDelayedMusic(app) {
   if (app.musicTimerRemaining <= 0) return;
   const frame = app.frames[app.currentIndex];
@@ -519,6 +549,20 @@ function resumeDelayedMusic(app) {
     app.musicTimerRemaining = null;
     playMusic(frame.music.src, frame.music.startVolume);
     fadeMusic(frame.music.fullVolume, frame.music.crescendoMs);
+
+    if (frame.music.exit !== null && frame.music.exit !== undefined) {
+      const fadeOutDelay = (frame.music.exit || 0) - (frame.music.enter || 0);
+      if (fadeOutDelay > 0) {
+        app.musicExitTimerStart = Date.now();
+        app.musicExitTimerDelay = fadeOutDelay;
+        app.musicExitTimer = setTimeout(() => {
+          app.musicExitTimer = null;
+          app.musicExitTimerStart = null;
+          app.musicExitTimerDelay = null;
+          fadeMusic(0, 2000);
+        }, fadeOutDelay);
+      }
+    }
   }, app.musicTimerRemaining);
   app.musicTimerRemaining = null;
 }
@@ -591,6 +635,7 @@ function doResume(app) {
   resumeDelayedNarration(app);
   resumeDelayedMusic(app);
   resumeDelayedPhase(app);
+  resumeMusicExitTimer(app);
 
   if (firstPlay) {
     handleFirstPlay(app);
@@ -637,8 +682,12 @@ function doPause(app) {
   saveMusicTimerRemaining(app);
 
   if (app.musicExitTimer) {
+    const elapsed = Date.now() - app.musicExitTimerStart;
+    app.musicExitTimerRemaining = Math.max(0, app.musicExitTimerDelay - elapsed);
     clearTimeout(app.musicExitTimer);
     app.musicExitTimer = null;
+    app.musicExitTimerStart = null;
+    app.musicExitTimerDelay = null;
   }
 
   if (app.phaseTimer) {
@@ -913,6 +962,9 @@ export function createApp() {
     musicTimerDelay: null,
     musicTimerRemaining: null,
     musicExitTimer: null,
+    musicExitTimerStart: null,
+    musicExitTimerDelay: null,
+    musicExitTimerRemaining: null,
     buffering: false,
     availableAudio: new Set(),
     els: {
