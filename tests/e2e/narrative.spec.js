@@ -178,10 +178,14 @@ test.describe('carbon-trace narrative', () => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
     const firstDot = page.locator('.progress-dot').first();
-    await expect(firstDot).not.toHaveClass(/active/);
+    const secondDot = page.locator('.progress-dot').nth(1);
+
+    // First dot active on title scene (scene 0)
+    await expect(firstDot).toHaveClass(/active/);
+    await expect(secondDot).not.toHaveClass(/active/);
 
     await page.click('#btn-next');
-    await expect(firstDot).toHaveClass(/active/);
+    await expect(secondDot).toHaveClass(/active/);
   });
 
   test('mute button aria-label toggles between mute and unmute', async ({ page }) => {

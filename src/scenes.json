@@ -13,8 +13,8 @@
   },
   "frames": [
     {
-      "id": "frame-00-title",
-      "frameType": "title",
+      "id": "scene-00-title",
+      "frameType": "scene",
       "description": "Title card — opening narration on a dark field",
       "narration": {
         "lines": [
@@ -36,7 +36,7 @@
           }
         ],
         "captions": [
-          { "text": "[Appalachian English dialect]", "start": 0, "end": 1000 },
+          { "text": "[Appalachian English dialect]", "start": 10, "end": 1000 },
           { "text": "I'm gonna tell you a story.", "start": 1000, "end": 3000 },
           {
             "text": "Not 'cause it's special. But 'cause it's mine.",
@@ -992,13 +992,11 @@
       }
     },
     {
-      "id": "frame-11-music",
+      "id": "scene-11-music",
       "frameType": "credits",
       "description": "Record player with diamond blazing and circuitry — the finale, light filling the room",
       "image": "assets/images/scene-11-music.webp",
       "advanceMode": "disabled",
-      "textMode": "ghost-drift",
-      "persistentVisualState": "machine-running",
       "narration": {
         "lines": [
           {
