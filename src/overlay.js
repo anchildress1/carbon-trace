@@ -1,6 +1,6 @@
 let dotElements = [];
 
-export function initOverlay(sceneCount) {
+export function initOverlay(sceneCount, onDotClick) {
   const dotsContainer = document.getElementById('progress-dots');
   if (!dotsContainer) return;
 
@@ -8,11 +8,17 @@ export function initOverlay(sceneCount) {
   dotElements = [];
 
   for (let i = 0; i < sceneCount; i++) {
-    const dot = document.createElement('span');
+    const dot = document.createElement('button');
     dot.className = 'progress-dot';
-    dot.setAttribute('aria-hidden', 'true');
+    dot.setAttribute('aria-label', `Go to scene ${i + 1} of ${sceneCount}`);
     dot.dataset.sceneIndex = String(i + 1);
     dot.setAttribute('title', `Scene ${i + 1} of ${sceneCount}`);
+    if (onDotClick) {
+      dot.addEventListener('click', (e) => {
+        e.stopPropagation();
+        onDotClick(i + 1);
+      });
+    }
     dotsContainer.appendChild(dot);
     dotElements.push(dot);
   }

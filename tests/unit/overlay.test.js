@@ -32,12 +32,12 @@ describe('overlay.js', () => {
       expect(dots.length).toBe(5);
     });
 
-    it('marks each dot as aria-hidden', () => {
+    it('sets aria-label on each dot', () => {
       initOverlay(3);
 
       const dots = dotsContainer.querySelectorAll('.progress-dot');
-      expect(dots[0].getAttribute('aria-hidden')).toBe('true');
-      expect(dots[2].getAttribute('aria-hidden')).toBe('true');
+      expect(dots[0].getAttribute('aria-label')).toBe('Go to scene 1 of 3');
+      expect(dots[2].getAttribute('aria-label')).toBe('Go to scene 3 of 3');
     });
 
     it('sets data-scene-index and title on each dot', () => {
@@ -61,6 +61,16 @@ describe('overlay.js', () => {
       initOverlay(0);
 
       expect(dotsContainer.children.length).toBe(0);
+    });
+
+    it('calls onDotClick with scene index when dot is clicked', () => {
+      const onClick = vi.fn();
+      initOverlay(3, onClick);
+
+      const dots = dotsContainer.querySelectorAll('.progress-dot');
+      dots[1].click();
+
+      expect(onClick).toHaveBeenCalledWith(2);
     });
   });
 

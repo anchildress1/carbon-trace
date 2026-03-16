@@ -156,12 +156,17 @@ function applyAmbient(app, frame) {
 }
 
 function buildSceneIndexMap(frames) {
-  const map = new Map();
+  const byFrame = new Map();
+  const byScene = new Map();
   let count = 0;
   frames.forEach((frame, i) => {
-    if (frame.frameType === 'scene') map.set(i, ++count);
+    if (frame.frameType === 'scene' || frame.frameType === 'credits') {
+      const sceneIdx = ++count;
+      byFrame.set(i, sceneIdx);
+      byScene.set(sceneIdx, i);
+    }
   });
-  return map;
+  return { byFrame, byScene };
 }
 
 function showFrame(app, index) {
@@ -186,7 +191,7 @@ function showFrame(app, index) {
     runEffect(frame.effects.idle, app.els.effectsLayer);
   }
 
-  const sceneIdx = app.sceneIndexByFrame.get(index);
+  const sceneIdx = app.sceneMap.byFrame.get(index);
   if (sceneIdx !== undefined) {
     updateProgress(sceneIdx);
   }
@@ -404,7 +409,7 @@ export function createApp() {
 
   const app = {
     frames,
-    sceneIndexByFrame: buildSceneIndexMap(frames),
+    sceneMap: buildSceneIndexMap(frames),
     currentIndex: 0,
     state: State.LOADING,
     muted: false,
@@ -427,7 +432,12 @@ export function createApp() {
     },
   };
 
-  initOverlay(app.sceneIndexByFrame.size);
+  initOverlay(app.sceneMap.byFrame.size, (sceneIndex) => {
+    const frameIndex = app.sceneMap.byScene.get(sceneIndex);
+    if (frameIndex !== undefined && frameIndex !== app.currentIndex) {
+      transition(app, frameIndex);
+    }
+  });
 
   initApp(app);
 

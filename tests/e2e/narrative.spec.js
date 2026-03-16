@@ -5,7 +5,9 @@ import { test, expect } from '@playwright/test';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const scenesData = JSON.parse(readFileSync(resolve(__dirname, '../../src/scenes.json'), 'utf8'));
-const SCENE_COUNT = scenesData.frames.filter((f) => f.frameType === 'scene').length;
+const SCENE_COUNT = scenesData.frames.filter(
+  (f) => f.frameType === 'scene' || f.frameType === 'credits',
+).length;
 
 test.describe('carbon-trace narrative', () => {
   test.beforeEach(async ({ page }) => {
@@ -188,7 +190,8 @@ test.describe('carbon-trace narrative', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
 
     // Navigate to credits (last frame) by pressing ArrowRight for each frame
-    for (let i = 0; i < SCENE_COUNT + 1; i++) {
+    const totalFrames = scenesData.frames.length;
+    for (let i = 0; i < totalFrames - 1; i++) {
       await page.keyboard.press('ArrowRight');
     }
 
