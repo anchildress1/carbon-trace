@@ -246,6 +246,48 @@ describe('text.js', () => {
       expect(el.classList.contains('narration-line--positioned')).toBe(false);
     });
 
+    it('skips lines with missing enter timing', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const lines = [
+        { text: 'Valid', enter: 0, exit: 1000 },
+        { text: 'No enter', exit: 2000 },
+        { text: 'Also valid', enter: 1000, exit: 3000 },
+      ];
+
+      const tl = buildTextTimeline(lines, container);
+
+      expect(container.children.length).toBe(2);
+      expect(tl.fromTo).toHaveBeenCalledTimes(2);
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Narration line 1 has invalid enter/exit timing:',
+        expect.objectContaining({ text: 'No enter' }),
+      );
+      errorSpy.mockRestore();
+    });
+
+    it('skips lines with missing exit timing', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const lines = [{ text: 'No exit', enter: 500 }];
+
+      const tl = buildTextTimeline(lines, container);
+
+      expect(container.children.length).toBe(0);
+      expect(tl.fromTo).not.toHaveBeenCalled();
+      expect(errorSpy).toHaveBeenCalled();
+      errorSpy.mockRestore();
+    });
+
+    it('skips lines with non-numeric enter/exit values', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const lines = [{ text: 'Bad timing', enter: 'foo', exit: 'bar' }];
+
+      buildTextTimeline(lines, container);
+
+      expect(container.children.length).toBe(0);
+      expect(errorSpy).toHaveBeenCalled();
+      errorSpy.mockRestore();
+    });
+
     it('handles mixed positioned and non-positioned lines', () => {
       const lines = [
         { text: 'Positioned', enter: 0, exit: 1000, x: 10, y: 70, align: 'left' },

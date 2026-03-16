@@ -562,6 +562,247 @@ describe('audio.js', () => {
     });
   });
 
+  describe('cached Howl error handlers', () => {
+    it('attaches loaderror handler to cached Howl on playNarration', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      preloadNarrationAhead('cached.m4a');
+      const cachedHowl = Howl.mock.results[Howl.mock.results.length - 1].value;
+
+      playNarration('cached.m4a');
+
+      // The cached howl should have .on('loaderror') called
+      expect(cachedHowl.on).toHaveBeenCalledWith('loaderror', expect.any(Function));
+
+      // Simulate loaderror on cached howl
+      const loaderrorCall = cachedHowl.on.mock.calls.find(([event]) => event === 'loaderror');
+      loaderrorCall[1](1, 'network error');
+
+      expect(warnSpy).toHaveBeenCalledWith('Failed to load narration: cached.m4a', 'network error');
+      warnSpy.mockRestore();
+    });
+
+    it('attaches playerror handler to cached Howl on playNarration', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      preloadNarrationAhead('cached.m4a');
+      const cachedHowl = Howl.mock.results[Howl.mock.results.length - 1].value;
+
+      playNarration('cached.m4a');
+
+      expect(cachedHowl.on).toHaveBeenCalledWith('playerror', expect.any(Function));
+
+      const playerrorCall = cachedHowl.on.mock.calls.find(([event]) => event === 'playerror');
+      playerrorCall[1](1, 'decode error');
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Failed to play narration: cached.m4a',
+        'decode error',
+      );
+      warnSpy.mockRestore();
+    });
+
+    it('attaches onend callback to cached Howl when provided', () => {
+      preloadNarrationAhead('cached.m4a');
+      const cachedHowl = Howl.mock.results[Howl.mock.results.length - 1].value;
+
+      const onend = vi.fn();
+      playNarration('cached.m4a', onend);
+
+      expect(cachedHowl.on).toHaveBeenCalledWith('end', onend);
+    });
+  });
+
+  describe('buffer monitor deferred attachment', () => {
+    it('defers listener attachment when _sounds is not available', () => {
+      // Create a Howl mock where _sounds is initially empty
+      const originalSounds = mockHowlInstance._sounds;
+      mockHowlInstance._sounds = [];
+
+      playNarration('deferred.m4a');
+
+      // Should not have attached DOM listeners (no node available)
+      const waitingCalls = mockNode.addEventListener.mock.calls.filter(
+        ([event]) => event === 'waiting',
+      );
+      expect(waitingCalls.length).toBe(0);
+
+      // Should have registered a deferred 'play' listener on the howl
+      const howl = Howl.mock.results[Howl.mock.results.length - 1].value;
+      expect(howl.once).toHaveBeenCalledWith('play', expect.any(Function));
+
+      mockHowlInstance._sounds = originalSounds;
+    });
+
+    it('warns when audio node is unavailable on deferred attachment', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const originalSounds = mockHowlInstance._sounds;
+      mockHowlInstance._sounds = [];
+
+      playNarration('deferred.m4a');
+
+      const howl = Howl.mock.results[Howl.mock.results.length - 1].value;
+      const onceCall = howl.once.mock.calls.find(([event]) => event === 'play');
+
+      // Simulate the play event firing, but node is still unavailable
+      mockHowlInstance._sounds = [{ _node: null }];
+      onceCall[1]();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Cannot monitor narration buffer: audio node unavailable',
+      );
+
+      mockHowlInstance._sounds = originalSounds;
+      warnSpy.mockRestore();
+    });
+  });
+
+  describe('buffer stall recovery', () => {
+    it('nudges stall after 2 stall checks', () => {
+      vi.useFakeTimers();
+      const cb = vi.fn();
+      onNarrationBufferChange(cb);
+
+      mockNode.buffered.length = 1;
+      mockNode.buffered.end.mockReturnValue(5);
+      mockNode.currentTime = 5;
+
+      playNarration('stall.m4a');
+
+      const waitingCall = mockNode.addEventListener.mock.calls.find(
+        ([event]) => event === 'waiting',
+      );
+      waitingCall[1]();
+
+      // Advance 2 intervals with no buffer progress
+      mockNode.buffered.end.mockReturnValue(5);
+      vi.advanceTimersByTime(4000);
+      vi.advanceTimersByTime(4000);
+
+      // After 2 stall checks, nudgeStall should have set currentTime
+      // (we can verify by checking it was assigned)
+      expect(mockNode.currentTime).toBe(5);
+
+      vi.useRealTimers();
+    });
+
+    it('reloads from position after 4 stall checks', () => {
+      vi.useFakeTimers();
+      const cb = vi.fn();
+      onNarrationBufferChange(cb);
+
+      mockNode.buffered.length = 1;
+      mockNode.buffered.end.mockReturnValue(5);
+      mockNode.currentTime = 5;
+      mockNode.src = 'stall.m4a';
+
+      playNarration('stall.m4a');
+
+      const waitingCall = mockNode.addEventListener.mock.calls.find(
+        ([event]) => event === 'waiting',
+      );
+      waitingCall[1]();
+
+      // Advance 4 intervals with no buffer progress
+      mockNode.buffered.end.mockReturnValue(5);
+      vi.advanceTimersByTime(4000);
+      vi.advanceTimersByTime(4000);
+      vi.advanceTimersByTime(4000);
+      vi.advanceTimersByTime(4000);
+
+      // After 4 stall checks, reloadFromPosition should have called play()
+      expect(mockNode.play).toHaveBeenCalled();
+
+      vi.useRealTimers();
+    });
+
+    it('clears buffering state after 3 recovery failures', () => {
+      vi.useFakeTimers();
+      const cb = vi.fn();
+      onNarrationBufferChange(cb);
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      mockNode.buffered.length = 1;
+      mockNode.buffered.end.mockReturnValue(5);
+      mockNode.currentTime = 5;
+      mockNode.src = 'stall.m4a';
+
+      playNarration('stall.m4a');
+
+      const waitingCall = mockNode.addEventListener.mock.calls.find(
+        ([event]) => event === 'waiting',
+      );
+      waitingCall[1]();
+
+      // Run through 3 full recovery cycles (4 stall checks each = 12 intervals)
+      for (let cycle = 0; cycle < 3; cycle++) {
+        mockNode.buffered.end.mockReturnValue(5);
+        for (let i = 0; i < 4; i++) {
+          vi.advanceTimersByTime(4000);
+        }
+      }
+
+      expect(warnSpy).toHaveBeenCalledWith('Buffer recovery exhausted after 3 attempts');
+      expect(isNarrationBuffering()).toBe(false);
+
+      warnSpy.mockRestore();
+      vi.useRealTimers();
+    });
+
+    it('resumes playback when buffer has enough ahead', () => {
+      vi.useFakeTimers();
+      const cb = vi.fn();
+      onNarrationBufferChange(cb);
+
+      mockNode.buffered.length = 1;
+      mockNode.buffered.end.mockReturnValue(5);
+      mockNode.currentTime = 5;
+
+      playNarration('recover.m4a');
+
+      const waitingCall = mockNode.addEventListener.mock.calls.find(
+        ([event]) => event === 'waiting',
+      );
+      waitingCall[1]();
+      mockNode.play.mockClear();
+
+      // Buffer progresses and gets 3+ seconds ahead
+      mockNode.buffered.end.mockReturnValue(9);
+      mockNode.currentTime = 5;
+      vi.advanceTimersByTime(4000);
+
+      expect(mockNode.play).toHaveBeenCalled();
+
+      vi.useRealTimers();
+    });
+
+    it('cleans up buffering on play() failure in checkBufferProgress', async () => {
+      vi.useFakeTimers();
+      const cb = vi.fn();
+      onNarrationBufferChange(cb);
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      mockNode.buffered.length = 1;
+      mockNode.buffered.end.mockReturnValue(5);
+      mockNode.currentTime = 5;
+      mockNode.play.mockRejectedValueOnce(new Error('autoplay blocked'));
+
+      playNarration('fail.m4a');
+
+      const waitingCall = mockNode.addEventListener.mock.calls.find(
+        ([event]) => event === 'waiting',
+      );
+      waitingCall[1]();
+
+      // Buffer progresses enough to trigger play()
+      mockNode.buffered.end.mockReturnValue(9);
+      await vi.advanceTimersByTimeAsync(4000);
+
+      expect(isNarrationBuffering()).toBe(false);
+
+      warnSpy.mockRestore();
+      vi.useRealTimers();
+    });
+  });
+
   describe('preloadNarrationAhead', () => {
     it('creates a Howl with preload enabled', () => {
       preloadNarrationAhead('next-scene.m4a');
