@@ -60,6 +60,64 @@ describe('text.js', () => {
       expect(container.children.length).toBe(3);
       expect(container.children[2].textContent).toBe('Third');
     });
+
+    it('applies absolute positioning when x and y are provided', () => {
+      const el = createLineElement('Positioned', container, { x: 10, y: 70 });
+
+      expect(el.style.position).toBe('absolute');
+      expect(el.style.left).toBe('10%');
+      expect(el.style.top).toBe('70%');
+      expect(el.classList.contains('narration-line--positioned')).toBe(true);
+    });
+
+    it('applies left alignment by default when positioned', () => {
+      const el = createLineElement('Left text', container, { x: 10, y: 50 });
+
+      expect(el.style.textAlign).toBe('left');
+      expect(el.style.transform).toBe('translateY(-50%)');
+    });
+
+    it('applies center alignment with translate(-50%, -50%)', () => {
+      const el = createLineElement('Center text', container, { x: 50, y: 50, align: 'center' });
+
+      expect(el.style.textAlign).toBe('center');
+      expect(el.style.transform).toBe('translate(-50%, -50%)');
+    });
+
+    it('applies right alignment with translate(-100%, -50%)', () => {
+      const el = createLineElement('Right text', container, { x: 75, y: 88, align: 'right' });
+
+      expect(el.style.textAlign).toBe('right');
+      expect(el.style.transform).toBe('translate(-100%, -50%)');
+    });
+
+    it('does not apply positioning when x/y are not provided', () => {
+      const el = createLineElement('Default', container);
+
+      expect(el.style.position).toBe('');
+      expect(el.classList.contains('narration-line--positioned')).toBe(false);
+    });
+
+    it('does not apply positioning when options is empty object', () => {
+      const el = createLineElement('Default', container, {});
+
+      expect(el.style.position).toBe('');
+    });
+
+    it('handles x=0 and y=0 as valid positions', () => {
+      const el = createLineElement('Origin', container, { x: 0, y: 0 });
+
+      expect(el.style.position).toBe('absolute');
+      expect(el.style.left).toBe('0%');
+      expect(el.style.top).toBe('0%');
+    });
+
+    it('defaults to left alignment when align is unrecognized', () => {
+      const el = createLineElement('Fallback', container, { x: 50, y: 50, align: 'justify' });
+
+      expect(el.style.textAlign).toBe('left');
+      expect(el.style.transform).toBe('translateY(-50%)');
+    });
   });
 
   describe('buildTextTimeline', () => {
@@ -151,6 +209,47 @@ describe('text.js', () => {
 
       const toCall = tl.to.mock.calls[0];
       expect(toCall[1]).toMatchObject({ opacity: 0, y: -6, duration: 0.6, ease: 'power2.in' });
+    });
+
+    it('passes position data to createLineElement', () => {
+      const lines = [
+        { text: 'Positioned', enter: 0, exit: 1000, x: 10, y: 70, align: 'left' },
+        { text: 'Centered', enter: 500, exit: 2000, x: 50, y: 50, align: 'center' },
+      ];
+
+      buildTextTimeline(lines, container);
+
+      const first = container.children[0];
+      expect(first.style.position).toBe('absolute');
+      expect(first.style.left).toBe('10%');
+      expect(first.style.top).toBe('70%');
+      expect(first.style.textAlign).toBe('left');
+
+      const second = container.children[1];
+      expect(second.style.left).toBe('50%');
+      expect(second.style.textAlign).toBe('center');
+    });
+
+    it('handles lines without position data (backward-compatible)', () => {
+      const lines = [{ text: 'No position', enter: 0, exit: 1000 }];
+
+      buildTextTimeline(lines, container);
+
+      const el = container.children[0];
+      expect(el.style.position).toBe('');
+      expect(el.classList.contains('narration-line--positioned')).toBe(false);
+    });
+
+    it('handles mixed positioned and non-positioned lines', () => {
+      const lines = [
+        { text: 'Positioned', enter: 0, exit: 1000, x: 10, y: 70, align: 'left' },
+        { text: 'Default', enter: 500, exit: 2000 },
+      ];
+
+      buildTextTimeline(lines, container);
+
+      expect(container.children[0].classList.contains('narration-line--positioned')).toBe(true);
+      expect(container.children[1].classList.contains('narration-line--positioned')).toBe(false);
     });
   });
 

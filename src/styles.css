@@ -78,14 +78,16 @@ body {
 
 .narration-layer {
   position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.narration-line:not(.narration-line--positioned) {
+  position: absolute;
   bottom: 10%;
   left: 5%;
   right: 5%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5em;
-  pointer-events: none;
+  text-align: center;
 }
 
 .narration-line {
