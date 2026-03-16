@@ -156,6 +156,64 @@ describe('captions.js', () => {
       expect(container.children.length).toBe(1);
       expect(container.children[0].textContent).toBe('Second');
     });
+
+    it('starts from offset when offsetMs is provided', () => {
+      const captions = [
+        { text: 'Early', start: 0, end: 2000 },
+        { text: 'Mid', start: 3000, end: 6000 },
+        { text: 'Late', start: 8000, end: 10000 },
+      ];
+
+      // Start from 4 seconds in — "Early" is past, "Mid" is active, "Late" is future
+      showCaptions(captions, container, 4000);
+
+      // "Mid" should be immediately visible (start 3000 < offset 4000 < end 6000)
+      expect(container.children.length).toBe(1);
+      expect(container.children[0].textContent).toBe('Mid');
+
+      // "Mid" hides at 6000 - 4000 = 2000ms from now
+      vi.advanceTimersByTime(2000);
+      expect(container.children.length).toBe(0);
+
+      // "Late" should appear at 8000 - 4000 = 4000ms from now
+      vi.advanceTimersByTime(2000);
+      expect(container.children.length).toBe(1);
+      expect(container.children[0].textContent).toBe('Late');
+    });
+
+    it('skips captions that have already ended before offset', () => {
+      const captions = [
+        { text: 'Past', start: 0, end: 1000 },
+        { text: 'Future', start: 5000, end: 8000 },
+      ];
+
+      showCaptions(captions, container, 2000);
+
+      // "Past" ended at 1000 < offset 2000, should not appear
+      expect(container.children.length).toBe(0);
+
+      // "Future" at 5000 - 2000 = 3000ms
+      vi.advanceTimersByTime(3000);
+      expect(container.children.length).toBe(1);
+      expect(container.children[0].textContent).toBe('Future');
+    });
+
+    it('correctly tracks elapsed time after offset for pause/resume', () => {
+      const captions = [{ text: 'Timed', start: 5000, end: 10000 }];
+
+      showCaptions(captions, container, 3000);
+
+      // Caption scheduled at 5000 - 3000 = 2000ms
+      vi.advanceTimersByTime(1000);
+      pauseCaptions();
+      vi.advanceTimersByTime(5000); // Should not fire during pause
+      expect(container.children.length).toBe(0);
+
+      resumeCaptions();
+      vi.advanceTimersByTime(1000); // Remaining 1000ms
+      expect(container.children.length).toBe(1);
+      expect(container.children[0].textContent).toBe('Timed');
+    });
   });
 
   describe('clearCaptions', () => {

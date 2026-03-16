@@ -70,7 +70,7 @@ function scheduleCaptionsFromOffset(captions, container, offsetMs) {
   });
 }
 
-export function showCaptions(captions, container) {
+export function showCaptions(captions, container, offsetMs = 0) {
   clearCaptions();
 
   if (!captions || !container) return;
@@ -78,9 +78,9 @@ export function showCaptions(captions, container) {
   currentCaptions = captions;
   currentContainer = container;
   playbackStartedAt = Date.now();
-  elapsedBeforePause = 0;
+  elapsedBeforePause = offsetMs;
 
-  scheduleCaptionsFromOffset(captions, container, 0);
+  scheduleCaptionsFromOffset(captions, container, offsetMs);
 }
 
 export function clearCaptions() {

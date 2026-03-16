@@ -3,11 +3,11 @@
 ## Narration Pipeline
 
 1. **Preload** — `preloadAudio()` uses `new Audio()` with `canplaythrough` event and 5s timeout
-2. **Schedule** — `scheduleNarrationAudio()` respects `narration.delay` (ms) and `userHasInteracted` gate
+2. **Schedule** — `scheduleNarrationAudio()` respects `narration.delay` (ms)
 3. **Play** — `playNarration()` creates a Howl (`html5: true`), unloads any previous narration
 4. **End** — Optional `onend` callback for post-playback actions
 
-The app starts in a fully paused state. Audio, captions, and the text timeline all wait for the user to press play. On first play, `userHasInteracted` is set and everything starts from t=0 in sync. This prevents autoplay policy violations and ensures a consistent initial experience.
+The app starts in a fully paused state. Audio, captions, and the text timeline all wait for the user to press play. The first frame's audio is preloaded immediately (alongside the first image) so it is ready when the user presses play. Remaining audio is deferred 4 seconds to avoid network contention. On first play, everything starts from t=0 in sync. The paused state itself is the autoplay gate — no separate `userHasInteracted` check is needed.
 
 ## Ambient Crossfade
 
@@ -53,6 +53,8 @@ Applied to both `narrationTimer` and `phaseTimer`.
 Caption pause records total elapsed time, clears all timers. Resume re-schedules remaining captions from the current offset using `scheduleCaptionsFromOffset()`.
 
 Toggling captions on/off while paused only updates the preference — captions are not shown until playback resumes. On resume, if captions are enabled they resume from the paused offset; if disabled, any running captions are cleared.
+
+Toggling captions **on** mid-narration reads the current GSAP timeline time (`app.textTimeline.time()`) and passes it as `offsetMs` to `showCaptions()`, so captions start in sync with the current audio/text playback position rather than from t=0.
 
 ## Replay Flow
 

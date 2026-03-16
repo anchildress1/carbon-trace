@@ -106,8 +106,26 @@ function collectAudioSrcs(frames) {
   return srcs;
 }
 
-function preloadAudioInBackground(app) {
-  const audioSrcs = [...collectAudioSrcs(app.frames)];
+function preloadFirstFrameAudio(app) {
+  const firstFrame = app.frames[0];
+  const srcs = audioSrcsFromEntry(firstFrame);
+  return Promise.all(
+    srcs.map((src) =>
+      preloadAudio(src).then((loaded) => {
+        if (loaded) {
+          app.availableAudio.add(loaded);
+          if (app.availableAudio.size === 1) {
+            app.els.btnMute.removeAttribute('aria-disabled');
+          }
+        }
+      }),
+    ),
+  );
+}
+
+function preloadRemainingAudio(app) {
+  const firstFrameSrcs = new Set(audioSrcsFromEntry(app.frames[0]));
+  const audioSrcs = [...collectAudioSrcs(app.frames)].filter((src) => !firstFrameSrcs.has(src));
   for (const src of audioSrcs) {
     preloadAudio(src).then((loaded) => {
       if (loaded) {
@@ -133,8 +151,6 @@ function preloadAssets(app) {
 }
 
 function scheduleNarrationAudio(app, narration) {
-  if (!app.userHasInteracted) return;
-
   const delay = narration.delay || 0;
   if (delay > 0) {
     app.narrationTimerStart = Date.now();
@@ -587,14 +603,15 @@ function toggleCaptions(app) {
   setCaptionsEnabled(enabled);
   app.els.btnCaptions.setAttribute('aria-pressed', String(enabled));
 
-  if (!app.userHasInteracted || app.paused) return;
+  if (app.paused) return;
 
   if (enabled) {
     const frame = app.frames[app.currentIndex];
     const hasCaptions =
       Array.isArray(frame.narration?.captions) && frame.narration.captions.length > 0;
     if (hasCaptions) {
-      showCaptions(frame.narration.captions, app.els.captionLayer);
+      const offsetMs = app.textTimeline ? app.textTimeline.time() * 1000 : 0;
+      showCaptions(frame.narration.captions, app.els.captionLayer, offsetMs);
     }
   } else {
     clearCaptions();
@@ -606,7 +623,7 @@ function initApp(app) {
     app.els.sceneImage.removeAttribute('src');
   });
 
-  preloadAssets(app)
+  Promise.all([preloadAssets(app), preloadFirstFrameAudio(app)])
     .then(() => {
       app.els.loadingScreen.hidden = true;
       app.els.sceneStage.hidden = false;
@@ -622,26 +639,23 @@ function initApp(app) {
       showFrame(app, 0);
 
       // Start paused — everything waits for the user to press play.
-      // Seek text timeline past the first line's entrance so it's visible
-      // as a static title card (also provides an LCP element for Lighthouse).
+      // Text timeline paused at t=0 so no text is visible before play.
+      // Stop any audio/captions that showFrame may have triggered.
+      stopNarration();
+      clearCaptions();
       app.paused = true;
       app.pausedFromState = State.SCENE_ACTIVE;
       app.state = State.PAUSED;
-      clearCaptions();
       if (app.textTimeline) {
-        const firstLine = app.frames[0].narration?.lines?.[0];
-        const seekTime = firstLine ? firstLine.enter / 1000 + 0.85 : 0;
-        app.textTimeline.seek(seekTime);
         app.textTimeline.pause();
       }
       app.els.btnPause.setAttribute('aria-pressed', 'true');
       app.els.btnPause.classList.add('paused');
 
-      // Defer background preloads to avoid network contention during initial render.
-      // Ensures GSAP text animation and LCP complete before loading remaining assets.
+      // Defer remaining asset preloads to avoid network contention.
       setTimeout(() => {
         preloadRemainingImages(app);
-        preloadAudioInBackground(app);
+        preloadRemainingAudio(app);
       }, 4000);
 
       const markInteracted = () => {
