@@ -59,7 +59,7 @@ export function crossfadeAmbient(newSrc, volume, durationMs) {
   return currentAmbient;
 }
 
-export function playNarration(src) {
+export function playNarration(src, onend) {
   if (currentNarration) {
     currentNarration.unload();
   }
@@ -69,6 +69,7 @@ export function playNarration(src) {
     volume: 1,
     html5: true,
     mute: globalMuted,
+    onend: onend || undefined,
     onloaderror: (_id, err) => {
       console.warn(`Failed to load narration: ${src}`, err);
       if (currentNarration === howl) currentNarration = null;
@@ -81,6 +82,37 @@ export function playNarration(src) {
   currentNarration = howl;
   currentNarration.play();
   return currentNarration;
+}
+
+export function stopNarration() {
+  if (currentNarration) {
+    currentNarration.unload();
+    currentNarration = null;
+  }
+}
+
+export function pauseNarration() {
+  if (currentNarration) {
+    currentNarration.pause();
+  }
+}
+
+export function resumeNarration() {
+  if (currentNarration) {
+    currentNarration.play();
+  }
+}
+
+export function pauseAmbient() {
+  if (currentAmbient) {
+    currentAmbient.pause();
+  }
+}
+
+export function resumeAmbient() {
+  if (currentAmbient) {
+    currentAmbient.play();
+  }
 }
 
 export function stopAll() {

@@ -7,6 +7,7 @@ const mockHowlInstance = {
   stop: vi.fn(),
   fade: vi.fn(),
   mute: vi.fn(),
+  pause: vi.fn(),
   unload: vi.fn(),
   volume: vi.fn().mockReturnValue(0.15),
 };
@@ -18,7 +19,18 @@ vi.mock('howler', () => ({
   }),
 }));
 
-import { playAmbient, crossfadeAmbient, playNarration, stopAll, setMuted } from '../../src/audio.js';
+import {
+  playAmbient,
+  crossfadeAmbient,
+  playNarration,
+  stopNarration,
+  pauseNarration,
+  resumeNarration,
+  pauseAmbient,
+  resumeAmbient,
+  stopAll,
+  setMuted,
+} from '../../src/audio.js';
 import { Howl } from 'howler';
 
 describe('audio.js', () => {
@@ -124,6 +136,103 @@ describe('audio.js', () => {
       playNarration('second.mp3');
 
       expect(first.unload).toHaveBeenCalled();
+    });
+
+    it('passes onend callback to Howl options', () => {
+      const onend = vi.fn();
+      playNarration('narration.mp3', onend);
+
+      expect(Howl).toHaveBeenCalledWith(
+        expect.objectContaining({
+          onend: onend,
+        }),
+      );
+    });
+
+    it('does not include onend when not provided', () => {
+      playNarration('narration.mp3');
+
+      expect(lastHowlOptions.onend).toBeUndefined();
+    });
+  });
+
+  describe('stopNarration', () => {
+    it('unloads current narration', () => {
+      const howl = playNarration('narration.mp3');
+      stopNarration();
+
+      expect(howl.unload).toHaveBeenCalled();
+    });
+
+    it('handles no active narration gracefully', () => {
+      stopAll();
+      expect(() => stopNarration()).not.toThrow();
+    });
+
+    it('nullifies narration reference after stopping', () => {
+      playNarration('narration.mp3');
+      stopNarration();
+
+      // Calling pause after stop should not throw (no active narration)
+      expect(() => pauseNarration()).not.toThrow();
+    });
+  });
+
+  describe('pauseNarration', () => {
+    it('pauses current narration', () => {
+      const howl = playNarration('narration.mp3');
+      pauseNarration();
+
+      expect(howl.pause).toHaveBeenCalled();
+    });
+
+    it('handles no active narration gracefully', () => {
+      stopAll();
+      expect(() => pauseNarration()).not.toThrow();
+    });
+  });
+
+  describe('resumeNarration', () => {
+    it('resumes paused narration by calling play', () => {
+      const howl = playNarration('narration.mp3');
+      vi.clearAllMocks();
+      resumeNarration();
+
+      expect(howl.play).toHaveBeenCalled();
+    });
+
+    it('handles no active narration gracefully', () => {
+      stopAll();
+      expect(() => resumeNarration()).not.toThrow();
+    });
+  });
+
+  describe('pauseAmbient', () => {
+    it('pauses current ambient', () => {
+      const howl = playAmbient('ambient.mp3', 0.1, true);
+      pauseAmbient();
+
+      expect(howl.pause).toHaveBeenCalled();
+    });
+
+    it('handles no active ambient gracefully', () => {
+      stopAll();
+      expect(() => pauseAmbient()).not.toThrow();
+    });
+  });
+
+  describe('resumeAmbient', () => {
+    it('resumes paused ambient by calling play', () => {
+      const howl = playAmbient('ambient.mp3', 0.1, true);
+      vi.clearAllMocks();
+      resumeAmbient();
+
+      expect(howl.play).toHaveBeenCalled();
+    });
+
+    it('handles no active ambient gracefully', () => {
+      stopAll();
+      expect(() => resumeAmbient()).not.toThrow();
     });
   });
 
@@ -249,9 +358,7 @@ describe('audio.js', () => {
       setMuted(true);
       playAmbient('new.mp3', 0.1, true);
 
-      expect(Howl).toHaveBeenCalledWith(
-        expect.objectContaining({ mute: true }),
-      );
+      expect(Howl).toHaveBeenCalledWith(expect.objectContaining({ mute: true }));
     });
   });
 });
