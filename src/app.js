@@ -118,12 +118,13 @@ function applyNarration(app, frame) {
 
   if (!frame.narration) {
     app.els.accessibleNarration.textContent = '';
-    app.els.btnReplay.hidden = true;
+    app.els.btnReplay.disabled = true;
     return;
   }
 
   const hasLines = Array.isArray(frame.narration.lines) && frame.narration.lines.length > 0;
-  const hasAudio = Boolean(frame.narration.audio && app.availableAudio.has(frame.narration.audio));
+  const hasAudioRef = Boolean(frame.narration.audio);
+  const audioReady = hasAudioRef && app.availableAudio.has(frame.narration.audio);
 
   if (hasLines) {
     buildTextTimeline(frame.narration.lines, app.els.narrationLayer, prefersReducedMotion());
@@ -132,16 +133,10 @@ function applyNarration(app, frame) {
     app.els.accessibleNarration.textContent = '';
   }
 
-  if (hasLines || hasAudio) {
-    app.els.btnReplay.hidden = false;
-    if (hasAudio) {
-      scheduleNarrationAudio(app, frame.narration);
-    }
-  } else {
-    if (document.activeElement === app.els.btnReplay) {
-      app.els.btnMute.focus();
-    }
-    app.els.btnReplay.hidden = true;
+  app.els.btnReplay.disabled = !(hasLines || hasAudioRef);
+
+  if (audioReady) {
+    scheduleNarrationAudio(app, frame.narration);
   }
 }
 

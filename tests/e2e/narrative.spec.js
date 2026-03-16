@@ -117,29 +117,25 @@ test.describe('carbon-trace narrative', () => {
     expect(content).toContain("connect-src 'none'");
   });
 
-  test('replay button is visible on initial scene load', async ({ page }) => {
+  test('replay button is enabled on initial scene load', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
     const replayBtn = page.locator('#btn-replay');
-    await expect(replayBtn).toBeVisible();
+    await expect(replayBtn).toBeEnabled();
   });
 
-  test('replay button is hidden after advancing to audio-only scene', async ({ page }) => {
+  test('replay button is disabled on credits frame', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
     await page.emulateMedia({ reducedMotion: 'reduce' });
 
-    const image = page.locator('#scene-image');
-
-    // advance past title to scene-01
-    await page.click('#btn-next');
-    await expect(image).toHaveAttribute('src', /scene-01/);
-
-    // advance to scene-02 (no narration lines, audio unavailable in test)
-    await page.click('#btn-next');
-    await expect(image).toHaveAttribute('src', /scene-02/);
+    // Navigate to credits (last frame)
+    const totalFrames = scenesData.frames.length;
+    for (let i = 0; i < totalFrames - 1; i++) {
+      await page.keyboard.press('ArrowRight');
+    }
 
     const replayBtn = page.locator('#btn-replay');
-    await expect(replayBtn).toBeHidden();
+    await expect(replayBtn).toBeDisabled();
   });
 
   test('clicking replay button does not advance the scene', async ({ page }) => {
