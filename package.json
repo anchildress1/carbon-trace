@@ -46,6 +46,9 @@
     "onlyBuiltDependencies": [
       "esbuild",
       "lefthook"
-    ]
+    ],
+    "overrides": {
+      "tmp": ">=0.2.3"
+    }
   }
 }
