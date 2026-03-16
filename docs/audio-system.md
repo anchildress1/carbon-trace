@@ -7,7 +7,7 @@
 3. **Play** — `playNarration()` creates a Howl (`html5: true`), unloads any previous narration
 4. **End** — Optional `onend` callback for post-playback actions
 
-Audio only plays after user interaction (click, keydown, dot navigation). The `userHasInteracted` flag prevents autoplay policy violations on strict browsers.
+The app starts in a fully paused state. Audio, captions, and the text timeline all wait for the user to press play. On first play, `userHasInteracted` is set and everything starts from t=0 in sync. This prevents autoplay policy violations and ensures a consistent initial experience.
 
 ## Ambient Crossfade
 
@@ -51,6 +51,8 @@ Applied to both `narrationTimer` and `phaseTimer`.
 ### Captions
 
 Caption pause records total elapsed time, clears all timers. Resume re-schedules remaining captions from the current offset using `scheduleCaptionsFromOffset()`.
+
+Toggling captions on/off while paused only updates the preference — captions are not shown until playback resumes. On resume, if captions are enabled they resume from the paused offset; if disabled, any running captions are cleared.
 
 ## Replay Flow
 

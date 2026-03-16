@@ -426,7 +426,11 @@ function togglePause(app) {
     const childTweens = gsap.getTweensOf(app.els.effectsLayer.children);
     [...effectsTweens, ...childTweens].forEach((tw) => tw.resume());
 
-    resumeCaptions();
+    if (areCaptionsEnabled()) {
+      resumeCaptions();
+    } else {
+      clearCaptions();
+    }
 
     if (app.narrationTimerRemaining > 0) {
       const frame = app.frames[app.currentIndex];
@@ -583,7 +587,7 @@ function toggleCaptions(app) {
   setCaptionsEnabled(enabled);
   app.els.btnCaptions.setAttribute('aria-pressed', String(enabled));
 
-  if (!app.userHasInteracted) return;
+  if (!app.userHasInteracted || app.paused) return;
 
   if (enabled) {
     const frame = app.frames[app.currentIndex];
@@ -617,12 +621,19 @@ function initApp(app) {
 
       showFrame(app, 0);
 
-      // Start awaiting first play — text animates silently as a visual hook,
-      // but audio and captions are gated until user presses play.
+      // Start paused — everything waits for the user to press play.
+      // Seek text timeline past the first line's entrance so it's visible
+      // as a static title card (also provides an LCP element for Lighthouse).
       app.paused = true;
       app.pausedFromState = State.SCENE_ACTIVE;
       app.state = State.PAUSED;
       clearCaptions();
+      if (app.textTimeline) {
+        const firstLine = app.frames[0].narration?.lines?.[0];
+        const seekTime = firstLine ? firstLine.enter / 1000 + 0.85 : 0;
+        app.textTimeline.seek(seekTime);
+        app.textTimeline.pause();
+      }
       app.els.btnPause.setAttribute('aria-pressed', 'true');
       app.els.btnPause.classList.add('paused');
 
