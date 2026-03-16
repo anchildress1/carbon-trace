@@ -151,8 +151,8 @@ describe('text.js', () => {
       const tl = buildTextTimeline(lines, container, false);
 
       const fromToCall = tl.fromTo.mock.calls[0];
-      expect(fromToCall[1]).toEqual({ opacity: 0, y: 8 });
-      expect(fromToCall[2]).toMatchObject({ duration: 0.8, ease: 'power2.out' });
+      expect(fromToCall[1]).toEqual({ opacity: 0, y: 18, filter: 'blur(4px)' });
+      expect(fromToCall[2]).toMatchObject({ duration: 1.2, ease: 'power3.out' });
     });
 
     it('clears existing content before building', () => {
@@ -202,13 +202,19 @@ describe('text.js', () => {
       expect(toCall[1]).toMatchObject({ opacity: 0, duration: 0.3, ease: 'none' });
     });
 
-    it('uses ghost-drift exit animation with y offset', () => {
+    it('uses ghost-drift exit animation with y offset and blur', () => {
       const lines = [{ text: 'Exit drift', enter: 0, exit: 3000 }];
 
       const tl = buildTextTimeline(lines, container, false);
 
       const toCall = tl.to.mock.calls[0];
-      expect(toCall[1]).toMatchObject({ opacity: 0, y: -6, duration: 0.6, ease: 'power2.in' });
+      expect(toCall[1]).toMatchObject({
+        opacity: 0,
+        y: -10,
+        filter: 'blur(3px)',
+        duration: 0.9,
+        ease: 'power2.in',
+      });
     });
 
     it('passes position data to createLineElement', () => {

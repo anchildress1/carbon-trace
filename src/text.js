@@ -47,11 +47,15 @@ export function buildTextTimeline(lines, container, reducedMotion = false) {
     } else {
       tl.fromTo(
         el,
-        { opacity: 0, y: 8 },
-        { opacity: 1, y: 0, duration: 0.8, ease: 'power2.out' },
+        { opacity: 0, y: 18, filter: 'blur(4px)' },
+        { opacity: 1, y: 0, filter: 'blur(0px)', duration: 1.2, ease: 'power3.out' },
         line.enter / 1000,
       );
-      tl.to(el, { opacity: 0, y: -6, duration: 0.6, ease: 'power2.in' }, line.exit / 1000);
+      tl.to(
+        el,
+        { opacity: 0, y: -10, filter: 'blur(3px)', duration: 0.9, ease: 'power2.in' },
+        line.exit / 1000,
+      );
     }
   });
 

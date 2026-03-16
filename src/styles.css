@@ -91,11 +91,19 @@ body {
 }
 
 .narration-line {
+  font-family: 'Lora', Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
   font-size: clamp(1rem, 2.5vw, 1.75rem);
-  line-height: 1.6;
+  line-height: 1.7;
+  letter-spacing: 0.03em;
   text-align: center;
-  color: #e8e4df;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+  color: rgba(232, 228, 223, 0.88);
+  text-shadow:
+    0 0 20px rgba(232, 228, 223, 0.15),
+    0 0 40px rgba(232, 228, 223, 0.06),
+    0 1px 3px rgba(0, 0, 0, 0.6);
+  filter: blur(0px);
   opacity: 0;
 }
 
