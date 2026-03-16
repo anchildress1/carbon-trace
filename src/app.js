@@ -138,7 +138,7 @@ function preloadAssets(app) {
   return firstFrame?.image ? preloadImage(firstFrame.image) : Promise.resolve();
 }
 
-function scheduleNarrationAudio(app, narration, onend) {
+function scheduleNarrationAudio(app, narration) {
   const delay = narration.delay || 0;
   if (delay > 0) {
     app.narrationTimerStart = Date.now();
@@ -147,10 +147,10 @@ function scheduleNarrationAudio(app, narration, onend) {
       app.narrationTimer = null;
       app.narrationTimerStart = null;
       app.narrationTimerDelay = null;
-      playNarration(narration.audio, onend);
+      playNarration(narration.audio);
     }, delay);
   } else {
-    playNarration(narration.audio, onend);
+    playNarration(narration.audio);
   }
 }
 
@@ -199,11 +199,11 @@ function applyNarration(app, frame) {
 
   if (frame.music) {
     playMusic(frame.music.src, frame.music.startVolume);
+    fadeMusic(frame.music.fullVolume, frame.music.crescendoMs);
   }
 
   if (hasAudioRef) {
-    const onNarrationEnd = frame.music ? () => fadeMusic(frame.music.fullVolume, 2000) : undefined;
-    scheduleNarrationAudio(app, frame.narration, onNarrationEnd);
+    scheduleNarrationAudio(app, frame.narration);
   }
 }
 
@@ -482,8 +482,7 @@ function togglePause(app) {
         app.narrationTimerDelay = null;
         app.narrationTimerRemaining = null;
         if (frame.narration?.audio) {
-          const onEnd = frame.music ? () => fadeMusic(frame.music.fullVolume, 2000) : undefined;
-          playNarration(frame.narration.audio, onEnd);
+          playNarration(frame.narration.audio);
         }
       }, app.narrationTimerRemaining);
       app.narrationTimerRemaining = null;
@@ -504,12 +503,10 @@ function togglePause(app) {
       }
       if (frame.music) {
         playMusic(frame.music.src, frame.music.startVolume);
+        fadeMusic(frame.music.fullVolume, frame.music.crescendoMs);
       }
       if (frame.narration?.audio) {
-        const onNarrationEnd = frame.music
-          ? () => fadeMusic(frame.music.fullVolume, 2000)
-          : undefined;
-        scheduleNarrationAudio(app, frame.narration, onNarrationEnd);
+        scheduleNarrationAudio(app, frame.narration);
       }
       if (areCaptionsEnabled() && frame.narration?.captions?.length > 0) {
         showCaptions(frame.narration.captions, app.els.captionLayer);
@@ -605,11 +602,11 @@ function replayNarration(app) {
 
   if (frame.music) {
     playMusic(frame.music.src, frame.music.startVolume);
+    fadeMusic(frame.music.fullVolume, frame.music.crescendoMs);
   }
 
   if (hasAudioRef) {
-    const onNarrationEnd = frame.music ? () => fadeMusic(frame.music.fullVolume, 2000) : undefined;
-    playNarration(frame.narration.audio, onNarrationEnd);
+    playNarration(frame.narration.audio);
   }
 
   if (frame.effects?.entry) {
