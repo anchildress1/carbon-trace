@@ -454,8 +454,6 @@ function transition(app, toIndex) {
   const toFrame = app.frames[toIndex];
   stopNarration();
 
-  const needsImage = toFrame.image && !app.imageCache.has(toFrame.image);
-
   const proceedWithFrame = () => {
     const prevIndex = app.currentIndex;
     app.currentIndex = toIndex;
@@ -480,7 +478,8 @@ function transition(app, toIndex) {
       landOnFrame();
     };
 
-    if (needsImage) {
+    // Re-check at execution time — image may have been cached by preload-ahead
+    if (toFrame.image && !app.imageCache.has(toFrame.image)) {
       waitForImage(app, toFrame.image).then(readyThen);
     } else {
       readyThen();
@@ -517,7 +516,8 @@ function transition(app, toIndex) {
         }
       };
 
-      if (needsImage) {
+      // Re-check — image may have been cached by preload-ahead during fade-out
+      if (toFrame.image && !app.imageCache.has(toFrame.image)) {
         waitForImage(app, toFrame.image).then(fadeIn);
       } else {
         fadeIn();

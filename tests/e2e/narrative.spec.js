@@ -46,6 +46,10 @@ test.describe('carbon-trace narrative', () => {
   test('clicking scene area does not advance the scene', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
+    // Dismiss play gate first so stage click reaches the stage
+    await page.click('#play-gate');
+    await page.waitForSelector('#play-gate[hidden]', { timeout: 3000 });
+
     const stage = page.locator('#scene-stage');
     const labelBefore = await stage.getAttribute('aria-label');
 
@@ -172,12 +176,14 @@ test.describe('carbon-trace narrative', () => {
   });
 
   test('forward button is disabled on credits frame', async ({ page }) => {
-    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
     await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
     const totalFrames = scenesData.frames.length;
     for (let i = 0; i < totalFrames - 1; i++) {
       await page.keyboard.press('ArrowRight');
+      // Wait for transition to settle (readiness gate may await image load)
+      await page.waitForTimeout(200);
     }
 
     const nextBtn = page.locator('#btn-next');
@@ -228,10 +234,11 @@ test.describe('carbon-trace — scene alignment', () => {
   });
 
   test('scene-02 description appears after advancing twice', async ({ page }) => {
-    for (let i = 0; i < 2; i++) await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+    await page.waitForTimeout(200);
+    await page.keyboard.press('ArrowRight');
     const stage = page.locator('#scene-stage');
-    const label = await stage.getAttribute('aria-label');
-    expect(label).toContain('Mine tunnel');
+    await expect(stage).toHaveAttribute('aria-label', /Mine tunnel/, { timeout: 5000 });
   });
 
   test('progress dots count matches scene count', async ({ page }) => {
