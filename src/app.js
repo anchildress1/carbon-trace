@@ -501,6 +501,7 @@ function transition(app, toIndex) {
         app.currentIndex = prevIndex;
         gsap.set(app.els.sceneStage, { opacity: 1 });
         app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
+        completePendingNav(app);
         return;
       }
 

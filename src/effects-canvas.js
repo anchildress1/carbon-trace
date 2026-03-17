@@ -41,6 +41,8 @@ export function initCanvas(el) {
     throw new Error('initCanvas requires a <canvas> element');
   }
 
+  if (canvasEl) destroy();
+
   canvasEl = el;
   ctx = canvasEl.getContext('2d');
 
@@ -63,7 +65,7 @@ export function pause() {
 }
 
 export function resume() {
-  if (!ctx) return;
+  if (!ctx || running) return;
   running = true;
   rafId = requestAnimationFrame(render);
 }
