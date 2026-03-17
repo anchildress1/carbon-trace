@@ -68,13 +68,25 @@ test.describe('carbon-trace narrative', () => {
     await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
   });
 
-  test('advances scene on keyboard Space', async ({ page }) => {
+  test('Space toggles pause instead of advancing', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
-    await page.keyboard.press('Space');
+    const pauseBtn = page.locator('#btn-pause');
+    // Starts paused
+    await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
 
+    // Space unpauses
+    await page.keyboard.press('Space');
+    await expect(pauseBtn).toHaveAttribute('aria-pressed', 'false');
+
+    // Space pauses again
+    await page.keyboard.press('Space');
+    await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
+
+    // Scene did not advance — still on title
     const stage = page.locator('#scene-stage');
-    await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
+    const label = await stage.getAttribute('aria-label');
+    expect(label).toBe(frameDescription(0));
   });
 
   test('previous button is disabled on first frame', async ({ page }) => {
@@ -119,29 +131,50 @@ test.describe('carbon-trace narrative', () => {
     expect(content).toContain("connect-src 'none'");
   });
 
-  test('replay button is enabled on initial scene load', async ({ page }) => {
+  test('replay button is disabled before first play', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+
+    const replayBtn = page.locator('#btn-replay');
+    await expect(replayBtn).toBeDisabled();
+  });
+
+  test('replay button is enabled after playing narration scene', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+
+    // Advance to scene-01 (has narration audio)
+    await page.click('#btn-next');
+    const stage = page.locator('#scene-stage');
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
 
     const replayBtn = page.locator('#btn-replay');
     await expect(replayBtn).toBeEnabled();
   });
 
   test('clicking replay button does not advance the scene', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
-    await page.locator('#btn-replay').waitFor({ state: 'visible', timeout: 3000 });
 
+    // Advance to scene-01 so replay is enabled
+    await page.click('#btn-next');
     const stage = page.locator('#scene-stage');
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
+
     const labelBefore = await stage.getAttribute('aria-label');
-
     await page.click('#btn-replay');
-
     const labelAfter = await stage.getAttribute('aria-label');
     expect(labelAfter).toBe(labelBefore);
   });
 
   test('clicking replay restores narration text elements', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
-    await page.locator('#btn-replay').waitFor({ state: 'visible', timeout: 3000 });
+
+    // Advance to scene-01 so replay is enabled
+    await page.click('#btn-next');
+    await expect(page.locator('#scene-stage')).toHaveAttribute('aria-label', frameDescription(1), {
+      timeout: 5000,
+    });
 
     await page.click('#btn-replay');
 
@@ -254,8 +287,11 @@ test.describe('carbon-trace — positioned text', () => {
   });
 
   test('overlay text elements have absolute positioning styles', async ({ page }) => {
-    // Title frame has positioned lines
+    // Press play so narration renders on title frame
+    await page.click('#play-gate');
+
     const lines = page.locator('.narration-line--positioned');
+    await expect(lines.first()).toBeVisible({ timeout: 5000 });
     const count = await lines.count();
     expect(count).toBeGreaterThan(0);
 
@@ -265,8 +301,11 @@ test.describe('carbon-trace — positioned text', () => {
   });
 
   test('text alignment matches data for center-aligned lines', async ({ page }) => {
-    // Title frame lines are center-aligned
+    // Press play so narration renders on title frame
+    await page.click('#play-gate');
+
     const lines = page.locator('.narration-line--positioned');
+    await expect(lines.first()).toBeVisible({ timeout: 5000 });
     const first = lines.first();
 
     const textAlign = await first.evaluate((el) => el.style.textAlign);
@@ -337,7 +376,7 @@ test.describe('carbon-trace — pause/play', () => {
     await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
   });
 
-  test('navigation while paused unpauses and advances', async ({ page }) => {
+  test('navigation while paused does hardCut and stays paused', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
 
     const pauseBtn = page.locator('#btn-pause');
@@ -348,7 +387,8 @@ test.describe('carbon-trace — pause/play', () => {
 
     const stage = page.locator('#scene-stage');
     await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
-    await expect(pauseBtn).toHaveAttribute('aria-pressed', 'false');
+    // Stays paused after hardCut navigation
+    await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
   });
 });
 
@@ -424,8 +464,13 @@ test.describe('carbon-trace — navigation interrupts', () => {
   });
 
   test('replay restores narration text elements from scratch', async ({ page }) => {
-    await page.locator('#btn-replay').waitFor({ state: 'visible', timeout: 3000 });
+    // Advance to scene-01 so replay is enabled (title starts paused with no narration)
+    await page.click('#btn-next');
+    await expect(page.locator('#scene-stage')).toHaveAttribute('aria-label', frameDescription(1), {
+      timeout: 5000,
+    });
 
+    await page.locator('#btn-replay').waitFor({ state: 'visible', timeout: 3000 });
     await page.click('#btn-replay');
 
     const lines = page.locator('.narration-line');
@@ -462,12 +507,18 @@ test.describe('carbon-trace narrative — prefers-reduced-motion', () => {
     await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
   });
 
-  test('advances scene on keyboard Space when reduced motion is set', async ({ page }) => {
+  test('Space toggles pause when reduced motion is set', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
-    await page.keyboard.press('Space');
+    const pauseBtn = page.locator('#btn-pause');
+    await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
 
+    await page.keyboard.press('Space');
+    await expect(pauseBtn).toHaveAttribute('aria-pressed', 'false');
+
+    // Scene did not advance — still on title
     const stage = page.locator('#scene-stage');
-    await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
+    const label = await stage.getAttribute('aria-label');
+    expect(label).toBe(frameDescription(0));
   });
 });
