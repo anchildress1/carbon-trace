@@ -20,6 +20,7 @@ function sizeCanvas() {
   canvasEl.height = rect.height * dpr;
 
   if (ctx) {
+    ctx.resetTransform();
     ctx.scale(dpr, dpr);
   }
 }

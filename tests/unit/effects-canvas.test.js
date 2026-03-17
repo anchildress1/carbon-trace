@@ -12,6 +12,7 @@ import {
 function createMockCanvas() {
   const mockCtx = {
     clearRect: vi.fn(),
+    resetTransform: vi.fn(),
     scale: vi.fn(),
   };
 
