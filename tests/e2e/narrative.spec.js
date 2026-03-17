@@ -48,7 +48,7 @@ test.describe('carbon-trace narrative', () => {
 
     // Dismiss play gate first so stage click reaches the stage
     await page.click('#play-gate');
-    await page.waitForSelector('#play-gate[hidden]', { timeout: 3000 });
+    await expect(page.locator('#play-gate')).toBeHidden({ timeout: 3000 });
 
     const stage = page.locator('#scene-stage');
     const labelBefore = await stage.getAttribute('aria-label');
