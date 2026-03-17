@@ -57,6 +57,9 @@ describe('effects-canvas.js', () => {
       observe: vi.fn(),
       disconnect: vi.fn(),
     }));
+
+    // Default: no reduced motion preference
+    globalThis.matchMedia = vi.fn().mockReturnValue({ matches: false });
   });
 
   afterEach(() => {
@@ -147,6 +150,32 @@ describe('effects-canvas.js', () => {
 
     it('resume without initCanvas does nothing', () => {
       resume();
+      expect(isRunning()).toBe(false);
+    });
+
+    it('resume does not start when prefers-reduced-motion is active', () => {
+      const { canvas } = createMockCanvas();
+      initCanvas(canvas);
+
+      globalThis.matchMedia = vi.fn().mockReturnValue({ matches: true });
+      resume();
+
+      expect(isRunning()).toBe(false);
+      expect(globalThis.requestAnimationFrame).not.toHaveBeenCalled();
+    });
+
+    it('render loop self-stops when reduced motion activates mid-run', () => {
+      const { canvas } = createMockCanvas();
+      initCanvas(canvas);
+
+      globalThis.matchMedia = vi.fn().mockReturnValue({ matches: false });
+      resume();
+      expect(isRunning()).toBe(true);
+
+      // Simulate reduced motion toggled on between frames
+      globalThis.matchMedia = vi.fn().mockReturnValue({ matches: true });
+      rafCallbacks[0]();
+
       expect(isRunning()).toBe(false);
     });
   });

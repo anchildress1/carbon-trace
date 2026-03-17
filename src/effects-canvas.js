@@ -2,6 +2,9 @@
  * Canvas 2D lifecycle — manages the effects canvas context, DPR-aware
  * sizing, and the render loop. Individual effects will be registered
  * and dispatched through this module.
+ *
+ * Respects prefers-reduced-motion: the render loop will not start (and
+ * will self-stop) when the user prefers reduced motion.
  */
 
 let ctx = null;
@@ -9,6 +12,10 @@ let canvasEl = null;
 let observer = null;
 let running = false;
 let rafId = null;
+
+function reducedMotion() {
+  return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
 
 function sizeCanvas() {
   if (!canvasEl) return;
@@ -27,6 +34,11 @@ function sizeCanvas() {
 
 function render() {
   if (!running || !ctx || !canvasEl) return;
+
+  if (reducedMotion()) {
+    pause();
+    return;
+  }
 
   const rect = canvasEl.getBoundingClientRect();
   ctx.clearRect(0, 0, rect.width, rect.height);
@@ -70,7 +82,7 @@ export function pause() {
 }
 
 export function resume() {
-  if (!ctx || running) return;
+  if (!ctx || running || reducedMotion()) return;
   running = true;
   rafId = requestAnimationFrame(render);
 }
