@@ -868,8 +868,6 @@ function toggleCaptions(app) {
   setCaptionsEnabled(enabled);
   app.els.btnCaptions.setAttribute('aria-pressed', String(enabled));
 
-  if (app.paused) return;
-
   if (enabled) {
     const frame = app.frames[app.currentIndex];
     const hasCaptions =
@@ -877,6 +875,7 @@ function toggleCaptions(app) {
     if (hasCaptions) {
       const offsetMs = app.textTimeline ? app.textTimeline.time() * 1000 : 0;
       showCaptions(frame.narration.captions, app.els.captionLayer, offsetMs);
+      if (app.paused) pauseCaptions();
     }
   } else {
     clearCaptions();
