@@ -28,11 +28,8 @@ import {
   clearAll as clearCanvasEffects,
 } from './effects-canvas.js';
 import { initOverlay, updateProgress, showControls } from './overlay.js';
-import {
-  preloadFirstFrameAssets,
-  preloadFirstFrameAudio,
-  preloadBackgroundAssets,
-} from './loader.js';
+import { initSceneCanvas, drawImage as drawSceneImage, clearScene, loadImage } from './canvas.js';
+import { preloadFirstFrameAudio, preloadBackgroundAssets } from './loader.js';
 import {
   initCaptions,
   setCaptionsEnabled,
@@ -80,6 +77,22 @@ function registerAudio(app, loaded) {
     app.availableAudio.add(loaded);
     if (app.availableAudio.size === 1) {
       app.els.btnMute.removeAttribute('aria-disabled');
+    }
+  }
+}
+
+async function preloadFirstFrameImage(app) {
+  const firstFrame = app.frames[0];
+  if (!firstFrame?.image) return;
+  const img = await loadImage(firstFrame.image);
+  if (img) app.imageCache.set(firstFrame.image, img);
+}
+
+async function preloadBackgroundImages(app) {
+  for (const frame of app.frames.slice(1)) {
+    if (frame.image && !app.imageCache.has(frame.image)) {
+      const img = await loadImage(frame.image);
+      if (img) app.imageCache.set(frame.image, img);
     }
   }
 }
@@ -251,11 +264,12 @@ function showFrame(app, index) {
   }
 
   const frame = app.frames[index];
-  app.els.sceneImage.alt = frame.description || '';
-  if (frame.image) {
-    app.els.sceneImage.src = frame.image;
+  app.els.sceneStage.setAttribute('aria-label', frame.description || '');
+  if (frame.image && app.imageCache.has(frame.image)) {
+    const img = app.imageCache.get(frame.image);
+    if (img) drawSceneImage(img);
   } else {
-    app.els.sceneImage.removeAttribute('src');
+    clearScene();
   }
   app.els.traceOverlay.style.opacity = frame.traceOverlay?.opacity ?? 0;
 
@@ -264,7 +278,7 @@ function showFrame(app, index) {
   clearNarrationLayer(app.els.narrationLayer);
 
   if (frame.effects?.idle) {
-    runEffect(frame.effects.idle, app.els.effectsCanvas, app.els.sceneImage);
+    runEffect(frame.effects.idle, app.els.effectsCanvas, app.els.sceneCanvas);
   }
 
   // Pre-warm the canvas render loop while the stage is still at opacity 0
@@ -437,7 +451,7 @@ function transition(app, toIndex) {
     opacity: 0,
     duration: halfDuration,
     ease: 'power2.inOut',
-    onComplete: async () => {
+    onComplete: () => {
       try {
         const prevIndex = app.currentIndex;
         app.currentIndex = toIndex;
@@ -450,18 +464,6 @@ function transition(app, toIndex) {
           app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
           completePendingNav(app);
           return;
-        }
-
-        // Wait for image to decode before fading in to avoid blank-frame flash
-        if (toFrame.image && app.els.sceneImage.src) {
-          try {
-            await Promise.race([
-              app.els.sceneImage.decode(),
-              new Promise((resolve) => setTimeout(resolve, 2000)),
-            ]);
-          } catch (err) {
-            console.warn(`Image decode rejected for frame ${toIndex}:`, err);
-          }
         }
 
         gsap.to(app.els.sceneStage, {
@@ -505,8 +507,8 @@ function triggerEffect(app) {
   if (!frame.effects?.idle) return;
   clearEffects();
   if (frame.effects.entry)
-    runEffect(frame.effects.entry, app.els.effectsCanvas, app.els.sceneImage);
-  runEffect(frame.effects.idle, app.els.effectsCanvas, app.els.sceneImage);
+    runEffect(frame.effects.entry, app.els.effectsCanvas, app.els.sceneCanvas);
+  runEffect(frame.effects.idle, app.els.effectsCanvas, app.els.sceneCanvas);
 }
 
 function updateNavButtons(app) {
@@ -777,7 +779,7 @@ function replayNarration(app) {
   }
 
   if (frame.effects?.entry) {
-    runEffect(frame.effects.entry, app.els.effectsCanvas, app.els.sceneImage);
+    runEffect(frame.effects.entry, app.els.effectsCanvas, app.els.sceneCanvas);
   }
 }
 
@@ -821,17 +823,13 @@ function toggleCaptions(app) {
 }
 
 function initApp(app) {
-  app.els.sceneImage.addEventListener('error', () => {
-    console.warn(`Scene image failed to load: ${app.els.sceneImage.src}`);
-    app.els.sceneImage.removeAttribute('src');
-  });
-
+  initSceneCanvas(app.els.sceneCanvas);
   initCanvas(app.els.effectsCanvas);
 
   preloadFirstFrameAudio(app.frames, (loaded) => registerAudio(app, loaded));
   onNarrationBufferChange((isBuffering) => handleBufferChange(app, isBuffering));
 
-  preloadFirstFrameAssets(app.frames)
+  preloadFirstFrameImage(app)
     .then(() => {
       app.els.loadingScreen.hidden = true;
       app.els.sceneStage.hidden = false;
@@ -863,9 +861,10 @@ function initApp(app) {
       // Defer background asset preloads to avoid network contention.
       // Loads sequentially: each scene's image then audio, in order.
       setTimeout(() => {
-        preloadBackgroundAssets(app.frames, (loaded) => registerAudio(app, loaded)).catch((err) =>
-          console.warn('Background asset preload failed:', err),
-        );
+        Promise.all([
+          preloadBackgroundImages(app),
+          preloadBackgroundAssets(app.frames, (loaded) => registerAudio(app, loaded)),
+        ]).catch((err) => console.warn('Background asset preload failed:', err));
       }, 4000);
 
       const markInteracted = () => {
@@ -917,7 +916,7 @@ export function createApp() {
   const requiredIds = [
     'loading-screen',
     'scene-stage',
-    'scene-image',
+    'scene-canvas',
     'trace-overlay',
     'effects-canvas',
     'narration-layer',
@@ -973,10 +972,11 @@ export function createApp() {
     pendingNavIndex: null,
     buffering: false,
     availableAudio: new Set(),
+    imageCache: new Map(),
     els: {
       loadingScreen: document.getElementById('loading-screen'),
       sceneStage: document.getElementById('scene-stage'),
-      sceneImage: document.getElementById('scene-image'),
+      sceneCanvas: document.getElementById('scene-canvas'),
       traceOverlay: document.getElementById('trace-overlay'),
       effectsCanvas: document.getElementById('effects-canvas'),
       narrationLayer: document.getElementById('narration-layer'),
