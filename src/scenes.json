@@ -7,6 +7,7 @@
       "type": "fade",
       "duration": 1200
     },
+    "defaultHoldAfterNarration": 2000,
     "frameDefaults": {
       "textMode": "ghost-drift"
     }
@@ -15,6 +16,8 @@
     {
       "id": "scene-00-title",
       "frameType": "title",
+      "holdUntilClick": true,
+      "holdAfterNarration": null,
       "description": "Title card — opening narration on a dark field",
       "narration": {
         "lines": [
@@ -63,6 +66,8 @@
     {
       "id": "scene-01-seam",
       "frameType": "scene",
+      "holdUntilClick": false,
+      "holdAfterNarration": 2000,
       "description": "Coal seam wall, lamp upper left, diamond barely visible — carbon buried under immense pressure",
       "image": "assets/images/scene-01-seam.webp",
       "narration": {
@@ -160,6 +165,8 @@
     {
       "id": "scene-02-travel",
       "frameType": "scene",
+      "holdUntilClick": false,
+      "holdAfterNarration": 2000,
       "description": "Mine tunnel with coal car and miner silhouette — carbon in transit through the earth",
       "image": "assets/images/scene-02-travel.webp",
       "narration": {
@@ -268,6 +275,8 @@
     {
       "id": "scene-03-reach",
       "frameType": "scene",
+      "holdUntilClick": false,
+      "holdAfterNarration": 3000,
       "description": "Coke oven mouth with fire and a hand reaching in — carbon released as heat at the threshold of use",
       "image": "assets/images/scene-03-reach.webp",
       "narration": {
@@ -366,6 +375,8 @@
     {
       "id": "scene-04-pocket",
       "frameType": "scene",
+      "holdUntilClick": false,
+      "holdAfterNarration": 2000,
       "description": "Dark close-up of diamond in coal grit with coins and denim — carbon carried as something personal",
       "image": "assets/images/scene-04-pocket.webp",
       "narration": {
@@ -474,6 +485,8 @@
     {
       "id": "scene-05-rinse",
       "frameType": "scene",
+      "holdUntilClick": false,
+      "holdAfterNarration": 2500,
       "description": "Hands holding diamond under water with circuitry visible — carbon entering the water cycle",
       "image": "assets/images/scene-05-rinse.webp",
       "narration": {
@@ -582,6 +595,8 @@
     {
       "id": "scene-06-storage",
       "frameType": "scene",
+      "holdUntilClick": false,
+      "holdAfterNarration": 2000,
       "description": "Tin open with diamond glowing among coins — carbon quietly accumulated and set aside",
       "image": "assets/images/scene-06-storage.webp",
       "narration": {
@@ -685,6 +700,8 @@
     {
       "id": "scene-07-empty",
       "frameType": "scene",
+      "holdUntilClick": false,
+      "holdAfterNarration": 2000,
       "description": "Bedroom with empty bed and woman silhouette — carbon suspended in silence, barely moving",
       "image": "assets/images/scene-07-empty.webp",
       "narration": {
@@ -768,6 +785,8 @@
     {
       "id": "scene-08-stillness",
       "frameType": "scene",
+      "holdUntilClick": true,
+      "holdAfterNarration": null,
       "description": "Stripped bed, empty chair, tin glowing — a space where someone should be but isn't",
       "image": "assets/images/scene-08-stillness.webp",
       "narration": {
@@ -808,6 +827,8 @@
     {
       "id": "scene-09-return",
       "frameType": "scene",
+      "holdUntilClick": false,
+      "holdAfterNarration": 2000,
       "description": "Woman silhouette in doorway with traces exploding outward — carbon cycling back",
       "image": "assets/images/scene-09-return.webp",
       "narration": {
@@ -901,6 +922,8 @@
     {
       "id": "scene-10-building",
       "frameType": "scene",
+      "holdUntilClick": false,
+      "holdAfterNarration": 3000,
       "description": "Woman on floor with tools and components, diamond glowing — carbon activated into something new",
       "image": "assets/images/scene-10-building.webp",
       "narration": {
@@ -994,9 +1017,10 @@
     {
       "id": "scene-11-music",
       "frameType": "credits",
+      "holdUntilClick": null,
+      "holdAfterNarration": null,
       "description": "Record player with diamond blazing and circuitry — the finale, light filling the room",
       "image": "assets/images/scene-11-music.webp",
-      "advanceMode": "disabled",
       "narration": {
         "lines": [
           {
