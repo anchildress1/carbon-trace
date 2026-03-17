@@ -190,12 +190,13 @@ test.describe('carbon-trace narrative', () => {
     const firstDot = page.locator('.progress-dot').first();
     const secondDot = page.locator('.progress-dot').nth(1);
 
-    // First dot active on title scene (scene 0)
+    // Title frame has no dot — no dots active initially
+    await expect(firstDot).not.toHaveClass(/active/);
+
+    // Advance to scene 01 — first dot becomes active
+    await page.click('#btn-next');
     await expect(firstDot).toHaveClass(/active/);
     await expect(secondDot).not.toHaveClass(/active/);
-
-    await page.click('#btn-next');
-    await expect(secondDot).toHaveClass(/active/);
   });
 
   test('mute button aria-label toggles between mute and unmute', async ({ page }) => {

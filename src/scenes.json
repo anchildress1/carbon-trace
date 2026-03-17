@@ -14,7 +14,7 @@
   "frames": [
     {
       "id": "scene-00-title",
-      "frameType": "scene",
+      "frameType": "title",
       "description": "Title card — opening narration on a dark field",
       "narration": {
         "lines": [
