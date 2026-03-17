@@ -127,8 +127,7 @@ function scheduleAutoAdvance(app, delay) {
 }
 
 function shouldAutoAdvance(app, frame) {
-  if (frame.holdUntilClick) return false;
-  if (frame.advanceMode === 'disabled') return false;
+  if (frame.holdUntilClick === true || frame.holdUntilClick === null) return false;
   if (app.currentIndex >= app.frames.length - 1) return false;
   return true;
 }
@@ -138,15 +137,15 @@ function setupAutoAdvance(app) {
   const frame = app.frames[app.currentIndex];
   if (!shouldAutoAdvance(app, frame)) return;
 
-  const holdTime = frame.holdTime ?? scenesData.meta.defaultHoldTime ?? 3000;
+  const holdAfterNarration =
+    frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
 
-  if (app.textTimeline) {
-    app.textTimeline.eventCallback('onComplete', () => {
-      scheduleAutoAdvance(app, holdTime);
-    });
-  } else {
-    scheduleAutoAdvance(app, holdTime);
+  // For scenes without narration audio, schedule immediately on landing
+  if (!frame.narration?.audio) {
+    scheduleAutoAdvance(app, holdAfterNarration);
   }
+  // For scenes with narration audio, the Howler end callback in
+  // scheduleNarrationAudio triggers scheduleAutoAdvance
 }
 
 function scheduleMusic(app, music) {
@@ -186,6 +185,16 @@ function scheduleMusic(app, music) {
 }
 
 function scheduleNarrationAudio(app, narration) {
+  const frame = app.frames[app.currentIndex];
+  const holdAfterNarration =
+    frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
+
+  const onend = () => {
+    if (shouldAutoAdvance(app, frame)) {
+      scheduleAutoAdvance(app, holdAfterNarration);
+    }
+  };
+
   const delay = narration.delay || 0;
   if (delay > 0) {
     app.narrationTimerStart = Date.now();
@@ -194,10 +203,10 @@ function scheduleNarrationAudio(app, narration) {
       app.narrationTimer = null;
       app.narrationTimerStart = null;
       app.narrationTimerDelay = null;
-      playNarration(narration.audio);
+      playNarration(narration.audio, onend);
     }, delay);
   } else {
-    playNarration(narration.audio);
+    playNarration(narration.audio, onend);
   }
 }
 
