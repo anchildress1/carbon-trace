@@ -48,10 +48,9 @@ body {
   background: #0e0e0e;
 }
 
-.scene-image {
+.scene-canvas {
   width: 100%;
   height: 100%;
-  object-fit: cover;
   position: absolute;
   inset: 0;
 }
@@ -77,11 +76,6 @@ body {
   to {
     transform: rotate(360deg);
   }
-}
-
-.scene-image:not([src]),
-.scene-image[src=''] {
-  display: none;
 }
 
 .trace-overlay {
