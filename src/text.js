@@ -29,10 +29,18 @@ export function createLineElement(text, container, options = {}) {
   return el;
 }
 
-export function buildTextTimeline(lines, container, reducedMotion = false) {
+export function buildNarrationTimeline(lines, container, opts = {}) {
   clearNarrationLayer(container);
 
-  const tl = gsap.timeline();
+  const {
+    reducedMotion = false,
+    captions,
+    captionContainer,
+    captionDelay = 0,
+    isCaptionEnabled,
+  } = opts;
+
+  const tl = gsap.timeline({ paused: true });
 
   lines.forEach((line, i) => {
     if (typeof line.enter !== 'number' || typeof line.exit !== 'number') {
@@ -64,7 +72,43 @@ export function buildTextTimeline(lines, container, reducedMotion = false) {
     }
   });
 
-  return tl;
+  const captionEntries = [];
+
+  if (Array.isArray(captions) && captions.length > 0 && captionContainer) {
+    captions.forEach((caption) => {
+      const startSec = (captionDelay + caption.start) / 1000;
+      const endSec = (captionDelay + caption.end) / 1000;
+
+      const entry = { text: caption.text, startSec, endSec, el: null };
+      captionEntries.push(entry);
+
+      tl.call(
+        () => {
+          if (isCaptionEnabled && !isCaptionEnabled()) return;
+          const el = document.createElement('p');
+          el.className = 'caption-text';
+          el.textContent = caption.text;
+          captionContainer.appendChild(el);
+          entry.el = el;
+        },
+        [],
+        startSec,
+      );
+
+      tl.call(
+        () => {
+          if (entry.el) {
+            entry.el.remove();
+            entry.el = null;
+          }
+        },
+        [],
+        endSec,
+      );
+    });
+  }
+
+  return { timeline: tl, captionEntries };
 }
 
 export function clearNarrationLayer(container) {
