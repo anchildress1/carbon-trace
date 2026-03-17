@@ -21,6 +21,12 @@ import {
 } from './audio.js';
 import { buildTextTimeline, clearNarrationLayer } from './text.js';
 import { runEffect, clearEffects, effectExists } from './effects.js';
+import {
+  initCanvas,
+  pause as pauseCanvas,
+  resume as resumeCanvas,
+  clearAll as clearCanvasEffects,
+} from './effects-canvas.js';
 import { initOverlay, updateProgress, showControls } from './overlay.js';
 import {
   initCaptions,
@@ -315,6 +321,7 @@ function showFrame(app, index) {
   }
   app.els.traceOverlay.style.opacity = frame.traceOverlay?.opacity ?? 0;
 
+  clearCanvasEffects();
   clearEffects();
   clearNarrationLayer(app.els.narrationLayer);
 
@@ -619,11 +626,11 @@ function handleFirstPlay(app) {
 }
 
 function resumeEffects() {
-  // Canvas effects will use rAF — resume handled by effects-canvas module.
+  resumeCanvas();
 }
 
 function pauseEffects() {
-  // Canvas effects will use rAF — pause handled by effects-canvas module.
+  pauseCanvas();
 }
 
 function doResume(app) {
@@ -841,6 +848,8 @@ function initApp(app) {
     console.warn(`Scene image failed to load: ${app.els.sceneImage.src}`);
     app.els.sceneImage.removeAttribute('src');
   });
+
+  initCanvas(app.els.effectsCanvas);
 
   preloadFirstFrameAudio(app);
   onNarrationBufferChange((isBuffering) => handleBufferChange(app, isBuffering));
