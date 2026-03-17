@@ -298,9 +298,14 @@ function showFrame(app, index) {
     startPhase(app, frame, 0);
   }
 
-  // Pre-buffer next scene's narration audio while current scene plays
+  // Pre-buffer next scene's image and narration while current scene plays
   clearNarrationCache();
   const nextFrame = app.frames[index + 1];
+  if (nextFrame?.image && !app.imageCache.has(nextFrame.image)) {
+    loadImage(nextFrame.image).then((img) => {
+      if (img) app.imageCache.set(nextFrame.image, img);
+    });
+  }
   if (nextFrame?.narration?.audio) {
     preloadNarrationAhead(nextFrame.narration.audio);
   }
@@ -364,6 +369,24 @@ function handleBufferChange(app, isBuffering) {
   }
 }
 
+function waitForImage(app, src) {
+  return new Promise((resolve) => {
+    const spinnerTimer = setTimeout(() => {
+      app.els.transitionLoader.hidden = false;
+    }, 300);
+
+    loadImage(src)
+      .then((img) => {
+        if (img) app.imageCache.set(src, img);
+      })
+      .finally(() => {
+        clearTimeout(spinnerTimer);
+        app.els.transitionLoader.hidden = true;
+        resolve();
+      });
+  });
+}
+
 function completePendingNav(app) {
   if (app.pendingNavIndex !== null && app.pendingNavIndex !== app.currentIndex) {
     const pending = app.pendingNavIndex;
@@ -389,6 +412,7 @@ function transition(app, toIndex) {
   app.state = State.TRANSITIONING;
   app.buffering = false;
   app.els.sceneStage.classList.remove('buffering');
+  app.els.playGate.hidden = true;
 
   if (app.phaseTimer) {
     clearTimeout(app.phaseTimer);
@@ -430,7 +454,9 @@ function transition(app, toIndex) {
   const toFrame = app.frames[toIndex];
   stopNarration();
 
-  if (prefersReducedMotion()) {
+  const needsImage = toFrame.image && !app.imageCache.has(toFrame.image);
+
+  const proceedWithFrame = () => {
     const prevIndex = app.currentIndex;
     app.currentIndex = toIndex;
     try {
@@ -438,9 +464,27 @@ function transition(app, toIndex) {
     } catch (err) {
       console.error('Error during scene transition:', err);
       app.currentIndex = prevIndex;
+      return false;
     }
+    return true;
+  };
+
+  const landOnFrame = () => {
     app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
     completePendingNav(app);
+  };
+
+  if (prefersReducedMotion()) {
+    const readyThen = () => {
+      if (!proceedWithFrame()) return;
+      landOnFrame();
+    };
+
+    if (needsImage) {
+      waitForImage(app, toFrame.image).then(readyThen);
+    } else {
+      readyThen();
+    }
     return;
   }
 
@@ -452,34 +496,31 @@ function transition(app, toIndex) {
     duration: halfDuration,
     ease: 'power2.inOut',
     onComplete: () => {
-      try {
-        const prevIndex = app.currentIndex;
-        app.currentIndex = toIndex;
+      const fadeIn = () => {
         try {
-          showFrame(app, toIndex);
-        } catch (err) {
-          console.error('Error during scene transition:', err);
-          app.currentIndex = prevIndex;
-          gsap.set(app.els.sceneStage, { opacity: 1 });
-          app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
-          completePendingNav(app);
-          return;
-        }
+          if (!proceedWithFrame()) {
+            gsap.set(app.els.sceneStage, { opacity: 1 });
+            landOnFrame();
+            return;
+          }
 
-        gsap.to(app.els.sceneStage, {
-          opacity: 1,
-          duration: halfDuration,
-          ease: 'power2.inOut',
-          onComplete: () => {
-            app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
-            completePendingNav(app);
-          },
-        });
-      } catch (err) {
-        console.error('Unhandled error in transition onComplete:', err);
-        gsap.set(app.els.sceneStage, { opacity: 1 });
-        app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
-        completePendingNav(app);
+          gsap.to(app.els.sceneStage, {
+            opacity: 1,
+            duration: halfDuration,
+            ease: 'power2.inOut',
+            onComplete: landOnFrame,
+          });
+        } catch (err) {
+          console.error('Unhandled error in transition onComplete:', err);
+          gsap.set(app.els.sceneStage, { opacity: 1 });
+          landOnFrame();
+        }
+      };
+
+      if (needsImage) {
+        waitForImage(app, toFrame.image).then(fadeIn);
+      } else {
+        fadeIn();
       }
     },
   });
@@ -647,6 +688,7 @@ function doResume(app) {
   resumeMusicExitTimer(app);
 
   if (firstPlay) {
+    app.els.playGate.hidden = true;
     handleFirstPlay(app);
   }
 
@@ -854,6 +896,7 @@ function initApp(app) {
       app.els.btnCaptions.setAttribute('aria-pressed', String(captionsEnabled));
 
       showFrame(app, 0);
+      app.els.playGate.hidden = false;
 
       // Start paused — everything waits for the user to press play.
       // Set SCENE_ACTIVE first so doPause stores the correct resume state,
@@ -916,6 +959,10 @@ function initApp(app) {
         e.stopPropagation();
         toggleCaptions(app);
       });
+      app.els.playGate.addEventListener('click', (e) => {
+        e.stopPropagation();
+        togglePause(app);
+      });
     })
     .catch((err) => {
       console.error('Failed to initialize:', err);
@@ -941,6 +988,8 @@ export function createApp() {
     'btn-mute',
     'btn-pause',
     'btn-captions',
+    'play-gate',
+    'transition-loader',
   ];
 
   for (const id of requiredIds) {
@@ -1000,6 +1049,8 @@ export function createApp() {
       btnMute: document.getElementById('btn-mute'),
       btnPause: document.getElementById('btn-pause'),
       btnCaptions: document.getElementById('btn-captions'),
+      playGate: document.getElementById('play-gate'),
+      transitionLoader: document.getElementById('transition-loader'),
     },
   };
 
