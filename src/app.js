@@ -408,8 +408,21 @@ function handleBufferChange(app, isBuffering) {
   }
 }
 
+function completePendingNav(app) {
+  if (app.pendingNavIndex !== null && app.pendingNavIndex !== app.currentIndex) {
+    const pending = app.pendingNavIndex;
+    app.pendingNavIndex = null;
+    transition(app, pending);
+  }
+}
+
 function transition(app, toIndex) {
-  if (app.state === State.TRANSITIONING) return;
+  if (app.state === State.TRANSITIONING) {
+    app.pendingNavIndex = toIndex;
+    return;
+  }
+
+  app.pendingNavIndex = null;
 
   if (app.paused) {
     clearPauseState(app);
@@ -467,6 +480,7 @@ function transition(app, toIndex) {
       app.currentIndex = prevIndex;
     }
     app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
+    completePendingNav(app);
     return;
   }
 
@@ -508,6 +522,7 @@ function transition(app, toIndex) {
         ease: 'power2.inOut',
         onComplete: () => {
           app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
+          completePendingNav(app);
         },
       });
     },
@@ -515,7 +530,7 @@ function transition(app, toIndex) {
 }
 
 function advance(app) {
-  if (app.state === State.TRANSITIONING || app.state === State.CREDITS) return;
+  if (app.state === State.CREDITS) return;
   if (app.currentIndex >= app.frames.length - 1) return;
 
   app.userHasInteracted = true;
@@ -523,7 +538,6 @@ function advance(app) {
 }
 
 function retreat(app) {
-  if (app.state === State.TRANSITIONING) return;
   if (app.currentIndex <= 0) return;
 
   app.userHasInteracted = true;
@@ -1008,6 +1022,7 @@ export function createApp() {
     musicExitTimerStart: null,
     musicExitTimerDelay: null,
     musicExitTimerRemaining: null,
+    pendingNavIndex: null,
     buffering: false,
     availableAudio: new Set(),
     els: {
