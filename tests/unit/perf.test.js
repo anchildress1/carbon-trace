@@ -4,6 +4,7 @@ vi.mock('gsap', () => {
   const timelineMock = {
     fromTo: vi.fn().mockReturnThis(),
     to: vi.fn().mockReturnThis(),
+    call: vi.fn().mockReturnThis(),
   };
   return {
     gsap: {
@@ -16,7 +17,7 @@ vi.mock('gsap', () => {
   };
 });
 
-import { buildTextTimeline, clearNarrationLayer } from '../../src/text.js';
+import { buildNarrationTimeline, clearNarrationLayer } from '../../src/text.js';
 import { initOverlay, updateProgress } from '../../src/overlay.js';
 
 const BUDGET_MS = 50;
@@ -43,7 +44,7 @@ describe('performance budgets', () => {
         exit: (i + 1) * 1000,
       }));
 
-      const elapsed = measure(() => buildTextTimeline(lines, container));
+      const elapsed = measure(() => buildNarrationTimeline(lines, container));
 
       expect(elapsed).toBeLessThan(BUDGET_MS);
     });
@@ -55,7 +56,7 @@ describe('performance budgets', () => {
         exit: (i + 1) * 500,
       }));
 
-      const elapsed = measure(() => buildTextTimeline(lines, container));
+      const elapsed = measure(() => buildNarrationTimeline(lines, container));
 
       expect(elapsed).toBeLessThan(BUDGET_MS);
     });
