@@ -19,7 +19,7 @@ import {
   resumeMusic,
   stopMusic,
 } from './audio.js';
-import { buildTextTimeline, clearNarrationLayer } from './text.js';
+import { buildNarrationTimeline, clearNarrationLayer } from './text.js';
 import { runEffect, clearEffects, effectExists } from './effects.js';
 import {
   initCanvas,
@@ -33,11 +33,9 @@ import { preloadFirstFrameAudio, preloadBackgroundAssets } from './loader.js';
 import {
   initCaptions,
   setCaptionsEnabled,
-  showCaptions,
-  clearCaptions,
-  pauseCaptions,
-  resumeCaptions,
   areCaptionsEnabled,
+  syncCaptionsToTime,
+  clearCaptionElements,
 } from './captions.js';
 
 const State = Object.freeze({
@@ -158,25 +156,6 @@ function scheduleNarrationAudio(app, narration) {
   }
 }
 
-function scheduleCaptionDisplay(app, frame) {
-  if (app.captionDelayTimer) {
-    clearTimeout(app.captionDelayTimer);
-    app.captionDelayTimer = null;
-  }
-
-  const captionDelay = frame.narration.delay || 0;
-  if (captionDelay > 0) {
-    app.captionDelayTimer = setTimeout(() => {
-      app.captionDelayTimer = null;
-      if (app.frames[app.currentIndex] === frame && !app.paused) {
-        showCaptions(frame.narration.captions, app.els.captionLayer);
-      }
-    }, captionDelay);
-  } else {
-    showCaptions(frame.narration.captions, app.els.captionLayer);
-  }
-}
-
 function applyNarration(app, frame) {
   if (app.narrationTimer) {
     clearTimeout(app.narrationTimer);
@@ -184,17 +163,13 @@ function applyNarration(app, frame) {
     app.narrationTimerStart = null;
     app.narrationTimerDelay = null;
   }
-  if (app.captionDelayTimer) {
-    clearTimeout(app.captionDelayTimer);
-    app.captionDelayTimer = null;
-  }
-
-  clearCaptions();
+  clearCaptionElements(app.captionEntries);
 
   if (!frame.narration) {
     app.els.accessibleNarration.textContent = '';
     app.els.btnReplay.disabled = true;
     app.textTimeline = null;
+    app.captionEntries = [];
     return;
   }
 
@@ -204,20 +179,22 @@ function applyNarration(app, frame) {
   const hasAudioRef = Boolean(frame.narration.audio);
 
   if (hasLines) {
-    app.textTimeline = buildTextTimeline(
-      frame.narration.lines,
-      app.els.narrationLayer,
-      prefersReducedMotion(),
-    );
+    const result = buildNarrationTimeline(frame.narration.lines, app.els.narrationLayer, {
+      reducedMotion: prefersReducedMotion(),
+      captions: hasCaptions ? frame.narration.captions : undefined,
+      captionContainer: app.els.captionLayer,
+      captionDelay: frame.narration.delay || 0,
+      isCaptionEnabled: areCaptionsEnabled,
+    });
+    app.textTimeline = result.timeline;
+    app.captionEntries = result.captionEntries;
   } else {
     app.textTimeline = null;
+    app.captionEntries = [];
   }
 
   if (hasCaptions) {
     app.els.accessibleNarration.textContent = frame.narration.captions.map((c) => c.text).join(' ');
-    if (areCaptionsEnabled()) {
-      scheduleCaptionDisplay(app, frame);
-    }
   } else {
     app.els.accessibleNarration.textContent = '';
   }
@@ -318,11 +295,16 @@ function startPhase(app, frame, pi) {
   clearNarrationLayer(app.els.narrationLayer);
 
   if (phase.narration?.lines?.length > 0) {
-    app.textTimeline = buildTextTimeline(
-      phase.narration.lines,
-      app.els.narrationLayer,
-      prefersReducedMotion(),
-    );
+    const result = buildNarrationTimeline(phase.narration.lines, app.els.narrationLayer, {
+      reducedMotion: prefersReducedMotion(),
+      captions: phase.narration.captions,
+      captionContainer: app.els.captionLayer,
+      captionDelay: phase.narration.delay || 0,
+      isCaptionEnabled: areCaptionsEnabled,
+    });
+    app.textTimeline = result.timeline;
+    app.captionEntries = result.captionEntries;
+    app.textTimeline.play(0);
     app.els.accessibleNarration.textContent = phase.narration.lines.map((l) => l.text).join(' ');
 
     if (phase.narration.audio) {
@@ -357,13 +339,11 @@ function handleBufferChange(app, isBuffering) {
   if (isBuffering) {
     if (!app.paused) {
       if (app.textTimeline) app.textTimeline.pause();
-      pauseCaptions();
     }
     app.els.sceneStage.classList.add('buffering');
   } else {
     if (!app.paused) {
       if (app.textTimeline) app.textTimeline.resume();
-      resumeCaptions();
     }
     app.els.sceneStage.classList.remove('buffering');
   }
@@ -426,17 +406,14 @@ function transition(app, toIndex) {
     app.narrationTimerDelay = null;
   }
 
-  clearCaptions();
-  if (app.captionDelayTimer) {
-    clearTimeout(app.captionDelayTimer);
-    app.captionDelayTimer = null;
-  }
+  clearCaptionElements(app.captionEntries);
   try {
     app.textTimeline?.kill();
   } catch (err) {
     console.warn('Failed to kill text timeline:', err);
   }
   app.textTimeline = null;
+  app.captionEntries = [];
 
   clearMusicTimer(app);
   if (app.musicExitTimer) {
@@ -469,6 +446,7 @@ function transition(app, toIndex) {
 
   const landOnFrame = () => {
     app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
+    if (app.textTimeline) app.textTimeline.play(0);
     completePendingNav(app);
   };
 
@@ -633,16 +611,13 @@ function resumeDelayedPhase(app) {
 function handleFirstPlay(app) {
   const frame = app.frames[app.currentIndex];
   if (app.textTimeline) {
-    app.textTimeline.restart();
+    app.textTimeline.play(0);
   }
   if (frame.music) {
     scheduleMusic(app, frame.music);
   }
   if (frame.narration?.audio) {
     scheduleNarrationAudio(app, frame.narration);
-  }
-  if (areCaptionsEnabled() && frame.narration?.captions?.length > 0) {
-    scheduleCaptionDisplay(app, frame);
   }
 }
 
@@ -673,14 +648,6 @@ function doResume(app) {
   }
 
   resumeEffects();
-
-  if (!app.buffering) {
-    if (areCaptionsEnabled()) {
-      resumeCaptions();
-    } else {
-      clearCaptions();
-    }
-  }
 
   resumeDelayedNarration(app);
   resumeDelayedMusic(app);
@@ -727,7 +694,6 @@ function doPause(app) {
   }
 
   pauseEffects();
-  pauseCaptions();
 
   saveNarrationTimerRemaining(app);
   saveMusicTimerRemaining(app);
@@ -791,7 +757,7 @@ function replayNarration(app) {
   app.narrationTimerRemaining = null;
 
   clearNarrationLayer(app.els.narrationLayer);
-  clearCaptions();
+  clearCaptionElements(app.captionEntries);
 
   if (!frame.narration) return;
 
@@ -801,15 +767,16 @@ function replayNarration(app) {
   const hasAudioRef = Boolean(frame.narration.audio);
 
   if (hasLines) {
-    app.textTimeline = buildTextTimeline(
-      frame.narration.lines,
-      app.els.narrationLayer,
-      prefersReducedMotion(),
-    );
-  }
-
-  if (hasCaptions && areCaptionsEnabled()) {
-    scheduleCaptionDisplay(app, frame);
+    const result = buildNarrationTimeline(frame.narration.lines, app.els.narrationLayer, {
+      reducedMotion: prefersReducedMotion(),
+      captions: hasCaptions ? frame.narration.captions : undefined,
+      captionContainer: app.els.captionLayer,
+      captionDelay: frame.narration.delay || 0,
+      isCaptionEnabled: areCaptionsEnabled,
+    });
+    app.textTimeline = result.timeline;
+    app.captionEntries = result.captionEntries;
+    app.textTimeline.play(0);
   }
 
   if (frame.music) {
@@ -851,16 +818,11 @@ function toggleCaptions(app) {
   app.els.btnCaptions.setAttribute('aria-pressed', String(enabled));
 
   if (enabled) {
-    const frame = app.frames[app.currentIndex];
-    const hasCaptions =
-      Array.isArray(frame.narration?.captions) && frame.narration.captions.length > 0;
-    if (hasCaptions) {
-      const offsetMs = app.textTimeline ? app.textTimeline.time() * 1000 : 0;
-      showCaptions(frame.narration.captions, app.els.captionLayer, offsetMs);
-      if (app.paused) pauseCaptions();
+    if (app.captionEntries?.length > 0 && app.textTimeline) {
+      syncCaptionsToTime(app.captionEntries, app.textTimeline.time(), app.els.captionLayer);
     }
   } else {
-    clearCaptions();
+    clearCaptionElements(app.captionEntries);
   }
 }
 
@@ -899,18 +861,12 @@ function initApp(app) {
       app.els.playGate.hidden = false;
 
       // Start paused — everything waits for the user to press play.
-      // Set SCENE_ACTIVE first so doPause stores the correct resume state,
-      // then seek the text timeline to the title card position (provides an
-      // LCP element for Lighthouse). On play, doResume → handleFirstPlay
-      // restarts the timeline from t=0 with the full ghost-drift entrance.
+      // Set SCENE_ACTIVE first so doPause stores the correct resume state.
+      // The play gate button serves as the LCP element; no text seek needed.
+      // On play, doResume → handleFirstPlay starts the timeline from t=0.
       app.state = State.SCENE_ACTIVE;
       doPause(app);
       stopNarration();
-      if (app.textTimeline) {
-        const firstLine = app.frames[0].narration?.lines?.[0];
-        const seekTime = firstLine ? firstLine.enter / 1000 + 1.3 : 0;
-        app.textTimeline.seek(seekTime);
-      }
 
       // Defer background asset preloads to avoid network contention.
       // Loads sequentially: each scene's image then audio, in order.
@@ -1016,7 +972,7 @@ export function createApp() {
     phaseTimerDelay: null,
     phaseTimerRemaining: null,
     pausedPhaseIndex: null,
-    captionDelayTimer: null,
+    captionEntries: [],
     narrationTimer: null,
     narrationTimerStart: null,
     narrationTimerDelay: null,
