@@ -861,12 +861,17 @@ function initApp(app) {
       app.els.playGate.hidden = false;
 
       // Start paused — everything waits for the user to press play.
-      // Set SCENE_ACTIVE first so doPause stores the correct resume state.
-      // The play gate button serves as the LCP element; no text seek needed.
-      // On play, doResume → handleFirstPlay starts the timeline from t=0.
+      // Set SCENE_ACTIVE first so doPause stores the correct resume state,
+      // then seek the paused timeline to show title text as the LCP element.
+      // On play, doResume → handleFirstPlay restarts from t=0.
       app.state = State.SCENE_ACTIVE;
       doPause(app);
       stopNarration();
+      if (app.textTimeline) {
+        const firstLine = app.frames[0].narration?.lines?.[0];
+        const seekTime = firstLine ? firstLine.enter / 1000 + 1.3 : 0;
+        app.textTimeline.seek(seekTime);
+      }
 
       // Defer background asset preloads to avoid network contention.
       // Loads sequentially: each scene's image then audio, in order.
