@@ -1,12 +1,6 @@
 const STORAGE_KEY = 'carbon-trace-captions-enabled';
 
 let enabled = false;
-let activeTimers = [];
-let activeElements = [];
-let currentCaptions = null;
-let currentContainer = null;
-let playbackStartedAt = null;
-let elapsedBeforePause = 0;
 
 export function initCaptions() {
   try {
@@ -31,97 +25,29 @@ export function areCaptionsEnabled() {
   return enabled;
 }
 
-function scheduleCaptionsFromOffset(captions, container, offsetMs) {
-  captions.forEach((caption) => {
-    const showDelay = caption.start - offsetMs;
-    const hideDelay = caption.end - offsetMs;
+export function syncCaptionsToTime(captionEntries, currentTimeSec, container) {
+  if (!captionEntries || !container) return;
 
-    if (hideDelay <= 0) return;
+  clearCaptionElements(captionEntries);
 
-    if (showDelay <= 0) {
+  for (const entry of captionEntries) {
+    if (entry.startSec <= currentTimeSec && currentTimeSec < entry.endSec) {
       const el = document.createElement('p');
       el.className = 'caption-text';
-      el.textContent = caption.text;
+      el.textContent = entry.text;
       container.appendChild(el);
-      activeElements.push(el);
-
-      const hideId = setTimeout(() => {
-        el.remove();
-        const idx = activeElements.indexOf(el);
-        if (idx >= 0) activeElements.splice(idx, 1);
-      }, hideDelay);
-      activeTimers.push(hideId);
-    } else {
-      const showId = setTimeout(() => {
-        const el = document.createElement('p');
-        el.className = 'caption-text';
-        el.textContent = caption.text;
-        container.appendChild(el);
-        activeElements.push(el);
-
-        const hideId = setTimeout(() => {
-          el.remove();
-          const idx = activeElements.indexOf(el);
-          if (idx >= 0) activeElements.splice(idx, 1);
-        }, caption.end - caption.start);
-        activeTimers.push(hideId);
-      }, showDelay);
-      activeTimers.push(showId);
+      entry.el = el;
     }
-  });
+  }
 }
 
-export function showCaptions(captions, container, offsetMs = 0) {
-  clearCaptions();
+export function clearCaptionElements(captionEntries) {
+  if (!captionEntries) return;
 
-  if (!captions || !container) return;
-
-  currentCaptions = captions;
-  currentContainer = container;
-  playbackStartedAt = Date.now();
-  elapsedBeforePause = offsetMs;
-
-  scheduleCaptionsFromOffset(captions, container, offsetMs);
-}
-
-export function clearCaptions() {
-  for (const id of activeTimers) {
-    clearTimeout(id);
+  for (const entry of captionEntries) {
+    if (entry.el) {
+      entry.el.remove();
+      entry.el = null;
+    }
   }
-  activeTimers = [];
-
-  for (const el of activeElements) {
-    el.remove();
-  }
-  activeElements = [];
-
-  currentCaptions = null;
-  currentContainer = null;
-  playbackStartedAt = null;
-  elapsedBeforePause = 0;
-}
-
-export function pauseCaptions() {
-  if (playbackStartedAt === null) return;
-
-  elapsedBeforePause += Date.now() - playbackStartedAt;
-  playbackStartedAt = null;
-
-  for (const id of activeTimers) {
-    clearTimeout(id);
-  }
-  activeTimers = [];
-}
-
-export function resumeCaptions() {
-  if (!currentCaptions || !currentContainer) return;
-
-  playbackStartedAt = Date.now();
-
-  for (const el of activeElements) {
-    el.remove();
-  }
-  activeElements = [];
-
-  scheduleCaptionsFromOffset(currentCaptions, currentContainer, elapsedBeforePause);
 }
