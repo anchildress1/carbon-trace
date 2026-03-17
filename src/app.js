@@ -477,7 +477,7 @@ function transition(app, toIndex) {
     opacity: 0,
     duration: halfDuration,
     ease: 'power2.inOut',
-    onComplete: () => {
+    onComplete: async () => {
       const prevIndex = app.currentIndex;
       app.currentIndex = toIndex;
       try {
@@ -488,6 +488,18 @@ function transition(app, toIndex) {
         gsap.set(app.els.sceneStage, { opacity: 1 });
         app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
         return;
+      }
+
+      // Wait for image to decode before fading in to avoid blank-frame flash
+      if (toFrame.image && app.els.sceneImage.src) {
+        try {
+          await Promise.race([
+            app.els.sceneImage.decode(),
+            new Promise((resolve) => setTimeout(resolve, 2000)),
+          ]);
+        } catch {
+          // decode() can reject if src changes or image is invalid; proceed anyway
+        }
       }
 
       gsap.to(app.els.sceneStage, {
