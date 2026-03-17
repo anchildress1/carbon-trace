@@ -29,6 +29,11 @@ import {
 } from './effects-canvas.js';
 import { initOverlay, updateProgress, showControls } from './overlay.js';
 import {
+  preloadFirstFrameAssets,
+  preloadFirstFrameAudio,
+  preloadBackgroundAssets,
+} from './loader.js';
+import {
   initCaptions,
   setCaptionsEnabled,
   showCaptions,
@@ -70,45 +75,6 @@ function prefersReducedMotion() {
   return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-function preloadImage(src) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = resolve;
-    img.onerror = () => {
-      console.warn(`Failed to load image: ${src}`);
-      resolve();
-    };
-    img.src = src;
-  });
-}
-
-function preloadAudio(src) {
-  return new Promise((resolve) => {
-    const audio = new Audio();
-    audio.preload = 'metadata';
-
-    const timeout = setTimeout(() => {
-      console.warn(`Audio preload timed out: ${src}`);
-      resolve(null);
-    }, 5000);
-
-    audio.onloadedmetadata = () => {
-      clearTimeout(timeout);
-      resolve(src);
-    };
-    audio.onerror = () => {
-      clearTimeout(timeout);
-      console.warn(`Failed to preload audio: ${src}`);
-      resolve(null);
-    };
-    audio.src = src;
-  });
-}
-
-function audioSrcsFromEntry(entry) {
-  return [entry.ambient?.src, entry.narration?.audio, entry.music?.src].filter(Boolean);
-}
-
 function registerAudio(app, loaded) {
   if (loaded) {
     app.availableAudio.add(loaded);
@@ -116,34 +82,6 @@ function registerAudio(app, loaded) {
       app.els.btnMute.removeAttribute('aria-disabled');
     }
   }
-}
-
-function preloadFirstFrameAudio(app) {
-  const srcs = audioSrcsFromEntry(app.frames[0]);
-  for (const src of srcs) {
-    preloadAudio(src)
-      .then((loaded) => registerAudio(app, loaded))
-      .catch((err) => console.warn('First frame audio preload failed:', err));
-  }
-}
-
-async function preloadBackgroundAssets(app) {
-  const firstFrameSrcs = new Set(audioSrcsFromEntry(app.frames[0]));
-
-  for (const frame of app.frames.slice(1)) {
-    if (frame.image) await preloadImage(frame.image);
-    for (const src of audioSrcsFromEntry(frame)) {
-      if (!firstFrameSrcs.has(src)) {
-        const loaded = await preloadAudio(src);
-        registerAudio(app, loaded);
-      }
-    }
-  }
-}
-
-function preloadAssets(app) {
-  const firstFrame = app.frames[0];
-  return firstFrame?.image ? preloadImage(firstFrame.image) : Promise.resolve();
 }
 
 function clearMusicTimer(app) {
@@ -890,10 +828,10 @@ function initApp(app) {
 
   initCanvas(app.els.effectsCanvas);
 
-  preloadFirstFrameAudio(app);
+  preloadFirstFrameAudio(app.frames, (loaded) => registerAudio(app, loaded));
   onNarrationBufferChange((isBuffering) => handleBufferChange(app, isBuffering));
 
-  preloadAssets(app)
+  preloadFirstFrameAssets(app.frames)
     .then(() => {
       app.els.loadingScreen.hidden = true;
       app.els.sceneStage.hidden = false;
@@ -925,7 +863,7 @@ function initApp(app) {
       // Defer background asset preloads to avoid network contention.
       // Loads sequentially: each scene's image then audio, in order.
       setTimeout(() => {
-        preloadBackgroundAssets(app).catch((err) =>
+        preloadBackgroundAssets(app.frames, (loaded) => registerAudio(app, loaded)).catch((err) =>
           console.warn('Background asset preload failed:', err),
         );
       }, 4000);
