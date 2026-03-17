@@ -122,7 +122,9 @@ audio.js never touches DOM. navigator.js calls them all.
 ```
 TYPE     │ BEHAVIOR
 ─────────┼─────────────────────────────────────────────────────
-title    │ Static or slow-animated. Click/tap begins + unlocks audio.
+title    │ Entry gate. App loads paused on this frame. No progress
+         │ dot. Press play begins narration + unlocks AudioContext.
+         │ Still reachable via back button from scene 01.
 scene    │ Interactive narrative. Click/dot/keyboard advances.
          │ Ghost-drift text. Ambient audio. Effects.
 credits  │ Terminal. No advance. Music persists. Bio, RAI, links.
@@ -142,7 +144,7 @@ credits  │ Terminal. No advance. Music persists. Bio, RAI, links.
   "frames": [
     {
       "id": "scene-00-title",
-      "frameType": "scene",
+      "frameType": "title",
       "description": "Title card — opening narration on a dark field",
       "narration": {
         "lines": [
@@ -365,7 +367,8 @@ No other cross-calls between leaf modules.
 │                        APP (app.js)                          │
 │                                                              │
 │  state machine:                                              │
-│    LOADING → SCENE_ACTIVE ↔ TRANSITIONING → SCENE_ACTIVE    │
+│    LOADING → SCENE_ACTIVE → PAUSED (start-paused)           │
+│              SCENE_ACTIVE ↔ TRANSITIONING → SCENE_ACTIVE    │
 │                   ↕                              ↓           │
 │                 PAUSED                        CREDITS        │
 │                                                              │
@@ -399,6 +402,22 @@ No other cross-calls between leaf modules.
 │  LOCK RELEASED IN GSAP onComplete ONLY. NEVER BEFORE.        │
 └──────────────────────────────────────────────────────────────┘
 ```
+
+**Loading screen:** A circuit trace SVG draws itself across a dark field via
+stroke-dashoffset animation, with a subtle glow layer and pulsing center node.
+Title "carbon-trace" emerges below in Lora italic at low opacity. Pure CSS —
+no JS needed, so it appears on first paint. When the first frame image loads,
+the loading screen fades out (0.8s opacity transition) to reveal the scene
+stage. On error, content is replaced with a refresh prompt.
+
+**Start-paused init sequence:** After loading completes, the app renders the
+title frame (frame 0), sets state to SCENE_ACTIVE, then immediately calls
+doPause(). This freezes text timelines, narration, and effects. The text
+timeline is seeked to the first visible position to provide an LCP element
+for Lighthouse. When the user presses play, doResume() → handleFirstPlay()
+restarts the timeline from t=0 with the full ghost-drift entrance and
+schedules narration audio. This also serves as the mobile AudioContext
+unlock gate (Howler requires a user gesture).
 
 **transition() is the single navigation entry point.** advance() and retreat()
 are thin wrappers that call it. Mid-transition clicks are deferred (last-wins),
@@ -647,24 +666,31 @@ Mute button      │ Toggle all audio on/off         │ Icon: volume / volume-o
 
 ```html
 <div id="app">
-  <canvas id="scene-canvas" aria-hidden="true"></canvas>
-
-  <div id="overlay">
-    <div id="narration-layer">
-      <!-- ghost-drift lines injected by text.js -->
-    </div>
-
-    <nav id="control-bar" aria-label="Scene navigation and controls">
-      <!-- ONE unified bar. Internal layout is AI's decision.
-           All buttons + dots + controls in this single container.
-           Suggested order: back, dots, forward, replay, mute
-           but AI can rearrange within the bar if it makes
-           better visual/UX sense. -->
-    </nav>
+  <div id="loading-screen" role="status" aria-label="Loading carbon-trace">
+    <!-- Circuit trace SVG animation + title text.
+         Fades out when first frame image loads. -->
   </div>
 
-  <div id="a11y-narration" class="sr-only" aria-live="polite"></div>
-  <div id="loading" aria-live="assertive"></div>
+  <div id="scene-stage" hidden>
+    <canvas id="scene-canvas" aria-hidden="true"></canvas>
+    <div id="trace-overlay"></div>
+    <canvas id="effects-canvas" aria-hidden="true"></canvas>
+    <div id="narration-layer" aria-hidden="true">
+      <!-- ghost-drift lines injected by text.js -->
+    </div>
+    <div id="caption-layer" aria-hidden="true"></div>
+  </div>
+
+  <div id="overlay-controls" hidden>
+    <nav id="progress-dots" aria-label="Scene progress">
+      <!-- 11 dots (10 scenes + credits). Title has no dot. -->
+    </nav>
+    <div class="control-buttons">
+      <!-- back, pause/play, mute, captions, replay, forward -->
+    </div>
+  </div>
+
+  <div id="accessible-narration" class="sr-only" aria-live="polite"></div>
 </div>
 ```
 
