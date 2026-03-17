@@ -373,7 +373,7 @@ test.describe('carbon-trace — navigation interrupts', () => {
     await expect(lines).not.toHaveCount(0);
   });
 
-  test('rapid next-button clicks do not cause errors', async ({ page }) => {
+  test('rapid next-button clicks do not cause errors and land on correct frame', async ({ page }) => {
     const errors = [];
     page.on('pageerror', (err) => errors.push(err));
 
@@ -381,6 +381,9 @@ test.describe('carbon-trace — navigation interrupts', () => {
       await page.click('#btn-next');
     }
 
+    // "Last wins" deferred navigation should land on frame 5
+    const image = page.locator('#scene-image');
+    await expect(image).toHaveAttribute('src', /scene-05-rinse/, { timeout: 10000 });
     expect(errors.length).toBe(0);
   });
 });
