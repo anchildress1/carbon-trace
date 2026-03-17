@@ -438,6 +438,7 @@ function transition(app, toIndex) {
     clearTimeout(app.captionDelayTimer);
     app.captionDelayTimer = null;
   }
+  app.textTimeline?.kill();
   app.textTimeline = null;
 
   clearMusicTimer(app);
