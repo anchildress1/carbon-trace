@@ -59,6 +59,7 @@ export function preloadFirstFrameAudio(frames, onLoaded) {
 }
 
 export async function preloadBackgroundAssets(frames, onLoaded) {
+  if (frames.length === 0) return;
   const firstFrameSrcs = new Set(audioSrcsFromEntry(frames[0]));
 
   for (const frame of frames.slice(1)) {
