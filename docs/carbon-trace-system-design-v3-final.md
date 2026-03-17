@@ -21,12 +21,12 @@ LAYER        │ TOOL         │ WHY
 Build        │ Vite         │ Fast HMR, ES modules, tree-shakes GSAP/Howler.
              │              │ Already known — no learning curve during deadline.
 ─────────────┼──────────────┼──────────────────────────────────────────
-Rendering    │ Canvas 2D    │ Direct pixel read/write via getImageData /
-             │              │ putImageData. Required for v2 runtime trace
-             │              │ rendering. Pixel effects (ripple, dust, light
-             │              │ bloom) impossible with CSS — CSS moves boxes,
-             │              │ not pixels. Start with the renderer you need
-             │              │ later so you don't switch mid-project.
+Rendering    │ DOM <img> +  │ Scene images rendered via <img> with CSS
+             │ Canvas 2D   │ object-fit: cover for simplicity and native
+             │              │ browser decode/caching. Canvas 2D overlay
+             │              │ handles pixel effects (ripple, dust, bloom)
+             │              │ via getImageData / putImageData. Transitions
+             │              │ driven by GSAP opacity on the scene stage.
 ─────────────┼──────────────┼──────────────────────────────────────────
 Animation    │ GSAP         │ Ghost-drift text (DOM overlay), scene transition
              │              │ orchestration, zoom. Timeline API = workflow
@@ -52,9 +52,11 @@ Deploy       │ Cloud Run    │ Vite builds to dist/. nginx serves static asse
              │   Actions    │
 ```
 
-**Why Canvas 2D over DOM+CSS:** v2 trace rendering needs pixel access. Switching renderers mid-project is worse than starting with the right one. Pixel effects (ripple, dust particles, light bloom) require getImageData() / putImageData() — CSS operates on element boxes, not pixels. The cost is accessibility (canvas is a black box to screen readers) which is handled by a DOM overlay layer on top.
+**Why DOM `<img>` for scene images:** Native `<img>` with CSS `object-fit: cover` gives browser-native decode, caching, and responsive behaviour for free. GSAP drives opacity transitions on the scene stage container. Canvas 2D is reserved for the effects overlay layer where pixel manipulation is actually needed.
 
-**Why Canvas 2D over WebGL:** WebGL is a GPU shader pipeline — massive overkill for 2D image rendering and pixel manipulation. No 3D, no scene graphs, no shader compilation needed.
+**Why Canvas 2D for effects overlay:** Pixel effects (ripple, dust particles, light bloom) require getImageData() / putImageData() — CSS operates on element boxes, not pixels. The effects canvas sits above the scene image, `aria-hidden="true"`, with `pointer-events: none`. v2 runtime trace rendering will also use this layer.
+
+**Why Canvas 2D over WebGL:** WebGL is a GPU shader pipeline — massive overkill for 2D pixel effects. No 3D, no scene graphs, no shader compilation needed.
 
 **Why no framework:** No component reuse justifies React. Linear path, one page, minimal DOM overlay. GSAP animates DOM text, Canvas handles visuals. Adding React for ~20 overlay elements is overhead.
 
@@ -69,31 +71,31 @@ carbon-trace/
 ├── package.json
 │
 ├── src/
-│   ├── main.js                 # Entry — load config, init modules, bind events
+│   ├── main.js                 # Entry — imports app, calls createApp()
 │   ├── scenes.json             # All 12 frame definitions (§4)
-│   ├── navigator.js            # State machine + navigate(from, to) router
-│   ├── canvas.js               # Canvas 2D — image drawing, crossfade, resize
+│   ├── app.js                  # State machine, orchestrator, transition router
+│   ├── effects-canvas.js       # Canvas 2D lifecycle, render loop, DPR sizing
+│   ├── effects.js              # Effect registry — no-op skeleton, stable API
 │   ├── audio.js                # Howler — ambient crossfade, narration, replay
 │   ├── text.js                 # Ghost-drift text — GSAP timelines from config
-│   ├── effects.js              # v2 — placeholder with no-op handling
+│   ├── captions.js             # Timed captions with localStorage persistence
 │   ├── overlay.js              # DOM controls — dot bar, replay, mute, progress
-│   └── loader.js               # Image preloading into cache, loading state
+│   └── loader.js               # Image + audio preloading, asset pipeline
 │
 ├── public/
 │   └── assets/
 │       ├── images/             # Leonardo AI scenes (WebP, 16:9, 2x)
-│       │   ├── frame-00-title.webp
-│       │   ├── scene-01-buried.webp
-│       │   ├── scene-02-moved.webp
-│       │   ├── scene-03-oven-threshold.webp
+│       │   ├── scene-01-seam.webp
+│       │   ├── scene-02-travel.webp
+│       │   ├── scene-03-reach.webp
 │       │   ├── scene-04-pocket.webp
-│       │   ├── scene-05-keeper.webp
-│       │   ├── scene-06-stillness.webp
-│       │   ├── scene-07-return.webp
-│       │   ├── scene-08-device.webp
-│       │   ├── scene-09-activation.webp
-│       │   ├── scene-10-gathering.webp
-│       │   └── frame-11-credits.webp
+│       │   ├── scene-05-rinse.webp
+│       │   ├── scene-06-storage.webp
+│       │   ├── scene-07-empty.webp
+│       │   ├── scene-08-stillness.webp
+│       │   ├── scene-09-return.webp
+│       │   ├── scene-10-building.webp
+│       │   └── scene-11-music.webp
 │       ├── overlays/           # Circuit trace overlay images (v2 if needed)
 │       ├── audio/
 │       │   ├── ambient/        # Per-scene loops (subliminal level)
@@ -135,48 +137,54 @@ credits  │ Terminal. No advance. Music persists. Bio, RAI, links.
     "title": "carbon-trace",
     "author": "Ashley Childress",
     "aspectRatio": "16:9",
-    "defaultTransition": { "type": "fade", "duration": 1200 }
+    "defaultTransition": { "type": "fade", "duration": 1200 },
+    "frameDefaults": { "textMode": "ghost-drift" }
   },
   "frames": [
     {
-      "id": "frame-00-title",
-      "index": 0,
-      "frameType": "title",
-      "image": "assets/images/frame-00-title.webp",
-      "advanceMode": "click",
-      "textMode": "static",
-      "narration": null,
-      "ambient": null,
-      "effects": { "idle": null, "entry": null },
-      "traceOverlay": null,
-      "transition": { "type": "fade", "duration": 1500 }
-    },
-    {
-      "id": "scene-01-buried",
-      "index": 1,
+      "id": "scene-00-title",
       "frameType": "scene",
-      "image": "assets/images/scene-01-buried.webp",
-      "advanceMode": "click",
-
-      "textMode": "ghost-drift",
+      "description": "Title card — opening narration on a dark field",
       "narration": {
         "lines": [
-          { "text": "The world had already decided what everything was.", "enter": 500, "exit": 4000 },
-          { "text": "Pressure was not a problem. Pressure was the address.", "enter": 2000, "exit": 6000 }
+          { "text": "I'm gonna tell you a story.", "enter": 10, "exit": 3000, "x": 50, "y": 45, "align": "center" },
+          { "text": "Not 'cause it's special. But 'cause it's mine.", "enter": 3000, "exit": 8000, "x": 50, "y": 55, "align": "center" }
         ],
-        "audio": "assets/audio/narration/scene-01-buried.mp3",
+        "captions": [
+          { "text": "[Appalachian English dialect]", "start": 10, "end": 1000 },
+          { "text": "I'm gonna tell you a story.", "start": 1000, "end": 3000 }
+        ],
+        "audio": "assets/audio/narration/00-title.m4a",
+        "delay": 0
+      },
+      "ambient": null,
+      "effects": null,
+      "transition": { "type": "fade", "duration": 1500 },
+      "traceOverlay": null
+    },
+    {
+      "id": "scene-01-seam",
+      "frameType": "scene",
+      "description": "Coal seam wall, lamp upper left, diamond barely visible",
+      "image": "assets/images/scene-01-seam.webp",
+
+      "narration": {
+        "lines": [
+          { "text": "The ground either feeds you or buries you.", "enter": 2000, "exit": 5000, "x": 10, "y": 70, "align": "left" },
+          { "text": "Buchanan County, Virginia.", "enter": 5000, "exit": 9000, "x": 10, "y": 76, "align": "left" }
+        ],
+        "captions": [
+          { "text": "I come from a place where the ground either feeds you or buries you.", "start": 0, "end": 5000 }
+        ],
+        "audio": "assets/audio/narration/01-seam.m4a",
         "delay": 500
       },
 
-      "ambient": {
-        "src": "assets/audio/ambient/scene-01-buried.mp3",
-        "volume": 0.15,
-        "loop": true
-      },
+      "ambient": null,
 
       "effects": {
-        "idle": null,
-        "entry": null
+        "idle": "dust-drift",
+        "entry": "fade-in"
       },
 
       "transition": {
@@ -186,43 +194,46 @@ credits  │ Terminal. No advance. Music persists. Bio, RAI, links.
       },
 
       "traceOverlay": {
-        "opacity": 0.05,
-        "animation": "shimmer"
+        "opacity": 0.05
       }
     },
 
-    // Scene 6 — THE STILLNESS (one scene, no phases)
+    // Scene 8 — THE STILLNESS (minimal text, no narration audio)
     {
-      "id": "scene-06-stillness",
-      "index": 6,
+      "id": "scene-08-stillness",
       "frameType": "scene",
-      "image": "assets/images/scene-06-stillness.webp",
-      "advanceMode": "click",
-      "textMode": "ghost-drift",
+      "description": "Stripped bed, empty chair, tin glowing — a space where someone should be",
+      "image": "assets/images/scene-08-stillness.webp",
       "narration": {
         "lines": [
-          { "text": "It is too silent.", "enter": 1000, "exit": 5000 }
+          { "text": "All of them should still be here.", "enter": 0, "exit": 2000, "x": 40, "y": 45, "align": "center" },
+          { "text": "It's not supposed to be this quiet.", "enter": 1500, "exit": 4000, "x": 45, "y": 55, "align": "center" }
         ],
-        "audio": null,
-        "delay": 0
+        "captions": [{ "text": "[silence]", "start": 0, "end": 3000 }],
+        "delay": 500
       },
       "ambient": null,
-      "effects": { "idle": null, "entry": null },
-      "traceOverlay": { "opacity": 0.2, "animation": "tin-glow" },
-      "transition": { "type": "fade", "duration": 1500 }
+      "effects": { "idle": "assembly-micro", "entry": "fade-in" },
+      "traceOverlay": { "opacity": 0.3 },
+      "transition": { "type": "fade", "duration": 1200 }
     },
 
     // Credits — terminal frame
     {
-      "id": "frame-11-credits",
-      "index": 11,
+      "id": "scene-11-music",
       "frameType": "credits",
-      "image": "assets/images/frame-11-credits.webp",
+      "description": "Record player with diamond blazing and circuitry — the finale",
+      "image": "assets/images/scene-11-music.webp",
       "advanceMode": "disabled",
-      "textMode": "static",
-      "persistentVisualState": "machine-running",
-      "narration": null,
-      "ambient": { "src": "assets/audio/ambient/end-song.mp3", "volume": 0.6, "loop": false }
+      "narration": { "lines": [...], "captions": [...], "audio": "assets/audio/narration/11-music.m4a", "delay": 500 },
+      "music": {
+        "src": "assets/audio/sfx/BridgeCitySinners_BreakTheChain.mp3",
+        "enter": 20000, "exit": null,
+        "startVolume": 0.01, "fullVolume": 0.25, "crescendoMs": 45000
+      },
+      "ambient": null,
+      "effects": { "idle": "machine-steady" },
+      "traceOverlay": { "opacity": 0.5 }
     }
   ]
 }
@@ -272,203 +283,225 @@ fade-in/out or static. Same content, no spatial drift.
 All traces baked into Leonardo AI images. Runtime overlay adds shimmer/emphasis only.
 
 ```
-SCENE              │ BAKED        │ RUNTIME        │ DESCRIPTION
-───────────────────┼──────────────┼────────────────┼──────────────────────
-01 Buried          │ hairline     │ faint shimmer  │ Part of the rock
-02 Moved           │ catches      │ brief light    │ Conveyor reveals edges
-03 Oven Threshold  │ stress-bright│ heat-pulse     │ First legibility
-04 Pocket          │ residue only │ near-still     │ Almost invisible
-05 Keeper          │ clean read   │ water-clarity  │ First true seeing
-06 Stillness       │ tin-glow     │ persistence    │ Endures through time
-07 Return          │ reflexive    │ light-crack    │ Light activates trace
-08 Device          │ converging   │ assembly-micro │ Prior traces converge
-09 Activation      │ purposeful   │ illum-spread   │ Intentional, not chaotic
-10 Gathering       │ diffusing    │ room-carry     │ Traces become the light
-11 Credits         │ stable       │ machine-steady │ Persistent, running
+SCENE              │ BAKED        │ RUNTIME EFFECT   │ DESCRIPTION
+───────────────────┼──────────────┼──────────────────┼──────────────────────
+01 Seam            │ hairline     │ dust-drift       │ Part of the rock
+02 Travel          │ catches      │ motion-drag      │ Conveyor reveals edges
+03 Reach           │ stress-bright│ heat-pulse       │ First legibility
+04 Pocket          │ residue only │ near-still-pulse │ Almost invisible
+05 Rinse           │ clean read   │ water-run        │ First true seeing
+06 Storage         │ tin-glow     │ dust-settle      │ Endures through time
+07 Empty           │ reflexive    │ near-still-pulse │ Light activates trace
+08 Stillness       │ converging   │ assembly-micro   │ Prior traces converge
+09 Return          │ purposeful   │ light-crack      │ Intentional, not chaotic
+10 Building        │ diffusing    │ illumination-spread │ Traces become the light
+11 Music (credits) │ stable       │ machine-steady   │ Persistent, running
 ```
 
-**v1:** Baked traces in images + canvas-drawn shimmer overlay per scene.
-**v2:** Runtime procedural trace rendering via Canvas pixel ops — why we start with Canvas now.
+**v1:** Baked traces in images + canvas effects overlay per scene.
+**v2:** Runtime procedural trace rendering via Canvas pixel ops on the effects-canvas overlay.
 
 ---
 
 ## 5. Architecture
 
-### 5.1 Two Rendering Layers
+### 5.1 Three Rendering Layers
 
 ```
 ┌──────────────────────────────────────────────────┐
 │              WHAT THE USER SEES                  │
 │                                                  │
 │  ┌──────────────────────────────────────────┐    │
-│  │      DOM OVERLAY (position: absolute)    │ ◄── text, buttons, dots, a11y
+│  │      DOM OVERLAY (position: absolute)    │ ◄── text, captions, buttons, dots, a11y
 │  │      GSAP animates this layer            │    screen readers see THIS
 │  ├──────────────────────────────────────────┤    │
-│  │      CANVAS 2D                           │ ◄── images, pixel effects, traces
-│  │      rAF animates this layer             │    screen readers see NOTHING here
+│  │      CANVAS 2D EFFECTS OVERLAY           │ ◄── pixel effects, traces (v2)
+│  │      rAF animates this layer             │    aria-hidden, pointer-events: none
+│  ├──────────────────────────────────────────┤    │
+│  │      DOM <img> (scene image)             │ ◄── scene images, object-fit: cover
+│  │      GSAP drives opacity transitions     │    browser-native decode/caching
 │  └──────────────────────────────────────────┘    │
 │                                                  │
-│  canvas = visual data plane (pixels)             │
-│  DOM = control/accessibility plane (semantics)   │
+│  <img> = scene image plane (browser-optimized)   │
+│  canvas = effects data plane (pixel access)      │
+│  DOM overlay = control/a11y plane (semantics)    │
 └──────────────────────────────────────────────────┘
 ```
 
 Canvas is aria-hidden="true". All semantic content lives in DOM overlay.
+Scene images use native `<img>` with CSS object-fit for browser decode/caching.
 
 ### 5.2 Dependency Graph
 
 ```
                      main.js
                        │
-                       │ imports + wires event listeners
+                       │ imports createApp()
                        │
-               ┌───────┴───────┐
-               │               │
-           navigator.js    loader.js
-               │
-     ┌─────────┼──────────┐
-     │         │          │
-  canvas.js  audio.js   text.js
-     │         │          │
-  effects.js   │       overlay.js (dot bar, controls)
-               │
-          no cross-imports
-          between leaf modules
+                     app.js ────────── loader.js
+                       │
+     ┌─────┬───────┬───┼────┬──────────┐
+     │     │       │   │    │          │
+effects   effects  │  audio text   overlay
+ -canvas  .js      │  .js  .js     .js
+  .js              │
+                captions.js
 
-scenes.json ← imported by navigator, loader, audio (init)
+scenes.json ← imported by app.js
 
-main → navigator, loader
-navigator → canvas, effects, audio, text, overlay, scenes
-loader → scenes (reads image list), canvas (image cache)
-canvas → nothing (receives config, draws pixels)
-effects → canvas (reads/writes pixels via canvas API)
+app.js → effects-canvas, effects, audio, text, captions, overlay, loader, scenes
+loader → nothing (pure functions, receives frames array)
+effects-canvas → nothing (receives <canvas> element)
+effects → nothing (receives canvas + scene elements)
 audio → nothing (receives config, returns Howl refs)
 text → nothing (receives config + container, returns timeline)
+captions → nothing (receives config, manages DOM + localStorage)
 overlay → nothing (receives state, updates DOM)
 
-NO CYCLES. effects.js may call canvas functions for pixel access.
-No other cross-calls between leaf modules.
+NO CYCLES. No cross-imports between leaf modules.
 ```
 
-### 5.3 Navigator — the router (navigator.js)
+### 5.3 App — the orchestrator (app.js)
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                        NAVIGATOR                             │
+│                        APP (app.js)                          │
 │                                                              │
-│  state:                                                      │
-│    currentFrame = 0           ← which frame is showing       │
-│    transitioning = false      ← rate limiter                 │
+│  state machine:                                              │
+│    LOADING → SCENE_ACTIVE ↔ TRANSITIONING → SCENE_ACTIVE    │
+│                   ↕                              ↓           │
+│                 PAUSED                        CREDITS        │
 │                                                              │
-│  inputs (ALL resolve to one function):                       │
-│    dot click      → navigate(currentFrame, clickedIndex)     │
-│    forward btn    → navigate(currentFrame, currentFrame + 1) │
-│    back btn       → navigate(currentFrame, currentFrame - 1) │
-│    keyboard →     → navigate(currentFrame, currentFrame + 1) │
-│    keyboard ←     → navigate(currentFrame, currentFrame - 1) │
-│    click on stage → navigate(currentFrame, currentFrame + 1) │
+│  key state:                                                  │
+│    currentIndex = 0          ← which frame is showing        │
+│    state = State enum        ← finite state machine          │
+│    pendingNavIndex = null    ← deferred nav (last-wins)      │
 │                                                              │
-│  navigate(from, to):                                         │
-│    if (transitioning) return          ← 429                  │
-│    if (to === from) return            ← no-op                │
-│    if (to < 0 || to >= len) return    ← 404                  │
-│    if (frames[from].advanceMode       ← credits = dead end   │
-│        === 'disabled') return                                │
-│    transitioning = true               ← acquire lock         │
-│    buildAndRunTimeline(from, to)      ← GSAP + canvas        │
+│  inputs (ALL resolve to transition()):                       │
+│    dot click      → transition(app, clickedFrameIndex)       │
+│    forward btn    → advance(app) → transition(+1)            │
+│    back btn       → retreat(app) → transition(-1)            │
+│    keyboard →/␣   → advance(app) → transition(+1)            │
+│    keyboard ←     → retreat(app) → transition(-1)            │
+│                                                              │
+│  transition(app, toIndex):                                   │
+│    if (state === TRANSITIONING) {                            │
+│      pendingNavIndex = toIndex  ← last-wins deferred nav     │
+│      return                                                  │
+│    }                                                         │
+│    state = TRANSITIONING        ← acquire lock               │
+│    kill text, captions, timers  ← cleanup current scene      │
+│    GSAP fade-out → showFrame()  ← load new scene at opacity 0│
+│    await img.decode()           ← avoid blank-frame flash    │
+│    GSAP fade-in                 ← reveal new scene           │
 │    onComplete → {                                            │
-│      currentFrame = to                ← commit               │
-│      overlay.updateDotBar(to)         ← update UI            │
-│      transitioning = false            ← release lock         │
+│      state = SCENE_ACTIVE       ← release lock               │
+│      completePendingNav()       ← fire deferred nav if any   │
 │    }                                                         │
 │                                                              │
 │  LOCK RELEASED IN GSAP onComplete ONLY. NEVER BEFORE.        │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-**One function. Five callers.** Do NOT write separate next() / prev() / jumpTo().
+**transition() is the single navigation entry point.** advance() and retreat()
+are thin wrappers that call it. Mid-transition clicks are deferred (last-wins),
+not dropped — completePendingNav() fires after the current transition lands.
 
-Transition sequence inside navigate():
+Transition sequence inside transition():
 
 ```
 time ──────────────────────────────────────────────►
 
 kill text tl   █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-text exit      ████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-kill effects   █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-canvas xfade   ░░░░░████████████░░░░░░░░░░░░░░░░░░░  ← rAF-driven dissolve
-audio xfade    ░░░░░████████████░░░░░░░░░░░░░░░░░░░  ← parallel with canvas
-entry effect   ░░░░░░░░░░░░░████████░░░░░░░░░░░░░░░  ← canvas pixel effect
+kill captions  █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+stop narration █░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+GSAP fade-out  ████████████░░░░░░░░░░░░░░░░░░░░░░░░  ← opacity 1 → 0
+showFrame()    ░░░░░░░░░░░░█░░░░░░░░░░░░░░░░░░░░░░  ← swap image, start effects
+img.decode()   ░░░░░░░░░░░░░██░░░░░░░░░░░░░░░░░░░░  ← wait for browser decode
+GSAP fade-in   ░░░░░░░░░░░░░░░████████████░░░░░░░░░  ← opacity 0 → 1
 text enter     ░░░░░░░░░░░░░░░░░████████░░░░░░░░░░░  ← GSAP on DOM overlay
 lock release   ░░░░░░░░░░░░░░░░░░░░░░░░░█░░░░░░░░░  ← onComplete
 
 total: ~1.2 - 1.8 seconds per transition
 ```
 
-### 5.4 Canvas (canvas.js)
+### 5.4 Effects Canvas (effects-canvas.js)
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│                    CANVAS MODULE                          │
+│              EFFECTS CANVAS MODULE                        │
 │                                                          │
 │  responsibilities:                                       │
-│    • draw an image to canvas (cover-fit, centered)       │
-│    • crossfade from current image to new image           │
+│    • manage the <canvas> overlay element lifecycle        │
+│    • DPR-aware sizing (resetTransform + scale)           │
+│    • requestAnimationFrame render loop                   │
 │    • expose ctx for effects.js pixel manipulation        │
-│    • resize handling (maintain 16:9, letterbox)           │
+│    • respect prefers-reduced-motion (self-stop)          │
 │                                                          │
 │  does NOT know:                                          │
-│    • what frame number it's on                           │
+│    • what frame is showing or what effects are active    │
 │    • what audio is playing                               │
-│    • what text is showing                                │
 │    • whether navigation is locked                        │
 │                                                          │
 │  key functions:                                          │
-│    drawImage(img)                                        │
-│    crossfade(fromImg, toImg, duration, onComplete)       │
-│    getContext() → exposes ctx for effects.js             │
-│    handleResize() → recalculate dims, redraw current     │
+│    initCanvas(el)         → returns 2d context           │
+│    resume() / pause()     → start/stop rAF loop          │
+│    clearAll()             → pause + clear canvas          │
+│    destroy()              → disconnect observer, null ctx │
+│    getContext()            → exposes ctx for effects.js   │
+│    isRunning()            → render loop state             │
 └──────────────────────────────────────────────────────────┘
 ```
 
-**Crossfade:** Capture current canvas as ImageData. Draw new image. Blend frames over duration using globalAlpha in a requestAnimationFrame loop. Call onComplete when done.
+**Scene images are NOT on canvas.** They render via a DOM `<img>` element with CSS `object-fit: cover`. The canvas overlay sits above the image for pixel effects only. Scene transitions are GSAP opacity fades on the scene-stage container.
 
-**Resize:** ResizeObserver on container. Recalculate canvas dimensions maintaining 16:9. Handle devicePixelRatio for retina. Letterbox with black. Redraw current image — don't re-transition.
+**Resize:** ResizeObserver on the canvas element. Recalculate canvas dimensions using `getBoundingClientRect()` × `devicePixelRatio`. Reset transform before re-scaling to avoid compounding.
 
-**Image cache:** Map<string, Image> populated by loader.js at startup.
+**Reduced motion:** `resume()` checks `prefers-reduced-motion` and refuses to start. The render loop self-stops if the preference changes mid-run.
 
 ### 5.5 Audio (audio.js)
 
 ```js
 // State
-let currentAmbient = null;
-let currentNarration = null;
-let muted = false;
+let currentAmbient = null;   // Howl instance
+let currentNarration = null; // Howl instance
+let currentMusic = null;     // Howl instance
+let globalMuted = false;
 
-// Functions
-crossfadeAudio(fromConfig, toConfig, ms)  // fade out FROM, fade in TO
-playNarration(config)                      // one-shot, returns Howl ref for replay
-stopNarration()                            // kill current narration if playing
-setMuted(bool)                             // toggle all audio
+// Playback (all use Howler.js Howl instances)
+playAmbient(src, volume, loop)
+crossfadeAmbient(src, volume, ms)
+playNarration(src)           // one-shot, fires buffer change callbacks
+stopNarration()              // kill current narration if playing
+pauseNarration() / resumeNarration()
+playMusic(src, volume)       // credits song
+fadeMusic(volume, ms)        // crescendo / fade-out
+setMuted(bool)               // toggle all audio
+
+// Preloading (uses native Audio elements, NOT Howl)
+preloadNarrationAhead(src)   // pre-create Howl for next scene
+clearNarrationCache()        // flush ahead-of-time cache
 ```
 
-**Arbitrary jumps:** crossfade takes fromConfig and toConfig. When jumping frame 2 → frame 9: fade out frame 2's ambient, fade in frame 9's ambient, stop frame 2's narration. Do NOT play frames 3-8.
+**Two-tier audio strategy:** Preloading uses native `Audio()` elements for lightweight metadata-only preloading (in loader.js). Playback uses Howler.js `Howl` instances for crossfade, volume control, and mobile autoplay unlock. Ahead-of-time narration buffering (`preloadNarrationAhead`) pre-creates a Howl instance so audio data is ready before the user navigates.
 
-**Credits song:** Lives in credits frame's ambient config slot. crossfadeAudio fades it in like any other ambient. Navigate away = fades out. Return = restarts. No special channel.
+**Arbitrary jumps:** crossfadeAmbient takes a new src and fades to it. When jumping frame 2 → frame 9: crossfade to frame 9's ambient, stop frame 2's narration. Do NOT play frames 3-8.
 
-**Ambient deferred for v1:** All scene ambient config slots are null except credits. Architecture ready — when ambient assets exist, drop in paths, everything works.
+**Credits song:** Lives in the credits frame's `music` config slot (separate from ambient). Uses `playMusic()` with a delayed `enter` time and `crescendoMs` fade-up. Navigate away = stops. No special channel.
+
+**Ambient deferred for v1:** All scene ambient config slots are null. Architecture ready — when ambient assets exist, drop in paths, everything works.
 
 ```
 Audio hierarchy (enforced by volume levels in config):
   1. Narration (loudest)
   2. Emotional silence (ambient: null)
   3. Ambient texture (0.08–0.20)
-  4. End song (ambient slot, 0.6, loop: false)
+  4. Credits music (music slot, crescendo 0.01→0.25)
 ```
 
-**Mobile autoplay:** First click on title frame unlocks AudioContext via Howler.
+**Mobile autoplay:** First user interaction (play button) unlocks AudioContext via Howler.
 
-**Instance lifecycle:** Create all Howl instances at init from config. Preload: true. Pool — not constructed per transition.
+**Instance lifecycle:** Howl instances are created on demand per playback call (not pooled at init). Ahead-of-time narration buffering (`preloadNarrationAhead`) pre-creates a Howl for the next scene so audio data is ready before navigation. Metadata-only preloading at startup uses native `Audio()` elements in loader.js (lightweight, no Howl overhead).
 
 ### 5.6 Ghost-Drift Text (text.js)
 
@@ -499,40 +532,41 @@ Lines overlap naturally based on enter/exit timing. No queue. No wait.
 
 Stable DOM narration for accessibility in separate aria-live="polite" region.
 
-### 5.7 Effects (effects.js) — v2, placeholder in v1
+### 5.7 Effects — two-module split
 
-**v2 scope. Ships as a no-op placeholder with handling so navigator doesn't need to change when effects are added.**
+**effects.js** is the effect registry with a stable API. **effects-canvas.js** manages the Canvas 2D lifecycle, render loop, and DPR-aware sizing.
 
 ```js
-// effects.js — v1 placeholder
+// effects.js — effect registry (no-op skeleton until effects are implemented)
 
-export function startEffect(effectName, ctx, width, height) {
-  if (!effectName) return null;
-  // v2: dispatch to effect functions here
-  return null; // cleanup fn — null = nothing to clean up
-}
-
-export function stopEffect(cleanupFn) {
-  if (cleanupFn) cleanupFn();
-}
+export function effectExists(name) { return name in effects; }
+export function runEffect(name, canvas, scene) { /* dispatch to effect fn */ }
+export function clearEffects() { /* stop all running effects */ }
 ```
 
-Navigator calls `startEffect()` and `stopEffect()` in v1. They do nothing. When v2 effects are built, navigator code doesn't change — only this file does.
+```js
+// effects-canvas.js — Canvas 2D lifecycle
+
+export function initCanvas(el) { /* acquire 2d ctx, start ResizeObserver */ }
+export function resume() { /* start rAF loop (respects reduced motion) */ }
+export function pause() { /* stop rAF loop */ }
+export function clearAll() { /* pause + clear canvas */ }
+export function destroy() { /* disconnect observer, null ctx */ }
+```
+
+app.js calls `runEffect()` and `clearEffects()` — the effects.js API is stable.
+When effects are implemented, only effects.js changes. effects-canvas.js provides
+the render loop; effects register their render callbacks into it.
 
 ```
-v2 MODULE CONTRACT:
-  - receives canvas context + dimensions
-  - runs effect in a requestAnimationFrame loop
-  - returns a cleanup function that stops the loop
-
-v2 CONFIG SLOT (per frame in scenes.json):
+CONFIG SLOT (per frame in scenes.json):
   "effects": { "idle": "effect-name" | null, "entry": "effect-name" | null }
   null = no effect for that slot
 ```
 
 ### 5.8 Input Handling
 
-Handled in main.js, routed to navigator.navigate():
+Handled in app.js, routed to transition():
 
 ```
 INPUT              │ DESKTOP              │ MOBILE
@@ -813,14 +847,12 @@ Sensory framing    │ Alt modes preserve story beats at different
 ```
 DECISION                        │ REJECTED              │ WHY THIS
 ────────────────────────────────┼───────────────────────┼──────────────────────
-Canvas 2D over DOM+CSS         │ DOM + CSS filters     │ Need pixel access for
-                                │                       │ effects now and runtime
-                                │                       │ trace rendering in v2.
-                                │                       │ Switching renderers
-                                │                       │ mid-project is worse
-                                │                       │ than starting right.
+DOM <img> for scene images      │ Canvas 2D image       │ Native decode/caching.
++ Canvas 2D overlay for effects │ rendering             │ object-fit: cover for free.
+                                │                       │ Canvas reserved for pixel
+                                │                       │ effects where needed.
 ────────────────────────────────┼───────────────────────┼──────────────────────
-Canvas 2D over WebGL           │ GPU shader pipeline   │ Overkill for 2D.
+Canvas 2D overlay over WebGL   │ GPU shader pipeline   │ Overkill for 2D effects.
 ────────────────────────────────┼───────────────────────┼──────────────────────
 DOM overlay for text/UI        │ Canvas text drawing   │ Canvas text invisible
                                 │                       │ to screen readers.
@@ -829,8 +861,8 @@ DOM overlay for text/UI        │ Canvas text drawing   │ Canvas text invisib
 Flat modules over class         │ Engine hierarchy      │ 12 frames. One
 hierarchy                       │                       │ orchestrator + functions.
 ────────────────────────────────┼───────────────────────┼──────────────────────
-navigate(from, to) over        │ Separate next/prev/   │ Dot bar = random access.
-separate nav functions          │ jump functions        │ One function, five callers.
+Single transition() entry      │ Separate next/prev/   │ Dot bar = random access.
+point with last-wins defer     │ jump functions        │ Rapid clicks land correctly.
 ────────────────────────────────┼───────────────────────┼──────────────────────
 Baked traces + canvas shimmer   │ Runtime procedural    │ Baked looks better.
 (v1)                            │                       │ Same renderer for v2.
@@ -861,13 +893,17 @@ Per-scene authored effects       │ Generic effect system │ Effects serve sto
 
 ### v1 (ships by April 5)
 
-- All 12 frames with Canvas 2D transitions
-- Ghost-drift text (DOM overlay + GSAP)
-- Narration audio + replay
-- End song on credits via ambient slot
+- All 12 frames with GSAP opacity transitions
+- Ghost-drift text with positioned x/y/align (DOM overlay + GSAP)
+- Narration audio + replay + timed captions
+- Credits music with delayed crescendo
 - Dot bar random-access + forward/back + keyboard
-- Scene 6 stillness (text present, no audio, no effects)
-- Accessibility: aria-live, reduced-motion, keyboard
+- Scene 8 stillness (text present, no narration audio)
+- Pause/play with full timer save/restore
+- Last-wins deferred navigation for rapid clicks
+- Canvas 2D effects overlay (effects-canvas.js) with rAF loop
+- Effects registry skeleton (effects.js) — API stable, implementations pending
+- Accessibility: aria-live, reduced-motion, keyboard, WCAG AA contrast
 - Cloud Run deploy with CI/CD
 - Blog post submitted
 - Ambient audio deferred (null slots, architecture ready)
@@ -940,46 +976,44 @@ Per-scene authored effects       │ Generic effect system │ Effects serve sto
 ```
 ARCHITECTURE:
   ✓ each module does ONE thing
-  ✓ navigator is the ONLY module that knows frame ordering
+  ✓ app.js is the ONLY module that knows frame ordering
   ✓ all other modules receive config objects, not frame indices
-  ✓ no module imports from navigator (one-direction dependency)
+  ✓ no module imports from app.js (one-direction dependency)
   ✓ scenes.json is single source of truth
   ✓ scene differences = config data, not if-blocks
 
 RENDERING:
-  ✓ canvas = visual plane (images, traces in v2)
-  ✓ DOM overlay = semantic plane (text, buttons, a11y)
-  ✓ canvas is aria-hidden="true"
-  ✓ GSAP animates DOM elements
-  ✓ requestAnimationFrame animates canvas
+  ✓ <img> = scene image plane (browser-optimized decode/caching)
+  ✓ canvas overlay = effects data plane (pixel access for effects/traces)
+  ✓ DOM overlay = semantic plane (text, captions, buttons, a11y)
+  ✓ canvas is aria-hidden="true", pointer-events: none
+  ✓ GSAP animates DOM elements + scene transitions (opacity)
+  ✓ requestAnimationFrame animates canvas effects
 
 STATE:
-  ✓ two variables: currentFrame (int), transitioning (bool)
+  ✓ finite state machine: LOADING, SCENE_ACTIVE, TRANSITIONING, PAUSED, CREDITS
   ✓ lock released ONLY in GSAP onComplete
+  ✓ mid-transition navigation deferred (last-wins via pendingNavIndex)
 
-DATA FLOW (v1):
+DATA FLOW:
   user event
-    → main.js handler
-      → navigate(from, to)
-        → kill active text timeline + hard-reset elements
-        → GSAP orchestration timeline:
-          → canvas.crossfade(fromImg, toImg)
-          → audio.crossfadeAudio(fromConfig, toConfig)
-          → text.animateEnter(toConfig)
-        → onComplete: commit state, update dots, release lock
-
-DATA FLOW (v2 adds):
-  → effects.cleanup(fromConfig) before crossfade
-  → effects.start(toConfig, ctx) after crossfade
+    → app.js handler (advance/retreat/dot click)
+      → transition(app, toIndex)
+        → if TRANSITIONING: defer to pendingNavIndex, return
+        → kill text timeline, captions, narration timers
+        → GSAP fade-out scene stage
+          → showFrame(): swap image, start effects, start narration
+          → await img.decode()
+          → GSAP fade-in scene stage
+        → onComplete: set state, completePendingNav()
 
 NEVER:
   ✗ hardcoded frame indices in if/else
-  ✗ multiple functions for the same navigation action
   ✗ audio for intermediate frames on multi-frame jump
   ✗ text drawn on canvas
+  ✗ images drawn on canvas (use <img> + CSS object-fit)
   ✗ cross-imports between leaf modules
   ✗ global GSAP timelines
   ✗ releasing locks before async completes
-  ✗ constructing Howl instances on the fly
   ✗ framework for 20 DOM elements
 ```

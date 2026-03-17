@@ -45,24 +45,28 @@ audio, and recorded narration. Deployed via Cloud Run + nginx.
 
 Full system design: `docs/carbon-trace-system-design-v3-final.md`
 
-## Architecture: two rendering layers
+## Architecture: three rendering layers
 
-- **Canvas 2D** (`<canvas>`, `aria-hidden="true"`): images, pixel effects, traces.
-  Animated via `requestAnimationFrame`. Required for `getImageData`/`putImageData`
-  pixel manipulation (ripple, dust, bloom). CSS cannot do this.
-- **DOM overlay** (position: absolute over canvas): narration text, controls, a11y.
-  GSAP animates this layer. Screen readers see only this layer.
+- **DOM `<img>`**: scene images with CSS `object-fit: cover`. Browser-native
+  decode/caching. GSAP drives opacity transitions on the scene stage container.
+- **Canvas 2D overlay** (`<canvas>`, `aria-hidden="true"`, `pointer-events: none`):
+  pixel effects via `getImageData`/`putImageData` (ripple, dust, bloom).
+  Animated via `requestAnimationFrame`. Sits above the scene image.
+- **DOM overlay** (position: absolute over canvas): narration text, captions,
+  controls, a11y. GSAP animates this layer. Screen readers see only this layer.
 
 ### Module responsibilities
 
 | Module              | Job                                             | Does NOT know about   |
 | ------------------- | ----------------------------------------------- | --------------------- |
 | `app.js`            | State machine, orchestrator                     | Pixel rendering       |
-| `effects-canvas.js` | Canvas 2D lifecycle, render loop, pixel effects | Frame ordering, audio |
+| `effects-canvas.js` | Canvas 2D lifecycle, render loop, DPR sizing    | Frame ordering, audio |
 | `effects.js`        | Effect registry, `runEffect`/`clearEffects` API | Canvas internals      |
 | `audio.js`          | Howler — ambient crossfade, narration, replay   | DOM, canvas           |
 | `text.js`           | Ghost-drift GSAP timelines from config          | Audio, canvas         |
+| `captions.js`       | Timed captions, localStorage persistence        | Audio, canvas         |
 | `overlay.js`        | DOM controls — dot bar, buttons, progress       | Canvas, audio         |
+| `loader.js`         | Image + audio preloading, asset pipeline        | DOM, app state        |
 
 ### Rules
 
