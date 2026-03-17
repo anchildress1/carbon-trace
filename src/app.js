@@ -538,8 +538,13 @@ function transition(app, toIndex) {
 
   const landOnFrame = () => {
     app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
-    if (app.textTimeline) app.textTimeline.play(0);
-    setupAutoAdvance(app);
+    if (app.pendingPause) {
+      app.pendingPause = false;
+      doPause(app);
+    } else {
+      if (app.textTimeline) app.textTimeline.play(0);
+      setupAutoAdvance(app);
+    }
     completePendingNav(app);
   };
 
@@ -616,7 +621,7 @@ function updateNavButtons(app) {
   const frame = app.frames[app.currentIndex];
   app.els.btnPrev.disabled = app.currentIndex === 0;
   app.els.btnNext.disabled =
-    app.currentIndex >= app.frames.length - 1 || frame.advanceMode === 'disabled';
+    app.currentIndex >= app.frames.length - 1 || frame.holdUntilClick === null;
 }
 
 function resumeDelayedNarration(app) {
@@ -811,7 +816,13 @@ function doPause(app) {
 }
 
 function togglePause(app) {
-  if (app.state === State.TRANSITIONING || app.state === State.LOADING) return;
+  if (app.state === State.LOADING) return;
+
+  // Queue pause intent during transitions — applied when transition completes
+  if (app.state === State.TRANSITIONING) {
+    app.pendingPause = !app.pendingPause;
+    return;
+  }
 
   if (app.paused) {
     doResume(app);
@@ -888,11 +899,16 @@ function replayNarration(app) {
 }
 
 function handleKeydown(app, e) {
-  if (e.key === 'ArrowLeft') {
+  if (e.key === ' ') {
+    if (e.target.closest('#overlay-controls')) return;
+    e.preventDefault();
+    app.userHasInteracted = true;
+    togglePause(app);
+  } else if (e.key === 'ArrowLeft') {
     e.preventDefault();
     app.userHasInteracted = true;
     retreat(app);
-  } else if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') {
+  } else if (e.key === 'ArrowRight' || e.key === 'Enter') {
     if (e.target.closest('#overlay-controls')) return;
     e.preventDefault();
     app.userHasInteracted = true;
@@ -1085,6 +1101,7 @@ export function createApp() {
     autoAdvanceTimerDelay: null,
     autoAdvanceTimerRemaining: null,
     pendingNavIndex: null,
+    pendingPause: false,
     buffering: false,
     availableAudio: new Set(),
     imageCache: new Map(),
