@@ -785,7 +785,7 @@ function replayNarration(app) {
   }
 
   if (hasCaptions && areCaptionsEnabled()) {
-    showCaptions(frame.narration.captions, app.els.captionLayer);
+    scheduleCaptionDisplay(app, frame);
   }
 
   if (frame.music) {
@@ -793,7 +793,7 @@ function replayNarration(app) {
   }
 
   if (hasAudioRef) {
-    playNarration(frame.narration.audio);
+    scheduleNarrationAudio(app, frame.narration);
   }
 
   if (frame.effects?.entry) {
