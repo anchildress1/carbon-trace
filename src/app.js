@@ -104,6 +104,51 @@ function clearMusicTimer(app) {
   }
 }
 
+function clearAutoAdvance(app) {
+  if (app.autoAdvanceTimer) {
+    clearTimeout(app.autoAdvanceTimer);
+    app.autoAdvanceTimer = null;
+    app.autoAdvanceTimerStart = null;
+    app.autoAdvanceTimerDelay = null;
+  }
+}
+
+function scheduleAutoAdvance(app, delay) {
+  clearAutoAdvance(app);
+  app.autoAdvanceTimerStart = Date.now();
+  app.autoAdvanceTimerDelay = delay;
+  app.autoAdvanceTimer = setTimeout(() => {
+    app.autoAdvanceTimer = null;
+    app.autoAdvanceTimerStart = null;
+    app.autoAdvanceTimerDelay = null;
+    if (app.paused || app.state === State.TRANSITIONING) return;
+    advance(app);
+  }, delay);
+}
+
+function shouldAutoAdvance(app, frame) {
+  if (frame.holdUntilClick) return false;
+  if (frame.advanceMode === 'disabled') return false;
+  if (app.currentIndex >= app.frames.length - 1) return false;
+  return true;
+}
+
+function setupAutoAdvance(app) {
+  clearAutoAdvance(app);
+  const frame = app.frames[app.currentIndex];
+  if (!shouldAutoAdvance(app, frame)) return;
+
+  const holdTime = frame.holdTime ?? scenesData.meta.defaultHoldTime ?? 3000;
+
+  if (app.textTimeline) {
+    app.textTimeline.eventCallback('onComplete', () => {
+      scheduleAutoAdvance(app, holdTime);
+    });
+  } else {
+    scheduleAutoAdvance(app, holdTime);
+  }
+}
+
 function scheduleMusic(app, music) {
   clearMusicTimer(app);
   stopMusic();
@@ -268,7 +313,13 @@ function showFrame(app, index) {
   }
 
   updateNavButtons(app);
-  applyNarration(app, frame);
+
+  if (app.userHasInteracted) {
+    applyNarration(app, frame);
+  } else {
+    app.els.btnReplay.disabled = true;
+  }
+
   applyAmbient(app, frame);
 
   if (frame.phases) {
@@ -375,24 +426,9 @@ function completePendingNav(app) {
   }
 }
 
-function transition(app, toIndex) {
-  if (app.state === State.TRANSITIONING) {
-    app.pendingNavIndex = toIndex;
-    return;
-  }
-
-  app.pendingNavIndex = null;
-
-  if (app.paused) {
-    clearPauseState(app);
-    resumeNarration();
-    resumeAmbient();
-  }
-
-  app.state = State.TRANSITIONING;
-  app.buffering = false;
-  app.els.sceneStage.classList.remove('buffering');
-  app.els.playGate.hidden = true;
+function cleanupCurrentScene(app) {
+  clearAutoAdvance(app);
+  app.autoAdvanceTimerRemaining = null;
 
   if (app.phaseTimer) {
     clearTimeout(app.phaseTimer);
@@ -427,10 +463,57 @@ function transition(app, toIndex) {
   app.narrationTimerRemaining = null;
   app.phaseTimerRemaining = null;
   stopMusic();
+  stopNarration();
+}
+
+function transition(app, toIndex) {
+  if (app.state === State.TRANSITIONING) {
+    app.pendingNavIndex = toIndex;
+    return;
+  }
+
+  app.pendingNavIndex = null;
+  const wasPaused = app.paused;
+
+  if (app.paused) {
+    clearPauseState(app);
+  }
+
+  app.state = State.TRANSITIONING;
+  app.buffering = false;
+  app.els.sceneStage.classList.remove('buffering');
+  app.els.playGate.hidden = true;
+
+  cleanupCurrentScene(app);
 
   const toFrame = app.frames[toIndex];
-  stopNarration();
 
+  // Hard jump: instant cut when navigating while paused.
+  // No fade animation — swap frame and re-pause immediately.
+  if (wasPaused) {
+    const doHardJump = () => {
+      const prevIndex = app.currentIndex;
+      app.currentIndex = toIndex;
+      try {
+        showFrame(app, toIndex);
+      } catch (err) {
+        console.error('Error during scene transition:', err);
+        app.currentIndex = prevIndex;
+      }
+      app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
+      doPause(app);
+      completePendingNav(app);
+    };
+
+    if (toFrame.image && !app.imageCache.has(toFrame.image)) {
+      waitForImage(app, toFrame.image).then(doHardJump);
+    } else {
+      doHardJump();
+    }
+    return;
+  }
+
+  // Animated transition: fade out → swap frame → fade in → land playing
   const proceedWithFrame = () => {
     const prevIndex = app.currentIndex;
     app.currentIndex = toIndex;
@@ -447,6 +530,7 @@ function transition(app, toIndex) {
   const landOnFrame = () => {
     app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
     if (app.textTimeline) app.textTimeline.play(0);
+    setupAutoAdvance(app);
     completePendingNav(app);
   };
 
@@ -517,17 +601,6 @@ function retreat(app) {
 
   app.userHasInteracted = true;
   transition(app, app.currentIndex - 1);
-}
-
-function triggerEffect(app) {
-  if (prefersReducedMotion()) return;
-  if (app.state === State.TRANSITIONING || app.state === State.CREDITS) return;
-  const frame = app.frames[app.currentIndex];
-  if (!frame.effects?.idle) return;
-  clearEffects();
-  if (frame.effects.entry)
-    runEffect(frame.effects.entry, app.els.effectsCanvas, app.els.sceneCanvas);
-  runEffect(frame.effects.idle, app.els.effectsCanvas, app.els.sceneCanvas);
 }
 
 function updateNavButtons(app) {
@@ -610,15 +683,11 @@ function resumeDelayedPhase(app) {
 
 function handleFirstPlay(app) {
   const frame = app.frames[app.currentIndex];
+  applyNarration(app, frame);
   if (app.textTimeline) {
     app.textTimeline.play(0);
   }
-  if (frame.music) {
-    scheduleMusic(app, frame.music);
-  }
-  if (frame.narration?.audio) {
-    scheduleNarrationAudio(app, frame.narration);
-  }
+  setupAutoAdvance(app);
 }
 
 function resumeEffects() {
@@ -653,6 +722,12 @@ function doResume(app) {
   resumeDelayedMusic(app);
   resumeDelayedPhase(app);
   resumeMusicExitTimer(app);
+
+  if (app.autoAdvanceTimerRemaining !== null && app.autoAdvanceTimerRemaining > 0) {
+    const remaining = app.autoAdvanceTimerRemaining;
+    app.autoAdvanceTimerRemaining = null;
+    scheduleAutoAdvance(app, remaining);
+  }
 
   if (firstPlay) {
     app.els.playGate.hidden = true;
@@ -697,6 +772,12 @@ function doPause(app) {
 
   saveNarrationTimerRemaining(app);
   saveMusicTimerRemaining(app);
+
+  if (app.autoAdvanceTimer) {
+    const elapsed = Date.now() - app.autoAdvanceTimerStart;
+    app.autoAdvanceTimerRemaining = Math.max(0, app.autoAdvanceTimerDelay - elapsed);
+    clearAutoAdvance(app);
+  }
 
   if (app.musicExitTimer) {
     const elapsed = Date.now() - app.musicExitTimerStart;
@@ -746,6 +827,9 @@ function replayNarration(app) {
   app.buffering = false;
   app.els.sceneStage.classList.remove('buffering');
 
+  clearAutoAdvance(app);
+  app.autoAdvanceTimerRemaining = null;
+
   const frame = app.frames[app.currentIndex];
 
   if (app.narrationTimer) {
@@ -786,6 +870,8 @@ function replayNarration(app) {
   if (hasAudioRef) {
     scheduleNarrationAudio(app, frame.narration);
   }
+
+  setupAutoAdvance(app);
 
   if (frame.effects?.entry) {
     runEffect(frame.effects.entry, app.els.effectsCanvas, app.els.sceneCanvas);
@@ -861,17 +947,10 @@ function initApp(app) {
       app.els.playGate.hidden = false;
 
       // Start paused — everything waits for the user to press play.
-      // Set SCENE_ACTIVE first so doPause stores the correct resume state,
-      // then seek the paused timeline to show title text as the LCP element.
-      // On play, doResume → handleFirstPlay restarts from t=0.
+      // Set SCENE_ACTIVE first so doPause stores the correct resume state.
+      // On play, doResume → handleFirstPlay sets up narration and auto-advance.
       app.state = State.SCENE_ACTIVE;
       doPause(app);
-      stopNarration();
-      if (app.textTimeline) {
-        const firstLine = app.frames[0].narration?.lines?.[0];
-        const seekTime = firstLine ? firstLine.enter / 1000 + 1.3 : 0;
-        app.textTimeline.seek(seekTime);
-      }
 
       // Defer background asset preloads to avoid network contention.
       // Loads sequentially: each scene's image then audio, in order.
@@ -886,10 +965,12 @@ function initApp(app) {
         app.userHasInteracted = true;
       };
 
+      // Stage click/tap: skip to next scene (un-pauses if paused)
       document.addEventListener('click', (e) => {
         markInteracted();
         if (e.target.closest('#overlay-controls')) return;
-        triggerEffect(app);
+        if (e.target.closest('#play-gate')) return;
+        advance(app);
       });
       document.addEventListener('keydown', (e) => {
         markInteracted();
@@ -990,6 +1071,10 @@ export function createApp() {
     musicExitTimerStart: null,
     musicExitTimerDelay: null,
     musicExitTimerRemaining: null,
+    autoAdvanceTimer: null,
+    autoAdvanceTimerStart: null,
+    autoAdvanceTimerDelay: null,
+    autoAdvanceTimerRemaining: null,
     pendingNavIndex: null,
     buffering: false,
     availableAudio: new Set(),
