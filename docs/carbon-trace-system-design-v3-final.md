@@ -21,12 +21,12 @@ LAYER        │ TOOL         │ WHY
 Build        │ Vite         │ Fast HMR, ES modules, tree-shakes GSAP/Howler.
              │              │ Already known — no learning curve during deadline.
 ─────────────┼──────────────┼──────────────────────────────────────────
-Rendering    │ DOM <img> +  │ Scene images rendered via <img> with CSS
-             │ Canvas 2D   │ object-fit: cover for simplicity and native
-             │              │ browser decode/caching. Canvas 2D overlay
-             │              │ handles pixel effects (ripple, dust, bloom)
-             │              │ via getImageData / putImageData. Transitions
-             │              │ driven by GSAP opacity on the scene stage.
+Rendering    │ Canvas 2D    │ Direct pixel read/write via getImageData /
+             │              │ putImageData. Required for v2 runtime trace
+             │              │ rendering. Pixel effects (ripple, dust, light
+             │              │ bloom) impossible with CSS — CSS moves boxes,
+             │              │ not pixels. Start with the renderer you need
+             │              │ later so you don't switch mid-project.
 ─────────────┼──────────────┼──────────────────────────────────────────
 Animation    │ GSAP         │ Ghost-drift text (DOM overlay), scene transition
              │              │ orchestration, zoom. Timeline API = workflow
@@ -52,11 +52,9 @@ Deploy       │ Cloud Run    │ Vite builds to dist/. nginx serves static asse
              │   Actions    │
 ```
 
-**Why DOM `<img>` for scene images:** Native `<img>` with CSS `object-fit: cover` gives browser-native decode, caching, and responsive behaviour for free. GSAP drives opacity transitions on the scene stage container. Canvas 2D is reserved for the effects overlay layer where pixel manipulation is actually needed.
+**Why Canvas 2D over DOM+CSS:** v2 trace rendering needs pixel access. Switching renderers mid-project is worse than starting with the right one. Pixel effects (ripple, dust particles, light bloom) require getImageData() / putImageData() — CSS operates on element boxes, not pixels. The cost is accessibility (canvas is a black box to screen readers) which is handled by a DOM overlay layer on top.
 
-**Why Canvas 2D for effects overlay:** Pixel effects (ripple, dust particles, light bloom) require getImageData() / putImageData() — CSS operates on element boxes, not pixels. The effects canvas sits above the scene image, `aria-hidden="true"`, with `pointer-events: none`. v2 runtime trace rendering will also use this layer.
-
-**Why Canvas 2D over WebGL:** WebGL is a GPU shader pipeline — massive overkill for 2D pixel effects. No 3D, no scene graphs, no shader compilation needed.
+**Why Canvas 2D over WebGL:** WebGL is a GPU shader pipeline — massive overkill for 2D image rendering and pixel manipulation. No 3D, no scene graphs, no shader compilation needed.
 
 **Why no framework:** No component reuse justifies React. Linear path, one page, minimal DOM overlay. GSAP animates DOM text, Canvas handles visuals. Adding React for ~20 overlay elements is overhead.
 
@@ -74,7 +72,8 @@ carbon-trace/
 │   ├── main.js                 # Entry — imports app, calls createApp()
 │   ├── scenes.json             # All 12 frame definitions (§4)
 │   ├── app.js                  # State machine, orchestrator, transition router
-│   ├── effects-canvas.js       # Canvas 2D lifecycle, render loop, DPR sizing
+│   ├── canvas.js               # Canvas 2D — image drawing, cover-fit, resize
+│   ├── effects-canvas.js       # Canvas 2D effects overlay, render loop, DPR sizing
 │   ├── effects.js              # Effect registry — no-op skeleton, stable API
 │   ├── audio.js                # Howler — ambient crossfade, narration, replay
 │   ├── text.js                 # Ghost-drift text — GSAP timelines from config
@@ -305,7 +304,7 @@ SCENE              │ BAKED        │ RUNTIME EFFECT   │ DESCRIPTION
 
 ## 5. Architecture
 
-### 5.1 Three Rendering Layers
+### 5.1 Two Rendering Layers
 
 ```
 ┌──────────────────────────────────────────────────┐
@@ -315,21 +314,16 @@ SCENE              │ BAKED        │ RUNTIME EFFECT   │ DESCRIPTION
 │  │      DOM OVERLAY (position: absolute)    │ ◄── text, captions, buttons, dots, a11y
 │  │      GSAP animates this layer            │    screen readers see THIS
 │  ├──────────────────────────────────────────┤    │
-│  │      CANVAS 2D EFFECTS OVERLAY           │ ◄── pixel effects, traces (v2)
-│  │      rAF animates this layer             │    aria-hidden, pointer-events: none
-│  ├──────────────────────────────────────────┤    │
-│  │      DOM <img> (scene image)             │ ◄── scene images, object-fit: cover
-│  │      GSAP drives opacity transitions     │    browser-native decode/caching
+│  │      CANVAS 2D                           │ ◄── images, pixel effects, traces
+│  │      rAF animates this layer             │    screen readers see NOTHING here
 │  └──────────────────────────────────────────┘    │
 │                                                  │
-│  <img> = scene image plane (browser-optimized)   │
-│  canvas = effects data plane (pixel access)      │
-│  DOM overlay = control/a11y plane (semantics)    │
+│  canvas = visual data plane (pixels)             │
+│  DOM = control/accessibility plane (semantics)   │
 └──────────────────────────────────────────────────┘
 ```
 
 Canvas is aria-hidden="true". All semantic content lives in DOM overlay.
-Scene images use native `<img>` with CSS object-fit for browser decode/caching.
 
 ### 5.2 Dependency Graph
 
@@ -342,23 +336,26 @@ Scene images use native `<img>` with CSS object-fit for browser decode/caching.
                        │
      ┌─────┬───────┬───┼────┬──────────┐
      │     │       │   │    │          │
-effects   effects  │  audio text   overlay
- -canvas  .js      │  .js  .js     .js
-  .js              │
-                captions.js
+  canvas  effects  │  audio text   overlay
+  .js     .js      │  .js  .js     .js
+     │             │
+  effects       captions.js
+  -canvas.js
 
 scenes.json ← imported by app.js
 
-app.js → effects-canvas, effects, audio, text, captions, overlay, loader, scenes
+app.js → canvas, effects-canvas, effects, audio, text, captions, overlay, loader, scenes
+canvas → nothing (owns scene canvas, draws images, exposes ctx)
 loader → nothing (pure functions, receives frames array)
-effects-canvas → nothing (receives <canvas> element)
+effects-canvas → nothing (owns effects canvas overlay, rAF loop)
 effects → nothing (receives canvas + scene elements)
 audio → nothing (receives config, returns Howl refs)
 text → nothing (receives config + container, returns timeline)
 captions → nothing (receives config, manages DOM + localStorage)
 overlay → nothing (receives state, updates DOM)
 
-NO CYCLES. No cross-imports between leaf modules.
+NO CYCLES. effects.js may call canvas functions for pixel access.
+No other cross-calls between leaf modules.
 ```
 
 ### 5.3 App — the orchestrator (app.js)
@@ -425,37 +422,40 @@ lock release   ░░░░░░░░░░░░░░░░░░░░░�
 total: ~1.2 - 1.8 seconds per transition
 ```
 
-### 5.4 Effects Canvas (effects-canvas.js)
+### 5.4 Canvas (canvas.js)
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│              EFFECTS CANVAS MODULE                        │
+│                    CANVAS MODULE                          │
 │                                                          │
 │  responsibilities:                                       │
-│    • manage the <canvas> overlay element lifecycle        │
-│    • DPR-aware sizing (resetTransform + scale)           │
-│    • requestAnimationFrame render loop                   │
+│    • draw an image to canvas (cover-fit, centered)       │
+│    • crossfade from current image to new image           │
 │    • expose ctx for effects.js pixel manipulation        │
-│    • respect prefers-reduced-motion (self-stop)          │
+│    • resize handling (DPR-aware, redraw current)         │
+│    • image cache Map for preloaded images                │
 │                                                          │
 │  does NOT know:                                          │
-│    • what frame is showing or what effects are active    │
+│    • what frame number it's on                           │
 │    • what audio is playing                               │
+│    • what text is showing                                │
 │    • whether navigation is locked                        │
 │                                                          │
 │  key functions:                                          │
-│    initCanvas(el)         → returns 2d context           │
-│    resume() / pause()     → start/stop rAF loop          │
-│    clearAll()             → pause + clear canvas          │
-│    destroy()              → disconnect observer, null ctx │
-│    getContext()            → exposes ctx for effects.js   │
-│    isRunning()            → render loop state             │
+│    initCanvas(el)          → acquire 2d ctx, ResizeObserver│
+│    drawImage(img)          → cover-fit image to canvas    │
+│    crossfade(toImg, dur, onComplete) → rAF alpha blend   │
+│    getContext()             → exposes ctx for effects.js  │
+│    pause() / resume()      → stop/start rAF loop         │
+│    destroy()               → disconnect, null ctx         │
 └──────────────────────────────────────────────────────────┘
 ```
 
-**Scene images are NOT on canvas.** They render via a DOM `<img>` element with CSS `object-fit: cover`. The canvas overlay sits above the image for pixel effects only. Scene transitions are GSAP opacity fades on the scene-stage container.
+**Crossfade:** Capture current canvas as ImageData. Draw new image. Blend frames over duration using globalAlpha in a requestAnimationFrame loop. Call onComplete when done.
 
-**Resize:** ResizeObserver on the canvas element. Recalculate canvas dimensions using `getBoundingClientRect()` × `devicePixelRatio`. Reset transform before re-scaling to avoid compounding.
+**Resize:** ResizeObserver on canvas container. Recalculate canvas dimensions using `getBoundingClientRect()` × `devicePixelRatio`. Reset transform before re-scaling. Redraw current image — don't re-transition.
+
+**Image cache:** Map<string, Image> populated by loader.js at startup. Images preloaded as `Image()` objects, drawn to canvas via `ctx.drawImage()`.
 
 **Reduced motion:** `resume()` checks `prefers-reduced-motion` and refuses to start. The render loop self-stops if the preference changes mid-run.
 
@@ -847,12 +847,14 @@ Sensory framing    │ Alt modes preserve story beats at different
 ```
 DECISION                        │ REJECTED              │ WHY THIS
 ────────────────────────────────┼───────────────────────┼──────────────────────
-DOM <img> for scene images      │ Canvas 2D image       │ Native decode/caching.
-+ Canvas 2D overlay for effects │ rendering             │ object-fit: cover for free.
-                                │                       │ Canvas reserved for pixel
-                                │                       │ effects where needed.
+Canvas 2D over DOM+CSS         │ DOM + CSS filters     │ Need pixel access for
+                                │                       │ effects now and runtime
+                                │                       │ trace rendering in v2.
+                                │                       │ Switching renderers
+                                │                       │ mid-project is worse
+                                │                       │ than starting right.
 ────────────────────────────────┼───────────────────────┼──────────────────────
-Canvas 2D overlay over WebGL   │ GPU shader pipeline   │ Overkill for 2D effects.
+Canvas 2D over WebGL           │ GPU shader pipeline   │ Overkill for 2D.
 ────────────────────────────────┼───────────────────────┼──────────────────────
 DOM overlay for text/UI        │ Canvas text drawing   │ Canvas text invisible
                                 │                       │ to screen readers.
@@ -983,12 +985,11 @@ ARCHITECTURE:
   ✓ scene differences = config data, not if-blocks
 
 RENDERING:
-  ✓ <img> = scene image plane (browser-optimized decode/caching)
-  ✓ canvas overlay = effects data plane (pixel access for effects/traces)
+  ✓ canvas = visual plane (images, effects, traces in v2)
   ✓ DOM overlay = semantic plane (text, captions, buttons, a11y)
-  ✓ canvas is aria-hidden="true", pointer-events: none
-  ✓ GSAP animates DOM elements + scene transitions (opacity)
-  ✓ requestAnimationFrame animates canvas effects
+  ✓ canvas is aria-hidden="true"
+  ✓ GSAP animates DOM elements
+  ✓ requestAnimationFrame animates canvas (images + effects)
 
 STATE:
   ✓ finite state machine: LOADING, SCENE_ACTIVE, TRANSITIONING, PAUSED, CREDITS
@@ -1011,7 +1012,6 @@ NEVER:
   ✗ hardcoded frame indices in if/else
   ✗ audio for intermediate frames on multi-frame jump
   ✗ text drawn on canvas
-  ✗ images drawn on canvas (use <img> + CSS object-fit)
   ✗ cross-imports between leaf modules
   ✗ global GSAP timelines
   ✗ releasing locks before async completes

@@ -45,13 +45,12 @@ audio, and recorded narration. Deployed via Cloud Run + nginx.
 
 Full system design: `docs/carbon-trace-system-design-v3-final.md`
 
-## Architecture: three rendering layers
+## Architecture: two rendering layers
 
-- **DOM `<img>`**: scene images with CSS `object-fit: cover`. Browser-native
-  decode/caching. GSAP drives opacity transitions on the scene stage container.
-- **Canvas 2D overlay** (`<canvas>`, `aria-hidden="true"`, `pointer-events: none`):
-  pixel effects via `getImageData`/`putImageData` (ripple, dust, bloom).
-  Animated via `requestAnimationFrame`. Sits above the scene image.
+- **Canvas 2D** (`<canvas>`, `aria-hidden="true"`): scene images drawn via
+  `ctx.drawImage()` with cover-fit, plus pixel effects and traces.
+  Animated via `requestAnimationFrame`. Required for `getImageData`/`putImageData`
+  pixel manipulation (ripple, dust, bloom) and v2 runtime trace rendering.
 - **DOM overlay** (position: absolute over canvas): narration text, captions,
   controls, a11y. GSAP animates this layer. Screen readers see only this layer.
 
@@ -60,7 +59,8 @@ Full system design: `docs/carbon-trace-system-design-v3-final.md`
 | Module              | Job                                             | Does NOT know about   |
 | ------------------- | ----------------------------------------------- | --------------------- |
 | `app.js`            | State machine, orchestrator                     | Pixel rendering       |
-| `effects-canvas.js` | Canvas 2D lifecycle, render loop, DPR sizing    | Frame ordering, audio |
+| `canvas.js`         | Canvas 2D — image drawing, cover-fit, resize    | Frame ordering, audio |
+| `effects-canvas.js` | Canvas 2D effects overlay, render loop          | Frame ordering, audio |
 | `effects.js`        | Effect registry, `runEffect`/`clearEffects` API | Canvas internals      |
 | `audio.js`          | Howler — ambient crossfade, narration, replay   | DOM, canvas           |
 | `text.js`           | Ghost-drift GSAP timelines from config          | Audio, canvas         |
