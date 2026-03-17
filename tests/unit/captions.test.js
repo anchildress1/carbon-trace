@@ -36,13 +36,20 @@ describe('captions.js', () => {
       expect(initCaptions()).toBe(false);
     });
 
-    it('returns false when localStorage throws', () => {
-      const orig = localStorage.getItem;
-      localStorage.getItem = () => {
+    it('returns false and warns when localStorage throws', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const getItemSpy = vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
         throw new Error('quota exceeded');
-      };
+      });
+
       expect(initCaptions()).toBe(false);
-      localStorage.getItem = orig;
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Could not read captions preference:',
+        'quota exceeded',
+      );
+
+      getItemSpy.mockRestore();
+      warnSpy.mockRestore();
     });
   });
 
@@ -64,13 +71,20 @@ describe('captions.js', () => {
       expect(areCaptionsEnabled()).toBe(false);
     });
 
-    it('does not throw when localStorage is unavailable', () => {
-      const orig = localStorage.setItem;
-      localStorage.setItem = () => {
+    it('does not throw and warns when localStorage is unavailable', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const setItemSpy = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
         throw new Error('quota exceeded');
-      };
+      });
+
       expect(() => setCaptionsEnabled(true)).not.toThrow();
-      localStorage.setItem = orig;
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Could not save captions preference:',
+        'quota exceeded',
+      );
+
+      setItemSpy.mockRestore();
+      warnSpy.mockRestore();
     });
   });
 
@@ -83,6 +97,11 @@ describe('captions.js', () => {
   });
 
   describe('syncCaptionsToTime', () => {
+    it('handles empty entries array', () => {
+      syncCaptionsToTime([], 1.0, container);
+      expect(container.children.length).toBe(0);
+    });
+
     it('shows captions active at the given time', () => {
       const entries = [
         { text: 'Early', startSec: 0, endSec: 2, el: null },

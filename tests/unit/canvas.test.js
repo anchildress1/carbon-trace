@@ -104,6 +104,29 @@ describe('canvas.js', () => {
     it('throws for null', () => {
       expect(() => initSceneCanvas(null)).toThrow();
     });
+
+    it('returns null and logs error when getContext returns null', () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const canvas = document.createElement('canvas');
+      vi.spyOn(canvas, 'getContext').mockReturnValue(null);
+
+      const ctx = initSceneCanvas(canvas);
+
+      expect(ctx).toBeNull();
+      expect(errorSpy).toHaveBeenCalledWith('Failed to acquire 2D canvas context');
+      errorSpy.mockRestore();
+    });
+
+    it('destroys previous canvas before initializing new one', () => {
+      const { canvas: first } = createMockCanvas();
+      initSceneCanvas(first);
+      const firstObserver = globalThis.ResizeObserver.mock.results[0].value;
+
+      const { canvas: second } = createMockCanvas();
+      initSceneCanvas(second);
+
+      expect(firstObserver.disconnect).toHaveBeenCalled();
+    });
   });
 
   describe('drawImage', () => {
@@ -145,6 +168,11 @@ describe('canvas.js', () => {
   });
 
   describe('clearScene', () => {
+    it('does nothing when canvas is not initialized', () => {
+      destroySceneCanvas();
+      expect(() => clearScene()).not.toThrow();
+    });
+
     it('clears the canvas and nulls currentImg', () => {
       const { canvas, mockCtx } = createMockCanvas();
       initSceneCanvas(canvas);
@@ -235,6 +263,34 @@ describe('canvas.js', () => {
       // Source should be cropped (sx > 0)
       expect(call[1]).toBeGreaterThan(0); // sx
       expect(call[2]).toBe(0); // sy
+    });
+
+    it('handles image with same aspect ratio as canvas (no crop)', () => {
+      const { canvas, mockCtx } = createMockCanvas();
+      initSceneCanvas(canvas);
+
+      // 16:9 image on 16:9 canvas
+      const img = { naturalWidth: 1920, naturalHeight: 1080 };
+      drawImage(img);
+
+      const call = mockCtx.drawImage.mock.calls[0];
+      expect(call[1]).toBe(0); // sx
+      expect(call[2]).toBe(0); // sy
+    });
+
+    it('handles image with zero dimensions gracefully', () => {
+      const { canvas, mockCtx } = createMockCanvas();
+      initSceneCanvas(canvas);
+
+      const img = { naturalWidth: 0, naturalHeight: 0 };
+      drawImage(img);
+
+      expect(mockCtx.drawImage).toHaveBeenCalled();
+    });
+
+    it('does nothing when canvas is not initialized', () => {
+      destroySceneCanvas();
+      expect(() => drawImage({ naturalWidth: 100, naturalHeight: 100 })).not.toThrow();
     });
 
     it('handles taller image than canvas (crops top/bottom)', () => {

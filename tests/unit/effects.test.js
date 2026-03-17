@@ -35,6 +35,23 @@ describe('effects.js — no-op skeleton', () => {
     it('does not throw when called with no arguments', () => {
       expect(() => runEffect()).not.toThrow();
     });
+
+    it('does not warn for empty string name', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      runEffect('', document.createElement('canvas'));
+
+      // Empty string is falsy, so no warning
+      expect(warnSpy).not.toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
+
+    it('warns for non-empty unknown effect name', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      runEffect('nonexistent', document.createElement('canvas'));
+
+      expect(warnSpy).toHaveBeenCalledWith('Unknown effect: "nonexistent"');
+      warnSpy.mockRestore();
+    });
   });
 
   describe('clearEffects', () => {

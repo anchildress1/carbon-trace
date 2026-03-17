@@ -774,6 +774,69 @@ describe('audio.js', () => {
       vi.useRealTimers();
     });
 
+    it('cleans up buffering when reloadFromPosition play() fails', async () => {
+      vi.useFakeTimers();
+      const cb = vi.fn();
+      onNarrationBufferChange(cb);
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      mockNode.buffered.length = 1;
+      mockNode.buffered.end.mockReturnValue(5);
+      mockNode.currentTime = 5;
+      mockNode.src = 'stall.m4a';
+      mockNode.play.mockRejectedValue(new Error('reload failed'));
+
+      playNarration('stall.m4a');
+
+      const waitingCall = mockNode.addEventListener.mock.calls.find(
+        ([event]) => event === 'waiting',
+      );
+      waitingCall[1]();
+
+      // Advance 4 intervals to trigger reloadFromPosition
+      mockNode.buffered.end.mockReturnValue(5);
+      for (let i = 0; i < 4; i++) {
+        await vi.advanceTimersByTimeAsync(4000);
+      }
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Buffer recovery play() failed:',
+        'reload failed',
+      );
+      expect(isNarrationBuffering()).toBe(false);
+
+      warnSpy.mockRestore();
+      vi.useRealTimers();
+    });
+
+    it('resumes playback when near end of audio and buffer has some progress', () => {
+      vi.useFakeTimers();
+      const cb = vi.fn();
+      onNarrationBufferChange(cb);
+      mockNode.play.mockResolvedValue(undefined);
+
+      mockNode.buffered.length = 1;
+      mockNode.buffered.end.mockReturnValue(57);
+      mockNode.currentTime = 58;
+      mockNode.duration = 60;
+
+      playNarration('nearend.m4a');
+
+      const waitingCall = mockNode.addEventListener.mock.calls.find(
+        ([event]) => event === 'waiting',
+      );
+      waitingCall[1]();
+      mockNode.play.mockClear();
+
+      // Buffer progresses by just 1 second but we're near end (< 3s remaining)
+      mockNode.buffered.end.mockReturnValue(58);
+      vi.advanceTimersByTime(4000);
+
+      expect(mockNode.play).toHaveBeenCalled();
+
+      vi.useRealTimers();
+    });
+
     it('cleans up buffering on play() failure in checkBufferProgress', async () => {
       vi.useFakeTimers();
       const cb = vi.fn();

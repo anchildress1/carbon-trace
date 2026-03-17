@@ -376,6 +376,47 @@ describe('text.js', () => {
       expect(captionContainer.children[0].textContent).toBe('Gated');
     });
 
+    it('caption hide callback removes the element and nullifies entry.el', () => {
+      const lines = [{ text: 'Line', enter: 0, exit: 5000 }];
+      const captions = [{ text: 'Removable', start: 0, end: 2000 }];
+      const captionContainer = document.createElement('div');
+
+      const { timeline: tl, captionEntries } = buildNarrationTimeline(lines, container, {
+        captions,
+        captionContainer,
+        isCaptionEnabled: () => true,
+      });
+
+      // Execute show callback
+      const showCallback = tl.call.mock.calls[0][0];
+      showCallback();
+      expect(captionContainer.children.length).toBe(1);
+      expect(captionEntries[0].el).not.toBeNull();
+
+      // Execute hide callback
+      const hideCallback = tl.call.mock.calls[1][0];
+      hideCallback();
+      expect(captionContainer.children.length).toBe(0);
+      expect(captionEntries[0].el).toBeNull();
+    });
+
+    it('caption hide callback is safe when entry.el is already null', () => {
+      const lines = [{ text: 'Line', enter: 0, exit: 5000 }];
+      const captions = [{ text: 'Already gone', start: 0, end: 2000 }];
+      const captionContainer = document.createElement('div');
+
+      const { timeline: tl, captionEntries } = buildNarrationTimeline(lines, container, {
+        captions,
+        captionContainer,
+        isCaptionEnabled: () => true,
+      });
+
+      // entry.el starts null, skip show, call hide directly
+      expect(captionEntries[0].el).toBeNull();
+      const hideCallback = tl.call.mock.calls[1][0];
+      expect(() => hideCallback()).not.toThrow();
+    });
+
     it('does not place caption callbacks when captionContainer is missing', () => {
       const lines = [{ text: 'Line', enter: 0, exit: 1000 }];
       const captions = [{ text: 'Orphan', start: 0, end: 1000 }];
