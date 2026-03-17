@@ -49,17 +49,18 @@ perf: build
 	@echo "Running performance tests..."
 	pnpm perf
 
-# Run all tests: build first, then unit + e2e + perf in parallel
+# Run all tests: unit in parallel with e2e, then perf sequentially.
+# Lighthouse and Playwright both use Chrome and contend for ports/profiles
+# when run simultaneously, so perf must run after e2e finishes.
 test: build
-	@echo "Running unit, E2E, and performance tests in parallel..."
+	@echo "Running unit + E2E tests, then performance tests..."
 	@FAIL=0; \
 		pnpm test & UNIT_PID=$$!; \
 		pnpm e2e & E2E_PID=$$!; \
-		pnpm perf & PERF_PID=$$!; \
 		wait $$UNIT_PID || { echo "FAIL: unit tests failed"; FAIL=1; }; \
 		wait $$E2E_PID || { echo "FAIL: E2E tests failed"; FAIL=1; }; \
-		wait $$PERF_PID || { echo "FAIL: performance tests failed"; FAIL=1; }; \
-		if [ $$FAIL -ne 0 ]; then exit 1; fi
+		if [ $$FAIL -ne 0 ]; then exit 1; fi; \
+		pnpm perf || { echo "FAIL: performance tests failed"; exit 1; }
 
 # Scan for secrets
 secret-scan:
