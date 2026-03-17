@@ -315,11 +315,11 @@ function showFrame(app, index) {
   }
   app.els.traceOverlay.style.opacity = frame.traceOverlay?.opacity ?? 0;
 
-  clearEffects(app.els.effectsLayer, app.els.sceneImage);
+  clearEffects();
   clearNarrationLayer(app.els.narrationLayer);
 
   if (frame.effects?.idle) {
-    runEffect(frame.effects.idle, app.els.effectsLayer, app.els.sceneImage);
+    runEffect(frame.effects.idle, app.els.effectsCanvas, app.els.sceneImage);
   }
 
   const sceneIdx = app.sceneMap.byFrame.get(index);
@@ -518,9 +518,10 @@ function triggerEffect(app) {
   if (app.state === State.TRANSITIONING || app.state === State.CREDITS) return;
   const frame = app.frames[app.currentIndex];
   if (!frame.effects?.idle) return;
-  clearEffects(app.els.effectsLayer, app.els.sceneImage);
-  if (frame.effects.entry) runEffect(frame.effects.entry, app.els.effectsLayer, app.els.sceneImage);
-  runEffect(frame.effects.idle, app.els.effectsLayer, app.els.sceneImage);
+  clearEffects();
+  if (frame.effects.entry)
+    runEffect(frame.effects.entry, app.els.effectsCanvas, app.els.sceneImage);
+  runEffect(frame.effects.idle, app.els.effectsCanvas, app.els.sceneImage);
 }
 
 function updateNavButtons(app) {
@@ -617,18 +618,12 @@ function handleFirstPlay(app) {
   }
 }
 
-function resumeEffects(app) {
-  const overlayTweens = gsap.getTweensOf(app.els.effectsLayer);
-  const childTweens = gsap.getTweensOf(app.els.effectsLayer.children);
-  const sceneTweens = gsap.getTweensOf(app.els.sceneImage);
-  [...overlayTweens, ...childTweens, ...sceneTweens].forEach((tw) => tw.resume());
+function resumeEffects() {
+  // Canvas effects will use rAF — resume handled by effects-canvas module.
 }
 
-function pauseEffects(app) {
-  const overlayTweens = gsap.getTweensOf(app.els.effectsLayer);
-  const childTweens = gsap.getTweensOf(app.els.effectsLayer.children);
-  const sceneTweens = gsap.getTweensOf(app.els.sceneImage);
-  [...overlayTweens, ...childTweens, ...sceneTweens].forEach((tw) => tw.pause());
+function pauseEffects() {
+  // Canvas effects will use rAF — pause handled by effects-canvas module.
 }
 
 function doResume(app) {
@@ -649,7 +644,7 @@ function doResume(app) {
     app.textTimeline.resume();
   }
 
-  resumeEffects(app);
+  resumeEffects();
 
   if (!app.buffering) {
     if (areCaptionsEnabled()) {
@@ -702,7 +697,7 @@ function doPause(app) {
     app.textTimeline.pause();
   }
 
-  pauseEffects(app);
+  pauseEffects();
   pauseCaptions();
 
   saveNarrationTimerRemaining(app);
@@ -797,7 +792,7 @@ function replayNarration(app) {
   }
 
   if (frame.effects?.entry) {
-    runEffect(frame.effects.entry, app.els.effectsLayer, app.els.sceneImage);
+    runEffect(frame.effects.entry, app.els.effectsCanvas, app.els.sceneImage);
   }
 }
 
@@ -943,7 +938,7 @@ export function createApp() {
     'scene-stage',
     'scene-image',
     'trace-overlay',
-    'effects-layer',
+    'effects-canvas',
     'narration-layer',
     'caption-layer',
     'accessible-narration',
@@ -1001,7 +996,7 @@ export function createApp() {
       sceneStage: document.getElementById('scene-stage'),
       sceneImage: document.getElementById('scene-image'),
       traceOverlay: document.getElementById('trace-overlay'),
-      effectsLayer: document.getElementById('effects-layer'),
+      effectsCanvas: document.getElementById('effects-canvas'),
       narrationLayer: document.getElementById('narration-layer'),
       captionLayer: document.getElementById('caption-layer'),
       accessibleNarration: document.getElementById('accessible-narration'),
