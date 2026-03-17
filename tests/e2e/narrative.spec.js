@@ -267,6 +267,45 @@ test.describe('carbon-trace — positioned text', () => {
   });
 });
 
+test.describe('carbon-trace — play gate', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+  });
+
+  test('play gate is visible on title card', async ({ page }) => {
+    const playGate = page.locator('#play-gate');
+    await expect(playGate).toBeVisible();
+  });
+
+  test('play gate has accessible label', async ({ page }) => {
+    const playGate = page.locator('#play-gate');
+    await expect(playGate).toHaveAttribute('aria-label', 'Begin experience');
+  });
+
+  test('clicking play gate unpauses and hides it', async ({ page }) => {
+    const playGate = page.locator('#play-gate');
+    const pauseBtn = page.locator('#btn-pause');
+
+    await expect(playGate).toBeVisible();
+    await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
+
+    await playGate.click();
+
+    await expect(playGate).toBeHidden();
+    await expect(pauseBtn).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  test('play gate hides when navigating forward', async ({ page }) => {
+    const playGate = page.locator('#play-gate');
+    await expect(playGate).toBeVisible();
+
+    await page.click('#btn-next');
+
+    await expect(playGate).toBeHidden();
+  });
+});
+
 test.describe('carbon-trace — pause/play', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
