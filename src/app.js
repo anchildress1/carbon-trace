@@ -909,23 +909,18 @@ function initApp(app) {
       showFrame(app, 0);
 
       // Start paused — everything waits for the user to press play.
-      // Seek the text timeline past the first line's entrance animation
-      // so it's visible as a static title card (also provides an LCP
-      // element for Lighthouse). On play, textTimeline.restart() replays
-      // from t=0 with the full ghost-drift entrance.
+      // Set SCENE_ACTIVE first so doPause stores the correct resume state,
+      // then seek the text timeline to the title card position (provides an
+      // LCP element for Lighthouse). On play, doResume → handleFirstPlay
+      // restarts the timeline from t=0 with the full ghost-drift entrance.
+      app.state = State.SCENE_ACTIVE;
+      doPause(app);
       stopNarration();
-      clearCaptions();
-      app.paused = true;
-      app.pausedFromState = State.SCENE_ACTIVE;
-      app.state = State.PAUSED;
       if (app.textTimeline) {
         const firstLine = app.frames[0].narration?.lines?.[0];
         const seekTime = firstLine ? firstLine.enter / 1000 + 1.3 : 0;
         app.textTimeline.seek(seekTime);
-        app.textTimeline.pause();
       }
-      app.els.btnPause.setAttribute('aria-pressed', 'true');
-      app.els.btnPause.classList.add('paused');
 
       // Defer background asset preloads to avoid network contention.
       // Loads sequentially: each scene's image then audio, in order.
