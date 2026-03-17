@@ -412,12 +412,13 @@ stage. On error, content is replaced with a refresh prompt.
 
 **Start-paused init sequence:** After loading completes, the app renders the
 title frame (frame 0), sets state to SCENE_ACTIVE, then immediately calls
-doPause(). This freezes text timelines, narration, and effects. The text
-timeline is seeked to the first visible position to provide an LCP element
-for Lighthouse. When the user presses play, doResume() → handleFirstPlay()
-restarts the timeline from t=0 with the full ghost-drift entrance and
-schedules narration audio. This also serves as the mobile AudioContext
-unlock gate (Howler requires a user gesture).
+doPause(). The play-gate button with its "begin" label text is the only
+visible element and serves as the LCP element for Lighthouse. No ghost-drift
+text is rendered until the user presses play. When the user presses play,
+doResume() → handleFirstPlay() builds and starts the narration timeline
+from t=0 with the full ghost-drift entrance and schedules narration audio.
+This also serves as the mobile AudioContext unlock gate (Howler requires a
+user gesture).
 
 **transition() is the single navigation entry point.** advance() and retreat()
 are thin wrappers that call it. Mid-transition clicks are deferred (last-wins),

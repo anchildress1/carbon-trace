@@ -972,29 +972,11 @@ function initApp(app) {
       app.els.playGate.hidden = false;
 
       // Start paused — everything waits for the user to press play.
-      // Set SCENE_ACTIVE first so doPause stores the correct resume state,
-      // then build + seek the text timeline so title text is the LCP element.
-      // On play, doResume → handleFirstPlay restarts from t=0.
+      // Set SCENE_ACTIVE first so doPause stores the correct resume state.
+      // The play-gate label text serves as the LCP element for Lighthouse.
+      // On play, doResume → handleFirstPlay sets up narration and auto-advance.
       app.state = State.SCENE_ACTIVE;
       doPause(app);
-      stopNarration();
-
-      // Build title text timeline (without audio) and seek to show text as LCP
-      const titleFrame = app.frames[0];
-      if (titleFrame.narration?.lines?.length > 0) {
-        const result = buildNarrationTimeline(titleFrame.narration.lines, app.els.narrationLayer, {
-          reducedMotion: prefersReducedMotion(),
-          captions: titleFrame.narration.captions,
-          captionContainer: app.els.captionLayer,
-          captionDelay: titleFrame.narration.delay || 0,
-          isCaptionEnabled: areCaptionsEnabled,
-        });
-        app.textTimeline = result.timeline;
-        app.captionEntries = result.captionEntries;
-        const firstLine = titleFrame.narration.lines[0];
-        const seekTime = firstLine.enter / 1000 + 1.3;
-        app.textTimeline.seek(seekTime);
-      }
 
       // Defer background asset preloads to avoid network contention.
       // Loads sequentially: each scene's image then audio, in order.

@@ -261,6 +261,17 @@ body {
   opacity: 0.7;
 }
 
+.play-gate-label {
+  display: block;
+  margin-top: 0.75rem;
+  font-family: 'Lora', serif;
+  font-size: clamp(0.875rem, 2vw, 1.125rem);
+  font-style: italic;
+  letter-spacing: 0.15em;
+  text-transform: lowercase;
+  color: rgba(232, 228, 223, 0.35);
+}
+
 /* Transition loader — debounced spinner for slow image loads */
 .transition-loader {
   position: absolute;
