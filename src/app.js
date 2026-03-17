@@ -455,10 +455,7 @@ function transition(app, toIndex) {
   stopMusic();
 
   const toFrame = app.frames[toIndex];
-  const hasNarrationAudio = Boolean(toFrame.narration?.audio);
-  if (!hasNarrationAudio) {
-    stopNarration();
-  }
+  stopNarration();
 
   if (prefersReducedMotion()) {
     const prevIndex = app.currentIndex;
