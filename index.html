@@ -27,8 +27,26 @@
   </head>
   <body>
     <div id="app" role="application" aria-label="carbon-trace visual narrative">
-      <div class="loading-screen" id="loading-screen">
-        <p>Loading...</p>
+      <div
+        class="loading-screen"
+        id="loading-screen"
+        role="status"
+        aria-label="Loading carbon-trace"
+      >
+        <div class="loading-trace">
+          <svg class="loading-svg" viewBox="0 0 200 40" aria-hidden="true">
+            <path
+              class="trace-glow"
+              d="M 10,20 H 55 L 59,12 L 63,20 H 100 L 104,28 L 108,20 H 140 L 144,12 L 148,20 H 190"
+            />
+            <path
+              class="trace-path"
+              d="M 10,20 H 55 L 59,12 L 63,20 H 100 L 104,28 L 108,20 H 140 L 144,12 L 148,20 H 190"
+            />
+            <circle class="trace-node" cx="100" cy="20" r="2" />
+          </svg>
+          <p class="loading-title">carbon-trace</p>
+        </div>
       </div>
 
       <div class="scene-stage" id="scene-stage" hidden>

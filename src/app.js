@@ -831,9 +831,20 @@ function initApp(app) {
 
   preloadFirstFrameImage(app)
     .then(() => {
-      app.els.loadingScreen.hidden = true;
       app.els.sceneStage.hidden = false;
       showControls();
+
+      // Fade out loading screen to reveal the scene stage underneath
+      const hideLoading = () => {
+        app.els.loadingScreen.hidden = true;
+      };
+      if (prefersReducedMotion()) {
+        hideLoading();
+      } else {
+        app.els.loadingScreen.classList.add('fade-out');
+        app.els.loadingScreen.addEventListener('transitionend', hideLoading, { once: true });
+        setTimeout(hideLoading, 900);
+      }
 
       if (app.availableAudio.size > 0) {
         app.els.btnMute.removeAttribute('aria-disabled');
