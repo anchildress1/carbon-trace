@@ -92,6 +92,20 @@ describe('effects-canvas.js', () => {
       expect(observerInstance.observe).toHaveBeenCalledWith(canvas);
     });
 
+    it('resets transform before scaling on resize', () => {
+      const { canvas, mockCtx } = createMockCanvas();
+      initCanvas(canvas);
+
+      const observerCb = globalThis.ResizeObserver.mock.calls[0][0];
+      mockCtx.resetTransform.mockClear();
+      mockCtx.scale.mockClear();
+
+      observerCb();
+
+      expect(mockCtx.resetTransform).toHaveBeenCalledTimes(1);
+      expect(mockCtx.scale).toHaveBeenCalledTimes(1);
+    });
+
     it('throws when given a non-canvas element', () => {
       const div = document.createElement('div');
       expect(() => initCanvas(div)).toThrow('initCanvas requires a <canvas> element');
