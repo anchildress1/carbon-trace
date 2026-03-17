@@ -412,7 +412,7 @@ function completePendingNav(app) {
   if (app.pendingNavIndex !== null && app.pendingNavIndex !== app.currentIndex) {
     const pending = app.pendingNavIndex;
     app.pendingNavIndex = null;
-    transition(app, pending);
+    queueMicrotask(() => transition(app, pending));
   }
 }
 
@@ -451,7 +451,11 @@ function transition(app, toIndex) {
     clearTimeout(app.captionDelayTimer);
     app.captionDelayTimer = null;
   }
-  app.textTimeline?.kill();
+  try {
+    app.textTimeline?.kill();
+  } catch (err) {
+    console.warn('Failed to kill text timeline:', err);
+  }
   app.textTimeline = null;
 
   clearMusicTimer(app);
@@ -492,40 +496,47 @@ function transition(app, toIndex) {
     duration: halfDuration,
     ease: 'power2.inOut',
     onComplete: async () => {
-      const prevIndex = app.currentIndex;
-      app.currentIndex = toIndex;
       try {
-        showFrame(app, toIndex);
+        const prevIndex = app.currentIndex;
+        app.currentIndex = toIndex;
+        try {
+          showFrame(app, toIndex);
+        } catch (err) {
+          console.error('Error during scene transition:', err);
+          app.currentIndex = prevIndex;
+          gsap.set(app.els.sceneStage, { opacity: 1 });
+          app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
+          completePendingNav(app);
+          return;
+        }
+
+        // Wait for image to decode before fading in to avoid blank-frame flash
+        if (toFrame.image && app.els.sceneImage.src) {
+          try {
+            await Promise.race([
+              app.els.sceneImage.decode(),
+              new Promise((resolve) => setTimeout(resolve, 2000)),
+            ]);
+          } catch (err) {
+            console.warn(`Image decode rejected for frame ${toIndex}:`, err);
+          }
+        }
+
+        gsap.to(app.els.sceneStage, {
+          opacity: 1,
+          duration: halfDuration,
+          ease: 'power2.inOut',
+          onComplete: () => {
+            app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
+            completePendingNav(app);
+          },
+        });
       } catch (err) {
-        console.error('Error during scene transition:', err);
-        app.currentIndex = prevIndex;
+        console.error('Unhandled error in transition onComplete:', err);
         gsap.set(app.els.sceneStage, { opacity: 1 });
         app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
         completePendingNav(app);
-        return;
       }
-
-      // Wait for image to decode before fading in to avoid blank-frame flash
-      if (toFrame.image && app.els.sceneImage.src) {
-        try {
-          await Promise.race([
-            app.els.sceneImage.decode(),
-            new Promise((resolve) => setTimeout(resolve, 2000)),
-          ]);
-        } catch {
-          // decode() can reject if src changes or image is invalid; proceed anyway
-        }
-      }
-
-      gsap.to(app.els.sceneStage, {
-        opacity: 1,
-        duration: halfDuration,
-        ease: 'power2.inOut',
-        onComplete: () => {
-          app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
-          completePendingNav(app);
-        },
-      });
     },
   });
 }

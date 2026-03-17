@@ -45,6 +45,11 @@ export function initCanvas(el) {
 
   canvasEl = el;
   ctx = canvasEl.getContext('2d');
+  if (!ctx) {
+    console.error('Failed to acquire 2D canvas context — effects will be disabled');
+    canvasEl = null;
+    return null;
+  }
 
   sizeCanvas();
 
