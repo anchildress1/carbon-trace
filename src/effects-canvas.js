@@ -15,6 +15,8 @@ let canvasEl = null;
 let observer = null;
 let running = false;
 let rafId = null;
+let cssWidth = 0;
+let cssHeight = 0;
 
 function reducedMotion() {
   return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -26,8 +28,11 @@ function sizeCanvas() {
   const dpr = globalThis.devicePixelRatio || 1;
   const rect = canvasEl.getBoundingClientRect();
 
-  canvasEl.width = rect.width * dpr;
-  canvasEl.height = rect.height * dpr;
+  cssWidth = rect.width;
+  cssHeight = rect.height;
+
+  canvasEl.width = cssWidth * dpr;
+  canvasEl.height = cssHeight * dpr;
 
   if (ctx) {
     ctx.resetTransform();
@@ -43,8 +48,7 @@ function render() {
     return;
   }
 
-  const rect = canvasEl.getBoundingClientRect();
-  ctx.clearRect(0, 0, rect.width, rect.height);
+  ctx.clearRect(0, 0, cssWidth, cssHeight);
 
   // Currently no-op: effect draw calls will be added here when effect implementations are wired in.
 
@@ -90,8 +94,7 @@ export function resume() {
 export function clearAll() {
   pause();
   if (ctx && canvasEl) {
-    const rect = canvasEl.getBoundingClientRect();
-    ctx.clearRect(0, 0, rect.width, rect.height);
+    ctx.clearRect(0, 0, cssWidth, cssHeight);
   }
 }
 

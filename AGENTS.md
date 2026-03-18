@@ -43,9 +43,9 @@ Canonical instruction source for this repository. Treat this file as authoritati
 - Make small, atomic commits as you go — one logical change per commit.
 - Do not batch unrelated changes into a single commit.
 - Use Conventional Commits.
-- Include required RAI footer adding your name in place of Claude and valid email instead of anthropic:
+- Include required RAI footer:
   ```
-  Co-authored-By: Claude <noreply@anthropic.com>
+  Co-Authored-By: Claude <noreply@anthropic.com>
   ```
 
 ## Project: carbon-trace
@@ -55,7 +55,7 @@ Canvas 2D rendering, GSAP text/transition animation, and Howler.js audio. 12 fra
 (title + 10 scenes + credits) with ghost-drift text, per-scene visual effects, ambient
 audio, and recorded narration. Deployed via Cloud Run + nginx.
 
-Full system design: `docs/design_decisions/*.md`
+Full system design: `docs/carbon-trace-system-design-v4.md` and `docs/ADRs/*.md`
 
 ## Architecture: two rendering layers
 
@@ -123,7 +123,7 @@ Full system design: `docs/design_decisions/*.md`
 
 - Keep docs in `docs/` aligned with the codebase — update them whenever code changes affect architecture, audio system, or accessibility behavior.
 - Prefer Mermaid diagrams whenever a visual would clarify architecture, data flow, or state machines.
-- System design docs are authoritative for architectural decisions: `docs/design_decisions/*.md`
+- System design docs are authoritative for architectural decisions: `docs/carbon-trace-system-design-v4.md` and `docs/ADRs/*.md`
 
 ## Security
 
