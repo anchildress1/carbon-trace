@@ -26,7 +26,13 @@ export function initOverlay(sceneCount, onDotClick) {
 
 export function updateProgress(sceneIndex) {
   dotElements.forEach((dot, i) => {
-    dot.classList.toggle('active', i < sceneIndex);
+    const isActive = i < sceneIndex;
+    dot.classList.toggle('active', isActive);
+    if (i === sceneIndex - 1) {
+      dot.setAttribute('aria-current', 'step');
+    } else {
+      dot.removeAttribute('aria-current');
+    }
   });
 }
 
