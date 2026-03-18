@@ -9,17 +9,17 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  PROJECT_ID: anchildress1-unstable
-  REGION: us-east1
-  SERVICE_NAME: carbon-trace-unstable
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
+    environment: deploy
+    env:
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION }}
+      SERVICE_NAME: ${{ vars.CLOUD_RUN_SERVICE }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
