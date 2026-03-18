@@ -323,8 +323,9 @@ function showFrame(app, index) {
     runEffect(frame.effects.idle, app.els.effectsCanvas, app.els.sceneCanvas);
   }
 
-  // Pre-warm the canvas render loop while the stage is still at opacity 0
-  // so effects are visually present the instant the fade-in begins.
+  // Start the effects render loop early so it is already running when the
+  // fade-in begins. Without this, effects would appear to 'pop in' after
+  // the transition completes.
   resumeCanvas();
 
   const sceneIdx = app.sceneMap.byFrame.get(index);

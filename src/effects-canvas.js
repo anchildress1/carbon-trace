@@ -44,7 +44,7 @@ function render() {
   const rect = canvasEl.getBoundingClientRect();
   ctx.clearRect(0, 0, rect.width, rect.height);
 
-  // Effect render calls will go here when effects are added.
+  // Active effect drawing calls are inserted here by the orchestrator.
 
   rafId = requestAnimationFrame(render);
 }

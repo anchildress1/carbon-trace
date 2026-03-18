@@ -6,7 +6,7 @@ export function initCaptions() {
   try {
     enabled = localStorage.getItem(STORAGE_KEY) === 'true';
   } catch (err) {
-    console.warn('Could not read captions preference:', err.message);
+    console.warn('Could not read captions preference:', err);
     enabled = false;
   }
   return enabled;
@@ -17,7 +17,7 @@ export function setCaptionsEnabled(value) {
   try {
     localStorage.setItem(STORAGE_KEY, String(value));
   } catch (err) {
-    console.warn('Could not save captions preference:', err.message);
+    console.warn('Could not save captions preference:', err);
   }
 }
 

@@ -45,7 +45,7 @@ describe('captions.js', () => {
       expect(initCaptions()).toBe(false);
       expect(warnSpy).toHaveBeenCalledWith(
         'Could not read captions preference:',
-        'quota exceeded',
+        expect.any(Error),
       );
 
       getItemSpy.mockRestore();
@@ -80,7 +80,7 @@ describe('captions.js', () => {
       expect(() => setCaptionsEnabled(true)).not.toThrow();
       expect(warnSpy).toHaveBeenCalledWith(
         'Could not save captions preference:',
-        'quota exceeded',
+        expect.any(Error),
       );
 
       setItemSpy.mockRestore();
