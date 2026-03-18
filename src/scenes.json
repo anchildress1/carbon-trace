@@ -56,7 +56,7 @@
         "delay": 0
       },
       "ambient": null,
-      "effects": null,
+      "effects": { "idle": null, "entry": null },
       "transition": {
         "type": "fade",
         "duration": 1500
@@ -809,6 +809,7 @@
           }
         ],
         "captions": [{ "text": "[silence]", "start": 0, "end": 3000 }],
+        "audio": null,
         "delay": 500
       },
       "ambient": null,
@@ -1096,7 +1097,8 @@
       },
       "ambient": null,
       "effects": {
-        "idle": "machine-steady"
+        "idle": "machine-steady",
+        "entry": null
       },
       "transition": {
         "type": "fade",
