@@ -800,4 +800,41 @@ if (pendingPause) {
 
 ---
 
+## A1.7 Schema Shape Exceptions
+
+The §4.3 rule "every frame has the SAME shape" applies to all standard keys. Two
+frame types have intentional structural differences documented here:
+
+**Title frame (`scene-00-title`):**
+- Has no `image` key. The title card renders ghost-drift text over a dark field
+  with no scene image. The canvas is intentionally blank.
+- Code must guard `frame.image` before accessing image cache or drawing.
+
+**Credits frame (`scene-11-music`):**
+- Has a `music` key (object) for the credits song. No other frame type uses this key.
+  Music scheduling is handled by `scheduleMusic()` in `app.js`, gated on `frame.music`.
+- The `effects.entry` key is `null` — credits have an idle effect only.
+
+All other keys (`holdUntilClick`, `holdAfterNarration`, `narration`, `ambient`,
+`effects`, `transition`, `traceOverlay`) are present on every frame with consistent
+types. `null` means "skip this feature."
+
+---
+
+## A1.8 Navigation While Paused — Clarification
+
+When the user navigates while paused (via dot bar, forward/back buttons, keyboard,
+or stage click), the app performs a hard cut and **remains paused** on the destination
+scene. Navigation while paused does NOT un-pause.
+
+This is the correct behavior because:
+- The user explicitly paused. Navigation is steering, not resuming.
+- Hard cut is synchronous — no animation means no temporary un-pause needed.
+- The viewer presses play when ready to experience the destination scene.
+
+Stage click/tap while paused advances to the next scene via hard cut and lands paused.
+This differs from playing state where stage click triggers an animated transition.
+
+---
+
 *End of Addendum A1.*

@@ -56,24 +56,24 @@ Full system design: `docs/design_decisions/*.md`
 
 ### Module responsibilities
 
-| Module              | Job                                             | Does NOT know about   |
-| ------------------- | ----------------------------------------------- | --------------------- |
-| `app.js`            | State machine, orchestrator                     | Pixel rendering       |
-| `canvas.js`         | Canvas 2D — image drawing, cover-fit, resize    | Frame ordering, audio |
-| `effects-canvas.js` | Canvas 2D effects overlay, render loop          | Frame ordering, audio |
-| `effects.js`        | Effect registry, `runEffect`/`clearEffects` API | Canvas internals      |
-| `audio.js`          | Howler — ambient crossfade, narration, replay   | DOM, canvas           |
-| `text.js`           | Ghost-drift GSAP timelines from config          | Audio, canvas         |
-| `captions.js`       | Timed captions, localStorage persistence        | Audio, canvas         |
-| `overlay.js`        | DOM controls — dot bar, buttons, progress       | Canvas, audio         |
-| `loader.js`         | Image + audio preloading, asset pipeline        | DOM, app state        |
+| Module              | Job                                                             | Does NOT know about   |
+| ------------------- | --------------------------------------------------------------- | --------------------- |
+| `app.js`            | State machine, orchestrator                                     | Pixel rendering       |
+| `canvas.js`         | Canvas 2D — image drawing, cover-fit, resize                    | Frame ordering, audio |
+| `effects-canvas.js` | Canvas 2D effects overlay, render loop                          | Frame ordering, audio |
+| `effects.js`        | Effect registry, `runEffect`/`clearEffects` API                 | Canvas internals      |
+| `audio.js`          | Howler — ambient crossfade, narration, music, buffer monitoring | DOM, canvas           |
+| `text.js`           | Ghost-drift GSAP timelines from config                          | Audio, canvas         |
+| `captions.js`       | Timed captions, localStorage persistence                        | Audio, canvas         |
+| `overlay.js`        | DOM controls — dot bar, buttons, progress                       | Canvas, audio         |
+| `loader.js`         | Audio metadata preloading, frame-aware sequencing               | DOM, app state        |
 
 ### Rules
 
 - Each module does ONE thing. No cross-imports between leaf modules.
 - `app.js` is the only module that knows frame ordering.
 - Scene differences = config data in `scenes.json`, not if-blocks.
-- Effects receive canvas context + dimensions; return cleanup functions.
+- Effects receive canvas and scene canvas elements; cleanup is handled by `clearEffects()`.
 - Canvas effects use `requestAnimationFrame`; GSAP animates DOM only.
 
 ## Code Style
@@ -94,7 +94,7 @@ Full system design: `docs/design_decisions/*.md`
 
 - **Targets**: 100% desktop performance, 90%+ mobile performance, 95%+ accessibility/best-practices/SEO.
 - Images are WebP, 16:9, 2x resolution. Total asset budget <35MB.
-- Preloading uses `Promise.all` on image loads + Howler preloads.
+- Background preloading uses `Promise.all` to parallelize image and audio streams; within each stream, assets load sequentially. Audio metadata preloading uses native `Audio` elements; Howler handles actual playback.
 - Canvas render target: 60fps during effects (rAF loop).
 
 ## Accessibility
