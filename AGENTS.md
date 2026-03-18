@@ -11,7 +11,19 @@ Canonical instruction source for this repository. Treat this file as authoritati
 
 - Goal is long-term maintainable and reliable solutions only.
 - Do not implement quick fixes in this codebase for any reason.
+- Do not maintain backwards compatibility in this codebase for any reason.
 - Any test files introduced for local validation must be removed, not committed.
+
+### Spec compliance
+
+- All implementation MUST follow `docs/carbon-trace-system-design-v4.md` and
+  `docs/ADRs/*.md` as the authoritative source of truth.
+- If a deviation from the spec is warranted, you MUST:
+  1. Stop implementation.
+  2. Present the deviation and its rationale to the user.
+  3. Update the relevant spec and/or create a new ADR document to reflect the approved change noting the replacement in the original version.
+  4. Only then proceed with implementation.
+- Never silently diverge from the spec. Undocumented drift creates rework.
 
 ### Security: file access and path handling
 
