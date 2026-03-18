@@ -331,10 +331,10 @@ const app = {
   userHasInteracted: false,  // play-gate flag
   generation: 0,             // incremented on every navigation — guards stale callbacks
   cueOnly: false,            // true during hardCut — audio cued, not played
+  replayPending: false,      // replay happened while paused — doResume schedules fresh narration
   pendingPause: false,       // pause queued during transition
   pendingNavIndex: null,     // navigation queued during transition
   buffering: false,          // narration buffer stall active
-  replayFromPause: false,    // ADR-004: suppress auto-advance after replay-from-pause
   textTimeline: null,        // current GSAP timeline
   captionEntries: [],        // active caption DOM entries
   imageCache: new Map(),     // src → Image
@@ -434,10 +434,6 @@ Narration `onend` callback:
 const gen = app.generation;
 const onend = () => {
   if (gen !== app.generation) return;          // stale — rapid navigation
-  if (app.replayFromPause) {                   // ADR-004
-    app.replayFromPause = false;
-    return;                                    // scene holds, no auto-advance
-  }
   if (shouldAutoAdvance(app, frame)) {
     scheduleAutoAdvance(app, holdAfterNarration);
   }
@@ -484,26 +480,34 @@ else:
 replayNarration(app):
   if TRANSITIONING or LOADING: return
 
-  wasPaused = app.paused
+  userHasInteracted = true
 
   if paused:
-    clear pause state
-    resume ambient + music
-    restore pausedFromState
+    // Hard jump reset — same pattern as paused navigation
+    stopNarration()
+    clear narration timer
+    clearAutoAdvance()
 
-  clear auto-advance + narration timers
-  rebuild narration (audio + text + captions from top)
-  play text timeline from 0
+    cueOnly = true
+    buildNarration(app, frame)      // cues audio (loaded, not playing), builds timeline
+    cueOnly = false
 
-  if wasPaused:
-    app.replayFromPause = true    // suppress auto-advance on narration end
-  else:
-    setupAutoAdvance(app)         // normal replay — re-arm auto-advance
+    replayPending = true            // doResume will schedule fresh narration with onend
+    if textTimeline: textTimeline.pause(0)   // reset to start, stay paused
 
+    // Stay paused. No state change. User presses play to hear.
+    return
+
+  // --- Playing path (unchanged) ---
+  clearAutoAdvance()
+  clear narration timer
+  buildNarration(app, frame)        // plays audio immediately
+  if textTimeline: textTimeline.play(0)
+  setupAutoAdvance(app)
   run entry effect (if defined)
 ```
 
-See ADR-004 for full rationale.
+**Key rule:** While paused, replay is a hard jump — same as paused navigation. No unpause, no audio playback, no auto-advance. The scene resets to its starting state and waits for the user to press play. See ADR-004 for full rationale.
 
 ### 5.9 Buffering
 
@@ -522,7 +526,7 @@ When narration audio stalls mid-playback:
 ```
 INPUT              │ DESKTOP              │ MOBILE             │ EFFECT
 ───────────────────┼──────────────────────┼────────────────────┼─────────────────────
-Click/tap stage    │ Click on stage       │ Tap on stage       │ advance(cur+1)
+Scene interaction  │ Click / hover stage  │ Tap on stage       │ trigger visual effects (v2)
 Navigate to scene  │ Click dot            │ Tap dot            │ transition(dotFrameIdx)
 Forward            │ Click ► / Arrow → / Enter │ Tap ►         │ advance(cur+1)
 Back               │ Click ◄ / Arrow ←    │ Tap ◄              │ retreat(cur-1)
@@ -535,11 +539,11 @@ Tab to controls    │ Tab                  │ —                  │ focus m
 Auto-advance       │ (internal)           │ (internal)         │ advance(cur+1)
 ```
 
+- **Stage click/tap does NOT navigate** — reserved for visual effects (hover text, particle triggers). Mobile has no hover, so tap is the mobile equivalent for triggering scene interactions. Navigation is exclusively via buttons, dots, and keyboard.
 - TRANSITIONING: navigation queued as pendingNavIndex, pause queued as pendingPause
 - PAUSED: hardJump — no lock, rapid dot-clicking works
 - CREDITS: advance disabled (`holdUntilClick === null`)
 - holdUntilClick scenes: no auto-advance, forward button still navigates
-- Stage clicks exclude `#overlay-controls` and `#play-gate` via `e.target.closest()`
 
 ---
 
@@ -672,12 +676,10 @@ On each `showFrame()` call, `prebufferNextScene()`:
 
 ## 12. Deployment
 
-Multi-stage Dockerfile: Node 22-alpine builder stage runs `pnpm build`, then nginx:1-alpine serves `dist/` on port 8080.
-
 ```dockerfile
-# Stage 1 — build
+# Build stage — install deps and run Vite build
 FROM node:22-alpine AS builder
-RUN corepack enable && corepack prepare pnpm@<version> --activate
+RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
 WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
@@ -686,12 +688,16 @@ COPY src/ src/
 COPY public/ public/
 RUN pnpm build
 
-# Stage 2 — serve
+# Production stage — serve static files with nginx
 FROM nginx:1-alpine
+RUN rm -rf /usr/share/nginx/html/*
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget -qO /dev/null http://localhost:8080/ || exit 1
 USER nginx
+CMD ["nginx", "-g", "daemon off;"]
 ```
 
 ```nginx
@@ -751,9 +757,10 @@ Scene 8 + playing                   │ No timer. Holds until click/tap/arrow.
 Credits (Scene 11)                  │ holdUntilClick: null. No advance. Music plays.
 Replay while playing                │ Restart narration + text. Clear timer.
                                     │ 'end' re-arms auto-advance. (ADR-004)
-Replay while paused                 │ Resume + play narration + text from 0.
-                                    │ Auto-advance suppressed. Scene holds.
-                                    │ replayFromPause flag set. (ADR-004)
+Replay while paused                 │ Hard jump reset. Narration cued (loaded,
+                                    │ not playing). Text timeline at 0, paused.
+                                    │ replayPending = true. State stays PAUSED.
+                                    │ doResume schedules fresh narration. (ADR-004)
 Image load failure                  │ Fallback solid color. Evict from cache.
 Audio load failure                  │ onloaderror/onplayerror call onend.
                                     │ Auto-advance chain continues.
@@ -801,7 +808,7 @@ Progressive loading: first frame blocks, background assets load sequentially by 
 - Play-gate for mobile audio context unlock
 - Progress dots + forward/back + keyboard navigation
 - Scene 8: holdUntilClick, ghost-drift text, no audio
-- Replay-while-paused: auto-resume, suppress auto-advance (ADR-004)
+- Replay-while-paused: hard jump reset, stay paused (ADR-004)
 - Narration buffer stall detection and recovery
 - Accessibility: aria-live, reduced-motion, keyboard, WCAG 2.2.2, captions
 - Cloud Run deploy with CI/CD

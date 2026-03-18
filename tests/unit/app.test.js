@@ -767,6 +767,68 @@ describe('app.js', () => {
       vi.advanceTimersByTime(500); // narration delay fires
       expect(playNarration).toHaveBeenCalled();
     });
+
+    it('clears auto-advance timer on replay while paused', () => {
+      // Capture the onend callback so we can trigger the auto-advance timer
+      let capturedOnend;
+      playNarration.mockImplementation((_src, onend) => {
+        capturedOnend = onend;
+      });
+
+      // Narration delay fires → playNarration called with onend
+      vi.advanceTimersByTime(500);
+      expect(capturedOnend).toBeDefined();
+
+      // onend fires → scheduleAutoAdvance(2000ms)
+      capturedOnend();
+
+      // 500ms into the 2000ms auto-advance wait, pause the scene
+      vi.advanceTimersByTime(500);
+      app.togglePause();
+
+      // Replay while paused — must clear autoAdvanceTimerRemaining
+      document.getElementById('btn-replay').click();
+
+      // Resume — replayPending path, fresh narration scheduled from beginning
+      app.togglePause();
+
+      // Advance the remaining 1500ms from the old auto-advance timer.
+      // If replay did NOT clear it, the scene would advance to credits.
+      vi.advanceTimersByTime(1500);
+      expect(app.getState()).toBe('SCENE_ACTIVE');
+    });
+
+    it('multiple replays while paused are idempotent', () => {
+      app.togglePause();
+      document.getElementById('btn-replay').click();
+      vi.clearAllMocks();
+      document.getElementById('btn-replay').click();
+      document.getElementById('btn-replay').click();
+      expect(app.getState()).toBe('PAUSED');
+      expect(cueNarration).toHaveBeenCalledTimes(2);
+      expect(playNarration).not.toHaveBeenCalled();
+    });
+
+    it('clears buffering state on replay', () => {
+      app.togglePause();
+      // Simulate buffering state
+      const stage = document.getElementById('scene-stage');
+      stage.classList.add('buffering');
+      document.getElementById('btn-replay').click();
+      expect(stage.classList.contains('buffering')).toBe(false);
+    });
+
+    it('replayPending is cleared on navigation after replay-while-paused', async () => {
+      app.togglePause();
+      document.getElementById('btn-replay').click();
+      vi.clearAllMocks();
+      // Navigate to next scene instead of resuming
+      app.advance();
+      await vi.runAllTimersAsync();
+      // Resume on the new scene — should do normal resume, not replay path
+      app.togglePause(); // resume
+      expect(resumeNarration).toHaveBeenCalled();
+    });
   });
 
   // ── captions toggle ────────────────────────────────────────────────
@@ -846,17 +908,17 @@ describe('app.js', () => {
     });
   });
 
-  // ── document click ─────────────────────────────────────────────────
+  // ── stage click ────────────────────────────────────────────────────
 
-  describe('document click', () => {
-    it('advances on click outside controls', async () => {
+  describe('stage click', () => {
+    it('does not advance on click outside controls', async () => {
       app = createApp();
       await vi.runAllTimersAsync();
       app.togglePause();
       vi.clearAllMocks();
       document.getElementById('scene-stage').click();
       await vi.runAllTimersAsync();
-      expect(stopNarration).toHaveBeenCalled();
+      expect(stopNarration).not.toHaveBeenCalled();
     });
   });
 
