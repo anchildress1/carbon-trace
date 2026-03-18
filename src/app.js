@@ -51,13 +51,17 @@ const STATE_BY_FRAME_TYPE = {
 };
 
 function validateEffects(frames) {
+  const missing = [];
   for (const frame of frames) {
     for (const key of ['idle', 'entry']) {
       const name = frame.effects?.[key];
       if (name && !effectExists(name)) {
-        console.error(`Frame "${frame.id}" references unknown effect "${name}"`);
+        missing.push(`Frame "${frame.id}" references unknown effect "${name}"`);
       }
     }
+  }
+  if (missing.length > 0) {
+    throw new Error(`Invalid effects configuration:\n  ${missing.join('\n  ')}`);
   }
 }
 
@@ -127,6 +131,7 @@ function scheduleAutoAdvance(app, delay) {
 }
 
 function shouldAutoAdvance(app, frame) {
+  // holdUntilClick: true = wait for click, null = hold forever (no advance allowed)
   if (frame.holdUntilClick === true || frame.holdUntilClick === null) return false;
   if (app.currentIndex >= app.frames.length - 1) return false;
   return true;
@@ -455,7 +460,7 @@ function cleanupCurrentScene(app) {
   try {
     app.textTimeline?.kill();
   } catch (err) {
-    console.warn('Failed to kill text timeline:', err);
+    console.error('Failed to kill text timeline:', err);
   }
   app.textTimeline = null;
   app.captionEntries = [];
@@ -710,14 +715,6 @@ function handleFirstPlay(app) {
   setupAutoAdvance(app);
 }
 
-function resumeEffects() {
-  resumeCanvas();
-}
-
-function pauseEffects() {
-  pauseCanvas();
-}
-
 function doResume(app) {
   const firstPlay = !app.userHasInteracted;
   if (firstPlay) {
@@ -736,7 +733,7 @@ function doResume(app) {
     app.textTimeline.resume();
   }
 
-  resumeEffects();
+  resumeCanvas();
 
   resumeDelayedNarration(app);
   resumeDelayedMusic(app);
@@ -788,7 +785,7 @@ function doPause(app) {
     app.textTimeline.pause();
   }
 
-  pauseEffects();
+  pauseCanvas();
 
   saveNarrationTimerRemaining(app);
   saveMusicTimerRemaining(app);

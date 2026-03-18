@@ -27,9 +27,9 @@ describe('effects.js — no-op skeleton', () => {
 
   describe('runEffect', () => {
     it('does not throw for unknown effect name', () => {
-      const canvas = document.createElement('canvas');
-      const scene = document.createElement('img');
-      expect(() => runEffect('nonexistent', canvas, scene)).not.toThrow();
+      const effectsCanvas = document.createElement('canvas');
+      const sceneCanvas = document.createElement('canvas');
+      expect(() => runEffect('nonexistent', effectsCanvas, sceneCanvas)).not.toThrow();
     });
 
     it('does not throw when called with no arguments', () => {

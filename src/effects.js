@@ -13,14 +13,14 @@ export function effectExists(name) {
   return name in effects;
 }
 
-export function runEffect(name, canvas, scene) {
+export function runEffect(name, effectsCanvas, sceneCanvas) {
   const fn = effects[name];
   if (!fn) {
     if (name) console.warn(`Unknown effect: "${name}"`);
     return;
   }
   try {
-    fn({ canvas, scene });
+    fn({ canvas: effectsCanvas, scene: sceneCanvas });
   } catch (err) {
     console.error(`Effect "${name}" threw during execution:`, err);
   }
