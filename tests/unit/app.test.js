@@ -25,6 +25,7 @@ vi.mock('../../src/audio.js', () => ({
   playAmbient: vi.fn(),
   crossfadeAmbient: vi.fn(),
   playNarration: vi.fn(),
+  cueNarration: vi.fn(),
   stopNarration: vi.fn(),
   pauseNarration: vi.fn(),
   resumeNarration: vi.fn(),
@@ -168,6 +169,7 @@ import {
   pauseNarration,
   resumeNarration,
   playNarration,
+  cueNarration,
   crossfadeAmbient,
   playMusic,
   fadeMusic,
@@ -381,6 +383,15 @@ describe('app.js', () => {
       app.advance();
       await vi.runAllTimersAsync();
       expect(stopNarration).toHaveBeenCalled();
+    });
+
+    it('cues narration instead of playing during hard cut', async () => {
+      vi.clearAllMocks();
+      app.advance();
+      await vi.runAllTimersAsync();
+      // During hard cut (paused), narration should be cued, not played
+      expect(cueNarration).toHaveBeenCalledWith('narration.mp3');
+      expect(playNarration).not.toHaveBeenCalled();
     });
 
     it('calls clearEffects during hard cut', async () => {

@@ -274,6 +274,39 @@ export function playNarration(src, onend) {
   return currentNarration;
 }
 
+export function cueNarration(src) {
+  cleanupBufferMonitoring();
+
+  if (currentNarration) {
+    currentNarration.unload();
+  }
+
+  let howl = narrationCache.get(src);
+  if (howl) {
+    narrationCache.delete(src);
+    howl.mute(globalMuted);
+    howl.on('loaderror', (_id, err) => {
+      console.warn(`Failed to load narration: ${src}`, err);
+      if (currentNarration === howl) currentNarration = null;
+    });
+  } else {
+    howl = new Howl({
+      src: [src],
+      volume: 1,
+      html5: true,
+      mute: globalMuted,
+      preload: true,
+      onloaderror: (_id, err) => {
+        console.warn(`Failed to load narration: ${src}`, err);
+        if (currentNarration === howl) currentNarration = null;
+      },
+    });
+  }
+
+  currentNarration = howl;
+  return currentNarration;
+}
+
 export function stopNarration() {
   cleanupBufferMonitoring();
   if (currentNarration) {

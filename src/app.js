@@ -4,6 +4,7 @@ import {
   playAmbient,
   crossfadeAmbient,
   playNarration,
+  cueNarration,
   stopNarration,
   pauseNarration,
   resumeNarration,
@@ -257,8 +258,10 @@ function buildNarration(app, frame) {
 
   app.els.btnReplay.disabled = !(hasLines || hasAudioRef);
 
-  if (hasAudioRef) {
+  if (hasAudioRef && !app.cueOnly) {
     scheduleNarrationAudio(app, frame.narration);
+  } else if (hasAudioRef && app.cueOnly) {
+    cueNarration(frame.narration.audio);
   }
 }
 
@@ -519,6 +522,7 @@ function transition(app, toIndex) {
       const prevIndex = app.currentIndex;
       const prevFrame = app.frames[prevIndex];
       app.currentIndex = toIndex;
+      app.cueOnly = true;
       try {
         showFrame(app, toIndex);
         app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
@@ -527,6 +531,7 @@ function transition(app, toIndex) {
         app.currentIndex = prevIndex;
         app.state = STATE_BY_FRAME_TYPE[prevFrame.frameType] || State.SCENE_ACTIVE;
       }
+      app.cueOnly = false;
       doPause(app);
       completePendingNav(app);
     };
@@ -1089,6 +1094,7 @@ export function createApp() {
     autoAdvanceTimerRemaining: null,
     pendingNavIndex: null,
     generation: 0,
+    cueOnly: false,
     pendingPause: false,
     buffering: false,
     availableAudio: new Set(),

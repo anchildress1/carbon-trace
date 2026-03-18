@@ -36,6 +36,7 @@ import {
   playAmbient,
   crossfadeAmbient,
   playNarration,
+  cueNarration,
   stopNarration,
   pauseNarration,
   resumeNarration,
@@ -215,6 +216,53 @@ describe('audio.js', () => {
       // Should have added waiting and playing listeners
       expect(mockNode.addEventListener).toHaveBeenCalledWith('waiting', expect.any(Function));
       expect(mockNode.addEventListener).toHaveBeenCalledWith('playing', expect.any(Function));
+    });
+  });
+
+  describe('cueNarration', () => {
+    it('creates a Howl with preload but does not call play', () => {
+      const howl = cueNarration('narration.mp3');
+
+      expect(Howl).toHaveBeenCalledWith(
+        expect.objectContaining({
+          src: ['narration.mp3'],
+          volume: 1,
+          html5: true,
+          preload: true,
+        }),
+      );
+      expect(howl.play).not.toHaveBeenCalled();
+    });
+
+    it('unloads previous narration before cueing new one', () => {
+      const first = playNarration('first.mp3');
+      cueNarration('second.mp3');
+
+      expect(first.unload).toHaveBeenCalled();
+    });
+
+    it('uses cached Howl when available', () => {
+      preloadNarrationAhead('cached.m4a');
+      const preloadCallCount = Howl.mock.calls.length;
+
+      cueNarration('cached.m4a');
+
+      expect(Howl.mock.calls.length).toBe(preloadCallCount);
+    });
+
+    it('applies current mute state', () => {
+      setMuted(true);
+      cueNarration('narration.mp3');
+
+      expect(Howl).toHaveBeenCalledWith(expect.objectContaining({ mute: true }));
+    });
+
+    it('can be resumed with resumeNarration after cueing', () => {
+      const howl = cueNarration('narration.mp3');
+      vi.clearAllMocks();
+      resumeNarration();
+
+      expect(howl.play).toHaveBeenCalled();
     });
   });
 
