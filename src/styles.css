@@ -236,7 +236,8 @@ body {
 }
 
 .play-gate:focus-visible {
-  outline: none;
+  outline: 2px solid rgba(232, 228, 223, 0.6);
+  outline-offset: -2px;
 }
 
 .play-gate-icon {
