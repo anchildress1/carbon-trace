@@ -864,6 +864,34 @@ describe('app.js', () => {
         expect(app.getState()).toBe('CREDITS');
       });
     });
+
+    describe('pause during narration delay then resume', () => {
+      it('passes onend callback so auto-advance fires after narration', async () => {
+        let capturedOnend;
+        playNarration.mockImplementation((src, onend) => {
+          capturedOnend = onend;
+        });
+
+        app = createApp();
+        await vi.runAllTimersAsync();
+        app.togglePause(); // unpause → first play
+        app.advance(); // to scene-01, narration delay=500ms starts
+
+        vi.advanceTimersByTime(200); // 200ms into narration delay
+        app.togglePause(); // pause — saves narrationTimerRemaining ≈ 300
+        vi.clearAllMocks();
+        app.togglePause(); // resume — resumeDelayedNarration fires
+
+        vi.advanceTimersByTime(300); // remaining delay fires → playNarration with onend
+        expect(playNarration).toHaveBeenCalledWith('narration.mp3', expect.any(Function));
+
+        // Simulate narration ending — onend should schedule auto-advance
+        capturedOnend();
+        vi.advanceTimersByTime(2000); // holdAfterNarration
+        await vi.runAllTimersAsync();
+        expect(app.getState()).toBe('CREDITS');
+      });
+    });
   });
 
   // ── cleanup with active timers ─────────────────────────────────────

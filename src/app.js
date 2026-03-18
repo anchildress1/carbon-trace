@@ -677,7 +677,16 @@ function resumeDelayedNarration(app) {
     app.narrationTimerDelay = null;
     app.narrationTimerRemaining = null;
     if (frame.narration?.audio) {
-      playNarration(frame.narration.audio);
+      const holdAfterNarration =
+        frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
+      const gen = app.generation;
+      const onend = () => {
+        if (gen !== app.generation) return;
+        if (shouldAutoAdvance(app, frame)) {
+          scheduleAutoAdvance(app, holdAfterNarration);
+        }
+      };
+      playNarration(frame.narration.audio, onend);
     }
   }, app.narrationTimerRemaining);
   app.narrationTimerRemaining = null;
