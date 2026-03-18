@@ -331,6 +331,7 @@ const app = {
   userHasInteracted: false,  // play-gate flag
   generation: 0,             // incremented on every navigation — guards stale callbacks
   cueOnly: false,            // true during hardCut — audio cued, not played
+  replayPending: false,      // replay happened while paused — doResume schedules fresh narration
   pendingPause: false,       // pause queued during transition
   pendingNavIndex: null,     // navigation queued during transition
   buffering: false,          // narration buffer stall active
@@ -491,6 +492,7 @@ replayNarration(app):
     buildNarration(app, frame)      // cues audio (loaded, not playing), builds timeline
     cueOnly = false
 
+    replayPending = true            // doResume will schedule fresh narration with onend
     if textTimeline: textTimeline.pause(0)   // reset to start, stay paused
 
     // Stay paused. No state change. User presses play to hear.
@@ -675,9 +677,27 @@ On each `showFrame()` call, `prebufferNextScene()`:
 ## 12. Deployment
 
 ```dockerfile
-FROM nginx:alpine
+# Build stage — install deps and run Vite build
+FROM node:22-alpine AS builder
+RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
+WORKDIR /app
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+COPY index.html vite.config.js ./
+COPY src/ src/
+COPY public/ public/
+RUN pnpm build
+
+# Production stage — serve static files with nginx
+FROM nginx:1-alpine
+RUN rm -rf /usr/share/nginx/html/*
+COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY dist/ /usr/share/nginx/html/
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget -qO /dev/null http://localhost:8080/ || exit 1
+USER nginx
+CMD ["nginx", "-g", "daemon off;"]
 ```
 
 ```nginx
@@ -739,8 +759,8 @@ Replay while playing                │ Restart narration + text. Clear timer.
                                     │ 'end' re-arms auto-advance. (ADR-004)
 Replay while paused                 │ Hard jump reset. Narration cued (loaded,
                                     │ not playing). Text timeline at 0, paused.
-                                    │ State stays PAUSED. Press play to hear.
-                                    │ No new flags. (ADR-004)
+                                    │ replayPending = true. State stays PAUSED.
+                                    │ doResume schedules fresh narration. (ADR-004)
 Image load failure                  │ Fallback solid color. Evict from cache.
 Audio load failure                  │ onloaderror/onplayerror call onend.
                                     │ Auto-advance chain continues.

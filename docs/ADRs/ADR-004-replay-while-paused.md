@@ -41,12 +41,12 @@ Replay while paused treats the action like paused navigation — a hard jump tha
 
 | Dimension | Assessment |
 |-----------|------------|
-| Complexity | Low — reuses existing cueOnly + hardCut patterns |
+| Complexity | Low — reuses existing cueOnly + hardCut patterns, one resume-path flag |
 | Feedback | Visual — text elements reset to initial state. No audio. |
 | Control preservation | Full — pause state untouched, no auto-advance |
 | Surprise risk | None — nothing moves until user presses play |
 
-**Pros:** Pause is inviolable — replay cannot override it. Consistent with hardCut pattern already used for paused navigation. No new state flags. No edge cases around auto-advance suppression. Simple mental model: while paused, everything is a hard jump. User presses play when ready.
+**Pros:** Pause is inviolable — replay cannot override it. Consistent with hardCut pattern already used for paused navigation. No edge cases around auto-advance suppression. Simple mental model: while paused, everything is a hard jump. User presses play when ready.
 
 **Cons:** No audio feedback on tap — user must press play to hear the replay. Two-step interaction. Text elements reset visually (opacity 0 at time 0) which may look like "nothing happened" unless the user was watching the text.
 
@@ -77,8 +77,9 @@ When replay is triggered from a paused state:
 4. Cue narration audio (loaded, seeked to 0, not playing) via `cueNarration()`
 5. Rebuild text timeline (paused at time 0) — text elements exist in DOM at initial opacity
 6. Clear and rebuild caption entries
-7. No auto-advance timer. No state change. No transition.
-8. When user presses play → `doResume()` triggers narration + text + auto-advance as normal
+7. Set `replayPending = true` — signals `doResume()` to schedule fresh narration instead of resuming a paused Howl
+8. No auto-advance timer. No state change. No transition.
+9. When user presses play → `doResume()` sees `replayPending`, calls `scheduleNarrationAudio()` (which wires `onend` for auto-advance), plays text from 0, sets up auto-advance
 
 This is the same pattern as paused navigation via dot bar (hardCut) — the scene resets to its starting state and waits for the user to press play. Replay while paused IS a hard jump to the same scene.
 
@@ -90,7 +91,7 @@ Option A is the current implementation and the specific bug. It overrides the us
 
 Option C is clever but introduces unnecessary complexity. It requires a new state flag (`replayFromPause`), guards in the `onend` callback, and flag cleanup on navigation and resume. It also puts the experience in an ambiguous state — technically playing but without auto-advance, which is a mode that doesn't exist anywhere else in the state machine.
 
-Option B has zero new state. It reuses the exact same `cueOnly` pattern that hardCut already uses for paused navigation. While paused, everything is a hard jump — navigation, replay, all of it. One rule, no exceptions, no flags.
+Option B reuses the existing `cueOnly` pattern that hardCut already uses for paused navigation, with one lightweight addition: `replayPending`, a resume-path hint that tells `doResume()` to schedule fresh narration (with `onend` wired for auto-advance) instead of resuming a paused Howl. This is simpler than Option C's `replayFromPause` because it doesn't change runtime behavior — it only affects the resume path. While paused, everything is a hard jump — navigation, replay, all of it. One rule, no exceptions.
 
 The "no audio feedback" concern from Option B is real but acceptable in this context. The user explicitly paused. They know the experience is frozen. Tapping replay while paused is a setup action ("get ready to replay") not a playback action ("play now"). The play button is right there. One tap away.
 
@@ -98,9 +99,9 @@ The "no audio feedback" concern from Option B is real but acceptable in this con
 
 **What becomes easier:**
 
-- No new state flags — zero additions to the state object
+- One lightweight flag (`replayPending`) — a resume-path hint, not a runtime behavior modifier
 - Replay-while-paused follows the same rule as navigate-while-paused: hard jump, stay frozen
-- No edge cases around auto-advance suppression or flag cleanup
+- No edge cases around auto-advance suppression — `replayPending` is cleared on navigation (`cleanupCurrentScene`) and on resume (`doResume`)
 - Testing is straightforward: assert state is still PAUSED after replay
 
 **What becomes harder:**
@@ -136,6 +137,7 @@ replayNarration(app):
     buildNarration(app, frame)      // cues audio, builds timeline (paused)
     cueOnly = false
 
+    replayPending = true            // doResume will schedule fresh narration
     if textTimeline: textTimeline.pause(0)   // reset to start, stay paused
 
     // Stay paused. No state change. User presses play to hear.
@@ -159,16 +161,17 @@ Replay while playing                │ Unchanged — restart narration + text,
                                     │ clear timer, 'end' re-arms auto-advance
 Replay while paused                 │ Hard jump reset. Narration cued, text
                                     │ timeline at 0, paused. Press play to hear.
-Replay while paused, then play      │ doResume() triggers narration + text +
-                                    │ auto-advance as normal. Full scene replay.
-Replay while paused, then navigate  │ Normal hardCut to new scene. Replay
-                                    │ setup is discarded by cleanupCurrentScene.
+Replay while paused, then play      │ doResume() sees replayPending, calls
+                                    │ scheduleNarrationAudio() (wires onend),
+                                    │ plays text from 0, sets up auto-advance.
+Replay while paused, then navigate  │ Normal hardCut to new scene. replayPending
+                                    │ cleared by cleanupCurrentScene.
 Replay while paused on Scene 8      │ Text reset to start. No audio to cue.
                                     │ holdUntilClick prevents auto-advance anyway.
 Replay while paused on credits      │ Narration cued, text reset. No advance
                                     │ possible (holdUntilClick: null).
-Multiple replays while paused       │ Each replay re-cues from top. Idempotent.
-                                    │ No state accumulation. No leaked timers.
+Multiple replays while paused       │ Each replay re-cues from top. replayPending
+                                    │ stays true. Idempotent. No leaked timers.
 ```
 
 ## Schema Changes
@@ -177,4 +180,4 @@ None. This is a behavioral change in `app.js` only.
 
 ## State Changes
 
-None. No new flags. Reuses existing `cueOnly` pattern.
+One addition: `replayPending` (boolean, default `false`). Set in `replayNarration()` when paused, checked in `doResume()` to schedule fresh narration with `onend` callback instead of resuming a paused Howl. Cleared on resume and on navigation (`cleanupCurrentScene`). This is a resume-path hint, not a runtime behavior modifier — it does not affect any code path while the app is paused or playing.
