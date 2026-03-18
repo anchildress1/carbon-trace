@@ -6,7 +6,8 @@
       "startServerReadyPattern": "Local",
       "numberOfRuns": 3,
       "settings": {
-        "preset": "desktop"
+        "preset": "desktop",
+        "chromeFlags": "--headless"
       }
     },
     "assert": {
