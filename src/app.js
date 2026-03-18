@@ -147,6 +147,18 @@ function setupAutoAdvance(app) {
   // scheduleNarrationAudio triggers scheduleAutoAdvance
 }
 
+function scheduleMusicExitFade(app, fadeOutDelay) {
+  if (fadeOutDelay <= 0) return;
+  app.musicExitTimerStart = Date.now();
+  app.musicExitTimerDelay = fadeOutDelay;
+  app.musicExitTimer = setTimeout(() => {
+    app.musicExitTimer = null;
+    app.musicExitTimerStart = null;
+    app.musicExitTimerDelay = null;
+    fadeMusic(0, 2000);
+  }, fadeOutDelay);
+}
+
 function scheduleMusic(app, music) {
   clearMusicTimer(app);
   stopMusic();
@@ -160,17 +172,7 @@ function scheduleMusic(app, music) {
     fadeMusic(music.fullVolume, music.crescendoMs);
 
     if (music.exit !== null && music.exit !== undefined) {
-      const fadeOutDelay = music.exit - enter;
-      if (fadeOutDelay > 0) {
-        app.musicExitTimerStart = Date.now();
-        app.musicExitTimerDelay = fadeOutDelay;
-        app.musicExitTimer = setTimeout(() => {
-          app.musicExitTimer = null;
-          app.musicExitTimerStart = null;
-          app.musicExitTimerDelay = null;
-          fadeMusic(0, 2000);
-        }, fadeOutDelay);
-      }
+      scheduleMusicExitFade(app, music.exit - enter);
     }
   };
 
@@ -669,17 +671,7 @@ function resumeDelayedMusic(app) {
     fadeMusic(frame.music.fullVolume, frame.music.crescendoMs);
 
     if (frame.music.exit !== null && frame.music.exit !== undefined) {
-      const fadeOutDelay = (frame.music.exit || 0) - (frame.music.enter || 0);
-      if (fadeOutDelay > 0) {
-        app.musicExitTimerStart = Date.now();
-        app.musicExitTimerDelay = fadeOutDelay;
-        app.musicExitTimer = setTimeout(() => {
-          app.musicExitTimer = null;
-          app.musicExitTimerStart = null;
-          app.musicExitTimerDelay = null;
-          fadeMusic(0, 2000);
-        }, fadeOutDelay);
-      }
+      scheduleMusicExitFade(app, (frame.music.exit || 0) - (frame.music.enter || 0));
     }
   }, app.musicTimerRemaining);
   app.musicTimerRemaining = null;
