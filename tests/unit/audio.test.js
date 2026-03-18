@@ -607,7 +607,60 @@ describe('audio.js', () => {
       const onend = vi.fn();
       playNarration('cached.m4a', onend);
 
-      expect(cachedHowl.on).toHaveBeenCalledWith('end', onend);
+      expect(cachedHowl.once).toHaveBeenCalledWith('end', onend);
+    });
+
+    it('calls onend when cached Howl loaderror fires', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      preloadNarrationAhead('cached.m4a');
+      const cachedHowl = Howl.mock.results[Howl.mock.results.length - 1].value;
+
+      const onend = vi.fn();
+      playNarration('cached.m4a', onend);
+
+      const loaderrorCall = cachedHowl.on.mock.calls.find(([event]) => event === 'loaderror');
+      loaderrorCall[1](1, 'network error');
+
+      expect(onend).toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
+
+    it('calls onend when cached Howl playerror fires', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      preloadNarrationAhead('cached.m4a');
+      const cachedHowl = Howl.mock.results[Howl.mock.results.length - 1].value;
+
+      const onend = vi.fn();
+      playNarration('cached.m4a', onend);
+
+      const playerrorCall = cachedHowl.on.mock.calls.find(([event]) => event === 'playerror');
+      playerrorCall[1](1, 'decode error');
+
+      expect(onend).toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
+
+    it('calls onend when fresh Howl onloaderror fires', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const onend = vi.fn();
+      playNarration('fresh.m4a', onend);
+
+      // Trigger onloaderror from the fresh Howl
+      lastHowlOptions.onloaderror(1, 'network error');
+
+      expect(onend).toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
+
+    it('calls onend when fresh Howl onplayerror fires', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const onend = vi.fn();
+      playNarration('fresh.m4a', onend);
+
+      lastHowlOptions.onplayerror(1, 'decode error');
+
+      expect(onend).toHaveBeenCalled();
+      warnSpy.mockRestore();
     });
   });
 

@@ -131,7 +131,7 @@ function scheduleAutoAdvance(app, delay) {
 }
 
 function shouldAutoAdvance(app, frame) {
-  // holdUntilClick: true = wait for click, null = hold forever (no advance allowed)
+  // holdUntilClick: true = wait for click (no auto-advance), false = auto-advance after narration, null = no advance allowed (credits)
   if (frame.holdUntilClick === true || frame.holdUntilClick === null) return false;
   if (app.currentIndex >= app.frames.length - 1) return false;
   return true;
@@ -281,7 +281,7 @@ function applyAmbient(app, frame) {
   if (app.currentIndex === 0) {
     playAmbient(frame.ambient.src, frame.ambient.volume, frame.ambient.loop);
   } else {
-    crossfadeAmbient(frame.ambient.src, frame.ambient.volume, 800);
+    crossfadeAmbient(frame.ambient.src, frame.ambient.volume, 800, frame.ambient.loop);
   }
 }
 
@@ -974,7 +974,7 @@ function initApp(app) {
         app.userHasInteracted = true;
       };
 
-      // Stage click/tap: skip to next scene (un-pauses if paused)
+      // Stage click/tap: skip to next scene (hard cut if paused, animated if playing)
       document.addEventListener('click', (e) => {
         markInteracted();
         if (e.target.closest('#overlay-controls')) return;
