@@ -452,6 +452,7 @@ function cleanupCurrentScene(app) {
   app.musicExitTimerRemaining = null;
   app.musicTimerRemaining = null;
   app.narrationTimerRemaining = null;
+  app.replayPending = false;
   stopMusic();
   stopNarration();
 }
@@ -703,19 +704,33 @@ function doResume(app) {
   app.state = app.pausedFromState;
   app.pausedFromState = null;
 
-  resumeNarration();
-  resumeAmbient();
-  resumeMusic();
-
-  if (app.textTimeline && !app.buffering) {
-    app.textTimeline.resume();
+  if (app.replayPending) {
+    // Replay happened while paused — narration was cued, not played.
+    // Schedule fresh narration with onend callback for auto-advance.
+    app.replayPending = false;
+    const frame = app.frames[app.currentIndex];
+    if (frame.narration?.audio) {
+      scheduleNarrationAudio(app, frame.narration);
+    }
+    resumeAmbient();
+    resumeMusic();
+    if (app.textTimeline && !app.buffering) {
+      app.textTimeline.play(0);
+    }
+    setupAutoAdvance(app);
+  } else {
+    resumeNarration();
+    resumeAmbient();
+    resumeMusic();
+    if (app.textTimeline && !app.buffering) {
+      app.textTimeline.resume();
+    }
+    resumeDelayedNarration(app);
+    resumeDelayedMusic(app);
+    resumeMusicExitTimer(app);
   }
 
   resumeCanvas();
-
-  resumeDelayedNarration(app);
-  resumeDelayedMusic(app);
-  resumeMusicExitTimer(app);
 
   if (app.autoAdvanceTimerRemaining !== null && app.autoAdvanceTimerRemaining > 0) {
     const remaining = app.autoAdvanceTimerRemaining;
@@ -807,13 +822,8 @@ function replayNarration(app) {
 
   app.userHasInteracted = true;
 
-  if (app.paused) {
-    const resumeState = app.pausedFromState || State.SCENE_ACTIVE;
-    clearPauseState(app);
-    resumeNarration();
-    resumeAmbient();
-    app.state = resumeState;
-  }
+  // Stop current narration audio regardless of pause state
+  stopNarration();
 
   app.buffering = false;
   app.els.sceneStage.classList.remove('buffering');
@@ -831,10 +841,22 @@ function replayNarration(app) {
   }
   app.narrationTimerRemaining = null;
 
-  buildNarration(app, frame);
-
-  if (app.textTimeline) app.textTimeline.play(0);
-  setupAutoAdvance(app);
+  if (app.paused) {
+    // Replay while paused: cue narration audio, reset text, stay paused.
+    // Set replayPending so doResume knows to schedule narration with onend
+    // instead of just resuming a paused Howl.
+    app.cueOnly = true;
+    buildNarration(app, frame);
+    app.cueOnly = false;
+    app.replayPending = true;
+    if (app.textTimeline) {
+      app.textTimeline.pause(0);
+    }
+  } else {
+    buildNarration(app, frame);
+    if (app.textTimeline) app.textTimeline.play(0);
+    setupAutoAdvance(app);
+  }
 
   if (frame.effects?.entry) {
     runEffect(frame.effects.entry, app.els.effectsCanvas, app.els.sceneCanvas);
@@ -1042,6 +1064,7 @@ export function createApp() {
     pendingNavIndex: null,
     generation: 0,
     cueOnly: false,
+    replayPending: false,
     pendingPause: false,
     buffering: false,
     availableAudio: new Set(),

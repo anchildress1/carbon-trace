@@ -749,11 +749,23 @@ describe('app.js', () => {
       expect(playMusic).not.toHaveBeenCalled();
     });
 
-    it('unpauses when replaying while paused', () => {
+    it('stays paused when replaying while paused', () => {
       app.togglePause();
       expect(app.getState()).toBe('PAUSED');
       document.getElementById('btn-replay').click();
+      expect(app.getState()).toBe('PAUSED');
+      expect(cueNarration).toHaveBeenCalled();
+      expect(playNarration).not.toHaveBeenCalled();
+    });
+
+    it('plays narration from start on resume after replay-while-paused', () => {
+      app.togglePause();
+      document.getElementById('btn-replay').click();
+      vi.clearAllMocks();
+      app.togglePause(); // resume
       expect(app.getState()).toBe('SCENE_ACTIVE');
+      vi.advanceTimersByTime(500); // narration delay fires
+      expect(playNarration).toHaveBeenCalled();
     });
   });
 
