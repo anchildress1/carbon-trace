@@ -298,7 +298,7 @@ body {
 /* Overlay controls */
 .overlay-controls {
   position: absolute;
-  bottom: 3%;
+  bottom: max(3%, env(safe-area-inset-bottom, 0px));
   left: 0;
   right: 0;
   display: flex;
@@ -306,6 +306,7 @@ body {
   align-items: center;
   gap: 0.75rem;
   z-index: 10;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .progress-dots {
@@ -314,8 +315,8 @@ body {
 }
 
 .progress-dot {
-  width: 24px;
-  height: 24px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border-radius: 50%;
   background: transparent;
@@ -360,8 +361,8 @@ body {
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 50%;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   color: rgba(232, 228, 223, 0.9);
   cursor: pointer;
   transition:
