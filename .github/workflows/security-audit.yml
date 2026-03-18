@@ -8,6 +8,10 @@ on:
       - .github/workflows/security-audit.yml
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
+    paths-ignore:
+      - "*.md"
+      - "docs/**"
+      - "LICENSE"
   workflow_dispatch:
 
 concurrency:
