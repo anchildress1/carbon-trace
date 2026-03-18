@@ -192,7 +192,7 @@ flowchart LR
 
 ### Docker Build
 
-Multi-stage: Node 22-alpine builder runs `pnpm build` → nginx 1-alpine serves `dist/` on port 8080. Build runs inside Cloud Build (not locally); the `Dockerfile` is self-contained.
+nginx-alpine serves pre-built `dist/` on port 8080. Build runs inside Cloud Build via `gcloud builds submit`; the Dockerfile copies the build output and nginx config.
 
 ### Cloud Run
 
