@@ -29,7 +29,13 @@ import {
   clearAll as clearCanvasEffects,
 } from './effects-canvas.js';
 import { initOverlay, updateProgress, showControls } from './overlay.js';
-import { initSceneCanvas, drawImage as drawSceneImage, clearScene, loadImage } from './canvas.js';
+import {
+  initSceneCanvas,
+  drawImage as drawSceneImage,
+  clearScene,
+  drawFallback,
+  loadImage,
+} from './canvas.js';
 import { preloadFirstFrameAudio, preloadBackgroundAudio } from './loader.js';
 import {
   initCaptions,
@@ -311,6 +317,9 @@ function showFrame(app, index) {
   if (frame.image && app.imageCache.has(frame.image)) {
     const img = app.imageCache.get(frame.image);
     if (img) drawSceneImage(img);
+    else drawFallback();
+  } else if (frame.image) {
+    drawFallback();
   } else {
     clearScene();
   }

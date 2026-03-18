@@ -106,6 +106,13 @@ export function clearScene() {
   }
 }
 
+export function drawFallback() {
+  if (!ctx || !canvasEl) return;
+  const rect = canvasEl.getBoundingClientRect();
+  ctx.fillStyle = 'rgba(18, 18, 24, 0.92)';
+  ctx.fillRect(0, 0, rect.width, rect.height);
+}
+
 export function destroySceneCanvas() {
   if (observer) {
     observer.disconnect();

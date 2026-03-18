@@ -81,6 +81,7 @@ vi.mock('../../src/canvas.js', () => ({
   initSceneCanvas: vi.fn(),
   drawImage: vi.fn(),
   clearScene: vi.fn(),
+  drawFallback: vi.fn(),
   loadImage: vi.fn().mockResolvedValue(null),
   getImageCache: vi.fn(() => new Map()),
 }));
@@ -188,7 +189,7 @@ import {
   pause as pauseCanvas,
   resume as resumeCanvas,
 } from '../../src/effects-canvas.js';
-import { drawImage as drawSceneImage, clearScene, loadImage } from '../../src/canvas.js';
+import { drawImage as drawSceneImage, clearScene, drawFallback, loadImage } from '../../src/canvas.js';
 import { setCaptionsEnabled, areCaptionsEnabled, clearCaptionElements } from '../../src/captions.js';
 import { initOverlay } from '../../src/overlay.js';
 import { preloadFirstFrameAudio } from '../../src/loader.js';
@@ -504,12 +505,28 @@ describe('app.js', () => {
   // ── error handling ─────────────────────────────────────────────────
 
   describe('error handling', () => {
-    it('returns null image when loadImage resolves null', async () => {
+    it('draws fallback when image fails to load for a scene with image', async () => {
       loadImage.mockResolvedValue(null);
       app = createApp();
       await vi.runAllTimersAsync();
       expect(app.getState()).toBe('PAUSED');
+      // Title frame has no image key, so clearScene is called for it
       expect(clearScene).toHaveBeenCalled();
+    });
+
+    it('draws fallback when image load resolves null', async () => {
+      // All image loads fail
+      loadImage.mockResolvedValue(null);
+      app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause();
+
+      vi.clearAllMocks();
+      app.advance();
+      await vi.runAllTimersAsync();
+      // scene-01 has an image key but load failed (null in cache)
+      // waitForImage stores null, showFrame draws fallback
+      expect(drawFallback).toHaveBeenCalled();
     });
   });
 

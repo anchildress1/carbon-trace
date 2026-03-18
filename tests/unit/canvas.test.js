@@ -3,6 +3,7 @@ import {
   initSceneCanvas,
   drawImage,
   clearScene,
+  drawFallback,
   destroySceneCanvas,
   getSceneContext,
   loadImage,
@@ -246,6 +247,24 @@ describe('canvas.js', () => {
       // Failed load should be evicted so retry is possible
       expect(getImageCache().has('bad://fail.webp')).toBe(false);
       vi.useRealTimers();
+    });
+  });
+
+  describe('drawFallback', () => {
+    it('fills canvas with dark glass color', () => {
+      const { canvas, mockCtx } = createMockCanvas();
+      mockCtx.fillRect = vi.fn();
+      initSceneCanvas(canvas);
+
+      drawFallback();
+
+      expect(mockCtx.fillStyle).toBe('rgba(18, 18, 24, 0.92)');
+      expect(mockCtx.fillRect).toHaveBeenCalledWith(0, 0, 1920, 1080);
+    });
+
+    it('does nothing when canvas is not initialized', () => {
+      destroySceneCanvas();
+      expect(() => drawFallback()).not.toThrow();
     });
   });
 
