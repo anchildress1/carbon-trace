@@ -9,7 +9,7 @@ export default defineConfig({
       reporter: ['text', 'lcov', 'json-summary'],
       reportsDirectory: 'coverage',
       include: ['src/**/*.js'],
-      exclude: ['src/main.js', 'src/app.js'],
+      exclude: ['src/main.js'],
       thresholds: {
         lines: 85,
         functions: 85,
