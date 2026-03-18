@@ -22,14 +22,16 @@ content that `#accessible-narration` provides to assistive technology.
 
 | Key | Action |
 |-----|--------|
-| `Space` / `Enter` | Advance to next scene |
-| `ArrowRight` | Advance to next scene |
+| `Space` | Toggle play/pause |
+| `Enter` / `ArrowRight` | Advance to next scene |
 | `ArrowLeft` | Return to previous scene |
 | `Tab` | Navigate between controls |
 
-All control buttons (prev, pause, mute, captions, replay, next) are focusable
-and respond to keyboard activation. Space and Enter do not advance when focus
-is inside the control bar to avoid conflicting with button activation.
+Space toggles play/pause (not advance). Enter and ArrowRight advance to the
+next scene. All control buttons (prev, pause, mute, captions, replay, next)
+are focusable and respond to keyboard activation. Space and Enter/ArrowRight
+do not fire when focus is inside the control bar to avoid conflicting with
+button activation.
 
 ## Focus Management
 
@@ -51,7 +53,8 @@ is inside the control bar to avoid conflicting with button activation.
 | `#btn-captions` | `aria-pressed` | Toggle state for captions on/off |
 | `#btn-mute` | `aria-label` | Updates between "Mute audio" / "Unmute audio" |
 | `#btn-mute` | `aria-disabled` | Disabled until audio is available |
-| `#scene-image` | `alt` | Scene description from `frame.description` |
+| `#scene-stage` | `aria-label` | Scene description from `frame.description` |
+| progress dots | `aria-current="step"` | Identifies the current scene dot |
 
 ## Reduced Motion
 
