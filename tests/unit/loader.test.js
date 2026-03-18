@@ -1,59 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-  preloadImage,
   preloadAudio,
   audioSrcsFromEntry,
-  preloadFirstFrameAssets,
   preloadFirstFrameAudio,
-  preloadBackgroundAssets,
+  preloadBackgroundAudio,
 } from '../../src/loader.js';
 
 describe('loader.js', () => {
-  let originalImage;
-
   beforeEach(() => {
     vi.useFakeTimers();
-
-    // happy-dom's Image doesn't fire onload/onerror, so mock it
-    originalImage = globalThis.Image;
-    globalThis.Image = class MockImage {
-      set src(val) {
-        this._src = val;
-        // Simulate async load
-        if (val && !val.startsWith('bad://')) {
-          setTimeout(() => this.onload?.(), 0);
-        } else {
-          setTimeout(() => this.onerror?.(), 0);
-        }
-      }
-
-      get src() {
-        return this._src;
-      }
-    };
   });
 
   afterEach(() => {
-    globalThis.Image = originalImage;
     vi.useRealTimers();
     vi.restoreAllMocks();
-  });
-
-  describe('preloadImage', () => {
-    it('resolves when image loads', async () => {
-      const p = preloadImage('test.webp');
-      vi.advanceTimersByTime(1);
-      await expect(p).resolves.not.toThrow();
-    });
-
-    it('resolves (does not reject) when image fails', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const p = preloadImage('bad://missing.webp');
-      vi.advanceTimersByTime(1);
-      await expect(p).resolves.not.toThrow();
-      expect(warnSpy).toHaveBeenCalledWith('Failed to load image: bad://missing.webp');
-      warnSpy.mockRestore();
-    });
   });
 
   describe('preloadAudio', () => {
@@ -150,25 +110,14 @@ describe('loader.js', () => {
     });
   });
 
-  describe('preloadFirstFrameAssets', () => {
-    it('resolves immediately when first frame has no image', async () => {
-      const frames = [{ id: 'title', narration: null }];
-      await expect(preloadFirstFrameAssets(frames)).resolves.not.toThrow();
-    });
-
-    it('preloads first frame image when present', async () => {
-      const frames = [{ id: 'scene-01', image: 'test.webp' }];
-      const p = preloadFirstFrameAssets(frames);
-      vi.advanceTimersByTime(1);
-      await expect(p).resolves.not.toThrow();
-    });
-
-    it('resolves when frames array is empty', async () => {
-      await expect(preloadFirstFrameAssets([])).resolves.not.toThrow();
-    });
-  });
-
   describe('preloadFirstFrameAudio', () => {
+    it('does nothing when frames array is empty', () => {
+      const onLoaded = vi.fn();
+      preloadFirstFrameAudio([], onLoaded);
+      vi.advanceTimersByTime(5000);
+      expect(onLoaded).not.toHaveBeenCalled();
+    });
+
     it('calls onLoaded for each audio source', async () => {
       const onLoaded = vi.fn();
       const frames = [
@@ -227,7 +176,7 @@ describe('loader.js', () => {
     });
   });
 
-  describe('preloadBackgroundAssets', () => {
+  describe('preloadBackgroundAudio', () => {
     it('skips first frame audio sources to avoid duplicates', async () => {
       const onLoaded = vi.fn();
       const frames = [
@@ -235,7 +184,7 @@ describe('loader.js', () => {
         { narration: { audio: 'shared.m4a' }, ambient: null, music: null },
       ];
 
-      const p = preloadBackgroundAssets(frames, onLoaded);
+      const p = preloadBackgroundAudio(frames, onLoaded);
       vi.advanceTimersByTime(5000);
       await vi.runAllTimersAsync();
       await p;
@@ -251,7 +200,7 @@ describe('loader.js', () => {
         { narration: { audio: 'second.m4a' }, ambient: null, music: null },
       ];
 
-      const p = preloadBackgroundAssets(frames, onLoaded);
+      const p = preloadBackgroundAudio(frames, onLoaded);
       vi.advanceTimersByTime(5000);
       await vi.runAllTimersAsync();
       await p;
@@ -261,21 +210,19 @@ describe('loader.js', () => {
 
     it('handles empty frames array', async () => {
       const onLoaded = vi.fn();
-      await preloadBackgroundAssets([], onLoaded);
+      await preloadBackgroundAudio([], onLoaded);
 
       expect(onLoaded).not.toHaveBeenCalled();
     });
 
-    it('handles frames with images but no audio', async () => {
+    it('handles frames with no audio', async () => {
       const onLoaded = vi.fn();
       const frames = [
-        { image: 'first.webp', narration: null, ambient: null, music: null },
-        { image: 'second.webp', narration: null, ambient: null, music: null },
+        { narration: null, ambient: null, music: null },
+        { narration: null, ambient: null, music: null },
       ];
 
-      const p = preloadBackgroundAssets(frames, onLoaded);
-      vi.advanceTimersByTime(1);
-      await p;
+      await preloadBackgroundAudio(frames, onLoaded);
 
       expect(onLoaded).not.toHaveBeenCalled();
     });

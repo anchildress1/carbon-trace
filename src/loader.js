@@ -1,21 +1,14 @@
 /**
- * Asset preloader — preloads images and audio metadata so transitions
- * are instant. Images use the browser Image constructor; audio uses
- * native Audio elements for lightweight metadata-only preloading
- * (Howler handles actual playback in audio.js).
+ * Asset preloader — preloads audio metadata so transitions are instant.
+ * Audio uses native Audio elements for lightweight metadata-only
+ * preloading (Howler handles actual playback in audio.js). Also
+ * provides frame-aware orchestration helpers (preloadFirstFrameAudio,
+ * preloadBackgroundAudio) that sequence audio loading across the
+ * scene list.
+ *
+ * Image preloading is handled by canvas.js's loadImage which caches
+ * promises and resolves with Image objects.
  */
-
-export function preloadImage(src) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = resolve;
-    img.onerror = () => {
-      console.warn(`Failed to load image: ${src}`);
-      resolve();
-    };
-    img.src = src;
-  });
-}
 
 export function preloadAudio(src) {
   return new Promise((resolve) => {
@@ -44,12 +37,8 @@ export function audioSrcsFromEntry(entry) {
   return [entry.ambient?.src, entry.narration?.audio, entry.music?.src].filter(Boolean);
 }
 
-export function preloadFirstFrameAssets(frames) {
-  const firstFrame = frames[0];
-  return firstFrame?.image ? preloadImage(firstFrame.image) : Promise.resolve();
-}
-
 export function preloadFirstFrameAudio(frames, onLoaded) {
+  if (!frames.length) return;
   const srcs = audioSrcsFromEntry(frames[0]);
   for (const src of srcs) {
     preloadAudio(src)
@@ -58,12 +47,11 @@ export function preloadFirstFrameAudio(frames, onLoaded) {
   }
 }
 
-export async function preloadBackgroundAssets(frames, onLoaded) {
+export async function preloadBackgroundAudio(frames, onLoaded) {
   if (frames.length === 0) return;
   const firstFrameSrcs = new Set(audioSrcsFromEntry(frames[0]));
 
   for (const frame of frames.slice(1)) {
-    if (frame.image) await preloadImage(frame.image);
     for (const src of audioSrcsFromEntry(frame)) {
       if (!firstFrameSrcs.has(src)) {
         const loaded = await preloadAudio(src);

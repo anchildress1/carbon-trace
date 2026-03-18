@@ -29,7 +29,7 @@ import {
 } from './effects-canvas.js';
 import { initOverlay, updateProgress, showControls } from './overlay.js';
 import { initSceneCanvas, drawImage as drawSceneImage, clearScene, loadImage } from './canvas.js';
-import { preloadFirstFrameAudio, preloadBackgroundAssets } from './loader.js';
+import { preloadFirstFrameAudio, preloadBackgroundAudio } from './loader.js';
 import {
   initCaptions,
   setCaptionsEnabled,
@@ -978,13 +978,14 @@ function initApp(app) {
       app.state = State.SCENE_ACTIVE;
       doPause(app);
 
-      // Defer background asset preloads to avoid network contention.
-      // Loads sequentially: each scene's image then audio, in order.
+      // Defer background asset preloads to avoid contention with first-frame
+      // rendering. Image and audio streams load in parallel; within each
+      // stream, assets load sequentially by scene order.
       setTimeout(() => {
         Promise.all([
           preloadBackgroundImages(app),
-          preloadBackgroundAssets(app.frames, (loaded) => registerAudio(app, loaded)),
-        ]).catch((err) => console.warn('Background asset preload failed:', err));
+          preloadBackgroundAudio(app.frames, (loaded) => registerAudio(app, loaded)),
+        ]).catch((err) => console.error('Background asset preload failed:', err));
       }, 4000);
 
       const markInteracted = () => {
