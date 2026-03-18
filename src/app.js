@@ -61,7 +61,7 @@ function validateEffects(frames) {
     }
   }
   if (missing.length > 0) {
-    throw new Error(`Invalid effects configuration:\n  ${missing.join('\n  ')}`);
+    console.warn(`Unregistered effects (will no-op until implemented):\n  ${missing.join('\n  ')}`);
   }
 }
 
