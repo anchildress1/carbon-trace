@@ -769,15 +769,33 @@ describe('app.js', () => {
     });
 
     it('clears auto-advance timer on replay while paused', () => {
-      // Scene is playing with auto-advance pending
-      vi.advanceTimersByTime(500); // narration delay fires, narration plays
-      vi.clearAllMocks();
+      // Capture the onend callback so we can trigger the auto-advance timer
+      let capturedOnend;
+      playNarration.mockImplementation((_src, onend) => {
+        capturedOnend = onend;
+      });
+
+      // Narration delay fires → playNarration called with onend
+      vi.advanceTimersByTime(500);
+      expect(capturedOnend).toBeDefined();
+
+      // onend fires → scheduleAutoAdvance(2000ms)
+      capturedOnend();
+
+      // 500ms into the 2000ms auto-advance wait, pause the scene
+      vi.advanceTimersByTime(500);
       app.togglePause();
+
+      // Replay while paused — must clear autoAdvanceTimerRemaining
       document.getElementById('btn-replay').click();
-      // Resume — auto-advance should be re-armed fresh, not from stale timer
+
+      // Resume — replayPending path, fresh narration scheduled from beginning
       app.togglePause();
-      vi.advanceTimersByTime(500); // narration delay fires again
-      expect(playNarration).toHaveBeenCalled();
+
+      // Advance the remaining 1500ms from the old auto-advance timer.
+      // If replay did NOT clear it, the scene would advance to credits.
+      vi.advanceTimersByTime(1500);
+      expect(app.getState()).toBe('SCENE_ACTIVE');
     });
 
     it('multiple replays while paused are idempotent', () => {
