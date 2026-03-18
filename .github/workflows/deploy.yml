@@ -15,6 +15,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+      id-token: write # required for Workload Identity Federation
     environment: deploy
     env:
       PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
@@ -27,10 +28,34 @@ jobs:
       - name: Authenticate to GCP
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+
+      - name: Enable required GCP APIs
+        run: |
+          gcloud services enable \
+            artifactregistry.googleapis.com \
+            cloudbuild.googleapis.com \
+            run.googleapis.com \
+            --project "${PROJECT_ID}" \
+            --quiet
+
+      - name: Ensure Artifact Registry repository exists
+        run: |
+          if ! gcloud artifacts repositories describe "${SERVICE_NAME}" \
+              --location="${REGION}" \
+              --project="${PROJECT_ID}" \
+              --format="value(name)" &>/dev/null; then
+            gcloud artifacts repositories create "${SERVICE_NAME}" \
+              --repository-format=docker \
+              --location="${REGION}" \
+              --description="Docker images for ${SERVICE_NAME}" \
+              --project="${PROJECT_ID}" \
+              --quiet
+          fi
 
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
