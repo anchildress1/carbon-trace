@@ -606,6 +606,38 @@ describe('app.js', () => {
     });
   });
 
+  // ── narration generation counter ──────────────────────────────────
+
+  describe('narration generation counter', () => {
+    it('ignores stale onend callback after scene change', async () => {
+      let capturedOnend;
+      playNarration.mockImplementation((src, onend) => {
+        capturedOnend = onend;
+      });
+
+      app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause(); // resume → SCENE_ACTIVE
+      app.advance(); // to scene-01
+      vi.advanceTimersByTime(500); // narration delay fires
+      expect(playNarration).toHaveBeenCalledWith('narration.mp3', expect.any(Function));
+
+      const staleOnend = capturedOnend;
+
+      // Navigate away (to credits) before narration ends
+      app.advance();
+      await vi.runAllTimersAsync();
+      expect(app.getState()).toBe('CREDITS');
+
+      // Fire the stale onend — should be ignored (generation changed)
+      vi.clearAllMocks();
+      staleOnend();
+      vi.advanceTimersByTime(5000);
+      // Should remain on credits, no auto-advance scheduled
+      expect(app.getState()).toBe('CREDITS');
+    });
+  });
+
   // ── replay narration ───────────────────────────────────────────────
 
   describe('replay narration', () => {

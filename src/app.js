@@ -194,7 +194,9 @@ function scheduleNarrationAudio(app, narration) {
   const holdAfterNarration =
     frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
 
+  const gen = app.generation;
   const onend = () => {
+    if (gen !== app.generation) return;
     if (shouldAutoAdvance(app, frame)) {
       scheduleAutoAdvance(app, holdAfterNarration);
     }
@@ -448,6 +450,7 @@ function completePendingNav(app) {
 }
 
 function cleanupCurrentScene(app) {
+  app.generation++;
   clearAutoAdvance(app);
   app.autoAdvanceTimerRemaining = null;
 
@@ -1085,6 +1088,7 @@ export function createApp() {
     autoAdvanceTimerDelay: null,
     autoAdvanceTimerRemaining: null,
     pendingNavIndex: null,
+    generation: 0,
     pendingPause: false,
     buffering: false,
     availableAudio: new Set(),
