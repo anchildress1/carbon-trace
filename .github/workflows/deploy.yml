@@ -34,29 +34,6 @@ jobs:
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
 
-      - name: Enable required GCP APIs
-        run: |
-          gcloud services enable \
-            artifactregistry.googleapis.com \
-            cloudbuild.googleapis.com \
-            run.googleapis.com \
-            --project "${PROJECT_ID}" \
-            --quiet
-
-      - name: Ensure Artifact Registry repository exists
-        run: |
-          if ! gcloud artifacts repositories describe "${SERVICE_NAME}" \
-              --location="${REGION}" \
-              --project="${PROJECT_ID}" \
-              --format="value(name)" &>/dev/null; then
-            gcloud artifacts repositories create "${SERVICE_NAME}" \
-              --repository-format=docker \
-              --location="${REGION}" \
-              --description="Docker images for ${SERVICE_NAME}" \
-              --project="${PROJECT_ID}" \
-              --quiet
-          fi
-
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 
