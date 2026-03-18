@@ -5,16 +5,18 @@
 ```mermaid
 graph TD
     main["main.js<br/>(entry point)"] --> app["app.js<br/>(orchestrator / state machine)"]
+    app --> canvas["canvas.js<br/>(scene rendering)"]
+    app --> effectsCanvas["effects-canvas.js<br/>(rAF render loop)"]
     app --> audio["audio.js<br/>(3-channel mixer)"]
     app --> text["text.js<br/>(ghost-drift timeline)"]
-    app --> effects["effects.js<br/>(per-frame visuals)"]
+    app --> effects["effects.js<br/>(effect registry)"]
     app --> overlay["overlay.js<br/>(progress dots + controls)"]
     app --> captions["captions.js<br/>(timed subtitles)"]
+    app --> loader["loader.js<br/>(audio preloading)"]
     app --> scenes["scenes.json<br/>(frame data)"]
 
     audio -.->|Howler.js| howler["howler"]
     text -.->|GSAP| gsap["gsap"]
-    effects -.->|GSAP| gsap
 ```
 
 ## State Machine
@@ -63,8 +65,12 @@ flowchart TD
 2. Build ghost-drift text timeline from `frame.narration.lines`.
 3. Show captions via `scheduleCaptionDisplay` (respects `narration.delay`).
 4. Populate `#accessible-narration` for screen readers.
-5. Schedule music if `frame.music` is present (with enter/exit timing).
-6. Schedule narration audio (with optional delay).
+5. Schedule narration audio (with optional delay).
+
+Music scheduling is handled separately in `showFrame`, not inside
+`applyNarration`. Music is an independent audio track with its own
+enter/exit timing — it starts when configured, fades as configured,
+and plays until configured end. Replay does not restart music.
 
 ## Modules
 
@@ -136,7 +142,9 @@ meta:
   frameDefaults: { textMode }
 
 frames[]:
-  id, frameType ("scene" | "credits"), description, image
+  id, frameType ("title" | "scene" | "credits"), description, image
+  holdUntilClick: true (wait for click) | false (auto-advance) | null (no advance, credits)
+  holdAfterNarration: ms after narration ends before auto-advance
   narration:
     lines[]: { text, enter (ms), exit (ms), x?, y?, align? }
     captions[]: { text, start (ms), end (ms) }
@@ -147,7 +155,6 @@ frames[]:
   effects: { idle, entry }
   traceOverlay: { opacity }
   transition: { type, duration }
-  advanceMode: "disabled" (credits)
 ```
 
 ## Deployment
@@ -155,8 +162,7 @@ frames[]:
 ```mermaid
 flowchart LR
     subgraph CI["GitHub Actions"]
-        A[Push to main] --> B[Build with Vite]
-        B --> C[Deploy to GitHub Pages]
+        A[Push to main] --> B[CI: lint + test + build]
     end
 
     subgraph Docker["Cloud Run"]
@@ -165,9 +171,10 @@ flowchart LR
         F --> G[nginx 1-alpine]
         G --> H[Serve on :8080]
     end
+
+    B --> D
 ```
 
-- **GitHub Pages**: static deploy on push to `main` via `deploy.yml`.
 - **Cloud Run**: multi-stage Docker build → nginx with gzip, security headers,
   and tiered cache (1yr immutable for hashed assets, 30d for media, no-cache
-  for HTML).
+  for HTML). Deployed to an existing verified domain via GitHub Actions CI/CD.
