@@ -215,13 +215,8 @@ function scheduleNarrationAudio(app, narration) {
   }
 }
 
-function applyNarration(app, frame) {
-  if (app.narrationTimer) {
-    clearTimeout(app.narrationTimer);
-    app.narrationTimer = null;
-    app.narrationTimerStart = null;
-    app.narrationTimerDelay = null;
-  }
+function buildNarration(app, frame) {
+  clearNarrationLayer(app.els.narrationLayer);
   clearCaptionElements(app.captionEntries);
 
   if (!frame.narration) {
@@ -267,6 +262,17 @@ function applyNarration(app, frame) {
   if (hasAudioRef) {
     scheduleNarrationAudio(app, frame.narration);
   }
+}
+
+function applyNarration(app, frame) {
+  if (app.narrationTimer) {
+    clearTimeout(app.narrationTimer);
+    app.narrationTimer = null;
+    app.narrationTimerStart = null;
+    app.narrationTimerDelay = null;
+  }
+
+  buildNarration(app, frame);
 }
 
 function applyAmbient(app, frame) {
@@ -863,37 +869,9 @@ function replayNarration(app) {
   }
   app.narrationTimerRemaining = null;
 
-  clearNarrationLayer(app.els.narrationLayer);
-  clearCaptionElements(app.captionEntries);
+  buildNarration(app, frame);
 
-  if (!frame.narration) return;
-
-  const hasLines = Array.isArray(frame.narration.lines) && frame.narration.lines.length > 0;
-  const hasCaptions =
-    Array.isArray(frame.narration.captions) && frame.narration.captions.length > 0;
-  const hasAudioRef = Boolean(frame.narration.audio);
-
-  if (hasLines) {
-    const result = buildNarrationTimeline(frame.narration.lines, app.els.narrationLayer, {
-      reducedMotion: prefersReducedMotion(),
-      captions: hasCaptions ? frame.narration.captions : undefined,
-      captionContainer: app.els.captionLayer,
-      captionDelay: frame.narration.delay || 0,
-      isCaptionEnabled: areCaptionsEnabled,
-    });
-    app.textTimeline = result.timeline;
-    app.captionEntries = result.captionEntries;
-    app.textTimeline.play(0);
-  }
-
-  if (frame.music) {
-    scheduleMusic(app, frame.music);
-  }
-
-  if (hasAudioRef) {
-    scheduleNarrationAudio(app, frame.narration);
-  }
-
+  if (app.textTimeline) app.textTimeline.play(0);
   setupAutoAdvance(app);
 
   if (frame.effects?.entry) {
