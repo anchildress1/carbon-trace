@@ -667,6 +667,16 @@ describe('app.js', () => {
       expect(playNarration).toHaveBeenCalledWith('narration.mp3', expect.any(Function));
     });
 
+    it('does not restart music on replay', () => {
+      vi.advanceTimersByTime(100); // music starts
+      vi.clearAllMocks();
+      document.getElementById('btn-replay').click();
+      vi.advanceTimersByTime(500);
+      // Replay should restart narration but NOT re-trigger music
+      expect(playNarration).toHaveBeenCalled();
+      expect(playMusic).not.toHaveBeenCalled();
+    });
+
     it('unpauses when replaying while paused', () => {
       app.togglePause();
       expect(app.getState()).toBe('PAUSED');

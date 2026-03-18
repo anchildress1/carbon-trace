@@ -257,10 +257,6 @@ function buildNarration(app, frame) {
 
   app.els.btnReplay.disabled = !(hasLines || hasAudioRef);
 
-  if (frame.music) {
-    scheduleMusic(app, frame.music);
-  }
-
   if (hasAudioRef) {
     scheduleNarrationAudio(app, frame.narration);
   }
@@ -344,6 +340,10 @@ function showFrame(app, index) {
   }
 
   applyAmbient(app, frame);
+
+  if (frame.music) {
+    scheduleMusic(app, frame.music);
+  }
 
   if (frame.phases) {
     startPhase(app, frame, 0);
