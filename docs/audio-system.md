@@ -154,16 +154,22 @@ Music supports:
 
 ## Ambient Crossfade
 
-When transitioning between scenes, ambient audio crossfades:
+When transitioning between scenes while playing, ambient audio crossfades:
 
 1. New Howl created at volume 0, starts playing.
 2. New ambient fades from 0 to target volume over the crossfade duration.
 3. Old ambient fades from current volume to 0 over the same duration.
 4. Old Howl unloaded after fade completes (+100ms buffer).
 
+When navigating while paused (hard cut), `cueAmbient` creates the Howl with
+`preload: true` but does not call `play()`. The ambient starts when the user
+resumes via `resumeAmbient()`. Same pattern applies to music via `cueMusic`.
+This satisfies ADR-002's hard rule: no transient playback during paused
+navigation.
+
 ## Pause/Resume Timer Math
 
-All scheduled timers (narration delay, music enter, music exit, phase duration)
+All scheduled timers (narration delay, music enter, music exit, auto-advance)
 use the same pattern:
 
 ```

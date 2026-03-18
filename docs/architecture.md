@@ -45,18 +45,15 @@ When a frame becomes active, `showFrame(index)` runs this sequence:
 
 ```mermaid
 flowchart TD
-    A[showFrame] --> B[Clear phase timer]
-    B --> C[Set image + alt text + trace overlay]
+    A[showFrame] --> C[Set image + alt text + trace overlay]
     C --> D[clearEffects + clearNarrationLayer]
     D --> E[Run idle effect if defined]
     E --> F[Update progress dots]
     F --> G[Update nav button states]
     G --> H[applyNarration]
     H --> I[applyAmbient]
-    I --> J{Has phases?}
-    J -- yes --> K[startPhase 0]
-    J -- no --> L[Pre-buffer next narration]
-    K --> L
+    I --> J[Schedule music if configured]
+    J --> L[Pre-buffer next narration]
 ```
 
 ### applyNarration
@@ -103,24 +100,15 @@ opacity fade when `prefers-reduced-motion` is active.
 
 ### effects.js (visual effects)
 
-Registry of named effect functions, each receiving a container element:
-
-| Effect | Type | Description |
-|--------|------|-------------|
-| `dust-drift` | Particle | 12 white particles drifting upward |
-| `dust-settle` | Particle | 10 tan particles settling downward |
-| `motion-drag` | Filter | Blur 2px → 0px transition |
-| `heat-pulse` | Filter | Blur + brightness pulse (infinite) |
-| `near-still-pulse` | Opacity | Pulse to 0.97 over 3s |
-| `machine-steady` | Opacity | Pulse to 0.95 over 1.5s |
-| `light-crack` | DOM | Gradient flash with scale |
-| `illumination-spread` | DOM | Radial glow, scale 0.3 → 1.5 |
-| `water-run` | DOM | Vertical gradient stream (loop) |
-| `assembly-micro` | Transform | Random micro-jitter |
-| `fade-in` | Opacity | Simple 0 → 1 over 0.8s |
+Registry of named effect functions. Currently a no-op skeleton — all scene
+effect references (`dust-drift`, `heat-pulse`, etc.) are declared in
+`scenes.json` but resolve to no-ops until canvas-based implementations are
+added. The API surface (`effectExists`, `runEffect`, `clearEffects`) is stable;
+`app.js` does not change when effects are wired in.
 
 Frames declare `effects.idle` (persistent) and `effects.entry` (triggered on
-click or replay).
+scene entry or replay). Effects will receive the effects canvas and scene canvas
+elements; see `effects-canvas.js` for the render loop.
 
 ### captions.js (timed subtitles)
 
