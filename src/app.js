@@ -306,14 +306,7 @@ function buildSceneIndexMap(frames) {
   return { byFrame, byScene };
 }
 
-function showFrame(app, index) {
-  if (app.phaseTimer) {
-    clearTimeout(app.phaseTimer);
-    app.phaseTimer = null;
-  }
-
-  const frame = app.frames[index];
-  app.els.sceneStage.setAttribute('aria-label', frame.description || '');
+function renderSceneImage(app, frame) {
   if (frame.image && app.imageCache.has(frame.image)) {
     const img = app.imageCache.get(frame.image);
     if (img) drawSceneImage(img);
@@ -323,6 +316,30 @@ function showFrame(app, index) {
   } else {
     clearScene();
   }
+}
+
+function prebufferNextScene(app, index) {
+  clearNarrationCache();
+  const nextFrame = app.frames[index + 1];
+  if (nextFrame?.image && !app.imageCache.has(nextFrame.image)) {
+    loadImage(nextFrame.image).then((img) => {
+      if (img) app.imageCache.set(nextFrame.image, img);
+    });
+  }
+  if (nextFrame?.narration?.audio) {
+    preloadNarrationAhead(nextFrame.narration.audio);
+  }
+}
+
+function showFrame(app, index) {
+  if (app.phaseTimer) {
+    clearTimeout(app.phaseTimer);
+    app.phaseTimer = null;
+  }
+
+  const frame = app.frames[index];
+  app.els.sceneStage.setAttribute('aria-label', frame.description || '');
+  renderSceneImage(app, frame);
   app.els.traceOverlay.style.opacity = frame.traceOverlay?.opacity ?? 0;
 
   clearCanvasEffects();
@@ -361,17 +378,7 @@ function showFrame(app, index) {
     startPhase(app, frame, 0);
   }
 
-  // Pre-buffer next scene's image and narration while current scene plays
-  clearNarrationCache();
-  const nextFrame = app.frames[index + 1];
-  if (nextFrame?.image && !app.imageCache.has(nextFrame.image)) {
-    loadImage(nextFrame.image).then((img) => {
-      if (img) app.imageCache.set(nextFrame.image, img);
-    });
-  }
-  if (nextFrame?.narration?.audio) {
-    preloadNarrationAhead(nextFrame.narration.audio);
-  }
+  prebufferNextScene(app, index);
 }
 
 function startPhase(app, frame, pi) {
