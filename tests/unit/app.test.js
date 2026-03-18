@@ -767,6 +767,50 @@ describe('app.js', () => {
       vi.advanceTimersByTime(500); // narration delay fires
       expect(playNarration).toHaveBeenCalled();
     });
+
+    it('clears auto-advance timer on replay while paused', () => {
+      // Scene is playing with auto-advance pending
+      vi.advanceTimersByTime(500); // narration delay fires, narration plays
+      vi.clearAllMocks();
+      app.togglePause();
+      document.getElementById('btn-replay').click();
+      // Resume — auto-advance should be re-armed fresh, not from stale timer
+      app.togglePause();
+      vi.advanceTimersByTime(500); // narration delay fires again
+      expect(playNarration).toHaveBeenCalled();
+    });
+
+    it('multiple replays while paused are idempotent', () => {
+      app.togglePause();
+      document.getElementById('btn-replay').click();
+      vi.clearAllMocks();
+      document.getElementById('btn-replay').click();
+      document.getElementById('btn-replay').click();
+      expect(app.getState()).toBe('PAUSED');
+      expect(cueNarration).toHaveBeenCalledTimes(2);
+      expect(playNarration).not.toHaveBeenCalled();
+    });
+
+    it('clears buffering state on replay', () => {
+      app.togglePause();
+      // Simulate buffering state
+      const stage = document.getElementById('scene-stage');
+      stage.classList.add('buffering');
+      document.getElementById('btn-replay').click();
+      expect(stage.classList.contains('buffering')).toBe(false);
+    });
+
+    it('replayPending is cleared on navigation after replay-while-paused', async () => {
+      app.togglePause();
+      document.getElementById('btn-replay').click();
+      vi.clearAllMocks();
+      // Navigate to next scene instead of resuming
+      app.advance();
+      await vi.runAllTimersAsync();
+      // Resume on the new scene — should do normal resume, not replay path
+      app.togglePause(); // resume
+      expect(resumeNarration).toHaveBeenCalled();
+    });
   });
 
   // ── captions toggle ────────────────────────────────────────────────
@@ -846,17 +890,17 @@ describe('app.js', () => {
     });
   });
 
-  // ── document click ─────────────────────────────────────────────────
+  // ── stage click ────────────────────────────────────────────────────
 
-  describe('document click', () => {
-    it('advances on click outside controls', async () => {
+  describe('stage click', () => {
+    it('does not advance on click outside controls', async () => {
       app = createApp();
       await vi.runAllTimersAsync();
       app.togglePause();
       vi.clearAllMocks();
       document.getElementById('scene-stage').click();
       await vi.runAllTimersAsync();
-      expect(stopNarration).toHaveBeenCalled();
+      expect(stopNarration).not.toHaveBeenCalled();
     });
   });
 

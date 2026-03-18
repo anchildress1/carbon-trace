@@ -46,17 +46,19 @@ test.describe('carbon-trace narrative', () => {
   test('clicking scene area does not advance the scene', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
-    // Dismiss play gate first so stage click reaches the stage
-    await page.click('#play-gate');
-    await expect(page.locator('#play-gate')).toBeHidden({ timeout: 3000 });
-
+    // App starts paused. Navigate to scene-01 via btn-next (hardCut, stays paused).
+    await page.click('#btn-next');
     const stage = page.locator('#scene-stage');
-    const labelBefore = await stage.getAttribute('aria-label');
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
 
+    // Click the stage area multiple times — none should advance
     await page.click('#scene-stage');
+    await page.click('#scene-stage');
+    await page.click('#scene-stage');
+    await page.waitForTimeout(500);
 
     const labelAfter = await stage.getAttribute('aria-label');
-    expect(labelAfter).toBe(labelBefore);
+    expect(labelAfter).toBe(frameDescription(1));
   });
 
   test('forward button advances scene', async ({ page }) => {
