@@ -12,7 +12,7 @@ if ! command -v gcloud &> /dev/null; then
   exit 1
 fi
 
-PROJECT_ID=$(gcloud config get-value project 2>/dev/null)
+PROJECT_ID="${PROJECT_ID:-$(gcloud config get-value project 2>/dev/null)}"
 if [ -z "$PROJECT_ID" ]; then
   echo "ERROR: No GCP project set. Run: gcloud config set project <PROJECT_ID>"
   exit 1
