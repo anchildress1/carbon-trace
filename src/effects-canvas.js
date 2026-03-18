@@ -1,7 +1,8 @@
 /**
- * Canvas 2D lifecycle — manages the effects canvas context, DPR-aware
- * sizing, and the render loop. Individual effects will be registered
- * and dispatched through this module.
+ * Canvas 2D lifecycle — manages the effects overlay canvas context,
+ * DPR-aware sizing, and the requestAnimationFrame render loop. Effect
+ * drawing calls are inserted into the render loop by the orchestrator;
+ * the registry and dispatch live in effects.js.
  *
  * Respects prefers-reduced-motion: the render loop will not start (and
  * will self-stop) when the user prefers reduced motion.
@@ -58,16 +59,13 @@ export function initCanvas(el) {
   canvasEl = el;
   ctx = canvasEl.getContext('2d');
   if (!ctx) {
-    console.error('Failed to acquire 2D canvas context — effects will be disabled');
     canvasEl = null;
-    return null;
+    throw new Error('Failed to acquire 2D effects canvas context');
   }
 
   sizeCanvas();
 
-  observer = new ResizeObserver(() => {
-    sizeCanvas();
-  });
+  observer = new ResizeObserver(sizeCanvas);
   observer.observe(canvasEl);
 
   return ctx;

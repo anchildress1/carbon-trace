@@ -105,16 +105,13 @@ describe('canvas.js', () => {
       expect(() => initSceneCanvas(null)).toThrow();
     });
 
-    it('returns null and logs error when getContext returns null', () => {
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    it('throws when getContext returns null', () => {
       const canvas = document.createElement('canvas');
       vi.spyOn(canvas, 'getContext').mockReturnValue(null);
 
-      const ctx = initSceneCanvas(canvas);
-
-      expect(ctx).toBeNull();
-      expect(errorSpy).toHaveBeenCalledWith('Failed to acquire 2D canvas context');
-      errorSpy.mockRestore();
+      expect(() => initSceneCanvas(canvas)).toThrow(
+        'Failed to acquire 2D scene canvas context',
+      );
     });
 
     it('destroys previous canvas before initializing new one', () => {
@@ -239,13 +236,15 @@ describe('canvas.js', () => {
       expect(p1).toBe(p2);
     });
 
-    it('resolves with null on error', async () => {
+    it('resolves with null on error and evicts from cache', async () => {
       vi.useFakeTimers();
       vi.spyOn(console, 'warn').mockImplementation(() => {});
       const p = loadImage('bad://fail.webp');
       vi.advanceTimersByTime(1);
       const img = await p;
       expect(img).toBeNull();
+      // Failed load should be evicted so retry is possible
+      expect(getImageCache().has('bad://fail.webp')).toBe(false);
       vi.useRealTimers();
     });
   });

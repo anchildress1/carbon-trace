@@ -1,10 +1,13 @@
 /**
  * Canvas 2D — scene image rendering with cover-fit, DPR-aware sizing,
- * and resize handling. Exposes the context for effects.js pixel access.
+ * and resize handling. Exposes the scene canvas context via
+ * getSceneContext() for future pixel-level effects (e.g., ripple, bloom)
+ * that need to read the scene image data.
  *
  * Images are drawn to canvas via ctx.drawImage() with cover-fit logic
  * (same behaviour as CSS object-fit: cover). This is the primary
- * rendering surface — required for v2 pixel effects on the scene image.
+ * rendering surface — required for pixel effects that read scene image
+ * data via getImageData/putImageData.
  */
 
 let ctx = null;
@@ -71,9 +74,8 @@ export function initSceneCanvas(el) {
   canvasEl = el;
   ctx = canvasEl.getContext('2d');
   if (!ctx) {
-    console.error('Failed to acquire 2D canvas context');
     canvasEl = null;
-    return null;
+    throw new Error('Failed to acquire 2D scene canvas context');
   }
 
   sizeCanvas();
@@ -118,6 +120,11 @@ export function getSceneContext() {
   return ctx;
 }
 
+/**
+ * Load an image and cache the resulting promise. Concurrent calls for
+ * the same src share one in-flight request. Failed loads are evicted
+ * from the cache so a subsequent call can retry.
+ */
 export function loadImage(src) {
   if (imageCache.has(src)) return imageCache.get(src);
 
@@ -125,6 +132,7 @@ export function loadImage(src) {
     const img = new Image();
     img.onload = () => resolve(img);
     img.onerror = () => {
+      imageCache.delete(src);
       console.warn(`Failed to load image: ${src}`);
       resolve(null);
     };

@@ -122,22 +122,13 @@ describe('effects-canvas.js', () => {
       expect(() => initCanvas(undefined)).toThrow('initCanvas requires a <canvas> element');
     });
 
-    it('returns null and logs error when getContext returns null', () => {
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    it('throws when getContext returns null', () => {
       const canvas = document.createElement('canvas');
       vi.spyOn(canvas, 'getContext').mockReturnValue(null);
-      vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
-        width: 1920, height: 1080, top: 0, left: 0,
-        right: 1920, bottom: 1080, x: 0, y: 0, toJSON: () => {},
-      });
 
-      const ctx = initCanvas(canvas);
-
-      expect(ctx).toBeNull();
-      expect(errorSpy).toHaveBeenCalledWith(
-        'Failed to acquire 2D canvas context — effects will be disabled',
+      expect(() => initCanvas(canvas)).toThrow(
+        'Failed to acquire 2D effects canvas context',
       );
-      errorSpy.mockRestore();
     });
 
     it('destroys previous canvas before initializing new one', () => {
