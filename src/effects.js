@@ -9,7 +9,7 @@
 const effects = Object.create(null);
 
 export function effectExists(name) {
-  return typeof name === 'string' && Object.prototype.hasOwnProperty.call(effects, name);
+  return typeof name === 'string' && Object.hasOwn(effects, name);
 }
 
 export function runEffect(name, effectsCanvas, sceneCanvas) {
