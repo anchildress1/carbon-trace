@@ -5,16 +5,18 @@
 ```mermaid
 graph TD
     main["main.js<br/>(entry point)"] --> app["app.js<br/>(orchestrator / state machine)"]
+    app --> canvas["canvas.js<br/>(scene rendering)"]
+    app --> effectsCanvas["effects-canvas.js<br/>(rAF render loop)"]
     app --> audio["audio.js<br/>(3-channel mixer)"]
     app --> text["text.js<br/>(ghost-drift timeline)"]
-    app --> effects["effects.js<br/>(per-frame visuals)"]
+    app --> effects["effects.js<br/>(effect registry)"]
     app --> overlay["overlay.js<br/>(progress dots + controls)"]
     app --> captions["captions.js<br/>(timed subtitles)"]
+    app --> loader["loader.js<br/>(audio preloading)"]
     app --> scenes["scenes.json<br/>(frame data)"]
 
     audio -.->|Howler.js| howler["howler"]
     text -.->|GSAP| gsap["gsap"]
-    effects -.->|GSAP| gsap
 ```
 
 ## State Machine
@@ -25,7 +27,7 @@ stateDiagram-v2
     LOADING --> PAUSED : preloadAssets → showFrame(0) → start paused
 
     PAUSED --> SCENE_ACTIVE : doResume() / first play
-    PAUSED --> TRANSITIONING : navigate while paused
+    PAUSED --> TRANSITIONING : navigate (clears pause, hard-jumps)
 
     SCENE_ACTIVE --> PAUSED : doPause()
     SCENE_ACTIVE --> TRANSITIONING : advance() / retreat()
@@ -43,28 +45,32 @@ When a frame becomes active, `showFrame(index)` runs this sequence:
 
 ```mermaid
 flowchart TD
-    A[showFrame] --> B[Clear phase timer]
-    B --> C[Set image + alt text + trace overlay]
+    A[showFrame] --> C[Set image + alt text + trace overlay]
     C --> D[clearEffects + clearNarrationLayer]
     D --> E[Run idle effect if defined]
-    E --> F[Update progress dots]
+    E --> E2[Resume effects canvas render loop]
+    E2 --> F[Update progress dots]
     F --> G[Update nav button states]
     G --> H[applyNarration]
     H --> I[applyAmbient]
-    I --> J{Has phases?}
-    J -- yes --> K[startPhase 0]
-    J -- no --> L[Pre-buffer next narration]
-    K --> L
+    I --> J[Schedule music if configured]
+    J --> L[Pre-buffer next scene image + narration]
 ```
 
 ### applyNarration
 
-1. Clear pending narration timer and caption delay timer.
-2. Build ghost-drift text timeline from `frame.narration.lines`.
-3. Show captions via `scheduleCaptionDisplay` (respects `narration.delay`).
-4. Populate `#accessible-narration` for screen readers.
-5. Schedule music if `frame.music` is present (with enter/exit timing).
-6. Schedule narration audio (with optional delay).
+1. Clear pending narration timer.
+2. Build ghost-drift text timeline from `frame.narration.lines` via
+   `buildNarrationTimeline`, which also embeds caption show/hide calls
+   directly into the GSAP timeline (respects `narration.delay` offset).
+3. Populate `#accessible-narration` for screen readers (prefers captions
+   text when available, falls back to narration lines).
+4. Schedule narration audio (with optional delay) or cue it if paused.
+
+Music scheduling is handled separately in `showFrame`, not inside
+`applyNarration`. Music is an independent audio track with its own
+enter/exit timing — it starts when configured, fades as configured,
+and plays until configured end. Replay does not restart music.
 
 ## Modules
 
@@ -97,29 +103,23 @@ opacity fade when `prefers-reduced-motion` is active.
 
 ### effects.js (visual effects)
 
-Registry of named effect functions, each receiving a container element:
-
-| Effect | Type | Description |
-|--------|------|-------------|
-| `dust-drift` | Particle | 12 white particles drifting upward |
-| `dust-settle` | Particle | 10 tan particles settling downward |
-| `motion-drag` | Filter | Blur 2px → 0px transition |
-| `heat-pulse` | Filter | Blur + brightness pulse (infinite) |
-| `near-still-pulse` | Opacity | Pulse to 0.97 over 3s |
-| `machine-steady` | Opacity | Pulse to 0.95 over 1.5s |
-| `light-crack` | DOM | Gradient flash with scale |
-| `illumination-spread` | DOM | Radial glow, scale 0.3 → 1.5 |
-| `water-run` | DOM | Vertical gradient stream (loop) |
-| `assembly-micro` | Transform | Random micro-jitter |
-| `fade-in` | Opacity | Simple 0 → 1 over 0.8s |
+Registry of named effect functions. Currently a no-op skeleton — all scene
+effect references (`dust-drift`, `heat-pulse`, etc.) are declared in
+`scenes.json` but resolve to no-ops until canvas-based implementations are
+added. The API surface (`effectExists`, `runEffect`, `clearEffects`) is stable;
+`app.js` does not change when effects are wired in.
 
 Frames declare `effects.idle` (persistent) and `effects.entry` (triggered on
-click or replay).
+scene entry or replay). Effects will receive the effects canvas and scene canvas
+elements; see `effects-canvas.js` for the render loop.
 
 ### captions.js (timed subtitles)
 
-Manages a caption timeline synchronized to narration playback.
-See [accessibility.md](accessibility.md) for integration details.
+Manages caption preference persistence (`localStorage`) and provides
+`syncCaptionsToTime` for mid-scene caption sync when toggling captions on.
+Caption show/hide scheduling is embedded in the GSAP timeline built by
+`text.js`, not driven by separate timers. See [accessibility.md](accessibility.md)
+for integration details.
 
 ### overlay.js (progress + controls)
 
@@ -133,21 +133,23 @@ mute, captions, replay, and next buttons.
 meta:
   title, author, aspectRatio
   defaultTransition: { type, duration }
+  defaultHoldAfterNarration: ms (fallback for frames without explicit hold)
   frameDefaults: { textMode }
 
 frames[]:
-  id, frameType ("scene" | "credits"), description, image
+  id, frameType ("title" | "scene" | "credits"), description, image
+  holdUntilClick: true (wait for click) | false (auto-advance) | null (no advance, credits)
+  holdAfterNarration: ms after narration ends before auto-advance
   narration:
-    lines[]: { text, enter (ms), exit (ms), x?, y?, align? }
+    lines[]: { text, enter (ms), exit (ms), x? (vw), y? (vh), align? ("left"|"center"|"right") }
     captions[]: { text, start (ms), end (ms) }
     audio: path to .m4a
-    delay: ms before narration starts
+    delay: ms before narration starts (offsets caption timing too)
   ambient: { src, volume, loop }
   music: { src, startVolume, fullVolume, crescendoMs, enter, exit }
-  effects: { idle, entry }
+  effects: { idle: "effect-name"|null, entry: "effect-name"|null }
   traceOverlay: { opacity }
   transition: { type, duration }
-  advanceMode: "disabled" (credits)
 ```
 
 ## Deployment
@@ -155,8 +157,7 @@ frames[]:
 ```mermaid
 flowchart LR
     subgraph CI["GitHub Actions"]
-        A[Push to main] --> B[Build with Vite]
-        B --> C[Deploy to GitHub Pages]
+        A[Push to main] --> B[CI: lint + test + build]
     end
 
     subgraph Docker["Cloud Run"]
@@ -165,9 +166,10 @@ flowchart LR
         F --> G[nginx 1-alpine]
         G --> H[Serve on :8080]
     end
+
+    B --> D
 ```
 
-- **GitHub Pages**: static deploy on push to `main` via `deploy.yml`.
 - **Cloud Run**: multi-stage Docker build → nginx with gzip, security headers,
   and tiered cache (1yr immutable for hashed assets, 30d for media, no-cache
-  for HTML).
+  for HTML). Deployed to an existing verified domain via GitHub Actions CI/CD.

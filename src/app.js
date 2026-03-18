@@ -2,8 +2,10 @@ import { gsap } from 'gsap';
 import scenesData from './scenes.json';
 import {
   playAmbient,
+  cueAmbient,
   crossfadeAmbient,
   playNarration,
+  cueNarration,
   stopNarration,
   pauseNarration,
   resumeNarration,
@@ -14,22 +16,35 @@ import {
   preloadNarrationAhead,
   clearNarrationCache,
   playMusic,
+  cueMusic,
   fadeMusic,
   pauseMusic,
   resumeMusic,
   stopMusic,
 } from './audio.js';
-import { buildTextTimeline, clearNarrationLayer } from './text.js';
-import { runEffect, clearEffects, effectExists } from './effects.js';
+import { buildNarrationTimeline, clearNarrationLayer } from './text.js';
+import { runEffect, clearEffects } from './effects.js';
+import {
+  initCanvas,
+  pause as pauseCanvas,
+  resume as resumeCanvas,
+  clearAll as clearCanvasEffects,
+} from './effects-canvas.js';
 import { initOverlay, updateProgress, showControls } from './overlay.js';
+import {
+  initSceneCanvas,
+  drawImage as drawSceneImage,
+  clearScene,
+  drawFallback,
+  loadImage,
+} from './canvas.js';
+import { preloadFirstFrameAudio, preloadBackgroundAudio } from './loader.js';
 import {
   initCaptions,
   setCaptionsEnabled,
-  showCaptions,
-  clearCaptions,
-  pauseCaptions,
-  resumeCaptions,
   areCaptionsEnabled,
+  syncCaptionsToTime,
+  clearCaptionElements,
 } from './captions.js';
 
 const State = Object.freeze({
@@ -44,17 +59,6 @@ const STATE_BY_FRAME_TYPE = {
   credits: State.CREDITS,
 };
 
-function validateEffects(frames) {
-  for (const frame of frames) {
-    for (const key of ['idle', 'entry']) {
-      const name = frame.effects?.[key];
-      if (name && !effectExists(name)) {
-        console.error(`Frame "${frame.id}" references unknown effect "${name}"`);
-      }
-    }
-  }
-}
-
 function applyFrameDefaults(scenesJson) {
   const defaults = scenesJson.meta.frameDefaults || {};
   return scenesJson.frames.map((frame) => ({ ...defaults, ...frame }));
@@ -62,45 +66,6 @@ function applyFrameDefaults(scenesJson) {
 
 function prefersReducedMotion() {
   return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
-
-function preloadImage(src) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = resolve;
-    img.onerror = () => {
-      console.warn(`Failed to load image: ${src}`);
-      resolve();
-    };
-    img.src = src;
-  });
-}
-
-function preloadAudio(src) {
-  return new Promise((resolve) => {
-    const audio = new Audio();
-    audio.preload = 'metadata';
-
-    const timeout = setTimeout(() => {
-      console.warn(`Audio preload timed out: ${src}`);
-      resolve(null);
-    }, 5000);
-
-    audio.onloadedmetadata = () => {
-      clearTimeout(timeout);
-      resolve(src);
-    };
-    audio.onerror = () => {
-      clearTimeout(timeout);
-      console.warn(`Failed to preload audio: ${src}`);
-      resolve(null);
-    };
-    audio.src = src;
-  });
-}
-
-function audioSrcsFromEntry(entry) {
-  return [entry.ambient?.src, entry.narration?.audio, entry.music?.src].filter(Boolean);
 }
 
 function registerAudio(app, loaded) {
@@ -112,32 +77,20 @@ function registerAudio(app, loaded) {
   }
 }
 
-function preloadFirstFrameAudio(app) {
-  const srcs = audioSrcsFromEntry(app.frames[0]);
-  for (const src of srcs) {
-    preloadAudio(src)
-      .then((loaded) => registerAudio(app, loaded))
-      .catch((err) => console.warn('First frame audio preload failed:', err));
-  }
+async function preloadFirstFrameImage(app) {
+  const firstFrame = app.frames[0];
+  if (!firstFrame?.image) return;
+  const img = await loadImage(firstFrame.image);
+  if (img) app.imageCache.set(firstFrame.image, img);
 }
 
-async function preloadBackgroundAssets(app) {
-  const firstFrameSrcs = new Set(audioSrcsFromEntry(app.frames[0]));
-
+async function preloadBackgroundImages(app) {
   for (const frame of app.frames.slice(1)) {
-    if (frame.image) await preloadImage(frame.image);
-    for (const src of audioSrcsFromEntry(frame)) {
-      if (!firstFrameSrcs.has(src)) {
-        const loaded = await preloadAudio(src);
-        registerAudio(app, loaded);
-      }
+    if (frame.image && !app.imageCache.has(frame.image)) {
+      const img = await loadImage(frame.image);
+      if (img) app.imageCache.set(frame.image, img);
     }
   }
-}
-
-function preloadAssets(app) {
-  const firstFrame = app.frames[0];
-  return firstFrame?.image ? preloadImage(firstFrame.image) : Promise.resolve();
 }
 
 function clearMusicTimer(app) {
@@ -147,6 +100,63 @@ function clearMusicTimer(app) {
     app.musicTimerStart = null;
     app.musicTimerDelay = null;
   }
+}
+
+function clearAutoAdvance(app) {
+  if (app.autoAdvanceTimer) {
+    clearTimeout(app.autoAdvanceTimer);
+    app.autoAdvanceTimer = null;
+    app.autoAdvanceTimerStart = null;
+    app.autoAdvanceTimerDelay = null;
+  }
+}
+
+function scheduleAutoAdvance(app, delay) {
+  clearAutoAdvance(app);
+  app.autoAdvanceTimerStart = Date.now();
+  app.autoAdvanceTimerDelay = delay;
+  app.autoAdvanceTimer = setTimeout(() => {
+    app.autoAdvanceTimer = null;
+    app.autoAdvanceTimerStart = null;
+    app.autoAdvanceTimerDelay = null;
+    if (app.paused || app.state === State.TRANSITIONING) return;
+    advance(app);
+  }, delay);
+}
+
+function shouldAutoAdvance(app, frame) {
+  // holdUntilClick: true = wait for click (no auto-advance), false = auto-advance after narration, null = no advance allowed (credits)
+  if (frame.holdUntilClick === true || frame.holdUntilClick === null) return false;
+  if (app.currentIndex >= app.frames.length - 1) return false;
+  return true;
+}
+
+function setupAutoAdvance(app) {
+  clearAutoAdvance(app);
+  const frame = app.frames[app.currentIndex];
+  if (!shouldAutoAdvance(app, frame)) return;
+
+  const holdAfterNarration =
+    frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
+
+  // For scenes without narration audio, schedule immediately on landing
+  if (!frame.narration?.audio) {
+    scheduleAutoAdvance(app, holdAfterNarration);
+  }
+  // For scenes with narration audio, the Howler end callback in
+  // scheduleNarrationAudio triggers scheduleAutoAdvance
+}
+
+function scheduleMusicExitFade(app, fadeOutDelay) {
+  if (fadeOutDelay <= 0) return;
+  app.musicExitTimerStart = Date.now();
+  app.musicExitTimerDelay = fadeOutDelay;
+  app.musicExitTimer = setTimeout(() => {
+    app.musicExitTimer = null;
+    app.musicExitTimerStart = null;
+    app.musicExitTimerDelay = null;
+    fadeMusic(0, 2000);
+  }, fadeOutDelay);
 }
 
 function scheduleMusic(app, music) {
@@ -162,17 +172,7 @@ function scheduleMusic(app, music) {
     fadeMusic(music.fullVolume, music.crescendoMs);
 
     if (music.exit !== null && music.exit !== undefined) {
-      const fadeOutDelay = music.exit - enter;
-      if (fadeOutDelay > 0) {
-        app.musicExitTimerStart = Date.now();
-        app.musicExitTimerDelay = fadeOutDelay;
-        app.musicExitTimer = setTimeout(() => {
-          app.musicExitTimer = null;
-          app.musicExitTimerStart = null;
-          app.musicExitTimerDelay = null;
-          fadeMusic(0, 2000);
-        }, fadeOutDelay);
-      }
+      scheduleMusicExitFade(app, music.exit - enter);
     }
   };
 
@@ -185,7 +185,22 @@ function scheduleMusic(app, music) {
   }
 }
 
+function makeNarrationEndCallback(app, frame, holdAfterNarration) {
+  const gen = app.generation;
+  return () => {
+    if (gen !== app.generation) return;
+    if (shouldAutoAdvance(app, frame)) {
+      scheduleAutoAdvance(app, holdAfterNarration);
+    }
+  };
+}
+
 function scheduleNarrationAudio(app, narration) {
+  const frame = app.frames[app.currentIndex];
+  const holdAfterNarration =
+    frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
+  const onend = makeNarrationEndCallback(app, frame, holdAfterNarration);
+
   const delay = narration.delay || 0;
   if (delay > 0) {
     app.narrationTimerStart = Date.now();
@@ -194,29 +209,65 @@ function scheduleNarrationAudio(app, narration) {
       app.narrationTimer = null;
       app.narrationTimerStart = null;
       app.narrationTimerDelay = null;
-      playNarration(narration.audio);
+      playNarration(narration.audio, onend);
     }, delay);
   } else {
-    playNarration(narration.audio);
+    playNarration(narration.audio, onend);
   }
 }
 
-function scheduleCaptionDisplay(app, frame) {
-  if (app.captionDelayTimer) {
-    clearTimeout(app.captionDelayTimer);
-    app.captionDelayTimer = null;
+function buildNarration(app, frame) {
+  try {
+    app.textTimeline?.kill();
+  } catch (err) {
+    console.error('Failed to kill text timeline:', err);
+  }
+  app.textTimeline = null;
+  clearNarrationLayer(app.els.narrationLayer);
+  clearCaptionElements(app.captionEntries);
+
+  if (!frame.narration) {
+    app.els.accessibleNarration.textContent = '';
+    app.els.btnReplay.disabled = true;
+    app.textTimeline = null;
+    app.captionEntries = [];
+    return;
   }
 
-  const captionDelay = frame.narration.delay || 0;
-  if (captionDelay > 0) {
-    app.captionDelayTimer = setTimeout(() => {
-      app.captionDelayTimer = null;
-      if (app.frames[app.currentIndex] === frame && !app.paused) {
-        showCaptions(frame.narration.captions, app.els.captionLayer);
-      }
-    }, captionDelay);
+  const hasLines = Array.isArray(frame.narration.lines) && frame.narration.lines.length > 0;
+  const hasCaptions =
+    Array.isArray(frame.narration.captions) && frame.narration.captions.length > 0;
+  const hasAudioRef = Boolean(frame.narration.audio);
+
+  if (hasLines) {
+    const result = buildNarrationTimeline(frame.narration.lines, app.els.narrationLayer, {
+      reducedMotion: prefersReducedMotion(),
+      captions: hasCaptions ? frame.narration.captions : undefined,
+      captionContainer: app.els.captionLayer,
+      captionDelay: frame.narration.delay || 0,
+      isCaptionEnabled: areCaptionsEnabled,
+    });
+    app.textTimeline = result.timeline;
+    app.captionEntries = result.captionEntries;
   } else {
-    showCaptions(frame.narration.captions, app.els.captionLayer);
+    app.textTimeline = null;
+    app.captionEntries = [];
+  }
+
+  if (hasCaptions) {
+    app.els.accessibleNarration.textContent = frame.narration.captions.map((c) => c.text).join(' ');
+  } else if (hasLines) {
+    app.els.accessibleNarration.textContent = frame.narration.lines.map((l) => l.text).join(' ');
+  } else {
+    app.els.accessibleNarration.textContent = '';
+  }
+
+  app.els.btnReplay.disabled = !(hasLines || hasAudioRef);
+
+  if (hasAudioRef && !app.cueOnly) {
+    scheduleNarrationAudio(app, frame.narration);
+  } else if (hasAudioRef && app.cueOnly) {
+    cueNarration(frame.narration.audio);
   }
 }
 
@@ -227,62 +278,22 @@ function applyNarration(app, frame) {
     app.narrationTimerStart = null;
     app.narrationTimerDelay = null;
   }
-  if (app.captionDelayTimer) {
-    clearTimeout(app.captionDelayTimer);
-    app.captionDelayTimer = null;
-  }
 
-  clearCaptions();
-
-  if (!frame.narration) {
-    app.els.accessibleNarration.textContent = '';
-    app.els.btnReplay.disabled = true;
-    app.textTimeline = null;
-    return;
-  }
-
-  const hasLines = Array.isArray(frame.narration.lines) && frame.narration.lines.length > 0;
-  const hasCaptions =
-    Array.isArray(frame.narration.captions) && frame.narration.captions.length > 0;
-  const hasAudioRef = Boolean(frame.narration.audio);
-
-  if (hasLines) {
-    app.textTimeline = buildTextTimeline(
-      frame.narration.lines,
-      app.els.narrationLayer,
-      prefersReducedMotion(),
-    );
-  } else {
-    app.textTimeline = null;
-  }
-
-  if (hasCaptions) {
-    app.els.accessibleNarration.textContent = frame.narration.captions.map((c) => c.text).join(' ');
-    if (areCaptionsEnabled()) {
-      scheduleCaptionDisplay(app, frame);
-    }
-  } else {
-    app.els.accessibleNarration.textContent = '';
-  }
-
-  app.els.btnReplay.disabled = !(hasLines || hasAudioRef);
-
-  if (frame.music) {
-    scheduleMusic(app, frame.music);
-  }
-
-  if (hasAudioRef) {
-    scheduleNarrationAudio(app, frame.narration);
-  }
+  buildNarration(app, frame);
 }
 
 function applyAmbient(app, frame) {
   if (!frame.ambient) return;
 
+  if (app.cueOnly) {
+    cueAmbient(frame.ambient.src, frame.ambient.volume, frame.ambient.loop);
+    return;
+  }
+
   if (app.currentIndex === 0) {
     playAmbient(frame.ambient.src, frame.ambient.volume, frame.ambient.loop);
   } else {
-    crossfadeAmbient(frame.ambient.src, frame.ambient.volume, 800);
+    crossfadeAmbient(frame.ambient.src, frame.ambient.volume, 800, frame.ambient.loop);
   }
 }
 
@@ -300,27 +311,49 @@ function buildSceneIndexMap(frames) {
   return { byFrame, byScene };
 }
 
-function showFrame(app, index) {
-  if (app.phaseTimer) {
-    clearTimeout(app.phaseTimer);
-    app.phaseTimer = null;
-  }
-
-  const frame = app.frames[index];
-  app.els.sceneImage.alt = frame.description || '';
-  if (frame.image) {
-    app.els.sceneImage.src = frame.image;
+function renderSceneImage(app, frame) {
+  if (frame.image && app.imageCache.has(frame.image)) {
+    const img = app.imageCache.get(frame.image);
+    if (img) drawSceneImage(img);
+    else drawFallback();
+  } else if (frame.image) {
+    drawFallback();
   } else {
-    app.els.sceneImage.removeAttribute('src');
+    clearScene();
   }
+}
+
+function prebufferNextScene(app, index) {
+  clearNarrationCache();
+  const nextFrame = app.frames[index + 1];
+  if (nextFrame?.image && !app.imageCache.has(nextFrame.image)) {
+    loadImage(nextFrame.image).then((img) => {
+      if (img) app.imageCache.set(nextFrame.image, img);
+    });
+  }
+  if (nextFrame?.narration?.audio) {
+    preloadNarrationAhead(nextFrame.narration.audio);
+  }
+}
+
+function showFrame(app, index) {
+  const frame = app.frames[index];
+  app.els.sceneStage.setAttribute('aria-label', frame.description || '');
+  renderSceneImage(app, frame);
   app.els.traceOverlay.style.opacity = frame.traceOverlay?.opacity ?? 0;
 
-  clearEffects(app.els.effectsLayer);
+  clearCanvasEffects();
+  clearEffects();
   clearNarrationLayer(app.els.narrationLayer);
 
   if (frame.effects?.idle) {
-    runEffect(frame.effects.idle, app.els.effectsLayer);
+    runEffect(frame.effects.idle, app.els.effectsCanvas, app.els.sceneCanvas);
   }
+
+  // Start the effects render loop early so it is already running when the
+  // fade-in begins. Without this, effects would appear to 'pop in' after
+  // the transition completes.
+  resumeCanvas();
 
   const sceneIdx = app.sceneMap.byFrame.get(index);
   if (sceneIdx !== undefined) {
@@ -328,50 +361,24 @@ function showFrame(app, index) {
   }
 
   updateNavButtons(app);
-  applyNarration(app, frame);
+
+  if (app.userHasInteracted) {
+    applyNarration(app, frame);
+  } else {
+    app.els.btnReplay.disabled = true;
+  }
+
   applyAmbient(app, frame);
 
-  if (frame.phases) {
-    startPhase(app, frame, 0);
-  }
-
-  // Pre-buffer next scene's narration audio while current scene plays
-  clearNarrationCache();
-  const nextFrame = app.frames[index + 1];
-  if (nextFrame?.narration?.audio) {
-    preloadNarrationAhead(nextFrame.narration.audio);
-  }
-}
-
-function startPhase(app, frame, pi) {
-  const phase = frame.phases[pi];
-  if (!phase) return;
-
-  clearNarrationLayer(app.els.narrationLayer);
-
-  if (phase.narration?.lines?.length > 0) {
-    app.textTimeline = buildTextTimeline(
-      phase.narration.lines,
-      app.els.narrationLayer,
-      prefersReducedMotion(),
-    );
-    app.els.accessibleNarration.textContent = phase.narration.lines.map((l) => l.text).join(' ');
-
-    if (phase.narration.audio) {
-      playNarration(phase.narration.audio);
+  if (frame.music) {
+    if (app.cueOnly) {
+      cueMusic(frame.music.src, frame.music.startVolume);
+    } else {
+      scheduleMusic(app, frame.music);
     }
   }
 
-  if (phase.ambient) {
-    crossfadeAmbient(phase.ambient.src, phase.ambient.volume, 600);
-  }
-
-  if (phase.duration && pi < frame.phases.length - 1) {
-    app.phaseTimerStart = Date.now();
-    app.phaseTimerDelay = phase.duration;
-    app.pausedPhaseIndex = pi;
-    app.phaseTimer = setTimeout(() => startPhase(app, frame, pi + 1), phase.duration);
-  }
+  prebufferNextScene(app, index);
 }
 
 function clearPauseState(app) {
@@ -389,35 +396,46 @@ function handleBufferChange(app, isBuffering) {
   if (isBuffering) {
     if (!app.paused) {
       if (app.textTimeline) app.textTimeline.pause();
-      pauseCaptions();
     }
     app.els.sceneStage.classList.add('buffering');
   } else {
     if (!app.paused) {
       if (app.textTimeline) app.textTimeline.resume();
-      resumeCaptions();
     }
     app.els.sceneStage.classList.remove('buffering');
   }
 }
 
-function transition(app, toIndex) {
-  if (app.state === State.TRANSITIONING) return;
+function waitForImage(app, src) {
+  return new Promise((resolve) => {
+    const spinnerTimer = setTimeout(() => {
+      app.els.transitionLoader.hidden = false;
+    }, 300);
 
-  if (app.paused) {
-    clearPauseState(app);
-    resumeNarration();
-    resumeAmbient();
+    loadImage(src)
+      .then((img) => {
+        if (img) app.imageCache.set(src, img);
+      })
+      .finally(() => {
+        clearTimeout(spinnerTimer);
+        app.els.transitionLoader.hidden = true;
+        resolve();
+      });
+  });
+}
+
+function completePendingNav(app) {
+  if (app.pendingNavIndex !== null && app.pendingNavIndex !== app.currentIndex) {
+    const pending = app.pendingNavIndex;
+    app.pendingNavIndex = null;
+    queueMicrotask(() => transition(app, pending));
   }
+}
 
-  app.state = State.TRANSITIONING;
-  app.buffering = false;
-  app.els.sceneStage.classList.remove('buffering');
-
-  if (app.phaseTimer) {
-    clearTimeout(app.phaseTimer);
-    app.phaseTimer = null;
-  }
+function cleanupCurrentScene(app) {
+  app.generation++;
+  clearAutoAdvance(app);
+  app.autoAdvanceTimerRemaining = null;
 
   if (app.narrationTimer) {
     clearTimeout(app.narrationTimer);
@@ -426,12 +444,14 @@ function transition(app, toIndex) {
     app.narrationTimerDelay = null;
   }
 
-  clearCaptions();
-  if (app.captionDelayTimer) {
-    clearTimeout(app.captionDelayTimer);
-    app.captionDelayTimer = null;
+  clearCaptionElements(app.captionEntries);
+  try {
+    app.textTimeline?.kill();
+  } catch (err) {
+    console.error('Failed to kill text timeline:', err);
   }
   app.textTimeline = null;
+  app.captionEntries = [];
 
   clearMusicTimer(app);
   if (app.musicExitTimer) {
@@ -443,16 +463,67 @@ function transition(app, toIndex) {
   app.musicExitTimerRemaining = null;
   app.musicTimerRemaining = null;
   app.narrationTimerRemaining = null;
-  app.phaseTimerRemaining = null;
+  app.replayPending = false;
   stopMusic();
+  stopNarration();
+}
 
-  const toFrame = app.frames[toIndex];
-  const hasNarrationAudio = Boolean(toFrame.narration?.audio);
-  if (!hasNarrationAudio) {
-    stopNarration();
+function transition(app, toIndex) {
+  if (app.state === State.TRANSITIONING) {
+    app.pendingNavIndex = toIndex;
+    return;
   }
 
-  if (prefersReducedMotion()) {
+  app.pendingNavIndex = null;
+  const wasPaused = app.paused;
+
+  if (app.paused) {
+    clearPauseState(app);
+  }
+
+  app.state = State.TRANSITIONING;
+  app.buffering = false;
+  app.els.sceneStage.classList.remove('buffering');
+  app.els.playGate.hidden = true;
+
+  cleanupCurrentScene(app);
+
+  const toFrame = app.frames[toIndex];
+
+  // Hard jump: instant cut when navigating while paused.
+  // No fade animation — swap frame and re-pause immediately.
+  if (wasPaused) {
+    const doHardJump = () => {
+      const prevIndex = app.currentIndex;
+      const prevFrame = app.frames[prevIndex];
+      app.currentIndex = toIndex;
+      app.cueOnly = true;
+      try {
+        showFrame(app, toIndex);
+        app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
+      } catch (err) {
+        console.error('Error during scene transition:', err);
+        app.currentIndex = prevIndex;
+        app.state = STATE_BY_FRAME_TYPE[prevFrame.frameType] || State.SCENE_ACTIVE;
+      }
+      app.cueOnly = false;
+      doPause(app);
+      completePendingNav(app);
+    };
+
+    if (toFrame.image && !app.imageCache.has(toFrame.image)) {
+      waitForImage(app, toFrame.image).then(doHardJump);
+    } else {
+      doHardJump();
+    }
+    return;
+  }
+
+  // Animated transition: fade out → swap frame → fade in → land playing.
+  // On showFrame failure, revert both the frame index and the state to the
+  // previous frame's values to keep the state machine consistent.
+  const prevFrame = app.frames[app.currentIndex];
+  const proceedWithFrame = () => {
     const prevIndex = app.currentIndex;
     app.currentIndex = toIndex;
     try {
@@ -460,8 +531,36 @@ function transition(app, toIndex) {
     } catch (err) {
       console.error('Error during scene transition:', err);
       app.currentIndex = prevIndex;
+      app.state = STATE_BY_FRAME_TYPE[prevFrame.frameType] || State.SCENE_ACTIVE;
+      return false;
     }
+    return true;
+  };
+
+  const landOnFrame = () => {
     app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
+    if (app.pendingPause) {
+      app.pendingPause = false;
+      doPause(app);
+    } else {
+      if (app.textTimeline) app.textTimeline.play(0);
+      setupAutoAdvance(app);
+    }
+    completePendingNav(app);
+  };
+
+  if (prefersReducedMotion()) {
+    const readyThen = () => {
+      if (!proceedWithFrame()) return;
+      landOnFrame();
+    };
+
+    // Re-check at execution time — image may have been cached by preload-ahead
+    if (toFrame.image && !app.imageCache.has(toFrame.image)) {
+      waitForImage(app, toFrame.image).then(readyThen);
+    } else {
+      readyThen();
+    }
     return;
   }
 
@@ -473,32 +572,39 @@ function transition(app, toIndex) {
     duration: halfDuration,
     ease: 'power2.inOut',
     onComplete: () => {
-      const prevIndex = app.currentIndex;
-      app.currentIndex = toIndex;
-      try {
-        showFrame(app, toIndex);
-      } catch (err) {
-        console.error('Error during scene transition:', err);
-        app.currentIndex = prevIndex;
-        gsap.set(app.els.sceneStage, { opacity: 1 });
-        app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
-        return;
-      }
+      const fadeIn = () => {
+        try {
+          if (!proceedWithFrame()) {
+            gsap.set(app.els.sceneStage, { opacity: 1 });
+            completePendingNav(app);
+            return;
+          }
 
-      gsap.to(app.els.sceneStage, {
-        opacity: 1,
-        duration: halfDuration,
-        ease: 'power2.inOut',
-        onComplete: () => {
-          app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
-        },
-      });
+          gsap.to(app.els.sceneStage, {
+            opacity: 1,
+            duration: halfDuration,
+            ease: 'power2.inOut',
+            onComplete: landOnFrame,
+          });
+        } catch (err) {
+          console.error('Unhandled error in transition onComplete:', err);
+          gsap.set(app.els.sceneStage, { opacity: 1 });
+          landOnFrame();
+        }
+      };
+
+      // Re-check — image may have been cached by preload-ahead during fade-out
+      if (toFrame.image && !app.imageCache.has(toFrame.image)) {
+        waitForImage(app, toFrame.image).then(fadeIn);
+      } else {
+        fadeIn();
+      }
     },
   });
 }
 
 function advance(app) {
-  if (app.state === State.TRANSITIONING || app.state === State.CREDITS) return;
+  if (app.state === State.CREDITS) return;
   if (app.currentIndex >= app.frames.length - 1) return;
 
   app.userHasInteracted = true;
@@ -506,28 +612,17 @@ function advance(app) {
 }
 
 function retreat(app) {
-  if (app.state === State.TRANSITIONING) return;
   if (app.currentIndex <= 0) return;
 
   app.userHasInteracted = true;
   transition(app, app.currentIndex - 1);
 }
 
-function triggerEffect(app) {
-  if (prefersReducedMotion()) return;
-  if (app.state === State.TRANSITIONING || app.state === State.CREDITS) return;
-  const frame = app.frames[app.currentIndex];
-  if (!frame.effects?.idle) return;
-  clearEffects(app.els.effectsLayer);
-  if (frame.effects.entry) runEffect(frame.effects.entry, app.els.effectsLayer);
-  runEffect(frame.effects.idle, app.els.effectsLayer);
-}
-
 function updateNavButtons(app) {
   const frame = app.frames[app.currentIndex];
   app.els.btnPrev.disabled = app.currentIndex === 0;
   app.els.btnNext.disabled =
-    app.currentIndex >= app.frames.length - 1 || frame.advanceMode === 'disabled';
+    app.currentIndex >= app.frames.length - 1 || frame.holdUntilClick === null;
 }
 
 function resumeDelayedNarration(app) {
@@ -541,7 +636,12 @@ function resumeDelayedNarration(app) {
     app.narrationTimerDelay = null;
     app.narrationTimerRemaining = null;
     if (frame.narration?.audio) {
-      playNarration(frame.narration.audio);
+      const holdAfterNarration =
+        frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
+      playNarration(
+        frame.narration.audio,
+        makeNarrationEndCallback(app, frame, holdAfterNarration),
+      );
     }
   }, app.narrationTimerRemaining);
   app.narrationTimerRemaining = null;
@@ -576,57 +676,19 @@ function resumeDelayedMusic(app) {
     fadeMusic(frame.music.fullVolume, frame.music.crescendoMs);
 
     if (frame.music.exit !== null && frame.music.exit !== undefined) {
-      const fadeOutDelay = (frame.music.exit || 0) - (frame.music.enter || 0);
-      if (fadeOutDelay > 0) {
-        app.musicExitTimerStart = Date.now();
-        app.musicExitTimerDelay = fadeOutDelay;
-        app.musicExitTimer = setTimeout(() => {
-          app.musicExitTimer = null;
-          app.musicExitTimerStart = null;
-          app.musicExitTimerDelay = null;
-          fadeMusic(0, 2000);
-        }, fadeOutDelay);
-      }
+      scheduleMusicExitFade(app, (frame.music.exit || 0) - (frame.music.enter || 0));
     }
   }, app.musicTimerRemaining);
   app.musicTimerRemaining = null;
 }
 
-function resumeDelayedPhase(app) {
-  if (!app.phaseTimerRemaining || app.phaseTimerRemaining <= 0) return;
-  const frame = app.frames[app.currentIndex];
-  const pi = app.pausedPhaseIndex;
-  app.phaseTimer = setTimeout(() => startPhase(app, frame, pi + 1), app.phaseTimerRemaining);
-  app.phaseTimerRemaining = null;
-  app.pausedPhaseIndex = null;
-}
-
 function handleFirstPlay(app) {
   const frame = app.frames[app.currentIndex];
+  applyNarration(app, frame);
   if (app.textTimeline) {
-    app.textTimeline.restart();
+    app.textTimeline.play(0);
   }
-  if (frame.music) {
-    scheduleMusic(app, frame.music);
-  }
-  if (frame.narration?.audio) {
-    scheduleNarrationAudio(app, frame.narration);
-  }
-  if (areCaptionsEnabled() && frame.narration?.captions?.length > 0) {
-    scheduleCaptionDisplay(app, frame);
-  }
-}
-
-function resumeEffects(app) {
-  const effectsTweens = gsap.getTweensOf(app.els.effectsLayer);
-  const childTweens = gsap.getTweensOf(app.els.effectsLayer.children);
-  [...effectsTweens, ...childTweens].forEach((tw) => tw.resume());
-}
-
-function pauseEffects(app) {
-  const effectsTweens = gsap.getTweensOf(app.els.effectsLayer);
-  const childTweens = gsap.getTweensOf(app.els.effectsLayer.children);
-  [...effectsTweens, ...childTweens].forEach((tw) => tw.pause());
+  setupAutoAdvance(app);
 }
 
 function doResume(app) {
@@ -639,30 +701,42 @@ function doResume(app) {
   app.state = app.pausedFromState;
   app.pausedFromState = null;
 
-  resumeNarration();
-  resumeAmbient();
-  resumeMusic();
-
-  if (app.textTimeline && !app.buffering) {
-    app.textTimeline.resume();
-  }
-
-  resumeEffects(app);
-
-  if (!app.buffering) {
-    if (areCaptionsEnabled()) {
-      resumeCaptions();
-    } else {
-      clearCaptions();
+  if (app.replayPending) {
+    // Replay happened while paused — narration was cued, not played.
+    // Schedule fresh narration with onend callback for auto-advance.
+    app.replayPending = false;
+    const frame = app.frames[app.currentIndex];
+    if (frame.narration?.audio) {
+      scheduleNarrationAudio(app, frame.narration);
     }
+    resumeAmbient();
+    resumeMusic();
+    if (app.textTimeline && !app.buffering) {
+      app.textTimeline.play(0);
+    }
+    setupAutoAdvance(app);
+  } else {
+    resumeNarration();
+    resumeAmbient();
+    resumeMusic();
+    if (app.textTimeline && !app.buffering) {
+      app.textTimeline.resume();
+    }
+    resumeDelayedNarration(app);
+    resumeDelayedMusic(app);
+    resumeMusicExitTimer(app);
   }
 
-  resumeDelayedNarration(app);
-  resumeDelayedMusic(app);
-  resumeDelayedPhase(app);
-  resumeMusicExitTimer(app);
+  resumeCanvas();
+
+  if (app.autoAdvanceTimerRemaining !== null && app.autoAdvanceTimerRemaining > 0) {
+    const remaining = app.autoAdvanceTimerRemaining;
+    app.autoAdvanceTimerRemaining = null;
+    scheduleAutoAdvance(app, remaining);
+  }
 
   if (firstPlay) {
+    app.els.playGate.hidden = true;
     handleFirstPlay(app);
   }
 
@@ -700,11 +774,16 @@ function doPause(app) {
     app.textTimeline.pause();
   }
 
-  pauseEffects(app);
-  pauseCaptions();
+  pauseCanvas();
 
   saveNarrationTimerRemaining(app);
   saveMusicTimerRemaining(app);
+
+  if (app.autoAdvanceTimer) {
+    const elapsed = Date.now() - app.autoAdvanceTimerStart;
+    app.autoAdvanceTimerRemaining = Math.max(0, app.autoAdvanceTimerDelay - elapsed);
+    clearAutoAdvance(app);
+  }
 
   if (app.musicExitTimer) {
     const elapsed = Date.now() - app.musicExitTimerStart;
@@ -715,21 +794,18 @@ function doPause(app) {
     app.musicExitTimerDelay = null;
   }
 
-  if (app.phaseTimer) {
-    const elapsed = Date.now() - app.phaseTimerStart;
-    app.phaseTimerRemaining = Math.max(0, app.phaseTimerDelay - elapsed);
-    clearTimeout(app.phaseTimer);
-    app.phaseTimer = null;
-    app.phaseTimerStart = null;
-    app.phaseTimerDelay = null;
-  }
-
   app.els.btnPause.setAttribute('aria-pressed', 'true');
   app.els.btnPause.classList.add('paused');
 }
 
 function togglePause(app) {
-  if (app.state === State.TRANSITIONING || app.state === State.LOADING) return;
+  if (app.state === State.LOADING) return;
+
+  // Queue pause intent during transitions — applied when transition completes
+  if (app.state === State.TRANSITIONING) {
+    app.pendingPause = !app.pendingPause;
+    return;
+  }
 
   if (app.paused) {
     doResume(app);
@@ -743,16 +819,14 @@ function replayNarration(app) {
 
   app.userHasInteracted = true;
 
-  if (app.paused) {
-    const resumeState = app.pausedFromState || State.SCENE_ACTIVE;
-    clearPauseState(app);
-    resumeNarration();
-    resumeAmbient();
-    app.state = resumeState;
-  }
+  // Stop current narration audio regardless of pause state
+  stopNarration();
 
   app.buffering = false;
   app.els.sceneStage.classList.remove('buffering');
+
+  clearAutoAdvance(app);
+  app.autoAdvanceTimerRemaining = null;
 
   const frame = app.frames[app.currentIndex];
 
@@ -764,47 +838,39 @@ function replayNarration(app) {
   }
   app.narrationTimerRemaining = null;
 
-  clearNarrationLayer(app.els.narrationLayer);
-  clearCaptions();
-
-  if (!frame.narration) return;
-
-  const hasLines = Array.isArray(frame.narration.lines) && frame.narration.lines.length > 0;
-  const hasCaptions =
-    Array.isArray(frame.narration.captions) && frame.narration.captions.length > 0;
-  const hasAudioRef = Boolean(frame.narration.audio);
-
-  if (hasLines) {
-    app.textTimeline = buildTextTimeline(
-      frame.narration.lines,
-      app.els.narrationLayer,
-      prefersReducedMotion(),
-    );
-  }
-
-  if (hasCaptions && areCaptionsEnabled()) {
-    showCaptions(frame.narration.captions, app.els.captionLayer);
-  }
-
-  if (frame.music) {
-    scheduleMusic(app, frame.music);
-  }
-
-  if (hasAudioRef) {
-    playNarration(frame.narration.audio);
+  if (app.paused) {
+    // Replay while paused: cue narration audio, reset text, stay paused.
+    // Set replayPending so doResume knows to schedule narration with onend
+    // instead of just resuming a paused Howl.
+    app.cueOnly = true;
+    buildNarration(app, frame);
+    app.cueOnly = false;
+    app.replayPending = true;
+    if (app.textTimeline) {
+      app.textTimeline.pause(0);
+    }
+  } else {
+    buildNarration(app, frame);
+    if (app.textTimeline) app.textTimeline.play(0);
+    setupAutoAdvance(app);
   }
 
   if (frame.effects?.entry) {
-    runEffect(frame.effects.entry, app.els.effectsLayer);
+    runEffect(frame.effects.entry, app.els.effectsCanvas, app.els.sceneCanvas);
   }
 }
 
 function handleKeydown(app, e) {
-  if (e.key === 'ArrowLeft') {
+  if (e.key === ' ') {
+    if (e.target.closest('#overlay-controls')) return;
+    e.preventDefault();
+    app.userHasInteracted = true;
+    togglePause(app);
+  } else if (e.key === 'ArrowLeft') {
     e.preventDefault();
     app.userHasInteracted = true;
     retreat(app);
-  } else if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') {
+  } else if (e.key === 'ArrowRight' || e.key === 'Enter') {
     if (e.target.closest('#overlay-controls')) return;
     e.preventDefault();
     app.userHasInteracted = true;
@@ -824,35 +890,38 @@ function toggleCaptions(app) {
   setCaptionsEnabled(enabled);
   app.els.btnCaptions.setAttribute('aria-pressed', String(enabled));
 
-  if (app.paused) return;
-
   if (enabled) {
-    const frame = app.frames[app.currentIndex];
-    const hasCaptions =
-      Array.isArray(frame.narration?.captions) && frame.narration.captions.length > 0;
-    if (hasCaptions) {
-      const offsetMs = app.textTimeline ? app.textTimeline.time() * 1000 : 0;
-      showCaptions(frame.narration.captions, app.els.captionLayer, offsetMs);
+    if (app.captionEntries?.length > 0 && app.textTimeline) {
+      syncCaptionsToTime(app.captionEntries, app.textTimeline.time(), app.els.captionLayer);
     }
   } else {
-    clearCaptions();
+    clearCaptionElements(app.captionEntries);
   }
 }
 
 function initApp(app) {
-  app.els.sceneImage.addEventListener('error', () => {
-    console.warn(`Scene image failed to load: ${app.els.sceneImage.src}`);
-    app.els.sceneImage.removeAttribute('src');
-  });
+  initSceneCanvas(app.els.sceneCanvas);
+  initCanvas(app.els.effectsCanvas);
 
-  preloadFirstFrameAudio(app);
+  preloadFirstFrameAudio(app.frames, (loaded) => registerAudio(app, loaded));
   onNarrationBufferChange((isBuffering) => handleBufferChange(app, isBuffering));
 
-  preloadAssets(app)
+  preloadFirstFrameImage(app)
     .then(() => {
-      app.els.loadingScreen.hidden = true;
       app.els.sceneStage.hidden = false;
       showControls();
+
+      // Fade out loading screen to reveal the scene stage underneath
+      const hideLoading = () => {
+        app.els.loadingScreen.hidden = true;
+      };
+      if (prefersReducedMotion()) {
+        hideLoading();
+      } else {
+        app.els.loadingScreen.classList.add('fade-out');
+        app.els.loadingScreen.addEventListener('transitionend', hideLoading, { once: true });
+        setTimeout(hideLoading, 900);
+      }
 
       if (app.availableAudio.size > 0) {
         app.els.btnMute.removeAttribute('aria-disabled');
@@ -862,42 +931,35 @@ function initApp(app) {
       app.els.btnCaptions.setAttribute('aria-pressed', String(captionsEnabled));
 
       showFrame(app, 0);
+      app.els.playGate.hidden = false;
 
       // Start paused — everything waits for the user to press play.
-      // Seek the text timeline past the first line's entrance animation
-      // so it's visible as a static title card (also provides an LCP
-      // element for Lighthouse). On play, textTimeline.restart() replays
-      // from t=0 with the full ghost-drift entrance.
-      stopNarration();
-      clearCaptions();
-      app.paused = true;
-      app.pausedFromState = State.SCENE_ACTIVE;
-      app.state = State.PAUSED;
-      if (app.textTimeline) {
-        const firstLine = app.frames[0].narration?.lines?.[0];
-        const seekTime = firstLine ? firstLine.enter / 1000 + 1.3 : 0;
-        app.textTimeline.seek(seekTime);
-        app.textTimeline.pause();
-      }
-      app.els.btnPause.setAttribute('aria-pressed', 'true');
-      app.els.btnPause.classList.add('paused');
+      // Set SCENE_ACTIVE first so doPause stores the correct resume state.
+      // The play-gate label text serves as the LCP element for Lighthouse.
+      // On play, doResume → handleFirstPlay sets up narration and auto-advance.
+      app.state = State.SCENE_ACTIVE;
+      doPause(app);
 
-      // Defer background asset preloads to avoid network contention.
-      // Loads sequentially: each scene's image then audio, in order.
+      // Defer background asset preloads to avoid contention with first-frame
+      // rendering. Image and audio streams load in parallel; within each
+      // stream, assets load sequentially by scene order.
       setTimeout(() => {
-        preloadBackgroundAssets(app).catch((err) =>
-          console.warn('Background asset preload failed:', err),
-        );
+        Promise.all([
+          preloadBackgroundImages(app),
+          preloadBackgroundAudio(app.frames, (loaded) => registerAudio(app, loaded)),
+        ]).catch((err) => console.error('Background asset preload failed:', err));
       }, 4000);
 
       const markInteracted = () => {
         app.userHasInteracted = true;
       };
 
+      // Stage click/tap: skip to next scene (hard cut if paused, animated if playing)
       document.addEventListener('click', (e) => {
         markInteracted();
         if (e.target.closest('#overlay-controls')) return;
-        triggerEffect(app);
+        if (e.target.closest('#play-gate')) return;
+        advance(app);
       });
       document.addEventListener('keydown', (e) => {
         markInteracted();
@@ -928,6 +990,10 @@ function initApp(app) {
         e.stopPropagation();
         toggleCaptions(app);
       });
+      app.els.playGate.addEventListener('click', (e) => {
+        e.stopPropagation();
+        togglePause(app);
+      });
     })
     .catch((err) => {
       console.error('Failed to initialize:', err);
@@ -939,9 +1005,9 @@ export function createApp() {
   const requiredIds = [
     'loading-screen',
     'scene-stage',
-    'scene-image',
+    'scene-canvas',
     'trace-overlay',
-    'effects-layer',
+    'effects-canvas',
     'narration-layer',
     'caption-layer',
     'accessible-narration',
@@ -953,6 +1019,8 @@ export function createApp() {
     'btn-mute',
     'btn-pause',
     'btn-captions',
+    'play-gate',
+    'transition-loader',
   ];
 
   for (const id of requiredIds) {
@@ -962,7 +1030,6 @@ export function createApp() {
   }
 
   const frames = applyFrameDefaults(scenesData);
-  validateEffects(frames);
 
   const app = {
     frames,
@@ -974,12 +1041,7 @@ export function createApp() {
     pausedFromState: null,
     userHasInteracted: false,
     textTimeline: null,
-    phaseTimer: null,
-    phaseTimerStart: null,
-    phaseTimerDelay: null,
-    phaseTimerRemaining: null,
-    pausedPhaseIndex: null,
-    captionDelayTimer: null,
+    captionEntries: [],
     narrationTimer: null,
     narrationTimerStart: null,
     narrationTimerDelay: null,
@@ -992,14 +1054,24 @@ export function createApp() {
     musicExitTimerStart: null,
     musicExitTimerDelay: null,
     musicExitTimerRemaining: null,
+    autoAdvanceTimer: null,
+    autoAdvanceTimerStart: null,
+    autoAdvanceTimerDelay: null,
+    autoAdvanceTimerRemaining: null,
+    pendingNavIndex: null,
+    generation: 0,
+    cueOnly: false,
+    replayPending: false,
+    pendingPause: false,
     buffering: false,
     availableAudio: new Set(),
+    imageCache: new Map(),
     els: {
       loadingScreen: document.getElementById('loading-screen'),
       sceneStage: document.getElementById('scene-stage'),
-      sceneImage: document.getElementById('scene-image'),
+      sceneCanvas: document.getElementById('scene-canvas'),
       traceOverlay: document.getElementById('trace-overlay'),
-      effectsLayer: document.getElementById('effects-layer'),
+      effectsCanvas: document.getElementById('effects-canvas'),
       narrationLayer: document.getElementById('narration-layer'),
       captionLayer: document.getElementById('caption-layer'),
       accessibleNarration: document.getElementById('accessible-narration'),
@@ -1010,6 +1082,8 @@ export function createApp() {
       btnMute: document.getElementById('btn-mute'),
       btnPause: document.getElementById('btn-pause'),
       btnCaptions: document.getElementById('btn-captions'),
+      playGate: document.getElementById('play-gate'),
+      transitionLoader: document.getElementById('transition-loader'),
     },
   };
 

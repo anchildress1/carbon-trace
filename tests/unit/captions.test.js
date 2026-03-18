@@ -1,12 +1,10 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   initCaptions,
   setCaptionsEnabled,
   areCaptionsEnabled,
-  showCaptions,
-  clearCaptions,
-  pauseCaptions,
-  resumeCaptions,
+  syncCaptionsToTime,
+  clearCaptionElements,
 } from '../../src/captions.js';
 
 describe('captions.js', () => {
@@ -15,13 +13,7 @@ describe('captions.js', () => {
   beforeEach(() => {
     container = document.createElement('div');
     localStorage.clear();
-    clearCaptions();
     initCaptions();
-    vi.useFakeTimers();
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
   });
 
   describe('initCaptions', () => {
@@ -44,13 +36,20 @@ describe('captions.js', () => {
       expect(initCaptions()).toBe(false);
     });
 
-    it('returns false when localStorage throws', () => {
-      const orig = localStorage.getItem;
-      localStorage.getItem = () => {
+    it('returns false and warns when localStorage throws', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const getItemSpy = vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
         throw new Error('quota exceeded');
-      };
+      });
+
       expect(initCaptions()).toBe(false);
-      localStorage.getItem = orig;
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Could not read captions preference:',
+        expect.any(Error),
+      );
+
+      getItemSpy.mockRestore();
+      warnSpy.mockRestore();
     });
   });
 
@@ -72,13 +71,20 @@ describe('captions.js', () => {
       expect(areCaptionsEnabled()).toBe(false);
     });
 
-    it('does not throw when localStorage is unavailable', () => {
-      const orig = localStorage.setItem;
-      localStorage.setItem = () => {
+    it('does not throw and warns when localStorage is unavailable', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const setItemSpy = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
         throw new Error('quota exceeded');
-      };
+      });
+
       expect(() => setCaptionsEnabled(true)).not.toThrow();
-      localStorage.setItem = orig;
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Could not save captions preference:',
+        expect.any(Error),
+      );
+
+      setItemSpy.mockRestore();
+      warnSpy.mockRestore();
     });
   });
 
@@ -90,202 +96,133 @@ describe('captions.js', () => {
     });
   });
 
-  describe('showCaptions', () => {
-    it('creates caption elements at scheduled times', () => {
-      const captions = [
-        { text: 'Hello', start: 0, end: 2000 },
-        { text: 'World', start: 1000, end: 3000 },
-      ];
-
-      showCaptions(captions, container);
-
-      // First caption appears immediately (start=0)
-      expect(container.children.length).toBe(1);
-      expect(container.children[0].textContent).toBe('Hello');
-
-      vi.advanceTimersByTime(1000);
-      expect(container.children.length).toBe(2);
-      expect(container.children[1].textContent).toBe('World');
-    });
-
-    it('removes caption elements at scheduled end times', () => {
-      const captions = [{ text: 'Short', start: 0, end: 1000 }];
-
-      showCaptions(captions, container);
-      expect(container.children.length).toBe(1);
-
-      vi.advanceTimersByTime(1000);
+  describe('syncCaptionsToTime', () => {
+    it('handles empty entries array', () => {
+      syncCaptionsToTime([], 1.0, container);
       expect(container.children.length).toBe(0);
     });
 
-    it('uses textContent not innerHTML', () => {
-      const captions = [{ text: '<b>bold</b>', start: 0, end: 1000 }];
+    it('shows captions active at the given time', () => {
+      const entries = [
+        { text: 'Early', startSec: 0, endSec: 2, el: null },
+        { text: 'Mid', startSec: 1.5, endSec: 4, el: null },
+        { text: 'Late', startSec: 5, endSec: 8, el: null },
+      ];
 
-      showCaptions(captions, container);
+      syncCaptionsToTime(entries, 1.8, container);
+
+      expect(container.children.length).toBe(2);
+      expect(container.children[0].textContent).toBe('Early');
+      expect(container.children[1].textContent).toBe('Mid');
+      expect(entries[0].el).not.toBeNull();
+      expect(entries[1].el).not.toBeNull();
+      expect(entries[2].el).toBeNull();
+    });
+
+    it('shows no captions when time is before all entries', () => {
+      const entries = [{ text: 'Future', startSec: 5, endSec: 8, el: null }];
+
+      syncCaptionsToTime(entries, 0, container);
+
+      expect(container.children.length).toBe(0);
+    });
+
+    it('shows no captions when time is past all entries', () => {
+      const entries = [{ text: 'Past', startSec: 0, endSec: 2, el: null }];
+
+      syncCaptionsToTime(entries, 3, container);
+
+      expect(container.children.length).toBe(0);
+    });
+
+    it('clears existing caption elements before syncing', () => {
+      const el = document.createElement('p');
+      container.appendChild(el);
+      const entries = [{ text: 'Active', startSec: 0, endSec: 5, el }];
+
+      syncCaptionsToTime(entries, 1, container);
+
+      // Old element removed, new one created
+      expect(container.children.length).toBe(1);
+      expect(container.children[0].textContent).toBe('Active');
+      expect(entries[0].el).toBe(container.children[0]);
+    });
+
+    it('handles null captionEntries', () => {
+      expect(() => syncCaptionsToTime(null, 0, container)).not.toThrow();
+    });
+
+    it('handles null container', () => {
+      const entries = [{ text: 'X', startSec: 0, endSec: 1, el: null }];
+      expect(() => syncCaptionsToTime(entries, 0, null)).not.toThrow();
+    });
+
+    it('applies caption-text class to created elements', () => {
+      const entries = [{ text: 'Styled', startSec: 0, endSec: 5, el: null }];
+
+      syncCaptionsToTime(entries, 1, container);
+
+      expect(container.children[0].className).toBe('caption-text');
+    });
+
+    it('uses textContent not innerHTML', () => {
+      const entries = [{ text: '<b>bold</b>', startSec: 0, endSec: 5, el: null }];
+
+      syncCaptionsToTime(entries, 1, container);
 
       expect(container.children[0].textContent).toBe('<b>bold</b>');
       expect(container.children[0].children.length).toBe(0);
     });
 
-    it('applies caption-text class', () => {
-      const captions = [{ text: 'Styled', start: 0, end: 1000 }];
+    it('includes caption at exact startSec boundary', () => {
+      const entries = [{ text: 'Boundary', startSec: 2, endSec: 5, el: null }];
 
-      showCaptions(captions, container);
+      syncCaptionsToTime(entries, 2, container);
 
-      expect(container.children[0].className).toBe('caption-text');
+      expect(container.children.length).toBe(1);
     });
 
-    it('handles empty captions array', () => {
-      showCaptions([], container);
+    it('excludes caption at exact endSec boundary', () => {
+      const entries = [{ text: 'Boundary', startSec: 0, endSec: 2, el: null }];
+
+      syncCaptionsToTime(entries, 2, container);
+
       expect(container.children.length).toBe(0);
-    });
-
-    it('handles null captions', () => {
-      expect(() => showCaptions(null, container)).not.toThrow();
-    });
-
-    it('handles null container', () => {
-      expect(() => showCaptions([{ text: 'X', start: 0, end: 1000 }], null)).not.toThrow();
-    });
-
-    it('clears previous captions before showing new ones', () => {
-      showCaptions([{ text: 'First', start: 0, end: 5000 }], container);
-      expect(container.children.length).toBe(1);
-
-      showCaptions([{ text: 'Second', start: 0, end: 5000 }], container);
-      expect(container.children.length).toBe(1);
-      expect(container.children[0].textContent).toBe('Second');
-    });
-
-    it('starts from offset when offsetMs is provided', () => {
-      const captions = [
-        { text: 'Early', start: 0, end: 2000 },
-        { text: 'Mid', start: 3000, end: 6000 },
-        { text: 'Late', start: 8000, end: 10000 },
-      ];
-
-      // Start from 4 seconds in — "Early" is past, "Mid" is active, "Late" is future
-      showCaptions(captions, container, 4000);
-
-      // "Mid" should be immediately visible (start 3000 < offset 4000 < end 6000)
-      expect(container.children.length).toBe(1);
-      expect(container.children[0].textContent).toBe('Mid');
-
-      // "Mid" hides at 6000 - 4000 = 2000ms from now
-      vi.advanceTimersByTime(2000);
-      expect(container.children.length).toBe(0);
-
-      // "Late" should appear at 8000 - 4000 = 4000ms from now
-      vi.advanceTimersByTime(2000);
-      expect(container.children.length).toBe(1);
-      expect(container.children[0].textContent).toBe('Late');
-    });
-
-    it('skips captions that have already ended before offset', () => {
-      const captions = [
-        { text: 'Past', start: 0, end: 1000 },
-        { text: 'Future', start: 5000, end: 8000 },
-      ];
-
-      showCaptions(captions, container, 2000);
-
-      // "Past" ended at 1000 < offset 2000, should not appear
-      expect(container.children.length).toBe(0);
-
-      // "Future" at 5000 - 2000 = 3000ms
-      vi.advanceTimersByTime(3000);
-      expect(container.children.length).toBe(1);
-      expect(container.children[0].textContent).toBe('Future');
-    });
-
-    it('correctly tracks elapsed time after offset for pause/resume', () => {
-      const captions = [{ text: 'Timed', start: 5000, end: 10000 }];
-
-      showCaptions(captions, container, 3000);
-
-      // Caption scheduled at 5000 - 3000 = 2000ms
-      vi.advanceTimersByTime(1000);
-      pauseCaptions();
-      vi.advanceTimersByTime(5000); // Should not fire during pause
-      expect(container.children.length).toBe(0);
-
-      resumeCaptions();
-      vi.advanceTimersByTime(1000); // Remaining 1000ms
-      expect(container.children.length).toBe(1);
-      expect(container.children[0].textContent).toBe('Timed');
     });
   });
 
-  describe('clearCaptions', () => {
-    it('removes all caption elements', () => {
-      showCaptions(
-        [
-          { text: 'A', start: 0, end: 5000 },
-          { text: 'B', start: 0, end: 5000 },
-        ],
-        container,
-      );
+  describe('clearCaptionElements', () => {
+    it('removes all caption DOM elements', () => {
+      const el1 = document.createElement('p');
+      const el2 = document.createElement('p');
+      container.appendChild(el1);
+      container.appendChild(el2);
 
-      clearCaptions();
-      expect(container.children.length).toBe(0);
-    });
+      const entries = [
+        { text: 'A', el: el1 },
+        { text: 'B', el: el2 },
+      ];
 
-    it('cancels pending timers', () => {
-      showCaptions([{ text: 'Delayed', start: 2000, end: 5000 }], container);
-
-      clearCaptions();
-      vi.advanceTimersByTime(3000);
+      clearCaptionElements(entries);
 
       expect(container.children.length).toBe(0);
+      expect(entries[0].el).toBeNull();
+      expect(entries[1].el).toBeNull();
     });
 
-    it('handles no active captions', () => {
-      expect(() => clearCaptions()).not.toThrow();
-    });
-  });
+    it('handles entries with no active element', () => {
+      const entries = [{ text: 'Inactive', el: null }];
 
-  describe('pauseCaptions / resumeCaptions', () => {
-    it('pauses and resumes caption timers', () => {
-      showCaptions([{ text: 'Pause me', start: 2000, end: 5000 }], container);
-
-      vi.advanceTimersByTime(1000);
-      expect(container.children.length).toBe(0);
-
-      pauseCaptions();
-      vi.advanceTimersByTime(5000);
-      expect(container.children.length).toBe(0);
-
-      resumeCaptions();
-      vi.advanceTimersByTime(1000);
-      expect(container.children.length).toBe(1);
-      expect(container.children[0].textContent).toBe('Pause me');
+      expect(() => clearCaptionElements(entries)).not.toThrow();
+      expect(entries[0].el).toBeNull();
     });
 
-    it('handles pause when no captions are active', () => {
-      expect(() => pauseCaptions()).not.toThrow();
+    it('handles null captionEntries', () => {
+      expect(() => clearCaptionElements(null)).not.toThrow();
     });
 
-    it('handles resume when no captions were paused', () => {
-      expect(() => resumeCaptions()).not.toThrow();
-    });
-
-    it('preserves already-visible captions through pause cycle', () => {
-      showCaptions(
-        [
-          { text: 'Visible', start: 0, end: 10000 },
-          { text: 'Later', start: 5000, end: 10000 },
-        ],
-        container,
-      );
-
-      vi.advanceTimersByTime(1000);
-      expect(container.children.length).toBe(1);
-
-      pauseCaptions();
-      resumeCaptions();
-
-      // Visible caption should be re-shown (it's still within its time window)
-      expect(container.children.length).toBe(1);
+    it('handles empty array', () => {
+      expect(() => clearCaptionElements([])).not.toThrow();
     });
   });
 });

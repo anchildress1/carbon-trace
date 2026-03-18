@@ -26,16 +26,105 @@ body {
   position: relative;
 }
 
-/* Loading screen */
+/* Loading screen — circuit trace emergence */
 .loading-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
   height: 100%;
   background: #0e0e0e;
-  font-size: clamp(1rem, 2vw, 1.5rem);
-  color: #888;
+  transition: opacity 0.8s ease;
+}
+
+.loading-screen.fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loading-trace {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.loading-svg {
+  width: clamp(160px, 35vw, 280px);
+  height: auto;
+  overflow: visible;
+}
+
+.trace-path {
+  fill: none;
+  stroke: rgba(232, 228, 223, 0.25);
+  stroke-width: 0.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 220;
+  stroke-dashoffset: 220;
+  animation: trace-draw 2.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.trace-glow {
+  fill: none;
+  stroke: rgba(232, 228, 223, 0.06);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 220;
+  stroke-dashoffset: 220;
+  filter: blur(3px);
+  animation: trace-draw 2.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.trace-node {
+  fill: rgba(232, 228, 223, 0.35);
+  opacity: 0;
+  animation:
+    node-appear 0.6s ease 1.4s forwards,
+    node-pulse 2.4s ease-in-out 2s infinite;
+}
+
+.loading-title {
+  font-family: 'Lora', Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(0.75rem, 1.2vw, 1rem);
+  letter-spacing: 0.3em;
+  color: rgba(232, 228, 223, 0);
+  animation: title-emerge 1.8s ease 1.2s forwards;
+}
+
+@keyframes trace-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes node-appear {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes node-pulse {
+  0%,
+  100% {
+    fill: rgba(232, 228, 223, 0.25);
+  }
+  50% {
+    fill: rgba(232, 228, 223, 0.55);
+  }
+}
+
+@keyframes title-emerge {
+  to {
+    color: rgba(232, 228, 223, 0.4);
+  }
 }
 
 /* Scene stage — full-bleed image container */
@@ -48,10 +137,9 @@ body {
   background: #0e0e0e;
 }
 
-.scene-image {
+.scene-canvas {
   width: 100%;
   height: 100%;
-  object-fit: cover;
   position: absolute;
   inset: 0;
 }
@@ -79,11 +167,6 @@ body {
   }
 }
 
-.scene-image:not([src]),
-.scene-image[src=''] {
-  display: none;
-}
-
 .trace-overlay {
   position: absolute;
   inset: 0;
@@ -92,11 +175,12 @@ body {
   transition: opacity 0.6s ease;
 }
 
-.effects-layer {
+.effects-canvas {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
-  overflow: hidden;
 }
 
 .narration-layer {
@@ -130,10 +214,91 @@ body {
   opacity: 0;
 }
 
+/* Play gate — large centered play button for title card entry */
+.play-gate {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: rgba(232, 228, 223, 0.6);
+  transition: color 0.3s ease;
+}
+
+.play-gate:hover,
+.play-gate:focus-visible {
+  color: rgba(232, 228, 223, 0.9);
+}
+
+.play-gate:focus-visible {
+  outline: 2px solid rgba(232, 228, 223, 0.6);
+  outline-offset: -2px;
+}
+
+.play-gate-icon {
+  width: clamp(72px, 12vw, 112px);
+  height: auto;
+}
+
+.play-gate-icon circle {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  opacity: 0.3;
+  transition: opacity 0.3s ease;
+}
+
+.play-gate:hover .play-gate-icon circle,
+.play-gate:focus-visible .play-gate-icon circle {
+  opacity: 0.5;
+}
+
+.play-gate-icon polygon {
+  fill: currentColor;
+  opacity: 0.7;
+}
+
+.play-gate-label {
+  display: block;
+  margin-top: 0.75rem;
+  font-family: 'Lora', serif;
+  font-size: clamp(0.875rem, 2vw, 1.125rem);
+  font-style: italic;
+  letter-spacing: 0.15em;
+  text-transform: lowercase;
+  color: rgba(232, 228, 223, 0.35);
+}
+
+/* Transition loader — debounced spinner for slow image loads */
+.transition-loader {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.transition-loader::after {
+  content: '';
+  width: 32px;
+  height: 32px;
+  border: 2px solid rgba(232, 228, 223, 0.15);
+  border-top-color: rgba(232, 228, 223, 0.6);
+  border-radius: 50%;
+  animation: buffer-spin 0.8s linear infinite;
+}
+
 /* Overlay controls */
 .overlay-controls {
   position: absolute;
-  bottom: 3%;
+  bottom: max(3%, env(safe-area-inset-bottom, 0px));
   left: 0;
   right: 0;
   display: flex;
@@ -141,6 +306,7 @@ body {
   align-items: center;
   gap: 0.75rem;
   z-index: 10;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .progress-dots {
@@ -149,8 +315,8 @@ body {
 }
 
 .progress-dot {
-  width: 24px;
-  height: 24px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   border-radius: 50%;
   background: transparent;
@@ -195,8 +361,8 @@ body {
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 50%;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   color: rgba(232, 228, 223, 0.9);
   cursor: pointer;
   transition:
@@ -302,6 +468,38 @@ body {
   }
 
   .scene-stage.buffering::after {
+    animation: none;
+  }
+
+  .trace-path,
+  .trace-glow {
+    stroke-dashoffset: 0;
+    animation: none;
+  }
+
+  .trace-node {
+    opacity: 1;
+    animation: none;
+  }
+
+  .loading-title {
+    color: rgba(232, 228, 223, 0.4);
+    animation: none;
+  }
+
+  .loading-screen {
+    transition: none;
+  }
+
+  .play-gate {
+    transition: none;
+  }
+
+  .play-gate-icon circle {
+    transition: none;
+  }
+
+  .transition-loader::after {
     animation: none;
   }
 }

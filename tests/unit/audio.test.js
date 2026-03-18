@@ -34,8 +34,10 @@ vi.mock('howler', () => ({
 
 import {
   playAmbient,
+  cueAmbient,
   crossfadeAmbient,
   playNarration,
+  cueNarration,
   stopNarration,
   pauseNarration,
   resumeNarration,
@@ -48,6 +50,7 @@ import {
   preloadNarrationAhead,
   clearNarrationCache,
   playMusic,
+  cueMusic,
   fadeMusic,
   pauseMusic,
   resumeMusic,
@@ -91,6 +94,38 @@ describe('audio.js', () => {
       playAmbient('second.mp3', 0.2, true);
 
       expect(first.unload).toHaveBeenCalled();
+    });
+  });
+
+  describe('cueAmbient', () => {
+    it('creates a Howl with preload but does not call play', () => {
+      const howl = cueAmbient('ambient.mp3', 0.15, true);
+
+      expect(Howl).toHaveBeenCalledWith(
+        expect.objectContaining({
+          src: ['ambient.mp3'],
+          volume: 0.15,
+          loop: true,
+          html5: true,
+          preload: true,
+        }),
+      );
+      expect(howl.play).not.toHaveBeenCalled();
+    });
+
+    it('unloads previous ambient before cueing new one', () => {
+      const first = playAmbient('first.mp3', 0.1, true);
+      cueAmbient('second.mp3', 0.2, true);
+
+      expect(first.unload).toHaveBeenCalled();
+    });
+
+    it('can be resumed with resumeAmbient after cueing', () => {
+      const howl = cueAmbient('ambient.mp3', 0.15, true);
+      vi.clearAllMocks();
+      resumeAmbient();
+
+      expect(howl.play).toHaveBeenCalled();
     });
   });
 
@@ -215,6 +250,53 @@ describe('audio.js', () => {
       // Should have added waiting and playing listeners
       expect(mockNode.addEventListener).toHaveBeenCalledWith('waiting', expect.any(Function));
       expect(mockNode.addEventListener).toHaveBeenCalledWith('playing', expect.any(Function));
+    });
+  });
+
+  describe('cueNarration', () => {
+    it('creates a Howl with preload but does not call play', () => {
+      const howl = cueNarration('narration.mp3');
+
+      expect(Howl).toHaveBeenCalledWith(
+        expect.objectContaining({
+          src: ['narration.mp3'],
+          volume: 1,
+          html5: true,
+          preload: true,
+        }),
+      );
+      expect(howl.play).not.toHaveBeenCalled();
+    });
+
+    it('unloads previous narration before cueing new one', () => {
+      const first = playNarration('first.mp3');
+      cueNarration('second.mp3');
+
+      expect(first.unload).toHaveBeenCalled();
+    });
+
+    it('uses cached Howl when available', () => {
+      preloadNarrationAhead('cached.m4a');
+      const preloadCallCount = Howl.mock.calls.length;
+
+      cueNarration('cached.m4a');
+
+      expect(Howl.mock.calls.length).toBe(preloadCallCount);
+    });
+
+    it('applies current mute state', () => {
+      setMuted(true);
+      cueNarration('narration.mp3');
+
+      expect(Howl).toHaveBeenCalledWith(expect.objectContaining({ mute: true }));
+    });
+
+    it('can be resumed with resumeNarration after cueing', () => {
+      const howl = cueNarration('narration.mp3');
+      vi.clearAllMocks();
+      resumeNarration();
+
+      expect(howl.play).toHaveBeenCalled();
     });
   });
 
@@ -607,7 +689,60 @@ describe('audio.js', () => {
       const onend = vi.fn();
       playNarration('cached.m4a', onend);
 
-      expect(cachedHowl.on).toHaveBeenCalledWith('end', onend);
+      expect(cachedHowl.once).toHaveBeenCalledWith('end', onend);
+    });
+
+    it('calls onend when cached Howl loaderror fires', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      preloadNarrationAhead('cached.m4a');
+      const cachedHowl = Howl.mock.results[Howl.mock.results.length - 1].value;
+
+      const onend = vi.fn();
+      playNarration('cached.m4a', onend);
+
+      const loaderrorCall = cachedHowl.on.mock.calls.find(([event]) => event === 'loaderror');
+      loaderrorCall[1](1, 'network error');
+
+      expect(onend).toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
+
+    it('calls onend when cached Howl playerror fires', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      preloadNarrationAhead('cached.m4a');
+      const cachedHowl = Howl.mock.results[Howl.mock.results.length - 1].value;
+
+      const onend = vi.fn();
+      playNarration('cached.m4a', onend);
+
+      const playerrorCall = cachedHowl.on.mock.calls.find(([event]) => event === 'playerror');
+      playerrorCall[1](1, 'decode error');
+
+      expect(onend).toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
+
+    it('calls onend when fresh Howl onloaderror fires', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const onend = vi.fn();
+      playNarration('fresh.m4a', onend);
+
+      // Trigger onloaderror from the fresh Howl
+      lastHowlOptions.onloaderror(1, 'network error');
+
+      expect(onend).toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
+
+    it('calls onend when fresh Howl onplayerror fires', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const onend = vi.fn();
+      playNarration('fresh.m4a', onend);
+
+      lastHowlOptions.onplayerror(1, 'decode error');
+
+      expect(onend).toHaveBeenCalled();
+      warnSpy.mockRestore();
     });
   });
 
@@ -767,6 +902,69 @@ describe('audio.js', () => {
       // Buffer progresses and gets 3+ seconds ahead
       mockNode.buffered.end.mockReturnValue(9);
       mockNode.currentTime = 5;
+      vi.advanceTimersByTime(4000);
+
+      expect(mockNode.play).toHaveBeenCalled();
+
+      vi.useRealTimers();
+    });
+
+    it('cleans up buffering when reloadFromPosition play() fails', async () => {
+      vi.useFakeTimers();
+      const cb = vi.fn();
+      onNarrationBufferChange(cb);
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      mockNode.buffered.length = 1;
+      mockNode.buffered.end.mockReturnValue(5);
+      mockNode.currentTime = 5;
+      mockNode.src = 'stall.m4a';
+      mockNode.play.mockRejectedValue(new Error('reload failed'));
+
+      playNarration('stall.m4a');
+
+      const waitingCall = mockNode.addEventListener.mock.calls.find(
+        ([event]) => event === 'waiting',
+      );
+      waitingCall[1]();
+
+      // Advance 4 intervals to trigger reloadFromPosition
+      mockNode.buffered.end.mockReturnValue(5);
+      for (let i = 0; i < 4; i++) {
+        await vi.advanceTimersByTimeAsync(4000);
+      }
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Buffer recovery play() failed:',
+        'reload failed',
+      );
+      expect(isNarrationBuffering()).toBe(false);
+
+      warnSpy.mockRestore();
+      vi.useRealTimers();
+    });
+
+    it('resumes playback when near end of audio and buffer has some progress', () => {
+      vi.useFakeTimers();
+      const cb = vi.fn();
+      onNarrationBufferChange(cb);
+      mockNode.play.mockResolvedValue(undefined);
+
+      mockNode.buffered.length = 1;
+      mockNode.buffered.end.mockReturnValue(57);
+      mockNode.currentTime = 58;
+      mockNode.duration = 60;
+
+      playNarration('nearend.m4a');
+
+      const waitingCall = mockNode.addEventListener.mock.calls.find(
+        ([event]) => event === 'waiting',
+      );
+      waitingCall[1]();
+      mockNode.play.mockClear();
+
+      // Buffer progresses by just 1 second but we're near end (< 3s remaining)
+      mockNode.buffered.end.mockReturnValue(58);
       vi.advanceTimersByTime(4000);
 
       expect(mockNode.play).toHaveBeenCalled();
@@ -934,6 +1132,38 @@ describe('audio.js', () => {
 
       expect(() => setMuted(true)).not.toThrow();
       warnSpy.mockRestore();
+    });
+  });
+
+  describe('cueMusic', () => {
+    it('creates a Howl with preload but does not call play', () => {
+      const howl = cueMusic('song.mp3', 0.1);
+
+      expect(Howl).toHaveBeenCalledWith(
+        expect.objectContaining({
+          src: ['song.mp3'],
+          volume: 0.1,
+          loop: true,
+          html5: true,
+          preload: true,
+        }),
+      );
+      expect(howl.play).not.toHaveBeenCalled();
+    });
+
+    it('unloads previous music before cueing new one', () => {
+      const first = playMusic('first.mp3', 0.1);
+      cueMusic('second.mp3', 0.2);
+
+      expect(first.unload).toHaveBeenCalled();
+    });
+
+    it('can be resumed with resumeMusic after cueing', () => {
+      const howl = cueMusic('song.mp3', 0.1);
+      vi.clearAllMocks();
+      resumeMusic();
+
+      expect(howl.play).toHaveBeenCalled();
     });
   });
 

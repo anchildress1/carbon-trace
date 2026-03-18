@@ -8,23 +8,24 @@
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=anchildress1_carbon-trace&metric=alert_status)](https://sonarcloud.io/project/overview?id=anchildress1_carbon-trace)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=anchildress1_carbon-trace&metric=coverage)](https://sonarcloud.io/project/overview?id=anchildress1_carbon-trace)
 
-An immersive visual narrative told from the awareness of a diamond trapped in a coal seam. Navigate scenes via buttons and keyboard; click and hover trigger per-scene visual effects. WeCoded 2026 Frontend Art Entry.
+An immersive visual narrative told from the awareness of a diamond trapped in a coal seam. Navigate scenes via buttons, keyboard, or stage click/tap. WeCoded 2026 Frontend Art Entry.
 
 Built with Vite, vanilla JavaScript (ES modules), GSAP animations, and Howler.js audio. Deployed as a static site to Cloud Run.
 
 ## Controls
 
-| Control                    | Action                                               |
-| -------------------------- | ---------------------------------------------------- |
-| **Prev / Next** buttons    | Navigate between scenes                              |
-| **Arrow Left / Right**     | Navigate between scenes                              |
-| **Space / Enter**          | Advance to next scene                                |
-| **Pause** button           | Freeze/resume all audio, animations, and captions    |
-| **Mute** button            | Toggle audio mute                                    |
-| **Captions** button        | Toggle subtitle display (persists across sessions)   |
-| **Replay** button          | Restart current scene's narration from the beginning |
-| **Progress dots**          | Jump to a specific scene                             |
-| **Click / hover** on scene | Trigger visual effects (does not navigate)           |
+| Control                 | Action                                               |
+| ----------------------- | ---------------------------------------------------- |
+| **Prev / Next** buttons | Navigate between scenes                              |
+| **Arrow Left / Right**  | Navigate between scenes                              |
+| **Space**               | Toggle play/pause                                    |
+| **Enter / Arrow Right** | Advance to next scene                                |
+| **Pause** button        | Freeze/resume all audio, animations, and captions    |
+| **Mute** button         | Toggle audio mute                                    |
+| **Captions** button     | Toggle subtitle display (persists across sessions)   |
+| **Replay** button       | Restart current scene's narration from the beginning |
+| **Progress dots**       | Jump to a specific scene                             |
+| **Click / tap** stage   | Advance to next scene                                |
 
 ## Setup
 

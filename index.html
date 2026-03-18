@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="carbon-trace — an immersive visual narrative" />
     <meta
       http-equiv="Content-Security-Policy"
@@ -27,17 +27,45 @@
   </head>
   <body>
     <div id="app" role="application" aria-label="carbon-trace visual narrative">
-      <div class="loading-screen" id="loading-screen">
-        <p>Loading...</p>
+      <div
+        class="loading-screen"
+        id="loading-screen"
+        role="status"
+        aria-label="Loading carbon-trace"
+      >
+        <div class="loading-trace">
+          <svg class="loading-svg" viewBox="0 0 200 40" aria-hidden="true">
+            <path
+              class="trace-glow"
+              d="M 10,20 H 55 L 59,12 L 63,20 H 100 L 104,28 L 108,20 H 140 L 144,12 L 148,20 H 190"
+            />
+            <path
+              class="trace-path"
+              d="M 10,20 H 55 L 59,12 L 63,20 H 100 L 104,28 L 108,20 H 140 L 144,12 L 148,20 H 190"
+            />
+            <circle class="trace-node" cx="100" cy="20" r="2" />
+          </svg>
+          <p class="loading-title">carbon-trace</p>
+        </div>
       </div>
 
       <div class="scene-stage" id="scene-stage" hidden>
-        <img class="scene-image" id="scene-image" alt="" />
+        <canvas class="scene-canvas" id="scene-canvas" aria-hidden="true"></canvas>
         <div class="trace-overlay" id="trace-overlay"></div>
-        <div class="effects-layer" id="effects-layer"></div>
+        <canvas class="effects-canvas" id="effects-canvas" aria-hidden="true"></canvas>
         <div class="narration-layer" id="narration-layer" aria-hidden="true"></div>
         <div class="caption-layer" id="caption-layer" aria-hidden="true"></div>
       </div>
+
+      <button class="play-gate" id="play-gate" hidden aria-label="Begin experience">
+        <svg class="play-gate-icon" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+          <circle cx="32" cy="32" r="30" />
+          <polygon points="26,18 26,46 48,32" />
+        </svg>
+        <span class="play-gate-label">click to begin</span>
+      </button>
+
+      <div class="transition-loader" id="transition-loader" hidden aria-hidden="true"></div>
 
       <div class="overlay-controls" id="overlay-controls" hidden>
         <nav class="progress-dots" id="progress-dots" aria-label="Scene progress"></nav>

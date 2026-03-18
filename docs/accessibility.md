@@ -5,14 +5,13 @@
 ```mermaid
 flowchart LR
     A["#accessible-narration<br/>aria-live=polite"] -->|updated on| B[Scene change]
-    A -->|updated on| C[Caption display]
-    B --> D[Screen reader announces text]
-    C --> D
+    B --> C[Screen reader announces full narration text]
 ```
 
 A persistent `aria-live="polite"` region (`#accessible-narration`) receives the
-full narration text for each scene. Screen readers announce the content as it
-changes without interrupting the user.
+full narration text for each scene on scene change. When captions are available,
+their text is used; otherwise narration line text is joined. Screen readers
+announce the content as it changes without interrupting the user.
 
 The ghost-drift narration layer and caption layer are both marked
 `aria-hidden="true"` because they are visual-only presentations of the same
@@ -22,14 +21,16 @@ content that `#accessible-narration` provides to assistive technology.
 
 | Key | Action |
 |-----|--------|
-| `Space` / `Enter` | Advance to next scene |
-| `ArrowRight` | Advance to next scene |
+| `Space` | Toggle play/pause |
+| `Enter` / `ArrowRight` | Advance to next scene |
 | `ArrowLeft` | Return to previous scene |
 | `Tab` | Navigate between controls |
 
-All control buttons (prev, pause, mute, captions, replay, next) are focusable
-and respond to keyboard activation. Space and Enter do not advance when focus
-is inside the control bar to avoid conflicting with button activation.
+Space toggles play/pause (not advance). Enter and ArrowRight advance to the
+next scene. All control buttons (prev, pause, mute, captions, replay, next)
+are focusable and respond to keyboard activation. Space and Enter/ArrowRight
+do not fire when focus is inside the control bar to avoid conflicting with
+button activation.
 
 ## Focus Management
 
@@ -51,7 +52,8 @@ is inside the control bar to avoid conflicting with button activation.
 | `#btn-captions` | `aria-pressed` | Toggle state for captions on/off |
 | `#btn-mute` | `aria-label` | Updates between "Mute audio" / "Unmute audio" |
 | `#btn-mute` | `aria-disabled` | Disabled until audio is available |
-| `#scene-image` | `alt` | Scene description from `frame.description` |
+| `#scene-stage` | `aria-label` | Scene description from `frame.description` |
+| progress dots | `aria-current="step"` | Identifies the current scene dot |
 
 ## Reduced Motion
 
@@ -89,33 +91,37 @@ cached), so it responds to runtime changes in the user's system preference.
 sequenceDiagram
     participant User
     participant App as app.js
+    participant Text as text.js
     participant Cap as captions.js
+
+    Note over App: showFrame → buildNarration
+    App->>Text: buildNarrationTimeline(lines, container, opts)
+    Text->>Text: Embed caption show/hide as GSAP timeline callbacks
+    Text-->>App: { timeline, captionEntries }
+
+    Note over App: Scene plays — timeline drives captions
 
     User->>App: Toggle captions on
     App->>Cap: setCaptionsEnabled(true)
-    Cap->>Cap: Persist to localStorage
-
-    Note over App: Scene plays
-    App->>Cap: showCaptions(captions, container)
-    Cap->>Cap: Schedule show/hide timers
+    App->>Cap: syncCaptionsToTime(entries, currentTime, container)
+    Cap->>Cap: Show captions active at current position
 
     User->>App: Pause
-    App->>Cap: pauseCaptions()
-    Cap->>Cap: Save elapsed offset, clear timers
+    App->>App: textTimeline.pause() — freezes captions too
 
     User->>App: Resume
-    App->>Cap: resumeCaptions()
-    Cap->>Cap: Reschedule from saved offset
+    App->>App: textTimeline.resume() — captions resume in sync
 ```
 
-Captions are timed to narration playback using `start`/`end` timestamps in
-milliseconds. When paused, the elapsed playback time is saved. On resume,
-all caption timers are recalculated from the saved offset, keeping captions
-synchronized with audio.
+Caption show/hide scheduling is embedded directly in the GSAP text timeline
+built by `text.js`. Each caption's `start`/`end` timestamps (offset by
+`narration.delay`) become `tl.call()` entries that create and remove caption
+DOM elements. Because captions live inside the same timeline as narration
+text, they automatically pause and resume with it — no separate timer math.
 
-Toggling captions mid-scene recalculates from the current text timeline
-position, so captions appear at the correct point regardless of when they were
-enabled.
+Toggling captions mid-scene calls `syncCaptionsToTime`, which scans caption
+entries and immediately shows any that should be visible at the current
+timeline position.
 
 The caption preference is persisted in `localStorage` under the key
 `carbon-trace-captions-enabled`.

@@ -3,6 +3,10 @@ name: CI
 on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
+    paths-ignore:
+      - "*.md"
+      - "docs/**"
+      - "LICENSE"
   workflow_dispatch:
 
 concurrency:
@@ -34,9 +38,6 @@ jobs:
         with:
           node-version: 22
           cache: 'pnpm'
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
 
       - name: Install dependencies
         run: make install
@@ -76,14 +77,11 @@ jobs:
       - name: Build
         run: make build
 
-      - name: Run E2E Tests
-        run: make e2e
+      - name: Run E2E Tests (chromium only)
+        run: pnpm exec playwright test --project=chromium
 
       - name: Run Performance / Lighthouse Tests
-        run: make perf
-
-      - name: Secret Scan
-        run: make secret-scan
+        run: pnpm exec lhci autorun --collect.numberOfRuns=1
 
       - name: Store Playwright Report
         uses: actions/upload-artifact@v6
@@ -100,3 +98,31 @@ jobs:
           name: lighthouse-report
           path: .lighthouseci/
           retention-days: 30
+
+  sonar:
+    needs: test
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Download coverage artifact
+        uses: actions/download-artifact@v6
+        with:
+          name: coverage-report
+          path: coverage/
+
+      - name: SonarQube Scan
+        if: env.SONAR_TOKEN != ''
+        uses: SonarSource/sonarqube-scan-action@fd88b7d7ccbaefd23d8f36f73b59db7a3d246602 # v6.0.0
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io

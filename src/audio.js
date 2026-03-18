@@ -198,13 +198,35 @@ export function playAmbient(src, volume, loop) {
   return currentAmbient;
 }
 
-export function crossfadeAmbient(newSrc, volume, durationMs) {
+export function cueAmbient(src, volume, loop) {
+  if (currentAmbient) {
+    currentAmbient.unload();
+  }
+
+  const howl = new Howl({
+    src: [src],
+    volume: volume,
+    loop: loop,
+    html5: true,
+    preload: true,
+    mute: globalMuted,
+    onloaderror: (_id, err) => {
+      console.warn(`Failed to load ambient: ${src}`, err);
+      if (currentAmbient === howl) currentAmbient = null;
+    },
+  });
+
+  currentAmbient = howl;
+  return currentAmbient;
+}
+
+export function crossfadeAmbient(newSrc, volume, durationMs, loop = true) {
   const oldAmbient = currentAmbient;
 
   const howl = new Howl({
     src: [newSrc],
     volume: 0,
-    loop: true,
+    loop: loop,
     html5: true,
     mute: globalMuted,
     onloaderror: (_id, err) => {
@@ -239,13 +261,15 @@ export function playNarration(src, onend) {
   if (howl) {
     narrationCache.delete(src);
     howl.mute(globalMuted);
-    if (onend) howl.on('end', onend);
+    if (onend) howl.once('end', onend);
     howl.on('loaderror', (_id, err) => {
       console.warn(`Failed to load narration: ${src}`, err);
       if (currentNarration === howl) currentNarration = null;
+      if (onend) onend();
     });
     howl.on('playerror', (_id, err) => {
       console.warn(`Failed to play narration: ${src}`, err);
+      if (onend) onend();
     });
   } else {
     howl = new Howl({
@@ -257,9 +281,11 @@ export function playNarration(src, onend) {
       onloaderror: (_id, err) => {
         console.warn(`Failed to load narration: ${src}`, err);
         if (currentNarration === howl) currentNarration = null;
+        if (onend) onend();
       },
       onplayerror: (_id, err) => {
         console.warn(`Failed to play narration: ${src}`, err);
+        if (onend) onend();
       },
     });
   }
@@ -267,6 +293,39 @@ export function playNarration(src, onend) {
   currentNarration = howl;
   currentNarration.play();
   monitorNarrationBuffer(howl);
+  return currentNarration;
+}
+
+export function cueNarration(src) {
+  cleanupBufferMonitoring();
+
+  if (currentNarration) {
+    currentNarration.unload();
+  }
+
+  let howl = narrationCache.get(src);
+  if (howl) {
+    narrationCache.delete(src);
+    howl.mute(globalMuted);
+    howl.on('loaderror', (_id, err) => {
+      console.warn(`Failed to load narration: ${src}`, err);
+      if (currentNarration === howl) currentNarration = null;
+    });
+  } else {
+    howl = new Howl({
+      src: [src],
+      volume: 1,
+      html5: true,
+      mute: globalMuted,
+      preload: true,
+      onloaderror: (_id, err) => {
+        console.warn(`Failed to load narration: ${src}`, err);
+        if (currentNarration === howl) currentNarration = null;
+      },
+    });
+  }
+
+  currentNarration = howl;
   return currentNarration;
 }
 
@@ -324,6 +383,28 @@ export function playMusic(src, volume) {
 
   currentMusic = howl;
   currentMusic.play();
+  return currentMusic;
+}
+
+export function cueMusic(src, volume) {
+  if (currentMusic) {
+    currentMusic.unload();
+  }
+
+  const howl = new Howl({
+    src: [src],
+    volume: volume,
+    loop: true,
+    html5: true,
+    preload: true,
+    mute: globalMuted,
+    onloaderror: (_id, err) => {
+      console.warn(`Failed to load music: ${src}`, err);
+      if (currentMusic === howl) currentMusic = null;
+    },
+  });
+
+  currentMusic = howl;
   return currentMusic;
 }
 

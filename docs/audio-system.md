@@ -117,7 +117,7 @@ sequenceDiagram
     participant App as app.js
     participant Audio as audio.js
 
-    Note over App: applyNarration detects frame.music
+    Note over App: showFrame detects frame.music
     App->>App: scheduleMusic(music)
     App->>App: clearMusicTimer + stopMusic
 
@@ -136,25 +136,40 @@ sequenceDiagram
     end
 ```
 
+Music is an independent audio track, separate from narration. It is scheduled
+in `showFrame` (not `applyNarration`), so replaying narration does not restart
+music. Music starts at the configured `enter` time, fades in over
+`crescendoMs`, and plays until the configured `exit` time (or indefinitely if
+`exit` is null).
+
 Music supports:
 - **Delayed start** (`enter` ms): Timer saved/restored on pause/resume.
 - **Volume crescendo**: Starts at `startVolume`, fades to `fullVolume` over
   `crescendoMs`.
 - **Scheduled exit** (`exit` ms): Triggers a 2-second fade to silence. The exit
   timer is independently tracked for pause/resume.
+- **Independence from narration**: Music does not restart on replay. It
+  functions like a narrated track — it starts when configured and runs on
+  its own timeline.
 
 ## Ambient Crossfade
 
-When transitioning between scenes, ambient audio crossfades:
+When transitioning between scenes while playing, ambient audio crossfades:
 
 1. New Howl created at volume 0, starts playing.
 2. New ambient fades from 0 to target volume over the crossfade duration.
 3. Old ambient fades from current volume to 0 over the same duration.
 4. Old Howl unloaded after fade completes (+100ms buffer).
 
+When navigating while paused (hard cut), `cueAmbient` creates the Howl with
+`preload: true` but does not call `play()`. The ambient starts when the user
+resumes via `resumeAmbient()`. Same pattern applies to music via `cueMusic`.
+This satisfies ADR-002's hard rule: no transient playback during paused
+navigation.
+
 ## Pause/Resume Timer Math
 
-All scheduled timers (narration delay, music enter, music exit, phase duration)
+All scheduled timers (narration delay, music enter, music exit, auto-advance)
 use the same pattern:
 
 ```

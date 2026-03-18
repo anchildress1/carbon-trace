@@ -122,6 +122,37 @@ describe('overlay.js', () => {
       const activeDots = dotsContainer.querySelectorAll('.active');
       expect(activeDots.length).toBe(3);
     });
+
+    it('sets aria-current="step" on the current dot', () => {
+      initOverlay(5);
+      updateProgress(3);
+
+      const dots = dotsContainer.querySelectorAll('.progress-dot');
+      expect(dots[2].getAttribute('aria-current')).toBe('step');
+      expect(dots[1].hasAttribute('aria-current')).toBe(false);
+      expect(dots[3].hasAttribute('aria-current')).toBe(false);
+    });
+
+    it('moves aria-current when progress updates', () => {
+      initOverlay(5);
+      updateProgress(2);
+
+      const dots = dotsContainer.querySelectorAll('.progress-dot');
+      expect(dots[1].getAttribute('aria-current')).toBe('step');
+
+      updateProgress(4);
+      expect(dots[1].hasAttribute('aria-current')).toBe(false);
+      expect(dots[3].getAttribute('aria-current')).toBe('step');
+    });
+
+    it('removes aria-current from all dots when sceneIndex is 0', () => {
+      initOverlay(3);
+      updateProgress(2);
+      updateProgress(0);
+
+      const current = dotsContainer.querySelectorAll('[aria-current]');
+      expect(current.length).toBe(0);
+    });
   });
 
   describe('updateProgress — edge cases', () => {
