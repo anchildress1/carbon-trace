@@ -6,15 +6,18 @@
  * app.js does not change when effects are wired in.
  */
 
-const effects = {};
+const effects = Object.create(null);
 
 export function effectExists(name) {
-  return name in effects;
+  return typeof name === 'string' && Object.prototype.hasOwnProperty.call(effects, name);
 }
 
 export function runEffect(name, effectsCanvas, sceneCanvas) {
   const fn = effects[name];
-  if (!fn) return;
+  if (!fn) {
+    if (name) console.warn(`Effect "${name}" is not registered.`);
+    return;
+  }
   try {
     fn({ canvas: effectsCanvas, scene: sceneCanvas });
   } catch (err) {
