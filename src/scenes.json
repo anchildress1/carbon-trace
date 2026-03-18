@@ -19,6 +19,7 @@
       "holdUntilClick": true,
       "holdAfterNarration": null,
       "description": "Title card — opening narration on a dark field",
+      "image": null,
       "narration": {
         "lines": [
           {
