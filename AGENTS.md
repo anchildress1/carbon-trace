@@ -31,9 +31,9 @@ Canonical instruction source for this repository. Treat this file as authoritati
 - Make small, atomic commits as you go — one logical change per commit.
 - Do not batch unrelated changes into a single commit.
 - Use Conventional Commits.
-- Include required RAI footer:
+- Include required RAI footer adding your name in place of Claude and valid email instead of anthropic:
   ```
-  Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+  Co-authored-By: Claude <noreply@anthropic.com>
   ```
 
 ## Project: carbon-trace
@@ -43,7 +43,7 @@ Canvas 2D rendering, GSAP text/transition animation, and Howler.js audio. 12 fra
 (title + 10 scenes + credits) with ghost-drift text, per-scene visual effects, ambient
 audio, and recorded narration. Deployed via Cloud Run + nginx.
 
-Full system design: `docs/carbon-trace-system-design-v3-final.md`
+Full system design: `docs/design_decisions/*.md`
 
 ## Architecture: two rendering layers
 
@@ -103,11 +103,16 @@ Full system design: `docs/carbon-trace-system-design-v3-final.md`
 - Stable DOM narration via `aria-live="polite"` for screen readers.
 - `prefers-reduced-motion` swaps ghost-drift for simple fade or static text.
   Canvas effects minimal/none under reduced motion.
-- Keyboard navigation: Space/Enter advances, Tab to replay/mute.
+- Keyboard navigation: Space toggles play/pause, Enter/ArrowRight advances,
+  ArrowLeft retreats, Tab to replay/mute.
 - Narration panel meets WCAG AA contrast.
 
 ## Documentation
 
 - Keep docs in `docs/` aligned with the codebase — update them whenever code changes affect architecture, audio system, or accessibility behavior.
 - Prefer Mermaid diagrams whenever a visual would clarify architecture, data flow, or state machines.
-- System design doc is authoritative for architectural decisions: `docs/carbon-trace-system-design-v3-final.md`
+- System design docs are authoritative for architectural decisions: `docs/design_decisions/*.md`
+
+## Security
+
+- Before committing any changes, follow all rules in `.github/instructions/sonarqube_mcp.instructions.md`.
