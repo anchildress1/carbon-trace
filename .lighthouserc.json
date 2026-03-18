@@ -7,7 +7,7 @@
       "numberOfRuns": 3,
       "settings": {
         "preset": "desktop",
-        "chromeFlags": "--headless"
+        "chromeFlags": "--headless=new"
       }
     },
     "assert": {
