@@ -1,8 +1,8 @@
 /**
  * Canvas 2D — scene image rendering with cover-fit, DPR-aware sizing,
  * and resize handling. Exposes the scene canvas context via
- * getSceneContext() for future pixel-level effects (e.g., ripple, bloom)
- * that need to read the scene image data.
+ * getSceneContext() for pixel-level effects (e.g., ripple, bloom)
+ * that read scene image data.
  *
  * Images are drawn to canvas via ctx.drawImage() with cover-fit logic
  * (same behaviour as CSS object-fit: cover). This is the primary

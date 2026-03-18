@@ -1,8 +1,10 @@
 /**
  * Canvas 2D lifecycle — manages the effects overlay canvas context,
- * DPR-aware sizing, and the requestAnimationFrame render loop. Effect
- * drawing calls are inserted into the render loop by the orchestrator;
- * the registry and dispatch live in effects.js.
+ * DPR-aware sizing, and the requestAnimationFrame render loop. The
+ * render loop currently clears the canvas each frame; effect
+ * implementations will draw into this canvas via the effects.js
+ * registry. The render loop is controlled by the orchestrator via
+ * pause()/resume().
  *
  * Respects prefers-reduced-motion: the render loop will not start (and
  * will self-stop) when the user prefers reduced motion.
@@ -44,7 +46,7 @@ function render() {
   const rect = canvasEl.getBoundingClientRect();
   ctx.clearRect(0, 0, rect.width, rect.height);
 
-  // Active effect drawing calls are inserted here by the orchestrator.
+  // Currently no-op: effect draw calls will be added here when effect implementations are wired in.
 
   rafId = requestAnimationFrame(render);
 }

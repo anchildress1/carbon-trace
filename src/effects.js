@@ -1,10 +1,9 @@
 /**
- * Effects registry — no-op skeleton.
- *
- * Effect implementations will be added as Canvas 2D pixel effects
- * in subsequent commits. The API surface (effectExists, runEffect,
- * clearEffects) stays stable so app.js doesn't change when effects
- * are wired in.
+ * Effects registry. Effect functions are registered in the `effects` map.
+ * Currently empty — all scene effect references (dust-drift, heat-pulse,
+ * etc.) will no-op with a console warning until implementations are added.
+ * The API surface (effectExists, runEffect, clearEffects) is stable;
+ * app.js does not change when effects are wired in.
  */
 
 const effects = {};
