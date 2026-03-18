@@ -16,7 +16,7 @@ Canonical instruction source for this repository. Treat this file as authoritati
 
 ### Spec compliance
 
-- All implementation MUST follow `docs/carbon-trace-system-design-v4.md` and
+- All implementation MUST follow `docs/design/carbon-trace-system-design-v5.md` and
   `docs/ADRs/*.md` as the authoritative source of truth.
 - If a deviation from the spec is warranted, you MUST:
   1. Stop implementation.
@@ -55,7 +55,7 @@ Canvas 2D rendering, GSAP text/transition animation, and Howler.js audio. 12 fra
 (title + 10 scenes + credits) with ghost-drift text, per-scene visual effects, ambient
 audio, and recorded narration. Deployed via Cloud Run + nginx.
 
-Full system design: `docs/carbon-trace-system-design-v4.md` and `docs/ADRs/*.md`
+Full system design: `docs/design/carbon-trace-system-design-v5.md` and `docs/ADRs/*.md`
 
 ## Architecture: two rendering layers
 
@@ -123,7 +123,7 @@ Full system design: `docs/carbon-trace-system-design-v4.md` and `docs/ADRs/*.md`
 
 - Keep docs in `docs/` aligned with the codebase — update them whenever code changes affect architecture, audio system, or accessibility behavior.
 - Prefer Mermaid diagrams whenever a visual would clarify architecture, data flow, or state machines.
-- System design docs are authoritative for architectural decisions: `docs/carbon-trace-system-design-v4.md` and `docs/ADRs/*.md`
+- System design docs are authoritative for architectural decisions: `docs/design/carbon-trace-system-design-v5.md` and `docs/ADRs/*.md`
 
 ## Security
 

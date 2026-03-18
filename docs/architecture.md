@@ -156,20 +156,44 @@ frames[]:
 
 ```mermaid
 flowchart LR
-    subgraph CI["GitHub Actions"]
-        A[Push to main] --> B[CI: lint + test + build]
+    subgraph PR["Pull Request"]
+        A[ci.yml] -->|format + lint + unit + build + e2e + lighthouse| B[Coverage artifact]
+        B --> C[sonar job — SonarCloud analysis]
     end
 
-    subgraph Docker["Cloud Run"]
-        D[Dockerfile] --> E[Node builder stage]
-        E --> F[pnpm build → dist/]
-        F --> G[nginx 1-alpine]
-        G --> H[Serve on :8080]
+    subgraph Main["Push to main"]
+        D[deploy.yml] -->|gcloud builds submit| E[Cloud Build]
+        E --> F["Artifact Registry\n(Docker image)"]
+        F -->|gcloud run deploy| G[Cloud Run]
+        G --> H[Smoke test /health]
     end
 
-    B --> D
+    subgraph Scheduled["Scheduled / On-demand"]
+        I[security-audit.yml] -->|Trivy repo scan| J[SARIF → code-scanning]
+        K[codeql.yml] -->|CodeQL JS analysis| J
+        L[sonar.yml] -->|SonarCloud on main push| M[SonarCloud dashboard]
+    end
+
+    subgraph Release["Release"]
+        N[release-please.yml] -->|Conventional Commits| O[Release PR + CHANGELOG]
+    end
 ```
 
-- **Cloud Run**: multi-stage Docker build → nginx with gzip, security headers,
-  and tiered cache (1yr immutable for hashed assets, 30d for media, no-cache
-  for HTML). Deployed to an existing verified domain via GitHub Actions CI/CD.
+### Workflows
+
+| Workflow | Triggers | Purpose |
+|----------|----------|---------|
+| `ci.yml` | PR (non-draft) | Format check, lint, unit tests + coverage, build, E2E (chromium), Lighthouse, SonarCloud scan |
+| `deploy.yml` | Push to `main`, manual | Cloud Build → Artifact Registry → Cloud Run deploy + smoke test |
+| `sonar.yml` | Push to `main`, manual | SonarCloud analysis on merged code with coverage |
+| `security-audit.yml` | PR, schedule (twice monthly), manual | Trivy repo scan for misconfig/secrets/licenses (HIGH+CRITICAL) |
+| `codeql.yml` | PR, schedule, manual | GitHub CodeQL JavaScript analysis |
+| `release-please.yml` | Push to `main` | Automated release PR and CHANGELOG from Conventional Commits |
+
+### Docker Build
+
+Multi-stage: Node 22-alpine builder runs `pnpm build` → nginx 1-alpine serves `dist/` on port 8080. Build runs inside Cloud Build (not locally); the `Dockerfile` is self-contained.
+
+### Cloud Run
+
+Deployed via `gcloud run deploy` with `--allow-unauthenticated` and `--cpu-boost`. Authentication uses a GCP service account key (`GCP_SA_KEY` secret) scoped to the `deploy` GitHub environment.
