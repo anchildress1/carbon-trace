@@ -14,10 +14,7 @@ export function effectExists(name) {
 
 export function runEffect(name, effectsCanvas, sceneCanvas) {
   const fn = effects[name];
-  if (!fn) {
-    if (name) console.warn(`Unknown effect: "${name}"`);
-    return;
-  }
+  if (!fn) return;
   try {
     fn({ canvas: effectsCanvas, scene: sceneCanvas });
   } catch (err) {

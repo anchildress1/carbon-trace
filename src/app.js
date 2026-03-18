@@ -23,7 +23,7 @@ import {
   stopMusic,
 } from './audio.js';
 import { buildNarrationTimeline, clearNarrationLayer } from './text.js';
-import { runEffect, clearEffects, effectExists } from './effects.js';
+import { runEffect, clearEffects } from './effects.js';
 import {
   initCanvas,
   pause as pauseCanvas,
@@ -58,23 +58,6 @@ const State = Object.freeze({
 const STATE_BY_FRAME_TYPE = {
   credits: State.CREDITS,
 };
-
-function validateEffects(frames) {
-  const missing = [];
-  for (const frame of frames) {
-    for (const key of ['idle', 'entry']) {
-      const name = frame.effects?.[key];
-      if (name && !effectExists(name)) {
-        missing.push(`Frame "${frame.id}" references unknown effect "${name}"`);
-      }
-    }
-  }
-  if (missing.length > 0) {
-    console.debug(
-      `Unregistered effects (will no-op until implemented):\n  ${missing.join('\n  ')}`,
-    );
-  }
-}
 
 function applyFrameDefaults(scenesJson) {
   const defaults = scenesJson.meta.frameDefaults || {};
@@ -1028,7 +1011,6 @@ export function createApp() {
   }
 
   const frames = applyFrameDefaults(scenesData);
-  validateEffects(frames);
 
   const app = {
     frames,

@@ -45,11 +45,11 @@ describe('effects.js — no-op skeleton', () => {
       warnSpy.mockRestore();
     });
 
-    it('warns for non-empty unknown effect name', () => {
+    it('silently returns for non-empty unknown effect name', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       runEffect('nonexistent', document.createElement('canvas'));
 
-      expect(warnSpy).toHaveBeenCalledWith('Unknown effect: "nonexistent"');
+      expect(warnSpy).not.toHaveBeenCalled();
       warnSpy.mockRestore();
     });
   });
