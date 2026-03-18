@@ -185,18 +185,21 @@ function scheduleMusic(app, music) {
   }
 }
 
-function scheduleNarrationAudio(app, narration) {
-  const frame = app.frames[app.currentIndex];
-  const holdAfterNarration =
-    frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
-
+function makeNarrationEndCallback(app, frame, holdAfterNarration) {
   const gen = app.generation;
-  const onend = () => {
+  return () => {
     if (gen !== app.generation) return;
     if (shouldAutoAdvance(app, frame)) {
       scheduleAutoAdvance(app, holdAfterNarration);
     }
   };
+}
+
+function scheduleNarrationAudio(app, narration) {
+  const frame = app.frames[app.currentIndex];
+  const holdAfterNarration =
+    frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
+  const onend = makeNarrationEndCallback(app, frame, holdAfterNarration);
 
   const delay = narration.delay || 0;
   if (delay > 0) {
@@ -214,6 +217,12 @@ function scheduleNarrationAudio(app, narration) {
 }
 
 function buildNarration(app, frame) {
+  try {
+    app.textTimeline?.kill();
+  } catch (err) {
+    console.error('Failed to kill text timeline:', err);
+  }
+  app.textTimeline = null;
   clearNarrationLayer(app.els.narrationLayer);
   clearCaptionElements(app.captionEntries);
 
@@ -629,14 +638,10 @@ function resumeDelayedNarration(app) {
     if (frame.narration?.audio) {
       const holdAfterNarration =
         frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
-      const gen = app.generation;
-      const onend = () => {
-        if (gen !== app.generation) return;
-        if (shouldAutoAdvance(app, frame)) {
-          scheduleAutoAdvance(app, holdAfterNarration);
-        }
-      };
-      playNarration(frame.narration.audio, onend);
+      playNarration(
+        frame.narration.audio,
+        makeNarrationEndCallback(app, frame, holdAfterNarration),
+      );
     }
   }, app.narrationTimerRemaining);
   app.narrationTimerRemaining = null;
