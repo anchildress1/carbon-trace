@@ -18,8 +18,6 @@ Three patterns exist in comparable media:
 - **E-learning tools (Articulate Storyline):** Replay while paused stays paused with content cued. Two-step: replay → play. Prioritizes control. But e-learning is utilitarian — friction is acceptable.
 - **Museum audioguides:** Press the button, hear the narration, stay in front of the painting. No auto-advance to the next exhibit. Content plays immediately, but nothing happens when it ends.
 
-carbon-trace is closest to the audioguide model: an authored, paced experience where the viewer stands in front of each scene. The narration is the emotional content. Auto-advance is the convenience layer.
-
 ## Options Considered
 
 ### Option A: Auto-Resume + Replay (current implementation)
@@ -37,77 +35,82 @@ Replay clears pause, plays narration + text from the top, re-arms auto-advance.
 
 **Cons:** User's pause intent silently overridden. Auto-advance re-arms without consent. Accidental replay while paused = runaway scene progression. No undo back to paused state.
 
-### Option B: Stay Paused + Cue Content (original spec intent)
+### Option B: Stay Paused + Hard Jump Reset
 
-Replay resets narration and text to start but does NOT unpause. Audio is loaded and seeked to 0 but not playing. Text timeline built but paused at 0. User presses play to hear replay.
-
-| Dimension | Assessment |
-|-----------|------------|
-| Complexity | Low — cueOnly path already exists |
-| Feedback | None — silent. No visible change on screen |
-| Control preservation | Full — pause state untouched |
-| Surprise risk | None — nothing happens until user presses play |
-
-**Pros:** Respects pause absolutely. No surprise scene changes. Clean separation of intent.
-
-**Cons:** Zero feedback on tap — user thinks replay is broken. Two-step interaction (replay → play) adds friction in an art piece. All text elements are opacity: 0 after cue, so there's no visual confirmation. Breaks immersion by making the viewer manage playback state.
-
-### Option C: Auto-Resume + Replay, Suppress Auto-Advance (recommended)
-
-Replay clears pause and plays narration + text immediately, but does NOT schedule auto-advance. Scene plays its content and holds. User must manually advance, re-pause, or replay again.
+Replay while paused treats the action like paused navigation — a hard jump that resets the scene content to its initial state without unpausing. Narration is cued (loaded, not playing). Text timeline is rebuilt (paused at time 0). The scene is ready to play from the top when the user presses play. No transition animation.
 
 | Dimension | Assessment |
 |-----------|------------|
-| Complexity | Low — remove one function call from replay path |
+| Complexity | Low — reuses existing cueOnly + hardCut patterns |
+| Feedback | Visual — text elements reset to initial state. No audio. |
+| Control preservation | Full — pause state untouched, no auto-advance |
+| Surprise risk | None — nothing moves until user presses play |
+
+**Pros:** Pause is inviolable — replay cannot override it. Consistent with hardCut pattern already used for paused navigation. No new state flags. No edge cases around auto-advance suppression. Simple mental model: while paused, everything is a hard jump. User presses play when ready.
+
+**Cons:** No audio feedback on tap — user must press play to hear the replay. Two-step interaction. Text elements reset visually (opacity 0 at time 0) which may look like "nothing happened" unless the user was watching the text.
+
+### Option C: Auto-Resume + Replay, Suppress Auto-Advance
+
+Replay clears pause and plays narration + text immediately, but does NOT schedule auto-advance. Scene plays its content and holds.
+
+| Dimension | Assessment |
+|-----------|------------|
+| Complexity | Low-Medium — new `replayFromPause` flag, guard in onend callback |
 | Feedback | Immediate — audio plays |
 | Control preservation | Partial — pause cleared, but no scene change |
-| Surprise risk | None — scene holds after narration ends |
+| Surprise risk | Low — scene holds, but pause state is technically lost |
 
-**Pros:** Instant audio feedback — one tap to hear content. No surprise scene advancement. User stays on current scene. Museum audioguide model: press button → hear content → you're still in front of the painting. Minimal code change.
+**Pros:** Instant audio feedback. No surprise scene advancement. Museum audioguide model.
 
-**Cons:** User who replays while paused and expects auto-advance to resume must press play or forward. Pause state technically lost (now playing). Slight departure from both current code and original spec.
+**Cons:** Pause state technically lost (now playing). New state flag (`replayFromPause`) that must be cleared on navigation and resume. Partial control preservation — user didn't ask to unpause, but they're now unpaused.
 
 ## Decision
 
-**Option C: Auto-Resume + Replay, Suppress Auto-Advance.**
+**Option B: Stay Paused + Hard Jump Reset.**
 
 When replay is triggered from a paused state:
 
-1. Clear pause state, resume ambient/music audio
-2. Stop current narration, rebuild from top
-3. Play narration audio + text timeline from 0
-4. **Do NOT call `setupAutoAdvance()`**
-5. When narration ends → scene holds (no timer, no advance)
-6. User can: advance manually (forward button/arrow/dot), pause, or replay again
+1. Pause state is preserved — `app.paused` remains `true`, `app.state` remains `PAUSED`
+2. Stop current narration audio (`stopNarration()`)
+3. Clear narration timer (if delayed narration was pending)
+4. Cue narration audio (loaded, seeked to 0, not playing) via `cueNarration()`
+5. Rebuild text timeline (paused at time 0) — text elements exist in DOM at initial opacity
+6. Clear and rebuild caption entries
+7. No auto-advance timer. No state change. No transition.
+8. When user presses play → `doResume()` triggers narration + text + auto-advance as normal
 
-The narration `onend` callback checks a `replayFromPause` flag. If set, `onend` does not schedule auto-advance. The flag is cleared on the next normal navigation or resume.
+This is the same pattern as paused navigation via dot bar (hardCut) — the scene resets to its starting state and waits for the user to press play. Replay while paused IS a hard jump to the same scene.
 
-### Why Option C over Option B
+### Why Option B over Option A
 
-Option B is the "correct" answer from a state-purity perspective. But carbon-trace is an art piece, not a media player. The viewer tapping replay while paused is saying "I want to hear that again" — and hearing nothing in response is a broken experience. The emotional cost of a dead click outweighs the state-purity benefit.
+Option A is the current implementation and the specific bug. It overrides the user's pause intent and re-arms auto-advance. This was identified as a P0 issue: the code doesn't match any accepted ADR behavior.
 
-Option C gives the user what they asked for (hear it again) without taking something they didn't offer (control of scene progression).
+### Why Option B over Option C
 
-### Why Option C over Option A
+Option C is clever but introduces unnecessary complexity. It requires a new state flag (`replayFromPause`), guards in the `onend` callback, and flag cleanup on navigation and resume. It also puts the experience in an ambiguous state — technically playing but without auto-advance, which is a mode that doesn't exist anywhere else in the state machine.
 
-Option A's auto-advance re-arm is the specific bug. The viewer paused for a reason — studying the image, reading text, taking a moment. Replay means "play this audio again," not "resume the conveyor belt." Suppressing auto-advance respects the implicit intent behind their pause while still delivering immediate content.
+Option B has zero new state. It reuses the exact same `cueOnly` pattern that hardCut already uses for paused navigation. While paused, everything is a hard jump — navigation, replay, all of it. One rule, no exceptions, no flags.
+
+The "no audio feedback" concern from Option B is real but acceptable in this context. The user explicitly paused. They know the experience is frozen. Tapping replay while paused is a setup action ("get ready to replay") not a playback action ("play now"). The play button is right there. One tap away.
 
 ## Consequences
 
 **What becomes easier:**
 
-- Replay always produces audio — no "did I tap it?" confusion
-- No surprise scene changes from replay
-- Viewer stays in an exploratory mode — hear content, stay on scene
+- No new state flags — zero additions to the state object
+- Replay-while-paused follows the same rule as navigate-while-paused: hard jump, stay frozen
+- No edge cases around auto-advance suppression or flag cleanup
+- Testing is straightforward: assert state is still PAUSED after replay
 
 **What becomes harder:**
 
-- Auto-advance doesn't re-arm after replay-from-pause — viewer must manually advance or press play. Acceptable because they explicitly paused.
-- One additional flag (`replayFromPause`) in state. Cleared on next `transition()` or `doResume()`.
+- User gets no audio feedback on replay tap while paused — must press play
+- If the scene had no visible text changes (e.g., Scene 8 with two short lines), the visual feedback of "replay worked" is subtle
 
 **What to revisit:**
 
-- If user testing shows people expect auto-advance after replay, switch to Option A. The flag is the only difference.
+- If user testing shows people are confused by the silent replay, consider adding a brief visual indicator (e.g., replay icon pulse) to confirm the tap registered
 
 ## Implementation
 
@@ -117,38 +120,34 @@ In `replayNarration()`:
 replayNarration(app):
   if TRANSITIONING or LOADING: return
 
-  wasPaused = app.paused
+  userHasInteracted = true
 
   if paused:
-    clear pause state
-    resume ambient + music
-    restore pausedFromState
+    // Hard jump reset — same pattern as paused navigation
+    stopNarration()
+    clear narration timer
 
-  clear auto-advance timer
+    clearAutoAdvance()
+    autoAdvanceTimerRemaining = null
+
+    frame = frames[currentIndex]
+
+    cueOnly = true
+    buildNarration(app, frame)      // cues audio, builds timeline (paused)
+    cueOnly = false
+
+    if textTimeline: textTimeline.pause(0)   // reset to start, stay paused
+
+    // Stay paused. No state change. User presses play to hear.
+    return
+
+  // --- Playing path (unchanged) ---
+  clearAutoAdvance()
   clear narration timer
-  rebuild narration (audio plays immediately)
-  play text timeline from 0
-
-  if wasPaused:
-    // Suppress auto-advance — scene holds after narration ends
-    // onNarrationEnd will check and skip scheduling
-  else:
-    setupAutoAdvance(app)
-```
-
-In `scheduleNarrationAudio()`:
-
-```
-const onend = () => {
-  if (gen !== app.generation) return;
-  if (app.replayFromPause) {
-    app.replayFromPause = false;
-    return;  // Scene holds — no auto-advance
-  }
-  if (shouldAutoAdvance(app, frame)) {
-    scheduleAutoAdvance(app, holdAfterNarration);
-  }
-};
+  buildNarration(app, frame)        // plays audio immediately
+  if textTimeline: textTimeline.play(0)
+  setupAutoAdvance(app)
+  run entry effect
 ```
 
 ## Edge Cases
@@ -158,20 +157,18 @@ CASE                                │ BEHAVIOR
 ────────────────────────────────────┼──────────────────────────────
 Replay while playing                │ Unchanged — restart narration + text,
                                     │ clear timer, 'end' re-arms auto-advance
-Replay while paused                 │ Resume + play narration + text from 0.
-                                    │ Auto-advance suppressed. Scene holds.
-Replay while paused, then pause     │ Normal pause. Narration pauses mid-replay.
-                                    │ Resume plays from pause point. Still no
-                                    │ auto-advance (flag persists until navigate).
-Replay while paused, then navigate  │ Normal transition. Flag cleared.
-                                    │ New scene has normal auto-advance behavior.
-Replay while paused on Scene 8      │ Scene 8 has no narration audio. Text replays.
-                                    │ No auto-advance (holdUntilClick: true
-                                    │ already prevents it).
-Replay while paused on credits      │ Narration replays. No advance possible
-                                    │ (holdUntilClick: null already prevents it).
-Multiple replays while paused       │ Each replay restarts from top. Flag stays set.
-                                    │ Scene never auto-advances until next navigate.
+Replay while paused                 │ Hard jump reset. Narration cued, text
+                                    │ timeline at 0, paused. Press play to hear.
+Replay while paused, then play      │ doResume() triggers narration + text +
+                                    │ auto-advance as normal. Full scene replay.
+Replay while paused, then navigate  │ Normal hardCut to new scene. Replay
+                                    │ setup is discarded by cleanupCurrentScene.
+Replay while paused on Scene 8      │ Text reset to start. No audio to cue.
+                                    │ holdUntilClick prevents auto-advance anyway.
+Replay while paused on credits      │ Narration cued, text reset. No advance
+                                    │ possible (holdUntilClick: null).
+Multiple replays while paused       │ Each replay re-cues from top. Idempotent.
+                                    │ No state accumulation. No leaked timers.
 ```
 
 ## Schema Changes
@@ -180,4 +177,4 @@ None. This is a behavioral change in `app.js` only.
 
 ## State Changes
 
-**Added:** `replayFromPause` (boolean, default `false`). Set `true` when replay triggers from paused state. Cleared on next `transition()` or `doResume()`.
+None. No new flags. Reuses existing `cueOnly` pattern.
