@@ -34,6 +34,7 @@ vi.mock('howler', () => ({
 
 import {
   playAmbient,
+  cueAmbient,
   crossfadeAmbient,
   playNarration,
   cueNarration,
@@ -49,6 +50,7 @@ import {
   preloadNarrationAhead,
   clearNarrationCache,
   playMusic,
+  cueMusic,
   fadeMusic,
   pauseMusic,
   resumeMusic,
@@ -92,6 +94,38 @@ describe('audio.js', () => {
       playAmbient('second.mp3', 0.2, true);
 
       expect(first.unload).toHaveBeenCalled();
+    });
+  });
+
+  describe('cueAmbient', () => {
+    it('creates a Howl with preload but does not call play', () => {
+      const howl = cueAmbient('ambient.mp3', 0.15, true);
+
+      expect(Howl).toHaveBeenCalledWith(
+        expect.objectContaining({
+          src: ['ambient.mp3'],
+          volume: 0.15,
+          loop: true,
+          html5: true,
+          preload: true,
+        }),
+      );
+      expect(howl.play).not.toHaveBeenCalled();
+    });
+
+    it('unloads previous ambient before cueing new one', () => {
+      const first = playAmbient('first.mp3', 0.1, true);
+      cueAmbient('second.mp3', 0.2, true);
+
+      expect(first.unload).toHaveBeenCalled();
+    });
+
+    it('can be resumed with resumeAmbient after cueing', () => {
+      const howl = cueAmbient('ambient.mp3', 0.15, true);
+      vi.clearAllMocks();
+      resumeAmbient();
+
+      expect(howl.play).toHaveBeenCalled();
     });
   });
 
@@ -1098,6 +1132,38 @@ describe('audio.js', () => {
 
       expect(() => setMuted(true)).not.toThrow();
       warnSpy.mockRestore();
+    });
+  });
+
+  describe('cueMusic', () => {
+    it('creates a Howl with preload but does not call play', () => {
+      const howl = cueMusic('song.mp3', 0.1);
+
+      expect(Howl).toHaveBeenCalledWith(
+        expect.objectContaining({
+          src: ['song.mp3'],
+          volume: 0.1,
+          loop: true,
+          html5: true,
+          preload: true,
+        }),
+      );
+      expect(howl.play).not.toHaveBeenCalled();
+    });
+
+    it('unloads previous music before cueing new one', () => {
+      const first = playMusic('first.mp3', 0.1);
+      cueMusic('second.mp3', 0.2);
+
+      expect(first.unload).toHaveBeenCalled();
+    });
+
+    it('can be resumed with resumeMusic after cueing', () => {
+      const howl = cueMusic('song.mp3', 0.1);
+      vi.clearAllMocks();
+      resumeMusic();
+
+      expect(howl.play).toHaveBeenCalled();
     });
   });
 

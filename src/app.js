@@ -2,6 +2,7 @@ import { gsap } from 'gsap';
 import scenesData from './scenes.json';
 import {
   playAmbient,
+  cueAmbient,
   crossfadeAmbient,
   playNarration,
   cueNarration,
@@ -15,6 +16,7 @@ import {
   preloadNarrationAhead,
   clearNarrationCache,
   playMusic,
+  cueMusic,
   fadeMusic,
   pauseMusic,
   resumeMusic,
@@ -258,6 +260,8 @@ function buildNarration(app, frame) {
 
   if (hasCaptions) {
     app.els.accessibleNarration.textContent = frame.narration.captions.map((c) => c.text).join(' ');
+  } else if (hasLines) {
+    app.els.accessibleNarration.textContent = frame.narration.lines.map((l) => l.text).join(' ');
   } else {
     app.els.accessibleNarration.textContent = '';
   }
@@ -284,6 +288,11 @@ function applyNarration(app, frame) {
 
 function applyAmbient(app, frame) {
   if (!frame.ambient) return;
+
+  if (app.cueOnly) {
+    cueAmbient(frame.ambient.src, frame.ambient.volume, frame.ambient.loop);
+    return;
+  }
 
   if (app.currentIndex === 0) {
     playAmbient(frame.ambient.src, frame.ambient.volume, frame.ambient.loop);
@@ -371,7 +380,11 @@ function showFrame(app, index) {
   applyAmbient(app, frame);
 
   if (frame.music) {
-    scheduleMusic(app, frame.music);
+    if (app.cueOnly) {
+      cueMusic(frame.music.src, frame.music.startVolume);
+    } else {
+      scheduleMusic(app, frame.music);
+    }
   }
 
   if (frame.phases) {

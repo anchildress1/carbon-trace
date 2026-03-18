@@ -198,6 +198,28 @@ export function playAmbient(src, volume, loop) {
   return currentAmbient;
 }
 
+export function cueAmbient(src, volume, loop) {
+  if (currentAmbient) {
+    currentAmbient.unload();
+  }
+
+  const howl = new Howl({
+    src: [src],
+    volume: volume,
+    loop: loop,
+    html5: true,
+    preload: true,
+    mute: globalMuted,
+    onloaderror: (_id, err) => {
+      console.warn(`Failed to load ambient: ${src}`, err);
+      if (currentAmbient === howl) currentAmbient = null;
+    },
+  });
+
+  currentAmbient = howl;
+  return currentAmbient;
+}
+
 export function crossfadeAmbient(newSrc, volume, durationMs, loop = true) {
   const oldAmbient = currentAmbient;
 
@@ -361,6 +383,28 @@ export function playMusic(src, volume) {
 
   currentMusic = howl;
   currentMusic.play();
+  return currentMusic;
+}
+
+export function cueMusic(src, volume) {
+  if (currentMusic) {
+    currentMusic.unload();
+  }
+
+  const howl = new Howl({
+    src: [src],
+    volume: volume,
+    loop: true,
+    html5: true,
+    preload: true,
+    mute: globalMuted,
+    onloaderror: (_id, err) => {
+      console.warn(`Failed to load music: ${src}`, err);
+      if (currentMusic === howl) currentMusic = null;
+    },
+  });
+
+  currentMusic = howl;
   return currentMusic;
 }
 

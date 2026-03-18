@@ -23,6 +23,7 @@ vi.mock('gsap', () => {
 
 vi.mock('../../src/audio.js', () => ({
   playAmbient: vi.fn(),
+  cueAmbient: vi.fn(),
   crossfadeAmbient: vi.fn(),
   playNarration: vi.fn(),
   cueNarration: vi.fn(),
@@ -36,6 +37,7 @@ vi.mock('../../src/audio.js', () => ({
   preloadNarrationAhead: vi.fn(),
   clearNarrationCache: vi.fn(),
   playMusic: vi.fn(),
+  cueMusic: vi.fn(),
   fadeMusic: vi.fn(),
   pauseMusic: vi.fn(),
   resumeMusic: vi.fn(),
@@ -171,7 +173,10 @@ import {
   resumeNarration,
   playNarration,
   cueNarration,
+  cueAmbient,
   crossfadeAmbient,
+  playAmbient,
+  cueMusic,
   playMusic,
   fadeMusic,
   stopMusic,
@@ -402,6 +407,23 @@ describe('app.js', () => {
       expect(clearEffects).toHaveBeenCalled();
       expect(clearCanvasEffects).toHaveBeenCalled();
     });
+
+    it('cues ambient instead of playing during hard cut', async () => {
+      vi.clearAllMocks();
+      app.advance();
+      await vi.runAllTimersAsync();
+      expect(cueAmbient).toHaveBeenCalledWith('ambient.mp3', 0.5, true);
+      expect(playAmbient).not.toHaveBeenCalled();
+      expect(crossfadeAmbient).not.toHaveBeenCalled();
+    });
+
+    it('cues music instead of scheduling during hard cut', async () => {
+      vi.clearAllMocks();
+      app.advance();
+      await vi.runAllTimersAsync();
+      expect(cueMusic).toHaveBeenCalledWith('credits-music.mp3', 0);
+      expect(playMusic).not.toHaveBeenCalled();
+    });
   });
 
   // ── shouldAutoAdvance ──────────────────────────────────────────────
@@ -631,6 +653,28 @@ describe('app.js', () => {
       vi.advanceTimersByTime(2000);
       await vi.runAllTimersAsync();
       expect(app.getState()).toBe('CREDITS');
+    });
+  });
+
+  // ── accessible narration region ──────────────────────────────────
+
+  describe('accessible narration region', () => {
+    it('populates aria-live region with caption text when captions exist', async () => {
+      app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause();
+      app.advance(); // to scene-01 which has captions
+
+      const region = document.getElementById('accessible-narration');
+      expect(region.textContent).toBe('Hello');
+    });
+
+    it('clears aria-live region on frame with no narration', async () => {
+      app = createApp();
+      await vi.runAllTimersAsync();
+
+      const region = document.getElementById('accessible-narration');
+      expect(region.textContent).toBe('');
     });
   });
 
