@@ -36,7 +36,7 @@ OPTION                            │ VERDICT   │ REASON
                                   │           │ experience a story = slideshow.
                                   │           │ wasPaused is a bandaid.
 ──────────────────────────────────┼───────────┼──────────────────────────────────────
-3. Hybrid — per-scene advanceMode │ REJECTED  │ Two code paths in navigator for
+3. Hybrid — per-scene advanceMode │ REJECTED  │ Two code paths in app.js for
    (narration OR click)           │           │ essentially the same result. Only
                                   │           │ title + Scene 6 need click-hold.
                                   │           │ Option 1 with holdUntilClick is
@@ -222,7 +222,7 @@ The `advanceMode` key is replaced by two keys: `holdUntilClick` and `holdAfterNa
 
 ---
 
-### Supersedes §5.3 — Navigator (navigator.js)
+### Supersedes §5.3 — Orchestrator (app.js)
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
@@ -756,7 +756,7 @@ Wire once at Howl construction time (init, not per-transition). The handler chec
 ```js
 // In audio.js init, per narration Howl:
 howl.on('end', () => {
-  // navigator exposes a callback for this
+  // app.js exposes a callback for this
   onNarrationEnd(frameIndex);
 });
 ```
