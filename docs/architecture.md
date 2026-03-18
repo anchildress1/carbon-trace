@@ -27,7 +27,7 @@ stateDiagram-v2
     LOADING --> PAUSED : preloadAssets → showFrame(0) → start paused
 
     PAUSED --> SCENE_ACTIVE : doResume() / first play
-    PAUSED --> TRANSITIONING : navigate while paused
+    PAUSED --> TRANSITIONING : navigate (clears pause, hard-jumps)
 
     SCENE_ACTIVE --> PAUSED : doPause()
     SCENE_ACTIVE --> TRANSITIONING : advance() / retreat()
@@ -48,21 +48,24 @@ flowchart TD
     A[showFrame] --> C[Set image + alt text + trace overlay]
     C --> D[clearEffects + clearNarrationLayer]
     D --> E[Run idle effect if defined]
-    E --> F[Update progress dots]
+    E --> E2[Resume effects canvas render loop]
+    E2 --> F[Update progress dots]
     F --> G[Update nav button states]
     G --> H[applyNarration]
     H --> I[applyAmbient]
     I --> J[Schedule music if configured]
-    J --> L[Pre-buffer next narration]
+    J --> L[Pre-buffer next scene image + narration]
 ```
 
 ### applyNarration
 
-1. Clear pending narration timer and caption delay timer.
-2. Build ghost-drift text timeline from `frame.narration.lines`.
-3. Show captions via `scheduleCaptionDisplay` (respects `narration.delay`).
-4. Populate `#accessible-narration` for screen readers.
-5. Schedule narration audio (with optional delay).
+1. Clear pending narration timer.
+2. Build ghost-drift text timeline from `frame.narration.lines` via
+   `buildNarrationTimeline`, which also embeds caption show/hide calls
+   directly into the GSAP timeline (respects `narration.delay` offset).
+3. Populate `#accessible-narration` for screen readers (prefers captions
+   text when available, falls back to narration lines).
+4. Schedule narration audio (with optional delay) or cue it if paused.
 
 Music scheduling is handled separately in `showFrame`, not inside
 `applyNarration`. Music is an independent audio track with its own
@@ -112,8 +115,11 @@ elements; see `effects-canvas.js` for the render loop.
 
 ### captions.js (timed subtitles)
 
-Manages a caption timeline synchronized to narration playback.
-See [accessibility.md](accessibility.md) for integration details.
+Manages caption preference persistence (`localStorage`) and provides
+`syncCaptionsToTime` for mid-scene caption sync when toggling captions on.
+Caption show/hide scheduling is embedded in the GSAP timeline built by
+`text.js`, not driven by separate timers. See [accessibility.md](accessibility.md)
+for integration details.
 
 ### overlay.js (progress + controls)
 
@@ -127,6 +133,7 @@ mute, captions, replay, and next buttons.
 meta:
   title, author, aspectRatio
   defaultTransition: { type, duration }
+  defaultHoldAfterNarration: ms (fallback for frames without explicit hold)
   frameDefaults: { textMode }
 
 frames[]:
@@ -134,13 +141,13 @@ frames[]:
   holdUntilClick: true (wait for click) | false (auto-advance) | null (no advance, credits)
   holdAfterNarration: ms after narration ends before auto-advance
   narration:
-    lines[]: { text, enter (ms), exit (ms), x?, y?, align? }
+    lines[]: { text, enter (ms), exit (ms), x? (vw), y? (vh), align? ("left"|"center"|"right") }
     captions[]: { text, start (ms), end (ms) }
     audio: path to .m4a
-    delay: ms before narration starts
+    delay: ms before narration starts (offsets caption timing too)
   ambient: { src, volume, loop }
   music: { src, startVolume, fullVolume, crescendoMs, enter, exit }
-  effects: { idle, entry }
+  effects: { idle: "effect-name"|null, entry: "effect-name"|null }
   traceOverlay: { opacity }
   transition: { type, duration }
 ```

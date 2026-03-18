@@ -5,14 +5,13 @@
 ```mermaid
 flowchart LR
     A["#accessible-narration<br/>aria-live=polite"] -->|updated on| B[Scene change]
-    A -->|updated on| C[Caption display]
-    B --> D[Screen reader announces text]
-    C --> D
+    B --> C[Screen reader announces full narration text]
 ```
 
 A persistent `aria-live="polite"` region (`#accessible-narration`) receives the
-full narration text for each scene. Screen readers announce the content as it
-changes without interrupting the user.
+full narration text for each scene on scene change. When captions are available,
+their text is used; otherwise narration line text is joined. Screen readers
+announce the content as it changes without interrupting the user.
 
 The ghost-drift narration layer and caption layer are both marked
 `aria-hidden="true"` because they are visual-only presentations of the same
@@ -92,33 +91,37 @@ cached), so it responds to runtime changes in the user's system preference.
 sequenceDiagram
     participant User
     participant App as app.js
+    participant Text as text.js
     participant Cap as captions.js
+
+    Note over App: showFrame → buildNarration
+    App->>Text: buildNarrationTimeline(lines, container, opts)
+    Text->>Text: Embed caption show/hide as GSAP timeline callbacks
+    Text-->>App: { timeline, captionEntries }
+
+    Note over App: Scene plays — timeline drives captions
 
     User->>App: Toggle captions on
     App->>Cap: setCaptionsEnabled(true)
-    Cap->>Cap: Persist to localStorage
-
-    Note over App: Scene plays
-    App->>Cap: showCaptions(captions, container)
-    Cap->>Cap: Schedule show/hide timers
+    App->>Cap: syncCaptionsToTime(entries, currentTime, container)
+    Cap->>Cap: Show captions active at current position
 
     User->>App: Pause
-    App->>Cap: pauseCaptions()
-    Cap->>Cap: Save elapsed offset, clear timers
+    App->>App: textTimeline.pause() — freezes captions too
 
     User->>App: Resume
-    App->>Cap: resumeCaptions()
-    Cap->>Cap: Reschedule from saved offset
+    App->>App: textTimeline.resume() — captions resume in sync
 ```
 
-Captions are timed to narration playback using `start`/`end` timestamps in
-milliseconds. When paused, the elapsed playback time is saved. On resume,
-all caption timers are recalculated from the saved offset, keeping captions
-synchronized with audio.
+Caption show/hide scheduling is embedded directly in the GSAP text timeline
+built by `text.js`. Each caption's `start`/`end` timestamps (offset by
+`narration.delay`) become `tl.call()` entries that create and remove caption
+DOM elements. Because captions live inside the same timeline as narration
+text, they automatically pause and resume with it — no separate timer math.
 
-Toggling captions mid-scene recalculates from the current text timeline
-position, so captions appear at the correct point regardless of when they were
-enabled.
+Toggling captions mid-scene calls `syncCaptionsToTime`, which scans caption
+entries and immediately shows any that should be visible at the current
+timeline position.
 
 The caption preference is persisted in `localStorage` under the key
 `carbon-trace-captions-enabled`.
