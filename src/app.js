@@ -954,13 +954,6 @@ function initApp(app) {
         app.userHasInteracted = true;
       };
 
-      // Stage click/tap: skip to next scene (hard cut if paused, animated if playing)
-      document.addEventListener('click', (e) => {
-        markInteracted();
-        if (e.target.closest('#overlay-controls')) return;
-        if (e.target.closest('#play-gate')) return;
-        advance(app);
-      });
       document.addEventListener('keydown', (e) => {
         markInteracted();
         handleKeydown(app, e);

@@ -8,7 +8,7 @@
 [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=anchildress1_carbon-trace&metric=alert_status)](https://sonarcloud.io/project/overview?id=anchildress1_carbon-trace)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=anchildress1_carbon-trace&metric=coverage)](https://sonarcloud.io/project/overview?id=anchildress1_carbon-trace)
 
-An immersive visual narrative told from the awareness of a diamond trapped in a coal seam. Navigate scenes via buttons, keyboard, or stage click/tap. WeCoded 2026 Frontend Art Entry.
+An immersive visual narrative told from the awareness of a diamond trapped in a coal seam. Navigate scenes via buttons, keyboard, or progress dots. WeCoded 2026 Frontend Art Entry.
 
 Built with Vite, vanilla JavaScript (ES modules), GSAP animations, and Howler.js audio. Deployed as a static site to Cloud Run.
 
@@ -25,7 +25,6 @@ Built with Vite, vanilla JavaScript (ES modules), GSAP animations, and Howler.js
 | **Captions** button     | Toggle subtitle display (persists across sessions)   |
 | **Replay** button       | Restart current scene's narration from the beginning |
 | **Progress dots**       | Jump to a specific scene                             |
-| **Click / tap** stage   | Advance to next scene                                |
 
 ## Setup
 
