@@ -70,7 +70,9 @@ function validateEffects(frames) {
     }
   }
   if (missing.length > 0) {
-    console.warn(`Unregistered effects (will no-op until implemented):\n  ${missing.join('\n  ')}`);
+    console.debug(
+      `Unregistered effects (will no-op until implemented):\n  ${missing.join('\n  ')}`,
+    );
   }
 }
 
@@ -341,11 +343,6 @@ function prebufferNextScene(app, index) {
 }
 
 function showFrame(app, index) {
-  if (app.phaseTimer) {
-    clearTimeout(app.phaseTimer);
-    app.phaseTimer = null;
-  }
-
   const frame = app.frames[index];
   app.els.sceneStage.setAttribute('aria-label', frame.description || '');
   renderSceneImage(app, frame);
@@ -387,47 +384,7 @@ function showFrame(app, index) {
     }
   }
 
-  if (frame.phases) {
-    startPhase(app, frame, 0);
-  }
-
   prebufferNextScene(app, index);
-}
-
-function startPhase(app, frame, pi) {
-  const phase = frame.phases[pi];
-  if (!phase) return;
-
-  clearNarrationLayer(app.els.narrationLayer);
-
-  if (phase.narration?.lines?.length > 0) {
-    const result = buildNarrationTimeline(phase.narration.lines, app.els.narrationLayer, {
-      reducedMotion: prefersReducedMotion(),
-      captions: phase.narration.captions,
-      captionContainer: app.els.captionLayer,
-      captionDelay: phase.narration.delay || 0,
-      isCaptionEnabled: areCaptionsEnabled,
-    });
-    app.textTimeline = result.timeline;
-    app.captionEntries = result.captionEntries;
-    app.textTimeline.play(0);
-    app.els.accessibleNarration.textContent = phase.narration.lines.map((l) => l.text).join(' ');
-
-    if (phase.narration.audio) {
-      playNarration(phase.narration.audio);
-    }
-  }
-
-  if (phase.ambient) {
-    crossfadeAmbient(phase.ambient.src, phase.ambient.volume, 600);
-  }
-
-  if (phase.duration && pi < frame.phases.length - 1) {
-    app.phaseTimerStart = Date.now();
-    app.phaseTimerDelay = phase.duration;
-    app.pausedPhaseIndex = pi;
-    app.phaseTimer = setTimeout(() => startPhase(app, frame, pi + 1), phase.duration);
-  }
 }
 
 function clearPauseState(app) {
@@ -486,11 +443,6 @@ function cleanupCurrentScene(app) {
   clearAutoAdvance(app);
   app.autoAdvanceTimerRemaining = null;
 
-  if (app.phaseTimer) {
-    clearTimeout(app.phaseTimer);
-    app.phaseTimer = null;
-  }
-
   if (app.narrationTimer) {
     clearTimeout(app.narrationTimer);
     app.narrationTimer = null;
@@ -517,7 +469,6 @@ function cleanupCurrentScene(app) {
   app.musicExitTimerRemaining = null;
   app.musicTimerRemaining = null;
   app.narrationTimerRemaining = null;
-  app.phaseTimerRemaining = null;
   stopMusic();
   stopNarration();
 }
@@ -750,15 +701,6 @@ function resumeDelayedMusic(app) {
   app.musicTimerRemaining = null;
 }
 
-function resumeDelayedPhase(app) {
-  if (!app.phaseTimerRemaining || app.phaseTimerRemaining <= 0) return;
-  const frame = app.frames[app.currentIndex];
-  const pi = app.pausedPhaseIndex;
-  app.phaseTimer = setTimeout(() => startPhase(app, frame, pi + 1), app.phaseTimerRemaining);
-  app.phaseTimerRemaining = null;
-  app.pausedPhaseIndex = null;
-}
-
 function handleFirstPlay(app) {
   const frame = app.frames[app.currentIndex];
   applyNarration(app, frame);
@@ -790,7 +732,6 @@ function doResume(app) {
 
   resumeDelayedNarration(app);
   resumeDelayedMusic(app);
-  resumeDelayedPhase(app);
   resumeMusicExitTimer(app);
 
   if (app.autoAdvanceTimerRemaining !== null && app.autoAdvanceTimerRemaining > 0) {
@@ -856,15 +797,6 @@ function doPause(app) {
     app.musicExitTimer = null;
     app.musicExitTimerStart = null;
     app.musicExitTimerDelay = null;
-  }
-
-  if (app.phaseTimer) {
-    const elapsed = Date.now() - app.phaseTimerStart;
-    app.phaseTimerRemaining = Math.max(0, app.phaseTimerDelay - elapsed);
-    clearTimeout(app.phaseTimer);
-    app.phaseTimer = null;
-    app.phaseTimerStart = null;
-    app.phaseTimerDelay = null;
   }
 
   app.els.btnPause.setAttribute('aria-pressed', 'true');
@@ -1108,11 +1040,6 @@ export function createApp() {
     pausedFromState: null,
     userHasInteracted: false,
     textTimeline: null,
-    phaseTimer: null,
-    phaseTimerStart: null,
-    phaseTimerDelay: null,
-    phaseTimerRemaining: null,
-    pausedPhaseIndex: null,
     captionEntries: [],
     narrationTimer: null,
     narrationTimerStart: null,
