@@ -1,4 +1,5 @@
 let dotElements = [];
+let currentSceneIndex = -1;
 
 export function initOverlay(sceneCount, onDotClick) {
   const dotsContainer = document.getElementById('progress-dots');
@@ -6,6 +7,7 @@ export function initOverlay(sceneCount, onDotClick) {
 
   dotsContainer.replaceChildren();
   dotElements = [];
+  currentSceneIndex = -1;
 
   for (let i = 0; i < sceneCount; i++) {
     const dot = document.createElement('button');
@@ -25,15 +27,40 @@ export function initOverlay(sceneCount, onDotClick) {
 }
 
 export function updateProgress(sceneIndex) {
-  dotElements.forEach((dot, i) => {
-    const isActive = i < sceneIndex;
-    dot.classList.toggle('active', isActive);
-    if (i === sceneIndex - 1) {
-      dot.setAttribute('aria-current', 'step');
-    } else {
-      dot.removeAttribute('aria-current');
+  if (sceneIndex === currentSceneIndex) return;
+
+  const prev = currentSceneIndex;
+  currentSceneIndex = sceneIndex;
+
+  if (prev === -1) {
+    // First call — set all dots
+    dotElements.forEach((dot, i) => {
+      dot.classList.toggle('active', i < sceneIndex);
+      if (i === sceneIndex - 1) {
+        dot.setAttribute('aria-current', 'step');
+      }
+    });
+    return;
+  }
+
+  // Clear previous current marker
+  if (prev >= 1 && prev <= dotElements.length) {
+    dotElements[prev - 1].removeAttribute('aria-current');
+  }
+
+  // Update only the dots between old and new positions
+  const lo = Math.min(prev, sceneIndex);
+  const hi = Math.max(prev, sceneIndex);
+  for (let i = lo; i < hi; i++) {
+    if (i >= 0 && i < dotElements.length) {
+      dotElements[i].classList.toggle('active', i < sceneIndex);
     }
-  });
+  }
+
+  // Set new current marker
+  if (sceneIndex >= 1 && sceneIndex <= dotElements.length) {
+    dotElements[sceneIndex - 1].setAttribute('aria-current', 'step');
+  }
 }
 
 export function showControls() {
