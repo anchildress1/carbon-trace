@@ -117,7 +117,7 @@ sequenceDiagram
     participant App as app.js
     participant Audio as audio.js
 
-    Note over App: applyNarration detects frame.music
+    Note over App: showFrame detects frame.music
     App->>App: scheduleMusic(music)
     App->>App: clearMusicTimer + stopMusic
 
@@ -136,12 +136,21 @@ sequenceDiagram
     end
 ```
 
+Music is an independent audio track, separate from narration. It is scheduled
+in `showFrame` (not `applyNarration`), so replaying narration does not restart
+music. Music starts at the configured `enter` time, fades in over
+`crescendoMs`, and plays until the configured `exit` time (or indefinitely if
+`exit` is null).
+
 Music supports:
 - **Delayed start** (`enter` ms): Timer saved/restored on pause/resume.
 - **Volume crescendo**: Starts at `startVolume`, fades to `fullVolume` over
   `crescendoMs`.
 - **Scheduled exit** (`exit` ms): Triggers a 2-second fade to silence. The exit
   timer is independently tracked for pause/resume.
+- **Independence from narration**: Music does not restart on replay. It
+  functions like a narrated track — it starts when configured and runs on
+  its own timeline.
 
 ## Ambient Crossfade
 
