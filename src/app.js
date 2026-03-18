@@ -502,14 +502,16 @@ function transition(app, toIndex) {
   if (wasPaused) {
     const doHardJump = () => {
       const prevIndex = app.currentIndex;
+      const prevFrame = app.frames[prevIndex];
       app.currentIndex = toIndex;
       try {
         showFrame(app, toIndex);
+        app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
       } catch (err) {
         console.error('Error during scene transition:', err);
         app.currentIndex = prevIndex;
+        app.state = STATE_BY_FRAME_TYPE[prevFrame.frameType] || State.SCENE_ACTIVE;
       }
-      app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
       doPause(app);
       completePendingNav(app);
     };
@@ -522,7 +524,10 @@ function transition(app, toIndex) {
     return;
   }
 
-  // Animated transition: fade out → swap frame → fade in → land playing
+  // Animated transition: fade out → swap frame → fade in → land playing.
+  // On showFrame failure, revert both the frame index and the state to the
+  // previous frame's values to keep the state machine consistent.
+  const prevFrame = app.frames[app.currentIndex];
   const proceedWithFrame = () => {
     const prevIndex = app.currentIndex;
     app.currentIndex = toIndex;
@@ -531,6 +536,7 @@ function transition(app, toIndex) {
     } catch (err) {
       console.error('Error during scene transition:', err);
       app.currentIndex = prevIndex;
+      app.state = STATE_BY_FRAME_TYPE[prevFrame.frameType] || State.SCENE_ACTIVE;
       return false;
     }
     return true;
@@ -575,7 +581,7 @@ function transition(app, toIndex) {
         try {
           if (!proceedWithFrame()) {
             gsap.set(app.els.sceneStage, { opacity: 1 });
-            landOnFrame();
+            completePendingNav(app);
             return;
           }
 
