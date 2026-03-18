@@ -104,7 +104,7 @@ Full system design: `docs/design/carbon-trace-system-design-v5.md` and `docs/ADR
 
 ## Performance / Lighthouse
 
-- **Targets**: 100% desktop performance, 90%+ mobile performance, 95%+ accessibility/best-practices/SEO.
+- **Targets** (enforced in `.lighthouserc.json`): ≥90% performance, ≥95% accessibility, ≥95% best-practices, ≥90% SEO.
 - Images are WebP, 16:9, 2x resolution. Total asset budget <35MB.
 - Background preloading uses `Promise.all` to parallelize image and audio streams; within each stream, assets load sequentially. Audio metadata preloading uses native `Audio` elements; Howler handles actual playback.
 - Canvas render target: 60fps during effects (rAF loop).
