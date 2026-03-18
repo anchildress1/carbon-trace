@@ -496,7 +496,7 @@ else:
 ```
 INPUT              │ DESKTOP              │ MOBILE             │ EFFECT
 ───────────────────┼──────────────────────┼────────────────────┼─────────────────────
-Skip forward       │ Click on stage       │ Tap on stage       │ navigate(cur, cur+1)
+Scene interaction  │ Click / hover stage  │ Tap on stage       │ trigger visual effects (v2)
 Navigate to scene  │ Click dot            │ Tap dot            │ navigate(cur, dot)
 Forward            │ Click ► / Arrow →    │ Tap ►              │ navigate(cur, cur+1)
 Back               │ Click ◄ / Arrow ←    │ Tap ◄              │ navigate(cur, cur-1)
@@ -507,10 +507,11 @@ Tab to controls    │ Tab                  │ —                  │ focus m
 Auto-advance       │ (internal)           │ (internal)         │ navigate(cur, cur+1)
 ```
 
+- Stage click/tap does NOT navigate — reserved for visual effects (hover text, particle triggers, etc.)
 - Playing + transitioning: inputs rejected
 - Paused: hardCut, no lock, rapid dot-clicking works
 - Credits: advance disabled (`holdUntilClick === null`)
-- holdUntilClick scenes: no auto-advance, click still skips forward
+- holdUntilClick scenes: no auto-advance, forward button still navigates
 
 ---
 
