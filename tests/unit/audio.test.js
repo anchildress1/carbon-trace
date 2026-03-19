@@ -623,6 +623,7 @@ describe('audio.js — unified cue API (ADR-005)', () => {
 
     it('cancels pending safety timer before restarting', () => {
       scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn(), maxNarrationDurationMs: 10000 });
+      const howl = getNarrationCue();
       vi.clearAllMocks();
 
       restartNarrationCue(makeCue(), {
@@ -630,8 +631,9 @@ describe('audio.js — unified cue API (ADR-005)', () => {
         maxNarrationDurationMs: 10000,
       });
 
-      // The old safety timer was cancelled, new one created
-      // (wireNarrationEnd creates a new PausableTimer)
+      // Old handlers cleared and new safety handler wired via wireNarrationEnd
+      expect(howl.stop).toHaveBeenCalled();
+      expect(howl.once).toHaveBeenCalledWith('end', expect.any(Function));
     });
   });
 

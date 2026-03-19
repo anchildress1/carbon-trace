@@ -197,7 +197,7 @@ function resolveAnchors(cues, opts) {
   }
 
   const narrationCue = cues.find((c) => c.type === 'narration');
-  if (narrationCue && opts?.maxNarrationDurationMs) {
+  if (narrationCue && opts?.maxNarrationDurationMs && !durations.has(narrationCue.id)) {
     durations.set(narrationCue.id, opts.maxNarrationDurationMs);
   }
 
@@ -376,12 +376,15 @@ export function scheduleAudioCues(cues, opts = {}) {
 
   for (const cue of resolved) {
     // Defensive: clean up any pre-existing entry with the same ID.
-    // Skip for ambient→ambient: crossfadeAmbientCue handles the transition.
+    // Always cancel pending timers. For ambient→ambient, skip howl unload —
+    // crossfadeAmbientCue handles the playing-howl transition.
     const existing = activeCues.get(cue.id);
-    if (existing && !(cue.type === 'ambient' && existing.type === 'ambient')) {
+    if (existing) {
       existing.timer?.cancel();
-      existing.howl?._crossfadeCleanup?.();
-      existing.howl?.unload();
+      if (!(cue.type === 'ambient' && existing.type === 'ambient')) {
+        existing.howl?._crossfadeCleanup?.();
+        existing.howl?.unload();
+      }
     }
 
     const entry = { id: cue.id, howl: null, timer: null, type: cue.type, state: 'pending' };

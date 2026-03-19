@@ -117,8 +117,7 @@ function scheduleAutoAdvance(app, delay) {
 }
 
 function shouldAutoAdvance(app) {
-  if (app.currentIndex >= app.frames.length - 1) return false;
-  return true;
+  return app.currentIndex < app.frames.length - 1;
 }
 
 function setupAutoAdvance(app) {
