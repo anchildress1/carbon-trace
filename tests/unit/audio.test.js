@@ -1410,20 +1410,22 @@ describe('audio.js', () => {
     it('does not restore old ambient after it has been unloaded', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       playAmbient('old.mp3', 0.15, true);
+      const oldHowl = Howl.mock.results[Howl.mock.results.length - 1].value;
       vi.clearAllMocks();
 
       scheduleAmbient('new.mp3', 0.2, 800);
       const newHowl = Howl.mock.results[Howl.mock.results.length - 1].value;
 
-      // Let unload timer fire
+      // Let unload timer fire — old ambient is gone
       vi.advanceTimersByTime(900);
 
-      // Now trigger error — old is already gone
+      // Now trigger error — old is already unloaded, should not restore
       lastHowlOptions.onloaderror(1, 'network');
       const loaderrorCall = newHowl.on.mock.calls.find(([event]) => event === 'loaderror');
       if (loaderrorCall) loaderrorCall[1]();
 
-      // Should not throw or try to restore
+      // Old ambient fade should NOT have been called with restore args
+      expect(oldHowl.fade).not.toHaveBeenCalledWith(0.15, 0.2, 200);
       warnSpy.mockRestore();
     });
 
@@ -1563,11 +1565,11 @@ describe('audio.js', () => {
       scheduleNarration('test.m4a', 0, onend, 3000);
 
       cancelAll();
+      warnSpy.mockClear();
       vi.advanceTimersByTime(10000);
 
-      // Safety timer should not fire onend after cancel
-      // (onend may have been called once by stopNarration triggering safeEnd,
-      // but the safety timer itself should not fire again)
+      // Safety timer should not fire after cancel — no timeout warning
+      expect(warnSpy).not.toHaveBeenCalledWith('Narration safety timeout: test.m4a');
       warnSpy.mockRestore();
     });
 
