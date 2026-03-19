@@ -554,10 +554,7 @@ export function scheduleAmbient(newSrc, volume, durationMs, loop = true) {
   });
   // Attach custom recovery after factory handles warn + unload
   newHowl.on('loaderror', restoreOld);
-  newHowl.on('playerror', () => {
-    console.warn(`Failed to play ambient: ${newSrc}`);
-    restoreOld();
-  });
+  newHowl.on('playerror', restoreOld);
 
   currentAmbient = newHowl;
   currentAmbient.play();
@@ -624,6 +621,10 @@ export function resumeAll() {
   }
 }
 
+// Cancels narration, music, and all scheduling timers.
+// Ambient is intentionally excluded — scheduleAmbient manages its own
+// crossfade lifecycle, and callers (e.g., scene transitions) rely on
+// the old ambient remaining active so the next scheduleAmbient can fade from it.
 export function cancelAll() {
   sessionId++;
   narrationDelayTimer?.cancel();
