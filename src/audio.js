@@ -1,28 +1,73 @@
 import { Howl } from 'howler';
 import { PausableTimer } from './pausable-timer.js';
 
-// Centralized Howl factory — every Howl in this project uses html5: true,
-// which acquires from Howler's internal Audio element pool. A failed load
-// that doesn't unload leaks that pool slot. This factory wraps onloaderror
-// to guarantee unload on failure, regardless of what the caller's handler does.
-function createHowl(options) {
-  const userHandler = options.onloaderror;
-  const howl = new Howl({
-    ...options,
-    onloaderror: (_id, err) => {
-      if (userHandler) userHandler(_id, err);
-      // Defer unload so Howler finishes processing the error event
-      // before we release the HTML5 Audio element back to the pool.
-      queueMicrotask(() => howl.unload());
-    },
-  });
-  return howl;
-}
+// --- Channel state ---
 
 let currentAmbient = null;
 let currentNarration = null;
 let currentMusic = null;
 let globalMuted = false;
+
+const channels = {
+  ambient: {
+    get() {
+      return currentAmbient;
+    },
+    set(v) {
+      currentAmbient = v;
+    },
+  },
+  narration: {
+    get() {
+      return currentNarration;
+    },
+    set(v) {
+      currentNarration = v;
+    },
+  },
+  music: {
+    get() {
+      return currentMusic;
+    },
+    set(v) {
+      currentMusic = v;
+    },
+  },
+};
+
+// --- Howl factory with centralized error handling ---
+//
+// Every Howl uses html5: true → acquires from Howler's Audio pool.
+// On load failure, the factory:
+//   1. Logs a warning with channel name and src
+//   2. Nulls the channel ref if this Howl is still current
+//   3. Calls onFail (e.g., narration's onend for auto-advance chain)
+//   4. Defers unload to release the pool slot
+//
+// On play failure, same warn + onFail but no unload (Howl may retry).
+//
+// Pass channel=null to skip ref-null (e.g., preloadNarrationAhead,
+// scheduleAmbient which have custom error recovery).
+
+function createHowl(channel, howlOptions, onFail) {
+  const src = howlOptions.src?.[0] || 'unknown';
+  const label = channel || 'audio';
+
+  const howl = new Howl({
+    ...howlOptions,
+    onloaderror: (_id, err) => {
+      console.warn(`Failed to load ${label}: ${src}`, err);
+      if (channel && channels[channel].get() === howl) channels[channel].set(null);
+      if (onFail) onFail();
+      queueMicrotask(() => howl.unload());
+    },
+    onplayerror: (_id, err) => {
+      console.warn(`Failed to play ${label}: ${src}`, err);
+      if (onFail) onFail();
+    },
+  });
+  return howl;
+}
 
 // Session model — cancelAll() increments sessionId, stale callbacks check before executing
 let sessionId = 0;
@@ -78,9 +123,6 @@ function cleanupBufferMonitoring() {
 }
 
 function nudgeStall(node) {
-  // Force the browser to re-evaluate its buffer position by seeking
-  // to the current time. This is an intentional no-op seek that
-  // unsticks stalled HTML5 audio in some browsers.
   const pos = node.currentTime;
   node.currentTime = pos;
 }
@@ -183,20 +225,20 @@ function monitorNarrationBuffer(howl) {
   }
 }
 
+// --- Preload cache ---
+
 export function preloadNarrationAhead(src) {
   if (narrationCache.has(src)) return;
 
-  const howl = createHowl({
+  const howl = createHowl(null, {
     src: [src],
     html5: true,
     preload: true,
     volume: 1,
     mute: globalMuted,
-    onloaderror: (_id, err) => {
-      console.warn(`Failed to preload narration: ${src}`, err);
-      narrationCache.delete(src);
-    },
   });
+  // Factory handles warn + unload on error; we just clean the cache ref
+  howl.on('loaderror', () => narrationCache.delete(src));
   narrationCache.set(src, howl);
 }
 
@@ -207,49 +249,34 @@ export function clearNarrationCache() {
   narrationCache.clear();
 }
 
-export function playAmbient(src, volume, loop) {
-  if (currentAmbient) {
-    currentAmbient.unload();
-  }
+// --- Ambient ---
 
-  const howl = createHowl({
+export function playAmbient(src, volume, loop) {
+  if (currentAmbient) currentAmbient.unload();
+
+  const howl = createHowl('ambient', {
     src: [src],
-    volume: volume,
-    loop: loop,
+    volume,
+    loop,
     html5: true,
     mute: globalMuted,
-    onloaderror: (_id, err) => {
-      console.warn(`Failed to load ambient: ${src}`, err);
-      if (currentAmbient === howl) currentAmbient = null;
-    },
-    onplayerror: (_id, err) => {
-      console.warn(`Failed to play ambient: ${src}`, err);
-    },
   });
-
   currentAmbient = howl;
   currentAmbient.play();
   return currentAmbient;
 }
 
 export function cueAmbient(src, volume, loop) {
-  if (currentAmbient) {
-    currentAmbient.unload();
-  }
+  if (currentAmbient) currentAmbient.unload();
 
-  const howl = createHowl({
+  const howl = createHowl('ambient', {
     src: [src],
-    volume: volume,
-    loop: loop,
+    volume,
+    loop,
     html5: true,
     preload: true,
     mute: globalMuted,
-    onloaderror: (_id, err) => {
-      console.warn(`Failed to load ambient: ${src}`, err);
-      if (currentAmbient === howl) currentAmbient = null;
-    },
   });
-
   currentAmbient = howl;
   return currentAmbient;
 }
@@ -257,21 +284,13 @@ export function cueAmbient(src, volume, loop) {
 export function crossfadeAmbient(newSrc, volume, durationMs, loop = true) {
   const oldAmbient = currentAmbient;
 
-  const howl = createHowl({
+  const howl = createHowl('ambient', {
     src: [newSrc],
     volume: 0,
-    loop: loop,
+    loop,
     html5: true,
     mute: globalMuted,
-    onloaderror: (_id, err) => {
-      console.warn(`Failed to load ambient: ${newSrc}`, err);
-      if (currentAmbient === howl) currentAmbient = null;
-    },
-    onplayerror: (_id, err) => {
-      console.warn(`Failed to play ambient: ${newSrc}`, err);
-    },
   });
-
   currentAmbient = howl;
   currentAmbient.play();
   currentAmbient.fade(0, volume, durationMs);
@@ -284,44 +303,37 @@ export function crossfadeAmbient(newSrc, volume, durationMs, loop = true) {
   return currentAmbient;
 }
 
+// --- Narration ---
+
 export function playNarration(src, onend) {
   cleanupBufferMonitoring();
-
-  if (currentNarration) {
-    currentNarration.unload();
-  }
+  if (currentNarration) currentNarration.unload();
 
   let howl = narrationCache.get(src);
   if (howl) {
     narrationCache.delete(src);
     howl.mute(globalMuted);
     if (onend) howl.once('end', onend);
-    howl.on('loaderror', (_id, err) => {
-      console.warn(`Failed to load narration: ${src}`, err);
+    // Factory already handles warn + unload; add domain logic
+    howl.on('loaderror', () => {
       if (currentNarration === howl) currentNarration = null;
       if (onend) onend();
     });
-    howl.on('playerror', (_id, err) => {
-      console.warn(`Failed to play narration: ${src}`, err);
+    howl.on('playerror', () => {
       if (onend) onend();
     });
   } else {
-    howl = createHowl({
-      src: [src],
-      volume: 1,
-      html5: true,
-      mute: globalMuted,
-      onend: onend || undefined,
-      onloaderror: (_id, err) => {
-        console.warn(`Failed to load narration: ${src}`, err);
-        if (currentNarration === howl) currentNarration = null;
-        if (onend) onend();
+    howl = createHowl(
+      'narration',
+      {
+        src: [src],
+        volume: 1,
+        html5: true,
+        mute: globalMuted,
+        onend: onend || undefined,
       },
-      onplayerror: (_id, err) => {
-        console.warn(`Failed to play narration: ${src}`, err);
-        if (onend) onend();
-      },
-    });
+      onend,
+    );
   }
 
   currentNarration = howl;
@@ -332,30 +344,22 @@ export function playNarration(src, onend) {
 
 export function cueNarration(src) {
   cleanupBufferMonitoring();
-
-  if (currentNarration) {
-    currentNarration.unload();
-  }
+  if (currentNarration) currentNarration.unload();
 
   let howl = narrationCache.get(src);
   if (howl) {
     narrationCache.delete(src);
     howl.mute(globalMuted);
-    howl.on('loaderror', (_id, err) => {
-      console.warn(`Failed to load narration: ${src}`, err);
+    howl.on('loaderror', () => {
       if (currentNarration === howl) currentNarration = null;
     });
   } else {
-    howl = createHowl({
+    howl = createHowl('narration', {
       src: [src],
       volume: 1,
       html5: true,
       mute: globalMuted,
       preload: true,
-      onloaderror: (_id, err) => {
-        console.warn(`Failed to load narration: ${src}`, err);
-        if (currentNarration === howl) currentNarration = null;
-      },
     });
   }
 
@@ -372,92 +376,65 @@ export function stopNarration() {
 }
 
 export function pauseNarration() {
-  if (currentNarration) {
-    currentNarration.pause();
-  }
+  if (currentNarration) currentNarration.pause();
 }
 
 export function resumeNarration() {
-  if (currentNarration) {
-    currentNarration.play();
-  }
+  if (currentNarration) currentNarration.play();
 }
 
+// --- Ambient pause/resume ---
+
 export function pauseAmbient() {
-  if (currentAmbient) {
-    currentAmbient.pause();
-  }
+  if (currentAmbient) currentAmbient.pause();
 }
 
 export function resumeAmbient() {
-  if (currentAmbient) {
-    currentAmbient.play();
-  }
+  if (currentAmbient) currentAmbient.play();
 }
 
-export function playMusic(src, volume) {
-  if (currentMusic) {
-    currentMusic.unload();
-  }
+// --- Music ---
 
-  const howl = createHowl({
+export function playMusic(src, volume) {
+  if (currentMusic) currentMusic.unload();
+
+  const howl = createHowl('music', {
     src: [src],
-    volume: volume,
+    volume,
     loop: true,
     html5: true,
     mute: globalMuted,
-    onloaderror: (_id, err) => {
-      console.warn(`Failed to load music: ${src}`, err);
-      if (currentMusic === howl) currentMusic = null;
-    },
-    onplayerror: (_id, err) => {
-      console.warn(`Failed to play music: ${src}`, err);
-    },
   });
-
   currentMusic = howl;
   currentMusic.play();
   return currentMusic;
 }
 
 export function cueMusic(src, volume) {
-  if (currentMusic) {
-    currentMusic.unload();
-  }
+  if (currentMusic) currentMusic.unload();
 
-  const howl = createHowl({
+  const howl = createHowl('music', {
     src: [src],
-    volume: volume,
+    volume,
     loop: true,
     html5: true,
     preload: true,
     mute: globalMuted,
-    onloaderror: (_id, err) => {
-      console.warn(`Failed to load music: ${src}`, err);
-      if (currentMusic === howl) currentMusic = null;
-    },
   });
-
   currentMusic = howl;
   return currentMusic;
 }
 
 export function fadeMusic(toVolume, durationMs) {
-  if (currentMusic) {
-    currentMusic.fade(currentMusic.volume(), toVolume, durationMs);
-  }
+  if (currentMusic) currentMusic.fade(currentMusic.volume(), toVolume, durationMs);
 }
 
 export function pauseMusic() {
-  if (currentMusic) {
-    currentMusic.pause();
-  }
+  if (currentMusic) currentMusic.pause();
 }
 
 export function resumeMusic() {
-  if (currentMusic) {
-    currentMusic.play();
-  }
+  if (currentMusic) currentMusic.play();
 }
 
 export function stopMusic() {
@@ -466,6 +443,8 @@ export function stopMusic() {
     currentMusic = null;
   }
 }
+
+// --- Global ---
 
 export function stopAll() {
   cleanupBufferMonitoring();
@@ -480,15 +459,9 @@ export function stopAll() {
 
 export function setMuted(muted) {
   globalMuted = muted;
-  if (currentAmbient) {
-    currentAmbient.mute(muted);
-  }
-  if (currentNarration) {
-    currentNarration.mute(muted);
-  }
-  if (currentMusic) {
-    currentMusic.mute(muted);
-  }
+  if (currentAmbient) currentAmbient.mute(muted);
+  if (currentNarration) currentNarration.mute(muted);
+  if (currentMusic) currentMusic.mute(muted);
 }
 
 // --- Scheduling API (ADR-005) ---
@@ -546,7 +519,6 @@ export function scheduleAmbient(newSrc, volume, durationMs, loop = true) {
   const oldAmbient = currentAmbient;
   let oldUnloaded = false;
 
-  // Set up old ambient fade-out FIRST (before play)
   cancelOldAmbientFade();
   if (oldAmbient) {
     oldAmbientRef = oldAmbient;
@@ -559,36 +531,32 @@ export function scheduleAmbient(newSrc, volume, durationMs, loop = true) {
     }, durationMs + 100);
   }
 
-  const newHowl = createHowl({
+  // Custom error recovery — restore old ambient on failure.
+  // Pass channel=null; we handle ref management ourselves.
+  const restoreOld = () => {
+    if (currentAmbient === newHowl && !oldUnloaded && oldAmbient) {
+      if (oldAmbientFadeTimer) {
+        clearTimeout(oldAmbientFadeTimer);
+        oldAmbientFadeTimer = null;
+      }
+      oldAmbient.fade(oldAmbient.volume(), volume, 200);
+      currentAmbient = oldAmbient;
+      oldAmbientRef = null;
+    }
+  };
+
+  const newHowl = createHowl(null, {
     src: [newSrc],
     volume: 0,
     loop,
     html5: true,
     mute: globalMuted,
-    onloaderror: (_id, err) => {
-      console.warn(`Failed to load ambient: ${newSrc}`, err);
-      if (currentAmbient === newHowl && !oldUnloaded && oldAmbient) {
-        if (oldAmbientFadeTimer) {
-          clearTimeout(oldAmbientFadeTimer);
-          oldAmbientFadeTimer = null;
-        }
-        oldAmbient.fade(oldAmbient.volume(), volume, 200);
-        currentAmbient = oldAmbient;
-        oldAmbientRef = null;
-      }
-    },
-    onplayerror: (_id, err) => {
-      console.warn(`Failed to play ambient: ${newSrc}`, err);
-      if (currentAmbient === newHowl && !oldUnloaded && oldAmbient) {
-        if (oldAmbientFadeTimer) {
-          clearTimeout(oldAmbientFadeTimer);
-          oldAmbientFadeTimer = null;
-        }
-        oldAmbient.fade(oldAmbient.volume(), volume, 200);
-        currentAmbient = oldAmbient;
-        oldAmbientRef = null;
-      }
-    },
+  });
+  // Attach custom recovery after factory handles warn + unload
+  newHowl.on('loaderror', restoreOld);
+  newHowl.on('playerror', () => {
+    console.warn(`Failed to play ambient: ${newSrc}`);
+    restoreOld();
   });
 
   currentAmbient = newHowl;
@@ -634,7 +602,6 @@ export function pauseAll() {
   pauseNarration();
   pauseAmbient();
   pauseMusic();
-  // Pause old ambient mid-crossfade
   if (oldAmbientRef) oldAmbientRef.pause();
   if (oldAmbientFadeTimer) {
     clearTimeout(oldAmbientFadeTimer);
@@ -650,7 +617,6 @@ export function resumeAll() {
   resumeNarration();
   resumeAmbient();
   resumeMusic();
-  // Snap old ambient to target (0) and unload
   if (oldAmbientRef) {
     oldAmbientRef.volume(0);
     oldAmbientRef.unload();

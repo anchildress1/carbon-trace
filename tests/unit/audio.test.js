@@ -537,7 +537,7 @@ describe('audio.js', () => {
       preloadNarrationAhead('fail.m4a');
       lastHowlOptions.onloaderror(1, 'not found');
       expect(warnSpy).toHaveBeenCalledWith(
-        'Failed to preload narration: fail.m4a',
+        'Failed to load audio: fail.m4a',
         'not found',
       );
       warnSpy.mockRestore();
@@ -709,40 +709,22 @@ describe('audio.js', () => {
 
   describe('cached Howl error handlers', () => {
     it('attaches loaderror handler to cached Howl on playNarration', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       preloadNarrationAhead('cached.m4a');
       const cachedHowl = Howl.mock.results[Howl.mock.results.length - 1].value;
 
       playNarration('cached.m4a');
 
-      // The cached howl should have .on('loaderror') called
+      // The cached howl should have .on('loaderror') called for domain cleanup
       expect(cachedHowl.on).toHaveBeenCalledWith('loaderror', expect.any(Function));
-
-      // Simulate loaderror on cached howl
-      const loaderrorCall = cachedHowl.on.mock.calls.find(([event]) => event === 'loaderror');
-      loaderrorCall[1](1, 'network error');
-
-      expect(warnSpy).toHaveBeenCalledWith('Failed to load narration: cached.m4a', 'network error');
-      warnSpy.mockRestore();
     });
 
     it('attaches playerror handler to cached Howl on playNarration', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       preloadNarrationAhead('cached.m4a');
       const cachedHowl = Howl.mock.results[Howl.mock.results.length - 1].value;
 
       playNarration('cached.m4a');
 
       expect(cachedHowl.on).toHaveBeenCalledWith('playerror', expect.any(Function));
-
-      const playerrorCall = cachedHowl.on.mock.calls.find(([event]) => event === 'playerror');
-      playerrorCall[1](1, 'decode error');
-
-      expect(warnSpy).toHaveBeenCalledWith(
-        'Failed to play narration: cached.m4a',
-        'decode error',
-      );
-      warnSpy.mockRestore();
     });
 
     it('attaches onend callback to cached Howl when provided', () => {
@@ -756,22 +738,22 @@ describe('audio.js', () => {
     });
 
     it('calls onend when cached Howl loaderror fires', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       preloadNarrationAhead('cached.m4a');
       const cachedHowl = Howl.mock.results[Howl.mock.results.length - 1].value;
 
       const onend = vi.fn();
       playNarration('cached.m4a', onend);
 
-      const loaderrorCall = cachedHowl.on.mock.calls.find(([event]) => event === 'loaderror');
-      loaderrorCall[1](1, 'network error');
+      // Find the domain loaderror handler (not the factory one from preload)
+      const loaderrorCalls = cachedHowl.on.mock.calls.filter(([event]) => event === 'loaderror');
+      // The last one is from playNarration
+      const playNarrationHandler = loaderrorCalls[loaderrorCalls.length - 1];
+      playNarrationHandler[1](1, 'network error');
 
       expect(onend).toHaveBeenCalled();
-      warnSpy.mockRestore();
     });
 
     it('calls onend when cached Howl playerror fires', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       preloadNarrationAhead('cached.m4a');
       const cachedHowl = Howl.mock.results[Howl.mock.results.length - 1].value;
 
@@ -782,7 +764,6 @@ describe('audio.js', () => {
       playerrorCall[1](1, 'decode error');
 
       expect(onend).toHaveBeenCalled();
-      warnSpy.mockRestore();
     });
 
     it('calls onend when fresh Howl onloaderror fires', () => {
@@ -1080,7 +1061,13 @@ describe('audio.js', () => {
     it('removes from cache on load error', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       preloadNarrationAhead('missing.m4a');
+      const preloadHowl = Howl.mock.results[Howl.mock.results.length - 1].value;
+
+      // Trigger factory's onloaderror (warn + unload)
       lastHowlOptions.onloaderror(1, 'not found');
+      // Trigger .on('loaderror') handler (cache deletion)
+      const loaderrorCall = preloadHowl.on.mock.calls.find(([event]) => event === 'loaderror');
+      if (loaderrorCall) loaderrorCall[1](1, 'not found');
 
       // After error, trying to play should create new Howl (not from cache)
       const callCountBefore = Howl.mock.calls.length;
@@ -1391,9 +1378,13 @@ describe('audio.js', () => {
       vi.clearAllMocks();
 
       scheduleAmbient('new.mp3', 0.2, 800);
+      const newHowl = Howl.mock.results[Howl.mock.results.length - 1].value;
 
-      // Simulate load error on new ambient
+      // Factory handler (warn + unload)
       lastHowlOptions.onloaderror(1, 'network');
+      // Domain handler (restore old ambient)
+      const loaderrorCall = newHowl.on.mock.calls.find(([event]) => event === 'loaderror');
+      loaderrorCall[1]();
 
       expect(oldHowl.fade).toHaveBeenCalledWith(0.15, 0.2, 200);
       warnSpy.mockRestore();
@@ -1406,7 +1397,11 @@ describe('audio.js', () => {
       vi.clearAllMocks();
 
       scheduleAmbient('new.mp3', 0.2, 800);
-      lastHowlOptions.onplayerror(1, 'codec');
+      const newHowl = Howl.mock.results[Howl.mock.results.length - 1].value;
+
+      // Trigger play error via .on() handler
+      const playerrorCall = newHowl.on.mock.calls.find(([event]) => event === 'playerror');
+      playerrorCall[1]();
 
       expect(oldHowl.fade).toHaveBeenCalledWith(0.15, 0.2, 200);
       warnSpy.mockRestore();
@@ -1418,12 +1413,15 @@ describe('audio.js', () => {
       vi.clearAllMocks();
 
       scheduleAmbient('new.mp3', 0.2, 800);
+      const newHowl = Howl.mock.results[Howl.mock.results.length - 1].value;
 
       // Let unload timer fire
       vi.advanceTimersByTime(900);
 
       // Now trigger error — old is already gone
       lastHowlOptions.onloaderror(1, 'network');
+      const loaderrorCall = newHowl.on.mock.calls.find(([event]) => event === 'loaderror');
+      if (loaderrorCall) loaderrorCall[1]();
 
       // Should not throw or try to restore
       warnSpy.mockRestore();
