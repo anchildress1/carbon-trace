@@ -249,6 +249,20 @@ function playCue(cue) {
     });
   }
 
+  // Error handlers for non-narration cues (narration gets handlers via wireNarrationEnd)
+  if (cue.type !== 'narration') {
+    const handlePlayCueError = (label, _id, err) => {
+      console.error(`Cue ${label} failed: ${cue.id} (${cue.src})`, err);
+      const entry = activeCues.get(cue.id);
+      if (entry && entry.howl === howl) {
+        entry.howl = null;
+        entry.state = 'error';
+      }
+    };
+    howl.on('loaderror', (id, err) => handlePlayCueError('load', id, err));
+    howl.on('playerror', (id, err) => handlePlayCueError('play', id, err));
+  }
+
   howl.play();
 
   if (cue.fadeIn > 0) {
@@ -274,12 +288,15 @@ function crossfadeAmbientCue(cue, crossfadeDurationMs) {
   let unloaded = false;
   let fadeOutTimerId = null;
 
+  let cancelled = false;
+
   // Unload old ONLY after new confirms playback
   newHowl.once('play', () => {
+    if (cancelled) return;
     if (oldHowl && !unloaded) {
       oldEntry.state = 'fading-out';
       oldHowl.fade(oldHowl.volume(), 0, crossfadeDurationMs);
-      fadeOutTimerId = setTimeout(() => {
+      fadeOutTimerId = new PausableTimer(() => {
         fadeOutTimerId = null;
         oldHowl.unload();
         unloaded = true;
@@ -308,8 +325,9 @@ function crossfadeAmbientCue(cue, crossfadeDurationMs) {
 
   // Store cleanup hook so cancelAudioCues can drain the deferred unload
   newHowl._crossfadeCleanup = () => {
+    cancelled = true;
     if (fadeOutTimerId) {
-      clearTimeout(fadeOutTimerId);
+      fadeOutTimerId.cancel();
       fadeOutTimerId = null;
     }
     if (oldHowl && !unloaded) {
@@ -317,6 +335,16 @@ function crossfadeAmbientCue(cue, crossfadeDurationMs) {
       unloaded = true;
       removeEntryIfCurrent(oldEntry);
     }
+  };
+
+  // Pause/resume hooks for fading-out old ambient during global pause
+  newHowl._crossfadePause = () => {
+    fadeOutTimerId?.pause();
+    if (oldHowl && !unloaded) oldHowl.pause();
+  };
+  newHowl._crossfadeResume = () => {
+    fadeOutTimerId?.resume();
+    if (oldHowl && !unloaded) oldHowl.play();
   };
 
   newHowl.play();
@@ -342,7 +370,10 @@ function wireNarrationEnd(entry, cue, opts) {
     entry.howl.unload();
     safeEnd();
   });
-  entry.howl.on('playerror', () => safeEnd());
+  entry.howl.on('playerror', () => {
+    entry.howl?.unload();
+    safeEnd();
+  });
 
   if (opts.maxNarrationDurationMs > 0) {
     const enterDelay = cue.resolvedEnter || 0;
@@ -388,12 +419,18 @@ export function scheduleAudioCues(cues, opts = {}) {
 
     const startCue = () => {
       entry.timer = null;
-      if (cue.type === 'ambient') {
-        entry.howl = crossfadeAmbientCue(cue, crossfadeDurationMs);
-      } else {
-        entry.howl = playCue(cue);
+      try {
+        if (cue.type === 'ambient') {
+          entry.howl = crossfadeAmbientCue(cue, crossfadeDurationMs);
+        } else {
+          entry.howl = playCue(cue);
+        }
+        entry.state = 'playing';
+      } catch (err) {
+        console.error(`Failed to start cue ${cue.id}:`, err);
+        entry.state = 'error';
+        return;
       }
-      entry.state = 'playing';
 
       if (cue.type === 'narration' && opts.onNarrationEnd) {
         wireNarrationEnd(entry, cue, opts);
@@ -412,7 +449,6 @@ export function scheduleAudioCues(cues, opts = {}) {
 }
 
 export function cancelAudioCues() {
-  isAudioPaused = false;
   for (const [, entry] of activeCues) {
     entry.timer?.cancel();
     entry.howl?._crossfadeCleanup?.();
@@ -420,13 +456,17 @@ export function cancelAudioCues() {
   }
   activeCues.clear();
   cleanupBufferMonitoring();
+  isAudioPaused = false;
 }
 
 export function pauseAudioCues() {
   isAudioPaused = true;
   for (const [, entry] of activeCues) {
     entry.timer?.pause();
-    if (entry.howl && entry.state === 'playing') entry.howl.pause();
+    if (entry.howl && entry.state === 'playing') {
+      entry.howl.pause();
+      entry.howl._crossfadePause?.();
+    }
   }
 }
 
@@ -434,7 +474,10 @@ export function resumeAudioCues() {
   isAudioPaused = false;
   for (const [, entry] of activeCues) {
     entry.timer?.resume();
-    if (entry.howl && entry.state === 'playing') entry.howl.play();
+    if (entry.howl && entry.state === 'playing') {
+      entry.howl.play();
+      entry.howl._crossfadeResume?.();
+    }
   }
 }
 
@@ -455,7 +498,15 @@ export function cueAudioCues(cues) {
         mute: globalMuted,
       });
     }
-    activeCues.set(cue.id, { howl, timer: null, type: cue.type, state: 'cued' });
+    const entry = { id: cue.id, howl, timer: null, type: cue.type, state: 'cued' };
+    howl.on('loaderror', (_id, err) => {
+      console.error(`Cue preload failed: ${cue.id} (${cue.src})`, err);
+      if (activeCues.get(cue.id) === entry) {
+        entry.howl = null;
+        entry.state = 'error';
+      }
+    });
+    activeCues.set(cue.id, entry);
   }
 }
 
@@ -477,7 +528,15 @@ export function reCueCue(cueId, cue) {
     mute: globalMuted,
     preload: true,
   });
-  activeCues.set(cueId, { howl, timer: null, type: cue.type, state: 'cued' });
+  const entry = { id: cueId, howl, timer: null, type: cue.type, state: 'cued' };
+  howl.on('loaderror', (_id, err) => {
+    console.error(`Re-cue preload failed: ${cueId} (${cue.src})`, err);
+    if (activeCues.get(cueId) === entry) {
+      entry.howl = null;
+      entry.state = 'error';
+    }
+  });
+  activeCues.set(cueId, entry);
   return howl;
 }
 
