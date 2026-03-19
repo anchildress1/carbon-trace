@@ -183,7 +183,7 @@ updateProgress(sceneIndex)           → update active dot
 showControls()                       → unhide overlay
 ```
 
-Progress dots map to scene indices (excludes title frame). Each dot is a `<button>` with `aria-label`, `aria-current="step"` on active.
+Progress dots map to scene indices (includes all frame types: title, scene, credits). Each dot is a `<button>` with `aria-label`, `aria-current="step"` on active.
 
 ### loader.js
 
@@ -287,7 +287,7 @@ fadeOut  │ number | null       │ ms fade-out at end. null = no auto-fade.
 ```
 FRAME                │ holdUntilClick │ holdAfterNarration
 ─────────────────────┼────────────────┼────────────────────
-00 Title             │ true           │ null
+00 Title             │ false          │ null
 01 Seam              │ false          │ 2000
 02 Travel            │ false          │ 2000
 03 Reach             │ false          │ 3000
@@ -620,7 +620,7 @@ ELEMENT          │ FUNCTION                        │ NOTES
 ─────────────────┼─────────────────────────────────┼────────────────────
 Back button      │ retreat()                       │ Disabled on frame 0
 Forward button   │ advance()                       │ Disabled on last frame / credits
-Progress dots    │ transition(frameIndex)          │ Dots = scenes only (excludes title)
+Progress dots    │ transition(frameIndex)          │ Dots = all frames (title, scenes, credits)
 Play/Pause btn   │ togglePause()                   │ Swaps icon, aria-pressed
 Replay button    │ replayNarration()               │ Disabled when no narration
 Mute button      │ toggleMute()                    │ Swaps icon, disabled until audio loads
