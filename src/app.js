@@ -4,24 +4,21 @@ import {
   playAmbient,
   cueAmbient,
   crossfadeAmbient,
-  playNarration,
   cueNarration,
-  stopNarration,
-  pauseNarration,
-  resumeNarration,
-  pauseAmbient,
-  resumeAmbient,
+  cueMusic,
   setMuted,
   onNarrationBufferChange,
   preloadNarrationAhead,
   clearNarrationCache,
-  playMusic,
-  cueMusic,
-  fadeMusic,
-  pauseMusic,
+  resumeAmbient,
   resumeMusic,
-  stopMusic,
+  scheduleNarration,
+  scheduleMusic,
+  pauseAll,
+  resumeAll,
+  cancelAll,
 } from './audio.js';
+import { PausableTimer } from './pausable-timer.js';
 import { buildNarrationTimeline, clearNarrationLayer } from './text.js';
 import { runEffect, clearEffects } from './effects.js';
 import {
@@ -59,6 +56,8 @@ const STATE_BY_FRAME_TYPE = {
   credits: State.CREDITS,
 };
 
+const DEFAULT_MAX_NARRATION_MS = 60000;
+
 function applyFrameDefaults(scenesJson) {
   const defaults = scenesJson.meta.frameDefaults || {};
   return scenesJson.frames.map((frame) => ({ ...defaults, ...frame }));
@@ -68,9 +67,24 @@ function prefersReducedMotion() {
   return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-function registerAudio(app, loaded) {
-  if (loaded) {
-    app.availableAudio.add(loaded);
+function computeProjectMaxCaptionMs(frames) {
+  let max = 0;
+  for (const frame of frames) {
+    if (frame.narration?.captions?.length > 0) {
+      for (const c of frame.narration.captions) {
+        if (c.end > max) max = c.end;
+      }
+    }
+  }
+  return max;
+}
+
+function registerAudio(app, result) {
+  if (result?.src) {
+    app.availableAudio.add(result.src);
+    if (result.duration > 0) {
+      app.audioDurations.set(result.src, result.duration);
+    }
     if (app.availableAudio.size === 1) {
       app.els.btnMute.removeAttribute('aria-disabled');
     }
@@ -93,32 +107,15 @@ async function preloadBackgroundImages(app) {
   }
 }
 
-function clearMusicTimer(app) {
-  if (app.musicTimer) {
-    clearTimeout(app.musicTimer);
-    app.musicTimer = null;
-    app.musicTimerStart = null;
-    app.musicTimerDelay = null;
-  }
-}
-
 function clearAutoAdvance(app) {
-  if (app.autoAdvanceTimer) {
-    clearTimeout(app.autoAdvanceTimer);
-    app.autoAdvanceTimer = null;
-    app.autoAdvanceTimerStart = null;
-    app.autoAdvanceTimerDelay = null;
-  }
+  app.autoAdvanceTimer?.cancel();
+  app.autoAdvanceTimer = null;
 }
 
 function scheduleAutoAdvance(app, delay) {
   clearAutoAdvance(app);
-  app.autoAdvanceTimerStart = Date.now();
-  app.autoAdvanceTimerDelay = delay;
-  app.autoAdvanceTimer = setTimeout(() => {
+  app.autoAdvanceTimer = new PausableTimer(() => {
     app.autoAdvanceTimer = null;
-    app.autoAdvanceTimerStart = null;
-    app.autoAdvanceTimerDelay = null;
     if (app.paused || app.state === State.TRANSITIONING) return;
     advance(app);
   }, delay);
@@ -143,46 +140,25 @@ function setupAutoAdvance(app) {
   if (!frame.narration?.audio) {
     scheduleAutoAdvance(app, holdAfterNarration);
   }
-  // For scenes with narration audio, the Howler end callback in
-  // scheduleNarrationAudio triggers scheduleAutoAdvance
+  // For scenes with narration audio, the onend callback in
+  // scheduleNarration triggers scheduleAutoAdvance
 }
 
-function scheduleMusicExitFade(app, fadeOutDelay) {
-  if (fadeOutDelay <= 0) return;
-  app.musicExitTimerStart = Date.now();
-  app.musicExitTimerDelay = fadeOutDelay;
-  app.musicExitTimer = setTimeout(() => {
-    app.musicExitTimer = null;
-    app.musicExitTimerStart = null;
-    app.musicExitTimerDelay = null;
-    fadeMusic(0, 2000);
-  }, fadeOutDelay);
-}
+function getMaxNarrationDuration(narration, audioDurations, projectMaxCaptionMs) {
+  // Tier 1: metadata duration from loader.js preload
+  const metaDuration = audioDurations?.get(narration.audio);
+  if (metaDuration > 0) return metaDuration * 1000;
 
-function scheduleMusic(app, music) {
-  clearMusicTimer(app);
-  stopMusic();
-
-  const enter = music.enter || 0;
-  const startPlayback = () => {
-    app.musicTimer = null;
-    app.musicTimerStart = null;
-    app.musicTimerDelay = null;
-    playMusic(music.src, music.startVolume);
-    fadeMusic(music.fullVolume, music.crescendoMs);
-
-    if (music.exit !== null && music.exit !== undefined) {
-      scheduleMusicExitFade(app, music.exit - enter);
-    }
-  };
-
-  if (enter > 0) {
-    app.musicTimerStart = Date.now();
-    app.musicTimerDelay = enter;
-    app.musicTimer = setTimeout(startPlayback, enter);
-  } else {
-    startPlayback();
+  // Tier 2: frame caption max
+  if (narration.captions?.length > 0) {
+    return Math.max(...narration.captions.map((c) => c.end));
   }
+
+  // Tier 3: project-wide caption max
+  if (projectMaxCaptionMs > 0) return projectMaxCaptionMs;
+
+  // Tier 4: absolute floor
+  return DEFAULT_MAX_NARRATION_MS;
 }
 
 function makeNarrationEndCallback(app, frame, holdAfterNarration) {
@@ -200,20 +176,14 @@ function scheduleNarrationAudio(app, narration) {
   const holdAfterNarration =
     frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
   const onend = makeNarrationEndCallback(app, frame, holdAfterNarration);
-
+  const maxDurationMs = getMaxNarrationDuration(
+    narration,
+    app.audioDurations,
+    app.projectMaxCaptionMs,
+  );
   const delay = narration.delay || 0;
-  if (delay > 0) {
-    app.narrationTimerStart = Date.now();
-    app.narrationTimerDelay = delay;
-    app.narrationTimer = setTimeout(() => {
-      app.narrationTimer = null;
-      app.narrationTimerStart = null;
-      app.narrationTimerDelay = null;
-      playNarration(narration.audio, onend);
-    }, delay);
-  } else {
-    playNarration(narration.audio, onend);
-  }
+
+  scheduleNarration(narration.audio, delay, onend, maxDurationMs);
 }
 
 function buildNarration(app, frame) {
@@ -272,13 +242,6 @@ function buildNarration(app, frame) {
 }
 
 function applyNarration(app, frame) {
-  if (app.narrationTimer) {
-    clearTimeout(app.narrationTimer);
-    app.narrationTimer = null;
-    app.narrationTimerStart = null;
-    app.narrationTimerDelay = null;
-  }
-
   buildNarration(app, frame);
 }
 
@@ -374,7 +337,7 @@ function showFrame(app, index) {
     if (app.cueOnly) {
       cueMusic(frame.music.src, frame.music.startVolume);
     } else {
-      scheduleMusic(app, frame.music);
+      scheduleMusic(frame.music);
     }
   }
 
@@ -435,14 +398,7 @@ function completePendingNav(app) {
 function cleanupCurrentScene(app) {
   app.generation++;
   clearAutoAdvance(app);
-  app.autoAdvanceTimerRemaining = null;
-
-  if (app.narrationTimer) {
-    clearTimeout(app.narrationTimer);
-    app.narrationTimer = null;
-    app.narrationTimerStart = null;
-    app.narrationTimerDelay = null;
-  }
+  cancelAll();
 
   clearCaptionElements(app.captionEntries);
   try {
@@ -453,19 +409,7 @@ function cleanupCurrentScene(app) {
   app.textTimeline = null;
   app.captionEntries = [];
 
-  clearMusicTimer(app);
-  if (app.musicExitTimer) {
-    clearTimeout(app.musicExitTimer);
-    app.musicExitTimer = null;
-    app.musicExitTimerStart = null;
-    app.musicExitTimerDelay = null;
-  }
-  app.musicExitTimerRemaining = null;
-  app.musicTimerRemaining = null;
-  app.narrationTimerRemaining = null;
   app.replayPending = false;
-  stopMusic();
-  stopNarration();
 }
 
 function transition(app, toIndex) {
@@ -625,63 +569,6 @@ function updateNavButtons(app) {
     app.currentIndex >= app.frames.length - 1 || frame.holdUntilClick === null;
 }
 
-function resumeDelayedNarration(app) {
-  if (!app.narrationTimerRemaining || app.narrationTimerRemaining <= 0) return;
-  const frame = app.frames[app.currentIndex];
-  app.narrationTimerStart = Date.now();
-  app.narrationTimerDelay = app.narrationTimerRemaining;
-  app.narrationTimer = setTimeout(() => {
-    app.narrationTimer = null;
-    app.narrationTimerStart = null;
-    app.narrationTimerDelay = null;
-    app.narrationTimerRemaining = null;
-    if (frame.narration?.audio) {
-      const holdAfterNarration =
-        frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
-      playNarration(
-        frame.narration.audio,
-        makeNarrationEndCallback(app, frame, holdAfterNarration),
-      );
-    }
-  }, app.narrationTimerRemaining);
-  app.narrationTimerRemaining = null;
-}
-
-function resumeMusicExitTimer(app) {
-  if (!app.musicExitTimerRemaining || app.musicExitTimerRemaining <= 0) return;
-  app.musicExitTimerStart = Date.now();
-  app.musicExitTimerDelay = app.musicExitTimerRemaining;
-  app.musicExitTimer = setTimeout(() => {
-    app.musicExitTimer = null;
-    app.musicExitTimerStart = null;
-    app.musicExitTimerDelay = null;
-    app.musicExitTimerRemaining = null;
-    fadeMusic(0, 2000);
-  }, app.musicExitTimerRemaining);
-  app.musicExitTimerRemaining = null;
-}
-
-function resumeDelayedMusic(app) {
-  if (!app.musicTimerRemaining || app.musicTimerRemaining <= 0) return;
-  const frame = app.frames[app.currentIndex];
-  if (!frame.music) return;
-  app.musicTimerStart = Date.now();
-  app.musicTimerDelay = app.musicTimerRemaining;
-  app.musicTimer = setTimeout(() => {
-    app.musicTimer = null;
-    app.musicTimerStart = null;
-    app.musicTimerDelay = null;
-    app.musicTimerRemaining = null;
-    playMusic(frame.music.src, frame.music.startVolume);
-    fadeMusic(frame.music.fullVolume, frame.music.crescendoMs);
-
-    if (frame.music.exit !== null && frame.music.exit !== undefined) {
-      scheduleMusicExitFade(app, (frame.music.exit || 0) - (frame.music.enter || 0));
-    }
-  }, app.musicTimerRemaining);
-  app.musicTimerRemaining = null;
-}
-
 function handleFirstPlay(app) {
   const frame = app.frames[app.currentIndex];
   applyNarration(app, frame);
@@ -716,24 +603,15 @@ function doResume(app) {
     }
     setupAutoAdvance(app);
   } else {
-    resumeNarration();
-    resumeAmbient();
-    resumeMusic();
+    resumeAll();
     if (app.textTimeline && !app.buffering) {
       app.textTimeline.resume();
     }
-    resumeDelayedNarration(app);
-    resumeDelayedMusic(app);
-    resumeMusicExitTimer(app);
   }
 
   resumeCanvas();
 
-  if (app.autoAdvanceTimerRemaining !== null && app.autoAdvanceTimerRemaining > 0) {
-    const remaining = app.autoAdvanceTimerRemaining;
-    app.autoAdvanceTimerRemaining = null;
-    scheduleAutoAdvance(app, remaining);
-  }
+  app.autoAdvanceTimer?.resume();
 
   if (firstPlay) {
     app.els.playGate.hidden = true;
@@ -744,31 +622,12 @@ function doResume(app) {
   app.els.btnPause.classList.remove('paused');
 }
 
-function saveNarrationTimerRemaining(app) {
-  if (!app.narrationTimer) return;
-  const elapsed = Date.now() - app.narrationTimerStart;
-  app.narrationTimerRemaining = Math.max(0, app.narrationTimerDelay - elapsed);
-  clearTimeout(app.narrationTimer);
-  app.narrationTimer = null;
-  app.narrationTimerStart = null;
-  app.narrationTimerDelay = null;
-}
-
-function saveMusicTimerRemaining(app) {
-  if (!app.musicTimer) return;
-  const elapsed = Date.now() - app.musicTimerStart;
-  app.musicTimerRemaining = Math.max(0, app.musicTimerDelay - elapsed);
-  clearMusicTimer(app);
-}
-
 function doPause(app) {
   app.paused = true;
   app.pausedFromState = app.state;
   app.state = State.PAUSED;
 
-  pauseNarration();
-  pauseAmbient();
-  pauseMusic();
+  pauseAll();
 
   if (app.textTimeline) {
     app.textTimeline.pause();
@@ -776,23 +635,7 @@ function doPause(app) {
 
   pauseCanvas();
 
-  saveNarrationTimerRemaining(app);
-  saveMusicTimerRemaining(app);
-
-  if (app.autoAdvanceTimer) {
-    const elapsed = Date.now() - app.autoAdvanceTimerStart;
-    app.autoAdvanceTimerRemaining = Math.max(0, app.autoAdvanceTimerDelay - elapsed);
-    clearAutoAdvance(app);
-  }
-
-  if (app.musicExitTimer) {
-    const elapsed = Date.now() - app.musicExitTimerStart;
-    app.musicExitTimerRemaining = Math.max(0, app.musicExitTimerDelay - elapsed);
-    clearTimeout(app.musicExitTimer);
-    app.musicExitTimer = null;
-    app.musicExitTimerStart = null;
-    app.musicExitTimerDelay = null;
-  }
+  app.autoAdvanceTimer?.pause();
 
   app.els.btnPause.setAttribute('aria-pressed', 'true');
   app.els.btnPause.classList.add('paused');
@@ -819,24 +662,15 @@ function replayNarration(app) {
 
   app.userHasInteracted = true;
 
-  // Stop current narration audio regardless of pause state
-  stopNarration();
+  // Cancel all audio scheduling (stops narration, clears delay timer, etc.)
+  cancelAll();
 
   app.buffering = false;
   app.els.sceneStage.classList.remove('buffering');
 
   clearAutoAdvance(app);
-  app.autoAdvanceTimerRemaining = null;
 
   const frame = app.frames[app.currentIndex];
-
-  if (app.narrationTimer) {
-    clearTimeout(app.narrationTimer);
-    app.narrationTimer = null;
-    app.narrationTimerStart = null;
-    app.narrationTimerDelay = null;
-  }
-  app.narrationTimerRemaining = null;
 
   if (app.paused) {
     // Replay while paused: cue narration audio, reset text, stay paused.
@@ -903,7 +737,7 @@ function initApp(app) {
   initSceneCanvas(app.els.sceneCanvas);
   initCanvas(app.els.effectsCanvas);
 
-  preloadFirstFrameAudio(app.frames, (loaded) => registerAudio(app, loaded));
+  preloadFirstFrameAudio(app.frames, (result) => registerAudio(app, result));
   onNarrationBufferChange((isBuffering) => handleBufferChange(app, isBuffering));
 
   preloadFirstFrameImage(app)
@@ -946,7 +780,7 @@ function initApp(app) {
       setTimeout(() => {
         Promise.all([
           preloadBackgroundImages(app),
-          preloadBackgroundAudio(app.frames, (loaded) => registerAudio(app, loaded)),
+          preloadBackgroundAudio(app.frames, (result) => registerAudio(app, result)),
         ]).catch((err) => console.error('Background asset preload failed:', err));
       }, 4000);
 
@@ -1035,22 +869,7 @@ export function createApp() {
     userHasInteracted: false,
     textTimeline: null,
     captionEntries: [],
-    narrationTimer: null,
-    narrationTimerStart: null,
-    narrationTimerDelay: null,
-    narrationTimerRemaining: null,
-    musicTimer: null,
-    musicTimerStart: null,
-    musicTimerDelay: null,
-    musicTimerRemaining: null,
-    musicExitTimer: null,
-    musicExitTimerStart: null,
-    musicExitTimerDelay: null,
-    musicExitTimerRemaining: null,
     autoAdvanceTimer: null,
-    autoAdvanceTimerStart: null,
-    autoAdvanceTimerDelay: null,
-    autoAdvanceTimerRemaining: null,
     pendingNavIndex: null,
     generation: 0,
     cueOnly: false,
@@ -1058,6 +877,8 @@ export function createApp() {
     pendingPause: false,
     buffering: false,
     availableAudio: new Set(),
+    audioDurations: new Map(),
+    projectMaxCaptionMs: computeProjectMaxCaptionMs(frames),
     imageCache: new Map(),
     els: {
       loadingScreen: document.getElementById('loading-screen'),

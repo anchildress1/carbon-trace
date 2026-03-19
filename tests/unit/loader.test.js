@@ -27,8 +27,9 @@ describe('loader.js', () => {
       globalThis.Audio = originalAudio;
     });
 
-    it('resolves with src when metadata loads successfully', async () => {
+    it('resolves with { src, duration } when metadata loads successfully', async () => {
       globalThis.Audio = class MockAudio {
+        duration = 12.5;
         set preload(_v) {}
         set src(v) {
           this._src = v;
@@ -41,10 +42,10 @@ describe('loader.js', () => {
       vi.advanceTimersByTime(1);
       const result = await p;
 
-      expect(result).toBe('test.m4a');
+      expect(result).toEqual({ src: 'test.m4a', duration: 12.5 });
     });
 
-    it('resolves with null on audio error', async () => {
+    it('resolves with { src: null, duration: 0 } on audio error', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       globalThis.Audio = class MockAudio {
         set preload(_v) {}
@@ -59,19 +60,19 @@ describe('loader.js', () => {
       vi.advanceTimersByTime(1);
       const result = await p;
 
-      expect(result).toBeNull();
+      expect(result).toEqual({ src: null, duration: 0 });
       expect(warnSpy).toHaveBeenCalledWith('Failed to preload audio: bad.m4a');
       warnSpy.mockRestore();
     });
 
-    it('resolves with null on timeout', async () => {
+    it('resolves with { src: null, duration: 0 } on timeout', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const p = preloadAudio('slow.m4a');
 
       vi.advanceTimersByTime(5000);
 
       const result = await p;
-      expect(result).toBeNull();
+      expect(result).toEqual({ src: null, duration: 0 });
       warnSpy.mockRestore();
     });
   });
@@ -170,7 +171,7 @@ describe('loader.js', () => {
       vi.advanceTimersByTime(5000);
       await vi.runAllTimersAsync();
 
-      expect(onLoaded).toHaveBeenCalledWith(null);
+      expect(onLoaded).toHaveBeenCalledWith({ src: null, duration: 0 });
       globalThis.Audio = origAudio;
       warnSpy.mockRestore();
     });

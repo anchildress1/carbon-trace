@@ -44,7 +44,74 @@ vi.mock('../../src/audio.js', () => ({
   stopMusic: vi.fn(),
   stopAll: vi.fn(),
   isNarrationBuffering: vi.fn().mockReturnValue(false),
+  scheduleNarration: vi.fn(),
+  scheduleAmbient: vi.fn(),
+  scheduleMusic: vi.fn(),
+  pauseAll: vi.fn(),
+  resumeAll: vi.fn(),
+  cancelAll: vi.fn(),
 }));
+
+vi.mock('../../src/pausable-timer.js', () => {
+  class MockPausableTimer {
+    #callback;
+    #delay;
+    #paused = false;
+    #cancelled = false;
+    #fired = false;
+    #timerId = null;
+
+    constructor(callback, delay) {
+      this.#callback = callback;
+      this.#delay = delay;
+      this.#timerId = setTimeout(() => {
+        if (this.#cancelled) return;
+        this.#fired = true;
+        this.#timerId = null;
+        this.#callback();
+      }, delay);
+    }
+
+    pause() {
+      if (this.#fired || this.#cancelled) return;
+      this.#paused = true;
+      if (this.#timerId) {
+        clearTimeout(this.#timerId);
+        this.#timerId = null;
+      }
+    }
+
+    resume() {
+      if (!this.#paused || this.#cancelled || this.#fired) return;
+      this.#paused = false;
+      this.#timerId = setTimeout(() => {
+        if (this.#cancelled) return;
+        this.#fired = true;
+        this.#timerId = null;
+        this.#callback();
+      }, this.#delay);
+    }
+
+    cancel() {
+      this.#cancelled = true;
+      this.#paused = false;
+      if (this.#timerId) {
+        clearTimeout(this.#timerId);
+        this.#timerId = null;
+      }
+    }
+
+    get isActive() {
+      return this.#timerId !== null;
+    }
+
+    get isPaused() {
+      return this.#paused;
+    }
+  }
+
+  return { PausableTimer: MockPausableTimer };
+});
 
 vi.mock('../../src/text.js', () => ({
   buildNarrationTimeline: vi.fn(() => ({
@@ -171,7 +238,6 @@ import {
   stopNarration,
   pauseNarration,
   resumeNarration,
-  playNarration,
   cueNarration,
   cueAmbient,
   crossfadeAmbient,
@@ -186,6 +252,11 @@ import {
   resumeAmbient,
   setMuted,
   onNarrationBufferChange,
+  scheduleNarration,
+  scheduleMusic,
+  pauseAll,
+  resumeAll,
+  cancelAll,
 } from '../../src/audio.js';
 import { clearNarrationLayer } from '../../src/text.js';
 import { clearEffects } from '../../src/effects.js';
@@ -334,24 +405,20 @@ describe('app.js', () => {
       expect(app.getState()).toBe('PAUSED');
     });
 
-    it('calls pauseNarration and pauseAmbient when pausing', () => {
+    it('calls pauseAll when pausing', () => {
       app.togglePause();
       vi.clearAllMocks();
       app.togglePause();
-      expect(pauseNarration).toHaveBeenCalled();
-      expect(pauseAmbient).toHaveBeenCalled();
-      expect(pauseMusic).toHaveBeenCalled();
+      expect(pauseAll).toHaveBeenCalled();
       expect(pauseCanvas).toHaveBeenCalled();
     });
 
-    it('calls resumeNarration and resumeAmbient when resuming', () => {
+    it('calls resumeAll when resuming', () => {
       app.togglePause();
       app.togglePause();
       vi.clearAllMocks();
       app.togglePause();
-      expect(resumeNarration).toHaveBeenCalled();
-      expect(resumeAmbient).toHaveBeenCalled();
-      expect(resumeMusic).toHaveBeenCalled();
+      expect(resumeAll).toHaveBeenCalled();
       expect(resumeCanvas).toHaveBeenCalled();
     });
 
@@ -384,20 +451,20 @@ describe('app.js', () => {
       expect(app.getState()).toBe('PAUSED');
     });
 
-    it('calls stopNarration for cleanup', async () => {
+    it('calls cancelAll for cleanup', async () => {
       vi.clearAllMocks();
       app.advance();
       await vi.runAllTimersAsync();
-      expect(stopNarration).toHaveBeenCalled();
+      expect(cancelAll).toHaveBeenCalled();
     });
 
     it('cues narration instead of playing during hard cut', async () => {
       vi.clearAllMocks();
       app.advance();
       await vi.runAllTimersAsync();
-      // During hard cut (paused), narration should be cued, not played
+      // During hard cut (paused), narration should be cued, not scheduled
       expect(cueNarration).toHaveBeenCalledWith('narration.mp3');
-      expect(playNarration).not.toHaveBeenCalled();
+      expect(scheduleNarration).not.toHaveBeenCalled();
     });
 
     it('calls clearEffects during hard cut', async () => {
@@ -422,7 +489,7 @@ describe('app.js', () => {
       app.advance();
       await vi.runAllTimersAsync();
       expect(cueMusic).toHaveBeenCalledWith('credits-music.mp3', 0);
-      expect(playMusic).not.toHaveBeenCalled();
+      expect(scheduleMusic).not.toHaveBeenCalled();
     });
   });
 
@@ -508,7 +575,7 @@ describe('app.js', () => {
       const stage = document.getElementById('scene-stage');
       stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
       await vi.runAllTimersAsync();
-      expect(stopNarration).toHaveBeenCalled();
+      expect(cancelAll).toHaveBeenCalled();
     });
 
     it('ArrowLeft retreats when on scene-01', async () => {
@@ -520,7 +587,7 @@ describe('app.js', () => {
       const stage = document.getElementById('scene-stage');
       stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
       await vi.runAllTimersAsync();
-      expect(stopNarration).toHaveBeenCalled();
+      expect(cancelAll).toHaveBeenCalled();
     });
   });
 
@@ -582,12 +649,11 @@ describe('app.js', () => {
       app.togglePause();
     });
 
-    it('stops narration and music on scene change', async () => {
+    it('calls cancelAll on scene change', async () => {
       vi.clearAllMocks();
       app.advance();
       await vi.runAllTimersAsync();
-      expect(stopNarration).toHaveBeenCalled();
-      expect(stopMusic).toHaveBeenCalled();
+      expect(cancelAll).toHaveBeenCalled();
     });
   });
 
@@ -612,46 +678,78 @@ describe('app.js', () => {
       app = createApp();
       await vi.runAllTimersAsync();
       app.togglePause();
-      app.advance();
-      // Transition completes synchronously (image cached). Timers now pending.
     });
 
-    it('schedules music after enter delay', () => {
-      vi.advanceTimersByTime(100);
-      expect(playMusic).toHaveBeenCalledWith('credits-music.mp3', 0);
-      expect(fadeMusic).toHaveBeenCalledWith(0.5, 2000);
-    });
-
-    it('schedules music exit fade', () => {
-      vi.advanceTimersByTime(100); // music starts
+    it('calls scheduleMusic when advancing to a scene with music', async () => {
       vi.clearAllMocks();
-      vi.advanceTimersByTime(4900); // exit: 5000 - enter: 100 = 4900
-      expect(fadeMusic).toHaveBeenCalledWith(0, 2000);
+      app.advance();
+      await vi.runAllTimersAsync();
+      expect(scheduleMusic).toHaveBeenCalledWith(
+        expect.objectContaining({
+          src: 'credits-music.mp3',
+          enter: 100,
+          exit: 5000,
+        }),
+      );
     });
   });
 
-  // ── narration auto-advance ─────────────────────────────────────────
+  // ── narration scheduling ─────────────────────────────────────────
 
-  describe('narration auto-advance', () => {
-    it('schedules auto-advance after narration ends', async () => {
-      let capturedOnend;
-      playNarration.mockImplementation((src, onend) => {
-        capturedOnend = onend;
-      });
+  describe('narration scheduling', () => {
+    it('calls scheduleNarration when advancing to a scene with narration', async () => {
+      app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause();
+      vi.clearAllMocks();
+      app.advance();
+      await vi.runAllTimersAsync();
+      expect(scheduleNarration).toHaveBeenCalledWith(
+        'narration.mp3',
+        500,
+        expect.any(Function),
+        expect.any(Number),
+      );
+    });
 
+    it('onend callback from scheduleNarration triggers auto-advance', async () => {
       app = createApp();
       await vi.runAllTimersAsync();
       app.togglePause();
       app.advance();
+      await vi.runAllTimersAsync();
 
-      // Narration delay: 500ms → playNarration called
-      vi.advanceTimersByTime(500);
-      expect(playNarration).toHaveBeenCalledWith('narration.mp3', expect.any(Function));
+      // Extract the onend callback passed to scheduleNarration
+      const onend = scheduleNarration.mock.calls[0][2];
+      vi.clearAllMocks();
 
-      // Simulate narration ending → scheduleAutoAdvance(2000)
-      capturedOnend();
+      // Simulate narration ending
+      onend();
+
+      // Auto-advance timer should have been set (2000ms holdAfterNarration)
       vi.advanceTimersByTime(2000);
       await vi.runAllTimersAsync();
+      expect(app.getState()).toBe('CREDITS');
+    });
+
+    it('stale onend callback is ignored after scene change', async () => {
+      app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause();
+      app.advance(); // to scene-01
+      await vi.runAllTimersAsync();
+
+      const staleOnend = scheduleNarration.mock.calls[0][2];
+
+      // Navigate away (to credits) before narration ends
+      app.advance();
+      await vi.runAllTimersAsync();
+      expect(app.getState()).toBe('CREDITS');
+
+      // Fire the stale onend — should be ignored (generation changed)
+      vi.clearAllMocks();
+      staleOnend();
+      vi.advanceTimersByTime(5000);
       expect(app.getState()).toBe('CREDITS');
     });
   });
@@ -678,38 +776,6 @@ describe('app.js', () => {
     });
   });
 
-  // ── narration generation counter ──────────────────────────────────
-
-  describe('narration generation counter', () => {
-    it('ignores stale onend callback after scene change', async () => {
-      let capturedOnend;
-      playNarration.mockImplementation((src, onend) => {
-        capturedOnend = onend;
-      });
-
-      app = createApp();
-      await vi.runAllTimersAsync();
-      app.togglePause(); // resume → SCENE_ACTIVE
-      app.advance(); // to scene-01
-      vi.advanceTimersByTime(500); // narration delay fires
-      expect(playNarration).toHaveBeenCalledWith('narration.mp3', expect.any(Function));
-
-      const staleOnend = capturedOnend;
-
-      // Navigate away (to credits) before narration ends
-      app.advance();
-      await vi.runAllTimersAsync();
-      expect(app.getState()).toBe('CREDITS');
-
-      // Fire the stale onend — should be ignored (generation changed)
-      vi.clearAllMocks();
-      staleOnend();
-      vi.advanceTimersByTime(5000);
-      // Should remain on credits, no auto-advance scheduled
-      expect(app.getState()).toBe('CREDITS');
-    });
-  });
-
   // ── replay narration ───────────────────────────────────────────────
 
   describe('replay narration', () => {
@@ -718,44 +784,39 @@ describe('app.js', () => {
       await vi.runAllTimersAsync();
       app.togglePause();
       app.advance();
-      // On scene-01. narrationTimer (500ms) and musicTimer (100ms) pending.
+      await vi.runAllTimersAsync();
+      // On scene-01.
     });
 
     it('replays narration on btn-replay click', () => {
       vi.clearAllMocks();
       document.getElementById('btn-replay').click();
-      // replayNarration clears existing narrationTimer, then buildNarration
-      // sets a new 500ms delay timer
-      vi.advanceTimersByTime(500);
-      expect(playNarration).toHaveBeenCalledWith('narration.mp3', expect.any(Function));
-    });
-
-    it('clears active narration timer on replay', () => {
-      vi.advanceTimersByTime(200); // partially elapsed narration timer
-      vi.clearAllMocks();
-      document.getElementById('btn-replay').click();
-      // Old timer cleared; new 500ms timer set by buildNarration
-      vi.advanceTimersByTime(500);
-      expect(playNarration).toHaveBeenCalledWith('narration.mp3', expect.any(Function));
+      // replayNarration calls cancelAll then buildNarration which calls scheduleNarration
+      expect(cancelAll).toHaveBeenCalled();
+      expect(scheduleNarration).toHaveBeenCalledWith(
+        'narration.mp3',
+        500,
+        expect.any(Function),
+        expect.any(Number),
+      );
     });
 
     it('does not restart music on replay', () => {
-      vi.advanceTimersByTime(100); // music starts
       vi.clearAllMocks();
       document.getElementById('btn-replay').click();
-      vi.advanceTimersByTime(500);
       // Replay should restart narration but NOT re-trigger music
-      expect(playNarration).toHaveBeenCalled();
-      expect(playMusic).not.toHaveBeenCalled();
+      expect(scheduleNarration).toHaveBeenCalled();
+      expect(scheduleMusic).not.toHaveBeenCalled();
     });
 
     it('stays paused when replaying while paused', () => {
       app.togglePause();
       expect(app.getState()).toBe('PAUSED');
+      vi.clearAllMocks();
       document.getElementById('btn-replay').click();
       expect(app.getState()).toBe('PAUSED');
       expect(cueNarration).toHaveBeenCalled();
-      expect(playNarration).not.toHaveBeenCalled();
+      expect(scheduleNarration).not.toHaveBeenCalled();
     });
 
     it('plays narration from start on resume after replay-while-paused', () => {
@@ -764,38 +825,13 @@ describe('app.js', () => {
       vi.clearAllMocks();
       app.togglePause(); // resume
       expect(app.getState()).toBe('SCENE_ACTIVE');
-      vi.advanceTimersByTime(500); // narration delay fires
-      expect(playNarration).toHaveBeenCalled();
-    });
-
-    it('clears auto-advance timer on replay while paused', () => {
-      // Capture the onend callback so we can trigger the auto-advance timer
-      let capturedOnend;
-      playNarration.mockImplementation((_src, onend) => {
-        capturedOnend = onend;
-      });
-
-      // Narration delay fires → playNarration called with onend
-      vi.advanceTimersByTime(500);
-      expect(capturedOnend).toBeDefined();
-
-      // onend fires → scheduleAutoAdvance(2000ms)
-      capturedOnend();
-
-      // 500ms into the 2000ms auto-advance wait, pause the scene
-      vi.advanceTimersByTime(500);
-      app.togglePause();
-
-      // Replay while paused — must clear autoAdvanceTimerRemaining
-      document.getElementById('btn-replay').click();
-
-      // Resume — replayPending path, fresh narration scheduled from beginning
-      app.togglePause();
-
-      // Advance the remaining 1500ms from the old auto-advance timer.
-      // If replay did NOT clear it, the scene would advance to credits.
-      vi.advanceTimersByTime(1500);
-      expect(app.getState()).toBe('SCENE_ACTIVE');
+      // replayPending path calls scheduleNarrationAudio → scheduleNarration
+      expect(scheduleNarration).toHaveBeenCalledWith(
+        'narration.mp3',
+        500,
+        expect.any(Function),
+        expect.any(Number),
+      );
     });
 
     it('multiple replays while paused are idempotent', () => {
@@ -806,7 +842,7 @@ describe('app.js', () => {
       document.getElementById('btn-replay').click();
       expect(app.getState()).toBe('PAUSED');
       expect(cueNarration).toHaveBeenCalledTimes(2);
-      expect(playNarration).not.toHaveBeenCalled();
+      expect(scheduleNarration).not.toHaveBeenCalled();
     });
 
     it('clears buffering state on replay', () => {
@@ -825,9 +861,9 @@ describe('app.js', () => {
       // Navigate to next scene instead of resuming
       app.advance();
       await vi.runAllTimersAsync();
-      // Resume on the new scene — should do normal resume, not replay path
+      // Resume on the new scene — should do normal resume (resumeAll), not replay path
       app.togglePause(); // resume
-      expect(resumeNarration).toHaveBeenCalled();
+      expect(resumeAll).toHaveBeenCalled();
     });
   });
 
@@ -892,7 +928,7 @@ describe('app.js', () => {
       vi.clearAllMocks();
       document.getElementById('btn-prev').click();
       await vi.runAllTimersAsync();
-      expect(stopNarration).toHaveBeenCalled();
+      expect(cancelAll).toHaveBeenCalled();
     });
 
     it('btn-next advances to next frame', async () => {
@@ -918,118 +954,34 @@ describe('app.js', () => {
       vi.clearAllMocks();
       document.getElementById('scene-stage').click();
       await vi.runAllTimersAsync();
-      expect(stopNarration).not.toHaveBeenCalled();
+      expect(cancelAll).not.toHaveBeenCalled();
     });
   });
 
-  // ── timer pause/resume ─────────────────────────────────────────────
+  // ── auto-advance timer pause/resume ────────────────────────────────
 
-  describe('timer pause/resume', () => {
-    describe('before narration plays', () => {
-      beforeEach(async () => {
-        app = createApp();
-        await vi.runAllTimersAsync();
-        app.togglePause();
-        app.advance();
-        // On scene-01. narrationTimer=500ms, musicTimer=100ms. No time elapsed.
-      });
-
-      it('saves and restores narration + music timers', () => {
-        vi.advanceTimersByTime(50); // 50ms into both timers
-        app.togglePause(); // saves remaining: narration=450, music=50
-        vi.clearAllMocks();
-        app.togglePause(); // restores both
-
-        vi.advanceTimersByTime(50); // music fires
-        expect(playMusic).toHaveBeenCalled();
-        vi.advanceTimersByTime(400); // narration fires
-        expect(playNarration).toHaveBeenCalled();
-      });
-
-      it('saves and restores music exit timer', () => {
-        vi.advanceTimersByTime(100); // music starts, exit timer set (4900ms)
-        vi.advanceTimersByTime(100); // 100ms into exit timer
-        vi.clearAllMocks();
-        app.togglePause(); // saves exitTimerRemaining ≈ 4800
-        app.togglePause(); // restores exit timer
-
-        vi.advanceTimersByTime(4800); // exit timer fires
-        expect(fadeMusic).toHaveBeenCalledWith(0, 2000);
-      });
-    });
-
-    describe('after narration ends', () => {
-      it('saves and restores auto-advance timer', async () => {
-        let capturedOnend;
-        playNarration.mockImplementation((src, onend) => {
-          capturedOnend = onend;
-        });
-
-        app = createApp();
-        await vi.runAllTimersAsync();
-        app.togglePause();
-        app.advance();
-        vi.advanceTimersByTime(500); // narration delay fires
-        capturedOnend(); // auto-advance timer set (2000ms)
-
-        vi.advanceTimersByTime(500); // 500ms into auto-advance
-        app.togglePause(); // saves remaining ≈ 1500
-        vi.clearAllMocks();
-        app.togglePause(); // restores
-
-        vi.advanceTimersByTime(1500);
-        await vi.runAllTimersAsync();
-        expect(app.getState()).toBe('CREDITS');
-      });
-    });
-
-    describe('pause during narration delay then resume', () => {
-      it('passes onend callback so auto-advance fires after narration', async () => {
-        let capturedOnend;
-        playNarration.mockImplementation((src, onend) => {
-          capturedOnend = onend;
-        });
-
-        app = createApp();
-        await vi.runAllTimersAsync();
-        app.togglePause(); // unpause → first play
-        app.advance(); // to scene-01, narration delay=500ms starts
-
-        vi.advanceTimersByTime(200); // 200ms into narration delay
-        app.togglePause(); // pause — saves narrationTimerRemaining ≈ 300
-        vi.clearAllMocks();
-        app.togglePause(); // resume — resumeDelayedNarration fires
-
-        vi.advanceTimersByTime(300); // remaining delay fires → playNarration with onend
-        expect(playNarration).toHaveBeenCalledWith('narration.mp3', expect.any(Function));
-
-        // Simulate narration ending — onend should schedule auto-advance
-        capturedOnend();
-        vi.advanceTimersByTime(2000); // holdAfterNarration
-        await vi.runAllTimersAsync();
-        expect(app.getState()).toBe('CREDITS');
-      });
-    });
-  });
-
-  // ── cleanup with active timers ─────────────────────────────────────
-
-  describe('cleanup with active timers', () => {
-    it('clears narration and music exit timers during scene change', async () => {
+  describe('auto-advance timer', () => {
+    it('saves and restores auto-advance timer via PausableTimer', async () => {
       app = createApp();
       await vi.runAllTimersAsync();
       app.togglePause();
-      app.advance(); // to scene-01
-      vi.advanceTimersByTime(200); // music started (100ms), exit timer active, narrationTimer active
-
-      vi.clearAllMocks();
-      app.advance(); // to credits — cleanupCurrentScene runs
+      app.advance();
       await vi.runAllTimersAsync();
 
-      // Advance way past all original timer deadlines
-      vi.advanceTimersByTime(10000);
-      // fadeMusic(0,...) should NOT have fired — exit timer was cleared
-      expect(fadeMusic).not.toHaveBeenCalled();
+      // Extract the onend callback and fire it to trigger auto-advance timer
+      const onend = scheduleNarration.mock.calls[0][2];
+      onend(); // scheduleAutoAdvance(2000)
+
+      vi.advanceTimersByTime(500); // 500ms into auto-advance
+      app.togglePause(); // pause — PausableTimer.pause() called
+
+      vi.clearAllMocks();
+      app.togglePause(); // resume — PausableTimer.resume() called
+
+      // Advance past the remaining auto-advance time
+      vi.advanceTimersByTime(2000);
+      await vi.runAllTimersAsync();
+      expect(app.getState()).toBe('CREDITS');
     });
   });
 
@@ -1061,7 +1013,7 @@ describe('app.js', () => {
       btn.setAttribute('aria-disabled', 'true');
 
       app = createApp();
-      audioCb('ambient.mp3');
+      audioCb({ src: 'ambient.mp3', duration: 10 });
       expect(btn.hasAttribute('aria-disabled')).toBe(false);
     });
   });
@@ -1108,7 +1060,7 @@ describe('app.js', () => {
       vi.clearAllMocks();
       dotClickCb(1); // scene index 1 → frame index 1 (scene-01)
       await vi.runAllTimersAsync();
-      expect(stopNarration).toHaveBeenCalled();
+      expect(cancelAll).toHaveBeenCalled();
     });
   });
 });
