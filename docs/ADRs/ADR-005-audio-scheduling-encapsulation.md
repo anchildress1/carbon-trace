@@ -82,7 +82,7 @@ cancelAudioCues()                   → stop all Howls, cancel all timers, clear
 pauseAudioCues()                    → pause all active Howls + freeze all pending timers
 resumeAudioCues()                   → resume all paused Howls + reschedule all frozen timers
 
-// Cueing (hardCut / replay-while-paused)
+// Cueing (targeted reset / preload flows)
 cueAudioCues(cues)                  → load all, seek to 0, do NOT play
 cancelCue(cueId)                    → stop + cancel one specific cue (for replay reset)
 reCueCue(cueId, cue)                → cancel + re-cue a single cue without touching others
@@ -101,15 +101,15 @@ clearNarrationCache()
 
 ```js
 // Dynamic cue tracking — no hardcoded timer variables
-const activeCues = new Map();   // Map<cueId, { howl, timer: PausableTimer, type, state }>
+const activeCues = new Map();   // Map<cueId, { id, howl, timer: PausableTimer, type, state }>
 
 function scheduleAudioCues(cues, opts) {
   if (!cues) return;
 
-  const resolved = resolveAnchors(cues, opts.maxNarrationDurationMs);
+  const resolved = resolveAnchors(cues, opts);
 
   for (const cue of resolved) {
-    const entry = { howl: null, timer: null, type: cue.type, state: 'pending' };
+    const entry = { id: cue.id, howl: null, timer: null, type: cue.type, state: 'pending' };
 
     const startCue = () => {
       if (cue.type === 'ambient') {
@@ -161,14 +161,22 @@ function resumeAudioCues() {
 
 ### Anchor Resolution
 
-Caption-derived duration as primary source:
+Metadata-derived duration when available, caption-derived narration duration as fallback:
 
 ```js
-function resolveAnchors(cues, maxNarrationDurationMs) {
+function resolveAnchors(cues, opts) {
   const durations = new Map();
+
+  if (opts?.audioDurations) {
+    for (const cue of cues) {
+      const metaDuration = opts.audioDurations.get(cue.src);
+      if (metaDuration > 0) durations.set(cue.id, metaDuration * 1000);
+    }
+  }
+
   const narrationCue = cues.find(c => c.type === 'narration');
-  if (narrationCue && maxNarrationDurationMs) {
-    durations.set(narrationCue.id, maxNarrationDurationMs);
+  if (narrationCue && opts?.maxNarrationDurationMs) {
+    durations.set(narrationCue.id, opts.maxNarrationDurationMs);
   }
 
   return cues.map(cue => {
@@ -356,21 +364,35 @@ scheduleAudioCues(frame.audioCues, {
   maxNarrationDurationMs: getMaxCaptionEnd(frame),
 });
 
-// showFrame — cueOnly (hardCut)
-cueAudioCues(frame.audioCues);
+// showFrame — hardCut while paused
+// render image/text immediately, but defer audio until resume
+app.deferFrameAudioUntilResume = true;
 
 // doPause
 pauseAudioCues();
 
 // doResume (normal)
-resumeAudioCues();
+if (app.deferFrameAudioUntilResume) {
+  app.deferFrameAudioUntilResume = false;
+  scheduleFrameAudio(app, frame);
+} else {
+  resumeAudioCues();
+}
 
 // doResume (replayPending)
-cancelCue('narration');
-scheduleAudioCues([narrationCue], {
-  onNarrationEnd: makeNarrationEndCallback(app, frame, holdAfterNarration),
-  maxNarrationDurationMs: getMaxCaptionEnd(frame),
-});
+if (app.deferFrameAudioUntilResume) {
+  app.deferFrameAudioUntilResume = false;
+  cancelAudioCues();
+  scheduleFrameAudio(app, frame);
+} else {
+  cancelCue('narration');
+  resumeAudioCues();
+  scheduleAudioCues([narrationCue], {
+    onNarrationEnd: makeNarrationEndCallback(app, frame, holdAfterNarration),
+    maxNarrationDurationMs: getMaxCaptionEnd(frame),
+    audioDurations: app.audioDurations,
+  });
+}
 
 // cleanupCurrentScene
 cancelAudioCues();
@@ -385,6 +407,7 @@ cancelCue('narration');
 scheduleAudioCues([narrationCue], {
   onNarrationEnd: makeNarrationEndCallback(app, frame, holdAfterNarration),
   maxNarrationDurationMs: getMaxCaptionEnd(frame),
+  audioDurations: app.audioDurations,
 });
 ```
 

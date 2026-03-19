@@ -98,11 +98,12 @@ scheduleAudioCues(cues, opts)    → schedule all cues for a frame
   opts.onNarrationEnd            → callback for auto-advance chain
   opts.maxNarrationDurationMs    → safety timeout (caption-derived)
   opts.crossfadeDurationMs       → ambient crossfade duration (default 800)
+  opts.audioDurations            → metadata durations map for generic anchor resolution
 cancelAudioCues()                → stop all Howls, cancel all timers, clear map
 pauseAudioCues()                 → pause all active Howls + freeze all pending timers
 resumeAudioCues()                → resume all paused Howls + reschedule all frozen timers
 
-// Cueing (hardCut / replay-while-paused)
+// Cueing (targeted reset / preload flows)
 cueAudioCues(cues)               → load all, seek to 0, do NOT play
 cancelCue(cueId)                 → stop + cancel one specific cue (for replay reset)
 reCueCue(cueId, cue)             → cancel + re-cue a single cue without touching others
@@ -119,7 +120,7 @@ clearNarrationCache()             → unload ahead-of-time cache
 
 Internal state uses `activeCues = new Map<cueId, { howl, timer, type, state }>`. No hardcoded timer variables — each cue gets its own `PausableTimer` entry. All Howl instances use `html5: true` for streaming.
 
-**Anchor resolution:** `resolveAnchors(cues, maxNarrationDurationMs)` computes `resolvedEnter` for each cue. Numeric enters pass through. Anchor objects (`{ ref, offset }`) resolve to `refEnter + refDuration + offset`. Unknown refs fall back to `enter: 0`.
+**Anchor resolution:** `resolveAnchors(cues, opts)` computes `resolvedEnter` for each cue. Numeric enters pass through. Anchor objects (`{ ref, offset }`) resolve to `refEnter + refDuration + offset`. Duration lookup prefers `opts.audioDurations` metadata and falls back to `opts.maxNarrationDurationMs` for narration when metadata is missing. Unknown refs fall back to `enter: 0`.
 
 **Narration safety timeout:** `wireNarrationEnd` sets a safety timer at `enterDelay + maxDurationMs + 5000ms`. If no `end`/`loaderror`/`playerror` fires, force-stops narration and calls `safeEnd`. Deduplicates — callback fires at most once. Duration authority: metadata → frame captions → project-wide max → 60s floor.
 
@@ -275,7 +276,7 @@ fadeOut  │ number | null       │ ms fade-out at end. null = no auto-fade.
 
 `audioCues: null` = no audio for this frame.
 
-**Anchor objects:** `{ ref: "narration", offset: -5000 }` resolves to `refEnter + refDuration + offset`. Requires `maxNarrationDurationMs` from caption data.
+**Anchor objects:** `{ ref: "narration", offset: -5000 }` resolves to `refEnter + refDuration + offset`. Resolution prefers `audioDurations` metadata and falls back to `maxNarrationDurationMs` for narration when metadata is missing.
 
 **Type behavior:**
 - `narration`: fires `end` event for auto-advance. One per frame max. Replay targets this.
@@ -341,7 +342,7 @@ const app = {
   pausedFromState: null,     // state to restore on resume
   userHasInteracted: false,  // play-gate flag
   generation: 0,             // incremented on every navigation — guards stale callbacks
-  cueOnly: false,            // true during hardCut — audio cued, not played
+  deferFrameAudioUntilResume: false, // true after paused hardJump — next resume schedules frame audio fresh
   replayPending: false,      // replay happened while paused — doResume schedules fresh narration
   pendingPause: false,       // pause queued during transition
   pendingNavIndex: null,     // navigation queued during transition
@@ -375,7 +376,7 @@ transition(toIndex):
   cleanupCurrentScene()           // clear all timers, kill timelines, stop audio
 
   if wasPaused:
-    hardJump(toIndex)             // instant — drawImage, cueOnly, re-pause
+    hardJump(toIndex)             // instant — drawImage, defer frame audio, re-pause
   else if prefersReducedMotion:
     instantSwap(toIndex)          // no animation, immediate showFrame + land
   else:
@@ -406,13 +407,12 @@ Transition uses GSAP opacity fade on the `#scene-stage` container — NOT offscr
 
 ```
 drawImage(toImg)                → instant, no crossfade
-set cueOnly = true
-showFrame(toIndex)              → renders image, builds text/captions, cues audio (not playing)
-set cueOnly = false
+set deferFrameAudioUntilResume = true
+showFrame(toIndex)              → renders image, builds text/captions, skips audio scheduling
 doPause()                       → freeze everything
 ```
 
-No lock. No timer. No animation. Scene lands paused and frozen.
+No lock. No timer. No animation. Scene lands paused and frozen. On resume, audio enters through the normal `scheduleFrameAudio()` path so delayed and anchored cues keep one authoritative timing model.
 
 ### 5.5 scheduleAutoAdvance
 
@@ -487,13 +487,22 @@ else:
 ```
 if replayPending:
   replayPending = false
-  cancelCue('narration')
-  scheduleAudioCues([narrationCue], { onNarrationEnd, maxNarrationDurationMs })
-  resumeAudioCues()                          // resume remaining cues (ambient, etc.)
+  if deferFrameAudioUntilResume:
+    deferFrameAudioUntilResume = false
+    cancelAudioCues()
+    scheduleFrameAudio(app, currentFrame)    // full frame fresh after paused hardJump
+  else:
+    cancelCue('narration')
+    resumeAudioCues()                        // resume remaining cues (ambient, etc.)
+    scheduleAudioCues([narrationCue], { onNarrationEnd, maxNarrationDurationMs, audioDurations })
   textTimeline.play(0)                       // restart from beginning
   setupAutoAdvance()
 else:
-  resumeAudioCues()                          // resume all audio + pending timers
+  if deferFrameAudioUntilResume:
+    deferFrameAudioUntilResume = false
+    scheduleFrameAudio(app, currentFrame)    // first real start after paused hardJump
+  else:
+    resumeAudioCues()                        // resume all audio + pending timers
   textTimeline.resume()
 ```
 
@@ -510,16 +519,11 @@ replayNarration(app):
   userHasInteracted = true
 
   if paused:
-    // Hard jump reset — same pattern as paused navigation
-    stopNarration()
-    clear narration timer
     clearAutoAdvance()
-
-    cueOnly = true
-    buildNarration(app, frame)      // cues audio (loaded, not playing), builds timeline
-    cueOnly = false
-
-    replayPending = true            // doResume will schedule fresh narration with onend
+    cancelCue('narration')
+    reCueCue('narration', narrationCue)
+    buildNarration(app, frame)      // rebuild text, stay paused at the start
+    replayPending = true            // doResume schedules fresh narration with onend
     if textTimeline: textTimeline.pause(0)   // reset to start, stay paused
 
     // Stay paused. No state change. User presses play to hear.
