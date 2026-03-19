@@ -1,4 +1,4 @@
-.PHONY: install dev format format-check lint typecheck unit test build e2e perf secret-scan deploy clean
+.PHONY: install dev format format-check lint typecheck unit test build e2e perf secret-scan deploy clean ai-checks
 
 # Install all dependencies
 install:
@@ -107,3 +107,7 @@ clean:
 	@echo "Cleaning up..."
 	rm -rf node_modules dist coverage playwright-report playwright-results .lighthouseci .secrets.baseline.tmp
 	@echo "Clean complete."
+
+# Run all AI required checks
+ai-checks: secret-scan format-check lint
+	@echo "AI checks passed!"
