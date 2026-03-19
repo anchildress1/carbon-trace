@@ -40,8 +40,16 @@
           }
         ],
         "captions": [
-          { "text": "[Appalachian English dialect]", "start": 0, "end": 1000 },
-          { "text": "I'm gonna tell you a story.", "start": 1000, "end": 2000 },
+          {
+            "text": "[Appalachian English dialect]",
+            "start": 0,
+            "end": 1000
+          },
+          {
+            "text": "I'm gonna tell you a story.",
+            "start": 1000,
+            "end": 2000
+          },
           {
             "text": "Not because it's special. But because it's mine.",
             "start": 3000,
@@ -52,17 +60,29 @@
             "start": 6000,
             "end": 10000
           }
-        ],
-        "audio": "assets/audio/narration/00-title.m4a",
-        "delay": 0
+        ]
       },
-      "ambient": null,
-      "effects": { "idle": null, "entry": null },
+      "effects": {
+        "idle": null,
+        "entry": null
+      },
       "transition": {
         "type": "fade",
         "duration": 1500
       },
-      "traceOverlay": null
+      "traceOverlay": null,
+      "audioCues": [
+        {
+          "id": "narration",
+          "type": "narration",
+          "src": "assets/audio/narration/00-title.m4a",
+          "enter": 0,
+          "volume": 1,
+          "loop": false,
+          "fadeIn": 0,
+          "fadeOut": 0
+        }
+      ]
     },
     {
       "id": "scene-01-seam",
@@ -142,11 +162,8 @@
             "start": 32000,
             "end": 34000
           }
-        ],
-        "audio": "assets/audio/narration/01-seam.m4a",
-        "delay": 500
+        ]
       },
-      "ambient": null,
       "effects": {
         "idle": "dust-drift",
         "entry": "fade-in"
@@ -155,13 +172,25 @@
         "type": "zoom-in",
         "duration": 1200,
         "scale": {
-          "from": 1.0,
+          "from": 1,
           "to": 1.15
         }
       },
       "traceOverlay": {
         "opacity": 0.05
-      }
+      },
+      "audioCues": [
+        {
+          "id": "narration",
+          "type": "narration",
+          "src": "assets/audio/narration/01-seam.m4a",
+          "enter": 500,
+          "volume": 1,
+          "loop": false,
+          "fadeIn": 0,
+          "fadeOut": 0
+        }
+      ]
     },
     {
       "id": "scene-02-travel",
@@ -222,7 +251,7 @@
             "end": 15000
           },
           {
-            "text": "Mommy and Mawmaw kept the rest of the world from falling apart\u2014",
+            "text": "Mommy and Mawmaw kept the rest of the world from falling apart—",
             "start": 15000,
             "end": 20000
           },
@@ -256,11 +285,8 @@
             "start": 40000,
             "end": 42000
           }
-        ],
-        "audio": "assets/audio/narration/02-travel.m4a",
-        "delay": 500
+        ]
       },
-      "ambient": null,
       "effects": {
         "idle": "motion-drag",
         "entry": "fade-in"
@@ -271,7 +297,19 @@
       },
       "traceOverlay": {
         "opacity": 0.08
-      }
+      },
+      "audioCues": [
+        {
+          "id": "narration",
+          "type": "narration",
+          "src": "assets/audio/narration/02-travel.m4a",
+          "enter": 500,
+          "volume": 1,
+          "loop": false,
+          "fadeIn": 0,
+          "fadeOut": 0
+        }
+      ]
     },
     {
       "id": "scene-03-reach",
@@ -317,7 +355,7 @@
         ],
         "captions": [
           {
-            "text": "I'll tell you what\u2014growing up was a hard thing to do.",
+            "text": "I'll tell you what—growing up was a hard thing to do.",
             "start": 0,
             "end": 4000
           },
@@ -356,11 +394,8 @@
             "start": 36000,
             "end": 43000
           }
-        ],
-        "audio": "assets/audio/narration/03-reach.m4a",
-        "delay": 500
+        ]
       },
-      "ambient": null,
       "effects": {
         "idle": "heat-pulse",
         "entry": "fade-in"
@@ -371,7 +406,19 @@
       },
       "traceOverlay": {
         "opacity": 0.15
-      }
+      },
+      "audioCues": [
+        {
+          "id": "narration",
+          "type": "narration",
+          "src": "assets/audio/narration/03-reach.m4a",
+          "enter": 500,
+          "volume": 1,
+          "loop": false,
+          "fadeIn": 0,
+          "fadeOut": 0
+        }
+      ]
     },
     {
       "id": "scene-04-pocket",
@@ -422,12 +469,12 @@
             "end": 3000
           },
           {
-            "text": "Not money\u2014we didn't have none of that.",
+            "text": "Not money—we didn't have none of that.",
             "start": 3000,
             "end": 7000
           },
           {
-            "text": "Not a plan neither\u2014I guess nobody thought to hand me one of those and I probably wouldn't have listened no how.",
+            "text": "Not a plan neither—I guess nobody thought to hand me one of those and I probably wouldn't have listened no how.",
             "start": 7000,
             "end": 15000
           },
@@ -442,7 +489,7 @@
             "end": 27000
           },
           {
-            "text": "I didn't learn how to survive by reading about it\u2014",
+            "text": "I didn't learn how to survive by reading about it—",
             "start": 27000,
             "end": 31000
           },
@@ -466,11 +513,8 @@
             "start": 42000,
             "end": 46000
           }
-        ],
-        "audio": "assets/audio/narration/04-pocket.m4a",
-        "delay": 500
+        ]
       },
-      "ambient": null,
       "effects": {
         "idle": "near-still-pulse",
         "entry": "fade-in"
@@ -481,7 +525,19 @@
       },
       "traceOverlay": {
         "opacity": 0.03
-      }
+      },
+      "audioCues": [
+        {
+          "id": "narration",
+          "type": "narration",
+          "src": "assets/audio/narration/04-pocket.m4a",
+          "enter": 500,
+          "volume": 1,
+          "loop": false,
+          "fadeIn": 0,
+          "fadeOut": 0
+        }
+      ]
     },
     {
       "id": "scene-05-rinse",
@@ -576,11 +632,8 @@
             "start": 46000,
             "end": 48000
           }
-        ],
-        "audio": "assets/audio/narration/05-rinse.m4a",
-        "delay": 500
+        ]
       },
-      "ambient": null,
       "effects": {
         "idle": "water-run",
         "entry": "fade-in"
@@ -591,7 +644,19 @@
       },
       "traceOverlay": {
         "opacity": 0.15
-      }
+      },
+      "audioCues": [
+        {
+          "id": "narration",
+          "type": "narration",
+          "src": "assets/audio/narration/05-rinse.m4a",
+          "enter": 500,
+          "volume": 1,
+          "loop": false,
+          "fadeIn": 0,
+          "fadeOut": 0
+        }
+      ]
     },
     {
       "id": "scene-06-storage",
@@ -677,15 +742,12 @@
             "end": 37000
           },
           {
-            "text": "Walking in front of you\u2014carrying the light as if they'd been the ones underground.",
+            "text": "Walking in front of you—carrying the light as if they'd been the ones underground.",
             "start": 37000,
             "end": 44000
           }
-        ],
-        "audio": "assets/audio/narration/06-storage.m4a",
-        "delay": 500
+        ]
       },
-      "ambient": null,
       "effects": {
         "idle": "dust-settle",
         "entry": "fade-in"
@@ -696,7 +758,19 @@
       },
       "traceOverlay": {
         "opacity": 0.2
-      }
+      },
+      "audioCues": [
+        {
+          "id": "narration",
+          "type": "narration",
+          "src": "assets/audio/narration/06-storage.m4a",
+          "enter": 500,
+          "volume": 1,
+          "loop": false,
+          "fadeIn": 0,
+          "fadeOut": 0
+        }
+      ]
     },
     {
       "id": "scene-07-empty",
@@ -747,7 +821,7 @@
             "end": 3000
           },
           {
-            "text": "That girl fresh out of school? She never even got a chance\u2014she was good. Too good.",
+            "text": "That girl fresh out of school? She never even got a chance—she was good. Too good.",
             "start": 3000,
             "end": 12000
           },
@@ -766,11 +840,8 @@
             "start": 24000,
             "end": 27000
           }
-        ],
-        "audio": "assets/audio/narration/07-empty.m4a",
-        "delay": 500
+        ]
       },
-      "ambient": null,
       "effects": {
         "idle": "near-still-pulse",
         "entry": "fade-in"
@@ -781,7 +852,19 @@
       },
       "traceOverlay": {
         "opacity": 0.1
-      }
+      },
+      "audioCues": [
+        {
+          "id": "narration",
+          "type": "narration",
+          "src": "assets/audio/narration/07-empty.m4a",
+          "enter": 500,
+          "volume": 1,
+          "loop": false,
+          "fadeIn": 0,
+          "fadeOut": 0
+        }
+      ]
     },
     {
       "id": "scene-08-stillness",
@@ -809,11 +892,14 @@
             "align": "center"
           }
         ],
-        "captions": [{ "text": "[silence]", "start": 0, "end": 3000 }],
-        "audio": null,
-        "delay": 500
+        "captions": [
+          {
+            "text": "[silence]",
+            "start": 0,
+            "end": 3000
+          }
+        ]
       },
-      "ambient": null,
       "effects": {
         "idle": "assembly-micro",
         "entry": "fade-in"
@@ -824,7 +910,8 @@
       },
       "traceOverlay": {
         "opacity": 0.3
-      }
+      },
+      "audioCues": null
     },
     {
       "id": "scene-09-return",
@@ -885,12 +972,12 @@
             "end": 14000
           },
           {
-            "text": "Everything all the women before me hauled around\u2014that matters.",
+            "text": "Everything all the women before me hauled around—that matters.",
             "start": 14000,
             "end": 22000
           },
           {
-            "text": "And all of you walking beside me while the industry aims to fix us\u2014don't lose your fight.",
+            "text": "And all of you walking beside me while the industry aims to fix us—don't lose your fight.",
             "start": 22000,
             "end": 30000
           },
@@ -904,11 +991,8 @@
             "start": 35000,
             "end": 40000
           }
-        ],
-        "audio": "assets/audio/narration/09-return.m4a",
-        "delay": 500
+        ]
       },
-      "ambient": null,
       "effects": {
         "idle": "light-crack",
         "entry": "fade-in"
@@ -919,7 +1003,19 @@
       },
       "traceOverlay": {
         "opacity": 0.25
-      }
+      },
+      "audioCues": [
+        {
+          "id": "narration",
+          "type": "narration",
+          "src": "assets/audio/narration/09-return.m4a",
+          "enter": 500,
+          "volume": 1,
+          "loop": false,
+          "fadeIn": 0,
+          "fadeOut": 0
+        }
+      ]
     },
     {
       "id": "scene-10-building",
@@ -999,11 +1095,8 @@
             "start": 35000,
             "end": 40000
           }
-        ],
-        "audio": "assets/audio/narration/10-building.m4a",
-        "delay": 500
+        ]
       },
-      "ambient": null,
       "effects": {
         "idle": "illumination-spread",
         "entry": "fade-in"
@@ -1014,7 +1107,19 @@
       },
       "traceOverlay": {
         "opacity": 0.35
-      }
+      },
+      "audioCues": [
+        {
+          "id": "narration",
+          "type": "narration",
+          "src": "assets/audio/narration/10-building.m4a",
+          "enter": 500,
+          "volume": 1,
+          "loop": false,
+          "fadeIn": 0,
+          "fadeOut": 0
+        }
+      ]
     },
     {
       "id": "scene-11-music",
@@ -1075,7 +1180,7 @@
             "end": 16000
           },
           {
-            "text": "I really just wanted to put a little light\u2014and some music\u2014into this one little corner of the universe so it ain't dark no more.",
+            "text": "I really just wanted to put a little light—and some music—into this one little corner of the universe so it ain't dark no more.",
             "start": 16000,
             "end": 26000
           },
@@ -1084,19 +1189,8 @@
             "start": 26000,
             "end": 32000
           }
-        ],
-        "audio": "assets/audio/narration/11-music.m4a",
-        "delay": 500
+        ]
       },
-      "music": {
-        "src": "assets/audio/sfx/BridgeCitySinners_BreakTheChain.mp3",
-        "enter": 20000,
-        "exit": null,
-        "startVolume": 0.01,
-        "fullVolume": 0.25,
-        "crescendoMs": 45000
-      },
-      "ambient": null,
       "effects": {
         "idle": "machine-steady",
         "entry": null
@@ -1107,7 +1201,32 @@
       },
       "traceOverlay": {
         "opacity": 0.5
-      }
+      },
+      "audioCues": [
+        {
+          "id": "narration",
+          "type": "narration",
+          "src": "assets/audio/narration/11-music.m4a",
+          "enter": 500,
+          "volume": 1,
+          "loop": false,
+          "fadeIn": 0,
+          "fadeOut": 0
+        },
+        {
+          "id": "end-song",
+          "type": "ambient",
+          "src": "assets/audio/sfx/BridgeCitySinners_BreakTheChain.mp3",
+          "enter": {
+            "ref": "narration",
+            "offset": -5000
+          },
+          "volume": 0.25,
+          "loop": true,
+          "fadeIn": 45000,
+          "fadeOut": null
+        }
+      ]
     }
   ]
 }
