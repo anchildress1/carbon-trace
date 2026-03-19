@@ -293,7 +293,11 @@ function buildSceneIndexMap(frames) {
   const byScene = new Map();
   let count = 0;
   frames.forEach((frame, i) => {
-    if (frame.frameType === 'scene' || frame.frameType === 'credits') {
+    if (
+      frame.frameType === 'title' ||
+      frame.frameType === 'scene' ||
+      frame.frameType === 'credits'
+    ) {
       const sceneIdx = ++count;
       byFrame.set(i, sceneIdx);
       byScene.set(sceneIdx, i);

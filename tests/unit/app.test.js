@@ -169,7 +169,7 @@ vi.mock('../../src/scenes.json', () => ({
       {
         id: 'title',
         frameType: 'title',
-        holdUntilClick: true,
+        holdUntilClick: false,
         holdAfterNarration: null,
         narration: {
           lines: [{ text: 'Opening line', enter: 0, exit: 3000 }],
@@ -495,7 +495,7 @@ describe('app.js', () => {
       await vi.runAllTimersAsync();
     });
 
-    it('does not auto-advance on holdUntilClick=true (title)', () => {
+    it('does not auto-advance on title before narration ends', () => {
       app.togglePause();
       vi.advanceTimersByTime(10000);
       expect(app.getState()).toBe('SCENE_ACTIVE');
@@ -1076,7 +1076,7 @@ describe('app.js', () => {
       app.togglePause();
 
       vi.clearAllMocks();
-      dotClickCb(1); // scene index 1 → frame index 1 (scene-01)
+      dotClickCb(2); // scene index 2 → frame index 1 (scene-01)
       await vi.runAllTimersAsync();
       expect(cancelAudioCues).toHaveBeenCalled();
     });
@@ -1355,8 +1355,8 @@ describe('app.js', () => {
       await vi.runAllTimersAsync();
 
       vi.clearAllMocks();
-      // Click the dot for the current scene (scene index 1 → frame index 1)
-      dotClickCb(1);
+      // Click the dot for the current scene (scene index 2 → frame index 1)
+      dotClickCb(2);
 
       // Should NOT trigger a transition
       expect(cancelAudioCues).not.toHaveBeenCalled();
