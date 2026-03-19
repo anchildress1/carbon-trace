@@ -14,6 +14,17 @@ Canonical instruction source for this repository. Treat this file as authoritati
 - Do not maintain backwards compatibility in this codebase for any reason.
 - Any test files introduced for local validation must be removed, not committed.
 
+### User approval for behavior decisions
+
+- Never unilaterally decide that a known limitation, degraded behavior, or
+  quality tradeoff is "acceptable." If a decision affects user experience or
+  technical excellence — even when replying to a PR review comment — you MUST
+  stop and ask the user before committing to a position.
+- This includes: deferring fixes as "post-launch," accepting degraded
+  audio/visual/interaction quality, choosing not to fix a real issue, or
+  characterizing a bug as a feature.
+- When in doubt, surface the tradeoff and let the user decide.
+
 ### Spec compliance
 
 - All implementation MUST follow `docs/design/carbon-trace-system-design-v5.md` and
