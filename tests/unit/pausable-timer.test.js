@@ -246,8 +246,8 @@ describe('PausableTimer', () => {
     });
   });
 
-  describe('uses performance.now()', () => {
-    it('computes remaining time using performance.now', () => {
+  describe('uses Date.now() for timing', () => {
+    it('computes remaining time using Date.now', () => {
       const dateSpy = vi.spyOn(Date, 'now');
       dateSpy.mockReturnValue(1000);
 
@@ -257,8 +257,60 @@ describe('PausableTimer', () => {
       dateSpy.mockReturnValue(1200);
       timer.pause();
 
-      // Remaining should be ~300ms (500 - 200 elapsed)
       expect(timer.isPaused).toBe(true);
+
+      // Resume and verify it fires at the correct remaining time (300ms)
+      timer.resume();
+      vi.advanceTimersByTime(299);
+      expect(cb).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1);
+      expect(cb).toHaveBeenCalledOnce();
+
+      dateSpy.mockRestore();
+    });
+  });
+
+  describe('edge cases', () => {
+    it('cancel after callback has fired is a no-op', () => {
+      const cb = vi.fn();
+      const timer = new PausableTimer(cb, 100);
+
+      vi.advanceTimersByTime(100);
+      expect(cb).toHaveBeenCalledOnce();
+
+      expect(() => timer.cancel()).not.toThrow();
+      expect(timer.isActive).toBe(false);
+      expect(timer.isPaused).toBe(false);
+    });
+
+    it('multiple pause/resume cycles converge correctly', () => {
+      const dateSpy = vi.spyOn(Date, 'now');
+      dateSpy.mockReturnValue(0);
+
+      const cb = vi.fn();
+      const timer = new PausableTimer(cb, 1000);
+
+      // Pause at 200ms (remaining = 800ms)
+      dateSpy.mockReturnValue(200);
+      timer.pause();
+
+      // Resume
+      dateSpy.mockReturnValue(300);
+      timer.resume();
+
+      // Pause at 300ms into resume (remaining = 800-300 = 500ms)
+      dateSpy.mockReturnValue(600);
+      timer.pause();
+
+      // Resume
+      dateSpy.mockReturnValue(700);
+      timer.resume();
+
+      // Should fire after 500ms from this resume
+      vi.advanceTimersByTime(499);
+      expect(cb).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1);
+      expect(cb).toHaveBeenCalledOnce();
 
       dateSpy.mockRestore();
     });
