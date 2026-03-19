@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const scenesData = JSON.parse(readFileSync(resolve(__dirname, '../../src/scenes.json'), 'utf8'));
 const SCENE_COUNT = scenesData.frames.filter(
-  (f) => f.frameType === 'scene' || f.frameType === 'credits',
+  (f) => f.frameType === 'title' || f.frameType === 'scene' || f.frameType === 'credits',
 ).length;
 
 function frameDescription(index) {
