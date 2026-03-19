@@ -11,7 +11,9 @@ function createHowl(options) {
     ...options,
     onloaderror: (_id, err) => {
       if (userHandler) userHandler(_id, err);
-      howl.unload();
+      // Defer unload so Howler finishes processing the error event
+      // before we release the HTML5 Audio element back to the pool.
+      queueMicrotask(() => howl.unload());
     },
   });
   return howl;
