@@ -93,10 +93,21 @@ DPR-aware. Respects `prefers-reduced-motion` — render loop self-stops when red
 ### audio.js
 
 ```
+// Scheduling API (ADR-005 session model)
+scheduleNarration(src, delay, onend, maxDurationMs) → delayed playback + safety timeout
+scheduleAmbient(src, volume, durationMs, loop)      → crossfade with error recovery
+scheduleMusic(config)                               → internal enter/exit timer chain
+pauseAll()                                          → freeze all audio + pending timers
+resumeAll()                                         → resume from saved state
+cancelAll()                                         → increment session, clear all, stop audio
+
+// Low-level playback (used internally by scheduling API)
 playAmbient(src, volume, loop)           → start ambient track
 crossfadeAmbient(newSrc, volume, ms, loop) → fade out old, fade in new
 playNarration(src, onend)                → play narration with end callback
 cueNarration(src)                        → load + seek to 0, do NOT play (for hardCut)
+cueAmbient(src, volume, loop)            → load, do NOT play
+cueMusic(src, volume)                    → load, do NOT play
 stopNarration()                          → stop + unload current narration
 pauseNarration() / resumeNarration()
 pauseAmbient() / resumeAmbient()
@@ -112,6 +123,14 @@ clearNarrationCache()                    → unload ahead-of-time cache
 ```
 
 All Howl instances use `html5: true` for streaming. Narration uses `preloadNarrationAhead` for one-scene-ahead buffering. Ambient and music create new Howl instances per scene (old instances unloaded after crossfade).
+
+**Session model (ADR-005):** Internal `sessionId` counter. `cancelAll()` increments it. All scheduled callbacks capture sessionId at creation and check before executing, preventing stale playback after scene transitions.
+
+**Narration safety timeout:** `scheduleNarration` sets a safety timer at `maxDurationMs + 5000ms`. If no `end`/`loaderror`/`playerror` fires, force-stops narration and calls `onend`. `safeEnd` deduplicates — callback fires at most once. Duration authority is a 4-tier fallback chain: metadata → frame captions → project-wide max → 60s floor. Safety is never skipped.
+
+**Crossfade error recovery:** `scheduleAmbient` tracks old ambient during crossfade. On new ambient load/play error: cancels old fade-out, restores old ambient volume, guards ownership to prevent overwriting a third ambient.
+
+**Music timer chain:** `scheduleMusic` owns enter delay and exit fade timers internally via `PausableTimer`. `pauseAll()`/`resumeAll()` handle them atomically — no orphaning possible.
 
 **Buffer recovery:** `monitorNarrationBuffer()` attaches `waiting`/`playing` event listeners to the underlying HTML5 audio node. On stall: tracks buffered ranges, attempts nudge-seek after 2 checks, full reload after 4 checks, gives up after 3 recovery attempts. Visual indicator via `.scene-stage.buffering` CSS class.
 
@@ -169,13 +188,13 @@ Progress dots map to scene indices (excludes title frame). Each dot is a `<butto
 ### loader.js
 
 ```
-preloadAudio(src)                    → Promise<src|null>, metadata-only, 5s timeout
+preloadAudio(src)                    → Promise<{src, duration}>, metadata-only, 5s timeout
 audioSrcsFromEntry(frame)            → extract all audio srcs from frame config
 preloadFirstFrameAudio(frames, onLoaded) → preload frame 0 audio immediately
 preloadBackgroundAudio(frames, onLoaded) → sequential by scene, skips first frame
 ```
 
-Uses native `Audio()` elements with `preload: 'metadata'` — lightweight, no Howler overhead. Timeout prevents stalled loads from blocking the pipeline.
+Uses native `Audio()` elements with `preload: 'metadata'` — lightweight, no Howler overhead. Returns `{ src, duration }` where duration is from `audio.duration` after `loadedmetadata` (used as Tier 1 in narration safety timeout fallback chain). Timeout prevents stalled loads from blocking the pipeline.
 
 ---
 
@@ -339,12 +358,12 @@ const app = {
   captionEntries: [],        // active caption DOM entries
   imageCache: new Map(),     // src → Image
   availableAudio: new Set(), // preloaded audio srcs
+  audioDurations: new Map(), // src → duration in seconds (from loader.js metadata preload)
+  projectMaxCaptionMs: 0,    // max caption end time across all frames (computed at startup)
 
-  // Timers — each has start/delay/remaining triple for pause precision
-  autoAdvanceTimer, autoAdvanceTimerStart, autoAdvanceTimerDelay, autoAdvanceTimerRemaining,
-  narrationTimer, narrationTimerStart, narrationTimerDelay, narrationTimerRemaining,
-  musicTimer, musicTimerStart, musicTimerDelay, musicTimerRemaining,
-  musicExitTimer, musicExitTimerStart, musicExitTimerDelay, musicExitTimerRemaining,
+  // Timer — PausableTimer instance (auto-advance is a state machine concern, stays in app.js)
+  // All audio timers (narration delay, music enter/exit) are internal to audio.js (ADR-005)
+  autoAdvanceTimer: null,    // PausableTimer | null
 };
 ```
 
@@ -465,13 +484,28 @@ else:
 
 **doPause():**
 - Set `paused = true`, `pausedFromState = current state`, `state = PAUSED`
-- Pause narration, ambient, music, text timeline, effects canvas
-- Save remaining time for all active timers (auto-advance, narration delay, music, music exit)
+- `pauseAll()` — freezes all audio + internal timers (narration delay, music enter/exit, old ambient crossfade)
+- Pause text timeline, effects canvas
+- `autoAdvanceTimer?.pause()` — saves remaining auto-advance time
 
 **doResume():**
 - Restore `pausedFromState`, clear pause
-- Resume narration, ambient, music, text timeline, effects canvas
-- Reschedule all timers with saved remaining durations
+
+```
+if replayPending:
+  replayPending = false
+  scheduleNarrationAudio(frame.narration)   // fresh onend for auto-advance
+  resumeAmbient()                           // resume — not resumeAll (narration is fresh)
+  resumeMusic()
+  textTimeline.play(0)                      // restart from beginning
+  setupAutoAdvance()
+else:
+  resumeAll()                               // resume all audio + internal timers
+  textTimeline.resume()
+```
+
+- Resume effects canvas
+- `autoAdvanceTimer?.resume()` — reschedule with saved remaining
 - If first interaction: hide play-gate, trigger `handleFirstPlay()`
 
 ### 5.8 replayNarration() — ADR-004
@@ -775,8 +809,20 @@ First interaction (play gate)       │ doResume → handleFirstPlay: trigger na
                                     │ + text + auto-advance for frame 0.
 Rapid navigation                    │ generation counter guards stale onend callbacks.
                                     │ pendingNavIndex queues during transition.
+                                    │ Session counter (ADR-005) guards stale audio
+                                    │ scheduling callbacks.
 Transition error                    │ Revert currentIndex + state to previous frame.
                                     │ Force stage opacity back to 1.
+Narration safety timeout            │ If Howler end/error never fires within
+                                    │ maxDurationMs + 5s, force-stop narration
+                                    │ and call onend. Prevents scene hang. (ADR-005)
+Crossfade ambient failure           │ scheduleAmbient: on new ambient load/play error,
+                                    │ cancel old fade-out, restore old ambient volume.
+                                    │ Ownership guard prevents overwrite. (ADR-005)
+Music timer orphaning               │ Eliminated. scheduleMusic owns enter/exit timers
+                                    │ internally. pauseAll/resumeAll handle atomically.
+Pause during ambient crossfade      │ Old ambient paused mid-fade. On resume, snapped
+                                    │ to target volume (0) and unloaded. (ADR-005)
 ```
 
 ---
@@ -842,7 +888,8 @@ STATE:
   ✓ generation counter incremented on every navigation
   ✓ generation guards all async callbacks (onend, timers)
   ✓ pausedFromState preserves resume target
-  ✓ all timers tracked with start/delay/remaining triples
+  ✓ autoAdvanceTimer is a PausableTimer — pause/resume/cancel built in
+  ✓ audio timers internal to audio.js — app.js calls pauseAll/resumeAll/cancelAll
   ✓ togglePause() queues as pendingPause during TRANSITIONING
   ✓ navigation queues as pendingNavIndex during TRANSITIONING
 
@@ -853,6 +900,11 @@ AUDIO:
   ✓ mute via howl.mute(), not volume — 'end' events still fire
   ✓ load/play errors call onend to maintain auto-advance chain
   ✓ buffer stall recovery: nudge → reload → give up
+  ✓ audio.js owns all audio timer lifecycle (ADR-005)
+  ✓ session counter prevents stale audio scheduling callbacks
+  ✓ narration safety timeout always set (4-tier duration fallback, never skipped)
+  ✓ crossfade error recovery: restore old ambient on new failure
+  ✓ play gate is hard no-play boundary — no audio before dismissal
 
 NEVER:
   ✗ hardcoded frame indices in if/else
@@ -866,6 +918,7 @@ NEVER:
   ✗ temporarily un-pausing for transitions
   ✗ auto-advancing during pause
   ✗ losing pause state across navigation
+  ✗ audio timers in app.js (audio.js owns scheduling — ADR-005)
   ✗ advanceTimers without clearing previous
   ✗ killing mid-flight GSAP timelines on pause (pause them)
   ✗ orphaned timers after navigate (cleanupCurrentScene clears all)

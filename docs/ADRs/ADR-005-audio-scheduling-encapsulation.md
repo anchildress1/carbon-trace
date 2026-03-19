@@ -1,6 +1,6 @@
 # ADR-005: Audio Scheduling Encapsulation and Failure Safety
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** March 18, 2026
 **Deciders:** Ashley Childress (@anchildress1)
 **Resolves:** Timer bloat in app.js, state desync on audio errors
@@ -536,10 +536,10 @@ The following issues were flagged during review and verified against the codebas
 
 1. [x] **[P0]** ~~Implement ADR-004 replay-while-paused (Option B)~~ — resolved in `docs/adr-004-option-b-alignment`
 2. [x] **[P1]** ~~Remove stage click advance handler~~ — resolved in `docs/adr-004-option-b-alignment`
-3. [ ] **[P1]** Update repo v5 spec `doResume()` section to include `replayPending` branching pseudocode
-4. [ ] Implement `PausableTimer` utility in `src/pausable-timer.js` (unit tested)
-5. [ ] Refactor `audio.js` with session model + scheduling API + safety timeout + crossfade recovery
-6. [ ] Refactor `app.js`: remove 12 timer state fields, replace audio paths with high-level calls
-7. [ ] Expose duration from `loader.js` `preloadAudio()` for metadata-based timing authority
-8. [ ] Update tests: scheduling + session + safety + crossfade tests
-9. [ ] Update v5 spec §3, §5.2, §5.7, §14, §17 to reflect new architecture
+3. [x] **[P1]** ~~Update repo v5 spec `doResume()` section to include `replayPending` branching pseudocode~~
+4. [x] ~~Implement `PausableTimer` utility in `src/pausable-timer.js` (unit tested)~~
+5. [x] ~~Refactor `audio.js` with session model + scheduling API + safety timeout + crossfade recovery~~
+6. [x] ~~Refactor `app.js`: remove 12 timer state fields, replace audio paths with high-level calls~~
+7. [x] ~~Expose duration from `loader.js` `preloadAudio()` for metadata-based timing authority~~
+8. [x] ~~Update tests: scheduling + session + safety + crossfade tests~~
+9. [x] ~~Update v5 spec §3, §5.2, §5.7, §14, §17 to reflect new architecture~~
