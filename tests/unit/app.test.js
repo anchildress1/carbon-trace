@@ -171,8 +171,13 @@ vi.mock('../../src/scenes.json', () => ({
         frameType: 'title',
         holdUntilClick: true,
         holdAfterNarration: null,
-        narration: null,
-        audioCues: null,
+        narration: {
+          lines: [{ text: 'Opening line', enter: 0, exit: 3000 }],
+          captions: [{ text: 'Opening line', start: 0, end: 3000 }],
+        },
+        audioCues: [
+          { id: 'narration', type: 'narration', src: 'title-narration.m4a', enter: 0, volume: 1.0, loop: false, fadeIn: 0, fadeOut: 0 },
+        ],
         effects: { idle: null, entry: null },
         transition: { type: 'fade', duration: 400 },
         traceOverlay: null,
@@ -628,6 +633,16 @@ describe('app.js', () => {
       expect(app.getState()).toBe('SCENE_ACTIVE');
       expect(gate.hidden).toBe(true);
     });
+
+    it('enables replay button on first play when frame has narration', () => {
+      const btn = document.getElementById('btn-replay');
+      // Before first play, replay is disabled (userHasInteracted was false)
+      expect(btn.disabled).toBe(true);
+
+      // Click play gate — handleFirstPlay should re-enable replay
+      document.getElementById('play-gate').click();
+      expect(btn.disabled).toBe(false);
+    });
   });
 
   // ── cleanup ────────────────────────────────────────────────────────
@@ -761,6 +776,10 @@ describe('app.js', () => {
 
     it('clears aria-live region on frame with no narration', async () => {
       app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause();
+      app.advance(); // to scene-01
+      app.advance(); // to scene-02 (narration: { lines: null, captions: null })
       await vi.runAllTimersAsync();
 
       const region = document.getElementById('accessible-narration');

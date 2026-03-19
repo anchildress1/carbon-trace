@@ -594,6 +594,13 @@ function updateNavButtons(app) {
 
 function handleFirstPlay(app) {
   const frame = app.frames[app.currentIndex];
+  const narrationCue = getNarrationCueFromFrame(frame);
+  const hasLines = Array.isArray(frame.narration?.lines) && frame.narration.lines.length > 0;
+
+  // showFrame disabled the replay button because userHasInteracted was false
+  // at that time. Now that the user has interacted, re-enable it.
+  app.els.btnReplay.disabled = !(hasLines || narrationCue);
+
   scheduleFrameAudio(app, frame);
   if (app.textTimeline) {
     app.textTimeline.play(0);
