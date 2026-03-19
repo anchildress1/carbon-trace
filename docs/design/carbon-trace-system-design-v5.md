@@ -32,12 +32,13 @@ carbon-trace/
 │   ├── app.js                  # State machine, orchestrator
 │   ├── canvas.js               # Scene image drawing, cover-fit, resize
 │   ├── effects-canvas.js       # Effects overlay canvas, render loop
-│   ├── audio.js                # Howler — narration, ambient, music, buffer recovery
+│   ├── audio.js                # Howler — narration, ambient, buffer recovery
 │   ├── text.js                 # Ghost-drift text + caption entries — GSAP timelines
 │   ├── captions.js             # Timed captions, localStorage persistence
 │   ├── effects.js              # Effect registry — no-op skeleton (v2)
 │   ├── overlay.js              # DOM controls — progress dots, buttons
-│   └── loader.js               # Audio metadata preloading (sequential by scene)
+│   ├── loader.js               # Audio metadata preloading (sequential by scene)
+│   └── pausable-timer.js      # Pausable/cancelable timer utility
 ├── public/
 │   └── assets/
 │       ├── images/             # 12 WebP scenes (16:9, 1536×824)
@@ -55,7 +56,9 @@ carbon-trace/
 
 ```
 app.js → canvas, effects-canvas, effects, audio, text,
-         captions, overlay, loader, scenes.json
+         captions, overlay, loader, pausable-timer, scenes.json
+
+audio.js → pausable-timer
 
 All leaf modules → nothing (no cross-imports, no cycles)
 app.js is the ONLY module that knows frame ordering.
@@ -93,31 +96,47 @@ DPR-aware. Respects `prefers-reduced-motion` — render loop self-stops when red
 ### audio.js
 
 ```
-playAmbient(src, volume, loop)           → start ambient track
-crossfadeAmbient(newSrc, volume, ms, loop) → fade out old, fade in new
-playNarration(src, onend)                → play narration with end callback
-cueNarration(src)                        → load + seek to 0, do NOT play (for hardCut)
-stopNarration()                          → stop + unload current narration
-pauseNarration() / resumeNarration()
-pauseAmbient() / resumeAmbient()
-playMusic(src, volume)                   → start music track
-fadeMusic(toVolume, durationMs)          → volume transition
-pauseMusic() / resumeMusic()
-stopMusic()                              → stop + unload
-stopAll()                                → unload everything
-setMuted(bool)                           → global mute (affects volume, not playback)
-onNarrationBufferChange(callback)        → register buffer state listener
-preloadNarrationAhead(src)               → pre-create Howl for next scene
-clearNarrationCache()                    → unload ahead-of-time cache
+// Unified scheduling API (ADR-005)
+scheduleAudioCues(cues, opts)    → schedule all cues for a frame
+  opts.onNarrationEnd            → callback for auto-advance chain
+  opts.maxNarrationDurationMs    → safety timeout (caption-derived)
+  opts.crossfadeDurationMs       → ambient crossfade duration (default 800)
+  opts.audioDurations            → metadata durations map for generic anchor resolution
+cancelAudioCues()                → stop all Howls, cancel all timers, clear map
+pauseAudioCues()                 → pause all active Howls + freeze all pending timers
+resumeAudioCues()                → resume all paused Howls + reschedule all frozen timers
+
+// Cueing (targeted reset / preload flows)
+cueAudioCues(cues)               → load all, seek to 0, do NOT play
+cancelCue(cueId)                 → stop + cancel one specific cue (for replay reset)
+reCueCue(cueId, cue)             → cancel + re-cue a single cue without touching others
+
+// Query
+getNarrationCue()                → returns active narration Howl (for replay)
+
+// Global
+setMuted(bool)                   → global mute (affects volume, not playback)
+onNarrationBufferChange(callback) → register buffer state listener
+isNarrationBuffering()           → returns current buffer stall state
+preloadNarrationAhead(src)        → pre-create Howl for next scene
+clearNarrationCache()             → unload ahead-of-time cache
 ```
 
-All Howl instances use `html5: true` for streaming. Narration uses `preloadNarrationAhead` for one-scene-ahead buffering. Ambient and music create new Howl instances per scene (old instances unloaded after crossfade).
+Internal state uses `activeCues = new Map<cueId, { howl, timer, type, state }>`. No hardcoded timer variables — each cue gets its own `PausableTimer` entry. All Howl instances use `html5: true` for streaming.
 
-**Buffer recovery:** `monitorNarrationBuffer()` attaches `waiting`/`playing` event listeners to the underlying HTML5 audio node. On stall: tracks buffered ranges, attempts nudge-seek after 2 checks, full reload after 4 checks, gives up after 3 recovery attempts. Visual indicator via `.scene-stage.buffering` CSS class.
+**Anchor resolution:** `resolveAnchors(cues, opts)` computes `resolvedEnter` for each cue. Numeric enters pass through. Anchor objects (`{ ref, offset }`) resolve to `refEnter + refDuration + offset`. Duration lookup prefers `opts.audioDurations` metadata and falls back to `opts.maxNarrationDurationMs` for narration when metadata is missing. Unknown refs fall back to `enter: 0`.
 
-**Mute:** Affects `howl.mute()`, not `howl.volume()`. `'end'` events still fire when muted. Auto-advance works while muted.
+**Narration safety timeout:** `wireNarrationEnd` sets a safety timer at `enterDelay + maxDurationMs + 5000ms`. If no `end`/`loaderror`/`playerror` fires, force-stops narration and calls `safeEnd`. Safety timer is a `PausableTimer` — pauses with the experience. Deduplicates — callback fires at most once. Duration authority: metadata → frame captions → project-wide max → 60s floor.
 
-**Audio failure graceful degradation:** Both `onloaderror` and `onplayerror` call the `onend` callback, which triggers the auto-advance chain. If narration fails to load/play, the scene still advances.
+**Crossfade error recovery:** `crossfadeAmbientCue` defers old ambient unload until new ambient confirms playback (`play` event). On load/play error: restores old ambient to its *original* volume, not the new target. No blind `setTimeout` unload.
+
+**Buffer exhaustion bridge:** `monitorNarrationBuffer` reports buffer exhaustion directly to `wireNarrationEnd` via `onExhaustion` callback, which triggers `safeEnd` immediately. No gap between buffer giving up and scene advancing.
+
+**Buffer recovery:** Attaches `waiting`/`playing` event listeners to the underlying HTML5 audio node. On stall: tracks buffered ranges, attempts nudge-seek after 2 checks, full reload after 4 checks, gives up after 3 recovery attempts. Visual indicator via `.scene-stage.buffering` CSS class.
+
+**Mute:** Iterates `activeCues` and calls `howl.mute()`. `'end'` events still fire when muted. Auto-advance works while muted.
+
+**Audio failure graceful degradation:** Both `onloaderror` and `onplayerror` call `safeEnd`, which triggers the auto-advance chain. If narration fails to load/play, the scene still advances.
 
 ### text.js
 
@@ -154,7 +173,7 @@ runEffect(name, effectsCanvas, sceneCanvas) → execute or warn + no-op
 clearEffects()                    → no-op until implementations exist
 ```
 
-Effect registry is `const effects = {}`. All scene references (dust-drift, heat-pulse, etc.) no-op with console warning until implementations are registered. `validateEffects()` in app.js logs all missing effects at startup.
+Effect registry is `const effects = {}`. All scene references (dust-drift, heat-pulse, etc.) no-op with console warning until implementations are registered.
 
 ### overlay.js
 
@@ -164,18 +183,18 @@ updateProgress(sceneIndex)           → update active dot
 showControls()                       → unhide overlay
 ```
 
-Progress dots map to scene indices (excludes title frame). Each dot is a `<button>` with `aria-label`, `aria-current="step"` on active.
+Progress dots map to scene indices (includes all frame types: title, scene, credits). Each dot is a `<button>` with `aria-label`, `aria-current="step"` on active.
 
 ### loader.js
 
 ```
-preloadAudio(src)                    → Promise<src|null>, metadata-only, 5s timeout
+preloadAudio(src)                    → Promise<{src, duration}>, metadata-only, 5s timeout
 audioSrcsFromEntry(frame)            → extract all audio srcs from frame config
 preloadFirstFrameAudio(frames, onLoaded) → preload frame 0 audio immediately
 preloadBackgroundAudio(frames, onLoaded) → sequential by scene, skips first frame
 ```
 
-Uses native `Audio()` elements with `preload: 'metadata'` — lightweight, no Howler overhead. Timeout prevents stalled loads from blocking the pipeline.
+Uses native `Audio()` elements with `preload: 'metadata'` — lightweight, no Howler overhead. Returns `{ src, duration }` where duration is from `audio.duration` after `loadedmetadata` (used as Tier 1 in narration safety timeout fallback chain). Timeout prevents stalled loads from blocking the pipeline.
 
 ---
 
@@ -201,7 +220,6 @@ Every frame has identical shape via `meta.frameDefaults` merge. `null` = skip fe
     {
       "id": "scene-01-seam",
       "frameType": "scene",
-      "holdUntilClick": false,
       "holdAfterNarration": 2000,
       "description": "Coal seam wall, lamp upper left — carbon buried under pressure",
       "image": "assets/images/scene-01-seam.webp",
@@ -211,16 +229,11 @@ Every frame has identical shape via `meta.frameDefaults` merge. `null` = skip fe
         ],
         "captions": [
           { "text": "...", "start": 0, "end": 5000 }
-        ],
-        "audio": "assets/audio/narration/01-seam.m4a",
-        "delay": 500
+        ]
       },
-      "ambient": {
-        "src": "assets/audio/ambient/scene-01-seam.mp3",
-        "volume": 0.15,
-        "loop": true
-      },
-      "music": null,
+      "audioCues": [
+        { "id": "narration", "type": "narration", "src": "assets/audio/narration/01-seam.m4a", "enter": 500, "volume": 1.0, "loop": false, "fadeIn": 0, "fadeOut": null }
+      ],
       "effects": { "idle": "dust-drift", "entry": "fade-in" },
       "transition": { "type": "fade", "duration": 1200 },
       "traceOverlay": { "opacity": 0.05 }
@@ -236,69 +249,68 @@ FIELD    │ TYPE            │ DESCRIPTION
 ─────────┼─────────────────┼──────────────────────────────────────
 lines    │ array           │ Ghost-drift text lines with enter/exit/x/y/align
 captions │ array           │ Timed caption entries with text/start/end (ms)
-audio    │ string | null   │ Narration audio asset path. null = no narration audio
-delay    │ number          │ ms delay before narration audio starts
 ```
 
-`narration: null` = no narration at all (no text, no audio, no captions).
+`narration: null` = no narration at all (no text, no captions).
 
-`narration.audio: null` = text + captions but no audio (Scene 8: silence with ghost-drift text).
+`narration` with `lines`/`captions` but no narration cue in `audioCues` = text + captions but no audio (Scene 8: silence with ghost-drift text).
 
-### 4.3 ambient Object
+### 4.3 audioCues Array (ADR-003/ADR-005)
 
-```
-FIELD    │ TYPE            │ DESCRIPTION
-─────────┼─────────────────┼──────────────────────────────────────
-src      │ string          │ Ambient audio asset path
-volume   │ number          │ Target volume (0.0–1.0)
-loop     │ boolean         │ Loop playback (default true)
-```
-
-`ambient: null` = no ambient audio for this frame.
-
-First frame uses `playAmbient()` (direct start). All subsequent frames use `crossfadeAmbient()` (fade out old, fade in new over 800ms).
-
-### 4.4 music Object (Scene 11 only)
+Replaces the former `ambient`, `music`, and `narration.audio`/`narration.delay` slots.
 
 ```
-FIELD        │ TYPE            │ DESCRIPTION
-─────────────┼─────────────────┼──────────────────────────────────────
-src          │ string          │ Music audio asset path
-enter        │ number          │ ms after scene entry to begin playback
-exit         │ number | null   │ ms after scene entry to begin fade-out. null = no auto-fade.
-startVolume  │ number          │ Initial volume for fade-in start
-fullVolume   │ number          │ Target volume after crescendo
-crescendoMs  │ number          │ Duration of volume ramp from startVolume to fullVolume
+FIELD    │ TYPE                │ DESCRIPTION
+─────────┼─────────────────────┼──────────────────────────────────────
+id       │ string              │ Unique identifier within the frame (referenced by anchoring)
+type     │ string              │ "narration" | "ambient" | "sfx"
+src      │ string              │ Audio asset path
+enter    │ number | object     │ ms after scene entry, OR anchor { ref, offset }
+volume   │ number              │ Target volume (0.0–1.0)
+loop     │ boolean             │ Loop playback
+fadeIn   │ number              │ ms fade-in duration from 0 to target volume
+fadeOut  │ number | null       │ ms fade-out at end. null = no auto-fade.
 ```
 
-Music is a separate audio channel from ambient and narration. Pause/resume/timer-remaining all tracked independently.
+`audioCues: null` = no audio for this frame.
 
-### 4.5 holdUntilClick Map
+**Anchor objects:** `{ ref: "narration", offset: -5000 }` resolves to `refEnter + refDuration + offset`. Resolution prefers `audioDurations` metadata and falls back to `maxNarrationDurationMs` for narration when metadata is missing.
+
+**Type behavior:**
+- `narration`: fires `end` event for auto-advance. One per frame max. Replay targets this.
+- `ambient`: crossfades on scene transition via `crossfadeAmbientCue`. Can overlap with narration.
+- `sfx`: one-shot, no crossfade, no replay.
+
+### 4.5 holdAfterNarration Map
 
 ```
-FRAME                │ holdUntilClick │ holdAfterNarration
-─────────────────────┼────────────────┼────────────────────
-00 Title             │ true           │ null
-01 Seam              │ false          │ 2000
-02 Travel            │ false          │ 2000
-03 Reach             │ false          │ 3000
-04 Pocket            │ false          │ 2000
-05 Rinse             │ false          │ 2500
-06 Storage           │ false          │ 2000
-07 Empty             │ false          │ 2000
-08 Stillness         │ true           │ null
-09 Return            │ false          │ 2000
-10 Building          │ false          │ 3000
-11 Music             │ null           │ null
+FRAME                │ holdAfterNarration
+─────────────────────┼────────────────────
+00 Title             │ null (default 2000)
+01 Seam              │ 2000
+02 Travel            │ 2000
+03 Reach             │ 3000
+04 Pocket            │ 2000
+05 Rinse             │ 2500
+06 Storage           │ 2000
+07 Empty             │ 2000
+08 Stillness         │ 8000
+09 Return            │ 2000
+10 Building          │ 3000
+11 Music (credits)   │ n/a (last frame, no advance)
 ```
+
+All frames auto-advance after narration + holdAfterNarration. The credits frame
+is the last frame, so `shouldAutoAdvance` returns false and `advance()` is blocked
+by the CREDITS state.
 
 ### 4.6 Audio Hierarchy
 
 ```
 1. Narration (loudest, volume: 1.0)
-2. Emotional silence (narration.audio: null, ambient: null)
+2. Emotional silence (audioCues: null, no audio cues)
 3. Ambient texture (volume: 0.08–0.20, loop: true)
-4. End song (music channel, crescendo to 0.25)
+4. End song (type: "ambient", anchor-based entry, crescendo to 0.25 over 45s)
 ```
 
 ---
@@ -330,7 +342,7 @@ const app = {
   pausedFromState: null,     // state to restore on resume
   userHasInteracted: false,  // play-gate flag
   generation: 0,             // incremented on every navigation — guards stale callbacks
-  cueOnly: false,            // true during hardCut — audio cued, not played
+  deferFrameAudioUntilResume: false, // true after paused hardJump — next resume schedules frame audio fresh
   replayPending: false,      // replay happened while paused — doResume schedules fresh narration
   pendingPause: false,       // pause queued during transition
   pendingNavIndex: null,     // navigation queued during transition
@@ -339,12 +351,13 @@ const app = {
   captionEntries: [],        // active caption DOM entries
   imageCache: new Map(),     // src → Image
   availableAudio: new Set(), // preloaded audio srcs
+  audioDurations: new Map(), // src → duration in seconds (from loader.js metadata preload)
+  projectMaxCaptionMs: 0,    // max caption end time across all frames (computed at startup)
 
-  // Timers — each has start/delay/remaining triple for pause precision
-  autoAdvanceTimer, autoAdvanceTimerStart, autoAdvanceTimerDelay, autoAdvanceTimerRemaining,
-  narrationTimer, narrationTimerStart, narrationTimerDelay, narrationTimerRemaining,
-  musicTimer, musicTimerStart, musicTimerDelay, musicTimerRemaining,
-  musicExitTimer, musicExitTimerStart, musicExitTimerDelay, musicExitTimerRemaining,
+  // Timer — PausableTimer instance (auto-advance is a state machine concern, stays in app.js)
+  // All audio timers (narration delay, music enter/exit) are internal to audio.js (ADR-005)
+  autoAdvanceTimer: null,    // PausableTimer | null
+  els: { /* DOM element references — see createApp() */ },
 };
 ```
 
@@ -364,7 +377,7 @@ transition(toIndex):
   cleanupCurrentScene()           // clear all timers, kill timelines, stop audio
 
   if wasPaused:
-    hardJump(toIndex)             // instant — drawImage, cueOnly, re-pause
+    hardJump(toIndex)             // instant — drawImage, defer frame audio, re-pause
   else if prefersReducedMotion:
     instantSwap(toIndex)          // no animation, immediate showFrame + land
   else:
@@ -394,16 +407,17 @@ Transition uses GSAP opacity fade on the `#scene-stage` container — NOT offscr
 ### 5.4 hardJump(toIndex) — paused
 
 ```
+if toImg not cached:
+  waitForImage(toImg)           → debounced spinner, resolve on load/fail
 drawImage(toImg)                → instant, no crossfade
-set cueOnly = true
-showFrame(toIndex)              → renders image, builds text/captions, cues audio (not playing)
-set cueOnly = false
+set deferFrameAudioUntilResume = true
+showFrame(toIndex)              → renders image, builds text/captions, skips audio scheduling
 doPause()                       → freeze everything
 ```
 
-No lock. No timer. No animation. Scene lands paused and frozen.
+No lock. No timer. No animation. Scene lands paused and frozen. On resume, audio enters through the normal `scheduleFrameAudio()` path so delayed and anchored cues keep one authoritative timing model.
 
-### 5.5 scheduleAutoAdvance
+### 5.5 setupAutoAdvance
 
 ```js
 function setupAutoAdvance(app) {
@@ -414,15 +428,15 @@ function setupAutoAdvance(app) {
   const holdAfterNarration = frame.holdAfterNarration
     ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
 
-  if (!frame.narration?.audio) {
+  const hasNarrationAudio = frame.audioCues?.some(c => c.type === 'narration');
+  if (!hasNarrationAudio) {
     // No narration audio — schedule immediately on landing
     scheduleAutoAdvance(app, holdAfterNarration);
   }
-  // With narration audio — Howler 'end' callback triggers scheduleAutoAdvance
+  // With narration audio — onNarrationEnd callback triggers scheduleAutoAdvance
 }
 
-function shouldAutoAdvance(app, frame) {
-  if (frame.holdUntilClick === true || frame.holdUntilClick === null) return false;
+function shouldAutoAdvance(app) {
   if (app.currentIndex >= app.frames.length - 1) return false;
   return true;
 }
@@ -465,14 +479,38 @@ else:
 
 **doPause():**
 - Set `paused = true`, `pausedFromState = current state`, `state = PAUSED`
-- Pause narration, ambient, music, text timeline, effects canvas
-- Save remaining time for all active timers (auto-advance, narration delay, music, music exit)
+- `pauseAudioCues()` — freezes all audio + pending timers in activeCues Map
+- Pause text timeline, effects canvas
+- `autoAdvanceTimer?.pause()` — saves remaining auto-advance time
 
 **doResume():**
 - Restore `pausedFromState`, clear pause
-- Resume narration, ambient, music, text timeline, effects canvas
-- Reschedule all timers with saved remaining durations
-- If first interaction: hide play-gate, trigger `handleFirstPlay()`
+
+```
+if replayPending:
+  replayPending = false
+  if deferFrameAudioUntilResume:
+    deferFrameAudioUntilResume = false
+    cancelAudioCues()
+    scheduleFrameAudio(app, currentFrame)    // full frame fresh after paused hardJump
+  else:
+    cancelCue('narration')
+    resumeAudioCues()                        // resume remaining cues (ambient, etc.)
+    scheduleAudioCues([narrationCue], { onNarrationEnd, maxNarrationDurationMs, audioDurations })
+  textTimeline.play(0)                       // restart from beginning
+  setupAutoAdvance()
+else:
+  if deferFrameAudioUntilResume:
+    deferFrameAudioUntilResume = false
+    scheduleFrameAudio(app, currentFrame)    // first real start after paused hardJump
+  else:
+    resumeAudioCues()                        // resume all audio + pending timers
+  textTimeline.resume()
+```
+
+- Resume effects canvas
+- `autoAdvanceTimer?.resume()` — reschedule with saved remaining
+- If first interaction: hide play-gate, `cancelAudioCues()`, then `handleFirstPlay()`.
 
 ### 5.8 replayNarration() — ADR-004
 
@@ -483,16 +521,11 @@ replayNarration(app):
   userHasInteracted = true
 
   if paused:
-    // Hard jump reset — same pattern as paused navigation
-    stopNarration()
-    clear narration timer
     clearAutoAdvance()
-
-    cueOnly = true
-    buildNarration(app, frame)      // cues audio (loaded, not playing), builds timeline
-    cueOnly = false
-
-    replayPending = true            // doResume will schedule fresh narration with onend
+    cancelCue('narration')
+    reCueCue('narration', narrationCue)
+    buildNarration(app, frame)      // rebuild text, stay paused at the start
+    replayPending = true            // doResume schedules fresh narration with onend
     if textTimeline: textTimeline.pause(0)   // reset to start, stay paused
 
     // Stay paused. No state change. User presses play to hear.
@@ -542,8 +575,7 @@ Auto-advance       │ (internal)           │ (internal)         │ advance(c
 - **Stage click/tap does NOT navigate** — reserved for visual effects (hover text, particle triggers). Mobile has no hover, so tap is the mobile equivalent for triggering scene interactions. Navigation is exclusively via buttons, dots, and keyboard.
 - TRANSITIONING: navigation queued as pendingNavIndex, pause queued as pendingPause
 - PAUSED: hardJump — no lock, rapid dot-clicking works
-- CREDITS: advance disabled (`holdUntilClick === null`)
-- holdUntilClick scenes: no auto-advance, forward button still navigates
+- CREDITS: advance disabled (last frame + CREDITS state)
 
 ---
 
@@ -589,7 +621,7 @@ ELEMENT          │ FUNCTION                        │ NOTES
 ─────────────────┼─────────────────────────────────┼────────────────────
 Back button      │ retreat()                       │ Disabled on frame 0
 Forward button   │ advance()                       │ Disabled on last frame / credits
-Progress dots    │ transition(frameIndex)          │ Dots = scenes only (excludes title)
+Progress dots    │ transition(frameIndex)          │ Dots = all frames (title, scenes, credits)
 Play/Pause btn   │ togglePause()                   │ Swaps icon, aria-pressed
 Replay button    │ replayNarration()               │ Disabled when no narration
 Mute button      │ toggleMute()                    │ Swaps icon, disabled until audio loads
@@ -621,7 +653,7 @@ line 3:  ░░░░░░░░░░░░░░░▓▓▓▓▓▓▓▓�
 - Exit: clear → blur(3px) + y:-10 (0.9s, power2.in)
 - Lines enter/exit independently, overlap allowed
 - If user navigates mid-drift: kill timeline, transition. Interrupt, not queue
-- Scene 8: text only, no audio — holdUntilClick waits for user
+- Scene 8: text only, no audio — auto-advances after holdAfterNarration (8000ms)
 - Reduced motion: simple opacity fade (0.3s), no spatial movement, no blur
 - `aria-live="polite"` region mirrors caption text for screen readers
 
@@ -743,8 +775,8 @@ connect-src 'none'; object-src 'none'; base-uri 'self'
 CASE                                │ BEHAVIOR
 ────────────────────────────────────┼──────────────────────────────
 Muted audio                         │ 'end' still fires. Auto-advance works.
-No narration audio (Scene 8)        │ holdAfterNarration used as scene duration.
-                                    │ (Scene 8 also has holdUntilClick: true.)
+No narration audio (Scene 8)        │ holdAfterNarration (8s) used as scene duration.
+                                    │ Auto-advances after the long hold.
 Skip mid-narration (playing)        │ cleanupCurrentScene: stop narration,
                                     │ crossfade ambient, clear all timers.
 Nav during transition (playing)     │ Queued as pendingNavIndex. Executes after
@@ -752,9 +784,9 @@ Nav during transition (playing)     │ Queued as pendingNavIndex. Executes afte
 Navigate while paused               │ hardJump. Lands paused. Play to start.
 Pause during transition             │ pendingPause. Transition finishes, then freezes.
 Pause during holdAfterNarration     │ Save remaining. Resume: reschedule.
-Scene 8 + paused                    │ No timer. Pause freezes text. Nav = hardJump.
-Scene 8 + playing                   │ No timer. Holds until click/tap/arrow.
-Credits (Scene 11)                  │ holdUntilClick: null. No advance. Music plays.
+Scene 8 + paused                    │ holdAfterNarration timer paused. Nav = hardJump.
+Scene 8 + playing                   │ Auto-advances after 8s hold.
+Credits (Scene 11)                  │ Last frame + CREDITS state. No advance. Music plays.
 Replay while playing                │ Restart narration + text. Clear timer.
                                     │ 'end' re-arms auto-advance. (ADR-004)
 Replay while paused                 │ Hard jump reset. Narration cued (loaded,
@@ -766,17 +798,29 @@ Audio load failure                  │ onloaderror/onplayerror call onend.
                                     │ Auto-advance chain continues.
 Narration buffer stall              │ .buffering CSS spinner. Text timeline pauses.
                                     │ Recovery: nudge-seek → reload → give up.
-Scene 11 music + narration          │ Music scheduled via enter delay (20000ms).
-                                    │ Crescendo from 0.01 to 0.25 over 45s.
-                                    │ Both play simultaneously. Terminal — no advance.
+Scene 11 music + narration          │ End song (type: ambient) scheduled via anchor
+                                    │ (ref: narration, offset: -5000). Crescendo from 0
+                                    │ to 0.25 over 45s. Both play simultaneously.
+                                    │ Terminal — no advance.
 Scene 11 skip (nav away)            │ cleanupCurrentScene stops music. Normal.
                                     │ Return = restart from top.
 First interaction (play gate)       │ doResume → handleFirstPlay: trigger narration
                                     │ + text + auto-advance for frame 0.
-Rapid navigation                    │ generation counter guards stale onend callbacks.
+Rapid navigation                    │ Generation counter guards stale onend callbacks.
                                     │ pendingNavIndex queues during transition.
 Transition error                    │ Revert currentIndex + state to previous frame.
                                     │ Force stage opacity back to 1.
+Narration safety timeout            │ If Howler end/error never fires within
+                                    │ maxDurationMs + 5s, force-stop narration
+                                    │ and call onend. Prevents scene hang. (ADR-005)
+Crossfade ambient failure           │ crossfadeAmbientCue: defers old unload until new
+                                    │ confirms play. On error, restores old ambient at
+                                    │ original volume. No blind setTimeout. (ADR-005)
+Timer orphaning                     │ Eliminated. activeCues Map with PausableTimer per
+                                    │ cue. pauseAudioCues/resumeAudioCues iterate map.
+Pause during ambient crossfade      │ Old ambient paused mid-fade via _crossfadePause
+                                    │ hook. Fade-out timer (PausableTimer) paused.
+                                    │ On resume: old ambient resumes fade. (ADR-005)
 ```
 
 ---
@@ -802,18 +846,18 @@ Progressive loading: first frame blocks, background assets load sequentially by 
 - All 12 frames with GSAP opacity fade transitions
 - Narration-driven auto-advance with play/pause (ADR-002)
 - Ghost-drift text (DOM overlay + GSAP) with positioned lines
-- Three-channel audio: narration, ambient, music (separate systems, not unified cues)
+- Unified audio cue system (ADR-005): narration, ambient, anchoring, crossfade
 - End song on Scene 11 with delayed entry and crescendo
 - Timed captions with localStorage persistence and mid-scene toggle
 - Play-gate for mobile audio context unlock
 - Progress dots + forward/back + keyboard navigation
-- Scene 8: holdUntilClick, ghost-drift text, no audio
+- Scene 8: holdAfterNarration (8s), ghost-drift text, no audio
 - Replay-while-paused: hard jump reset, stay paused (ADR-004)
 - Narration buffer stall detection and recovery
 - Accessibility: aria-live, reduced-motion, keyboard, WCAG 2.2.2, captions
 - Cloud Run deploy with CI/CD
 - Effects registry wired but no-op until implementations added
-- Ambient audio: architecture ready, data empty (next branch)
+- End song on Scene 11 using type: ambient with anchor-based entry and 45s crescendo
 
 ---
 
@@ -842,17 +886,23 @@ STATE:
   ✓ generation counter incremented on every navigation
   ✓ generation guards all async callbacks (onend, timers)
   ✓ pausedFromState preserves resume target
-  ✓ all timers tracked with start/delay/remaining triples
+  ✓ autoAdvanceTimer is a PausableTimer — pause/resume/cancel built in
+  ✓ audio timers internal to audio.js — app.js calls pauseAudioCues/resumeAudioCues/cancelAudioCues
   ✓ togglePause() queues as pendingPause during TRANSITIONING
   ✓ navigation queues as pendingNavIndex during TRANSITIONING
 
 AUDIO:
-  ✓ three channels: narration, ambient, music
+  ✓ unified activeCues Map — no hardcoded channels
   ✓ all Howls use html5: true (streaming)
   ✓ narration pre-buffered one scene ahead
   ✓ mute via howl.mute(), not volume — 'end' events still fire
   ✓ load/play errors call onend to maintain auto-advance chain
   ✓ buffer stall recovery: nudge → reload → give up
+  ✓ audio.js owns all audio timer lifecycle (ADR-005)
+  ✓ activeCues Map entry checks prevent stale audio callbacks
+  ✓ narration safety timeout always set (4-tier duration fallback, never skipped)
+  ✓ crossfade error recovery: restore old ambient on new failure
+  ✓ play gate is hard no-play boundary — no audio before dismissal
 
 NEVER:
   ✗ hardcoded frame indices in if/else
@@ -866,6 +916,7 @@ NEVER:
   ✗ temporarily un-pausing for transitions
   ✗ auto-advancing during pause
   ✗ losing pause state across navigation
+  ✗ audio timers in app.js (audio.js owns scheduling — ADR-005)
   ✗ advanceTimers without clearing previous
   ✗ killing mid-flight GSAP timelines on pause (pause them)
   ✗ orphaned timers after navigate (cleanupCurrentScene clears all)
@@ -879,5 +930,4 @@ PRE-SHIP CHECKLIST:
   □ Test connect-src: 'none' CSP with Howler html5 streaming
     across Safari, Chrome, Firefox
   □ Suppress or remove unimplemented effect warnings before submission
-  □ Ambient audio data in scenes.json (next branch)
 ```

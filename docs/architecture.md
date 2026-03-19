@@ -138,7 +138,6 @@ meta:
 
 frames[]:
   id, frameType ("title" | "scene" | "credits"), description, image
-  holdUntilClick: true (wait for click) | false (auto-advance) | null (no advance, credits)
   holdAfterNarration: ms after narration ends before auto-advance
   narration:
     lines[]: { text, enter (ms), exit (ms), x? (vw), y? (vh), align? ("left"|"center"|"right") }

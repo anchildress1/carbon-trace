@@ -17,24 +17,25 @@ export function preloadAudio(src) {
 
     const timeout = setTimeout(() => {
       console.warn(`Audio preload timed out: ${src}`);
-      resolve(null);
+      resolve({ src: null, duration: 0 });
     }, 5000);
 
     audio.onloadedmetadata = () => {
       clearTimeout(timeout);
-      resolve(src);
+      resolve({ src, duration: audio.duration || 0 });
     };
     audio.onerror = () => {
       clearTimeout(timeout);
       console.warn(`Failed to preload audio: ${src}`);
-      resolve(null);
+      resolve({ src: null, duration: 0 });
     };
     audio.src = src;
   });
 }
 
 export function audioSrcsFromEntry(entry) {
-  return [entry.ambient?.src, entry.narration?.audio, entry.music?.src].filter(Boolean);
+  if (!entry.audioCues) return [];
+  return entry.audioCues.map((c) => c.src).filter(Boolean);
 }
 
 export function preloadFirstFrameAudio(frames, onLoaded) {
@@ -42,7 +43,7 @@ export function preloadFirstFrameAudio(frames, onLoaded) {
   const srcs = audioSrcsFromEntry(frames[0]);
   for (const src of srcs) {
     preloadAudio(src)
-      .then((loaded) => onLoaded(loaded))
+      .then((result) => onLoaded(result))
       .catch((err) => console.warn('First frame audio preload failed:', err));
   }
 }
@@ -54,8 +55,8 @@ export async function preloadBackgroundAudio(frames, onLoaded) {
   for (const frame of frames.slice(1)) {
     for (const src of audioSrcsFromEntry(frame)) {
       if (!firstFrameSrcs.has(src)) {
-        const loaded = await preloadAudio(src);
-        onLoaded(loaded);
+        const result = await preloadAudio(src);
+        onLoaded(result);
       }
     }
   }

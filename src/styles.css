@@ -134,7 +134,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #0e0e0e;
+  background: radial-gradient(ellipse at 50% 40%, #1a1816, #12100e);
 }
 
 .scene-canvas {
@@ -392,10 +392,12 @@ body {
   cursor: default;
 }
 
-/* Caption layer */
+/* Caption layer — sits above scene content but below overlay controls.
+   bottom must clear the controls zone (~100px from bottom on small screens)
+   to prevent caption backgrounds from overlapping progress dots. */
 .caption-layer {
   position: absolute;
-  bottom: 12%;
+  bottom: max(12%, 110px);
   left: 50%;
   transform: translateX(-50%);
   max-width: 80%;

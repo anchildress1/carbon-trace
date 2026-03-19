@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const scenesData = JSON.parse(readFileSync(resolve(__dirname, '../../src/scenes.json'), 'utf8'));
 const SCENE_COUNT = scenesData.frames.filter(
-  (f) => f.frameType === 'scene' || f.frameType === 'credits',
+  (f) => f.frameType === 'title' || f.frameType === 'scene' || f.frameType === 'credits',
 ).length;
 
 function frameDescription(index) {
@@ -230,14 +230,17 @@ test.describe('carbon-trace narrative', () => {
 
     const firstDot = page.locator('.progress-dot').first();
     const secondDot = page.locator('.progress-dot').nth(1);
+    const thirdDot = page.locator('.progress-dot').nth(2);
 
-    // Title frame has no dot — no dots active initially
-    await expect(firstDot).not.toHaveClass(/active/);
-
-    // Advance to scene 01 — first dot becomes active
-    await page.click('#btn-next');
+    // Title frame is scene index 1 — first dot active initially
     await expect(firstDot).toHaveClass(/active/);
     await expect(secondDot).not.toHaveClass(/active/);
+
+    // Advance to scene 01 — first and second dots active
+    await page.click('#btn-next');
+    await expect(firstDot).toHaveClass(/active/);
+    await expect(secondDot).toHaveClass(/active/);
+    await expect(thirdDot).not.toHaveClass(/active/);
   });
 
   test('mute button aria-label toggles between mute and unmute', async ({ page }) => {

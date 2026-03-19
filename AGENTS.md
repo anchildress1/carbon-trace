@@ -14,6 +14,17 @@ Canonical instruction source for this repository. Treat this file as authoritati
 - Do not maintain backwards compatibility in this codebase for any reason.
 - Any test files introduced for local validation must be removed, not committed.
 
+### User approval for behavior decisions
+
+- Never unilaterally decide that a known limitation, degraded behavior, or
+  quality tradeoff is "acceptable." If a decision affects user experience or
+  technical excellence — even when replying to a PR review comment — you MUST
+  stop and ask the user before committing to a position.
+- This includes: deferring fixes as "post-launch," accepting degraded
+  audio/visual/interaction quality, choosing not to fix a real issue, or
+  characterizing a bug as a feature.
+- When in doubt, surface the tradeoff and let the user decide.
+
 ### Spec compliance
 
 - All implementation MUST follow `docs/design/carbon-trace-system-design-v5.md` and
@@ -68,17 +79,18 @@ Full system design: `docs/design/carbon-trace-system-design-v5.md` and `docs/ADR
 
 ### Module responsibilities
 
-| Module              | Job                                                             | Does NOT know about   |
-| ------------------- | --------------------------------------------------------------- | --------------------- |
-| `app.js`            | State machine, orchestrator                                     | Pixel rendering       |
-| `canvas.js`         | Canvas 2D — image drawing, cover-fit, resize                    | Frame ordering, audio |
-| `effects-canvas.js` | Canvas 2D effects overlay, render loop                          | Frame ordering, audio |
-| `effects.js`        | Effect registry, `runEffect`/`clearEffects` API                 | Canvas internals      |
-| `audio.js`          | Howler — ambient crossfade, narration, music, buffer monitoring | DOM, canvas           |
-| `text.js`           | Ghost-drift GSAP timelines from config                          | Audio, canvas         |
-| `captions.js`       | Timed captions, localStorage persistence                        | Audio, canvas         |
-| `overlay.js`        | DOM controls — dot bar, buttons, progress                       | Canvas, audio         |
-| `loader.js`         | Audio metadata preloading, frame-aware sequencing               | DOM, app state        |
+| Module              | Job                                                      | Does NOT know about   |
+| ------------------- | -------------------------------------------------------- | --------------------- |
+| `app.js`            | State machine, orchestrator                              | Pixel rendering       |
+| `canvas.js`         | Canvas 2D — image drawing, cover-fit, resize             | Frame ordering, audio |
+| `effects-canvas.js` | Canvas 2D effects overlay, render loop                   | Frame ordering, audio |
+| `effects.js`        | Effect registry, `runEffect`/`clearEffects` API          | Canvas internals      |
+| `audio.js`          | Howler — ambient crossfade, narration, buffer monitoring | DOM, canvas           |
+| `text.js`           | Ghost-drift GSAP timelines from config                   | Audio, canvas         |
+| `captions.js`       | Timed captions, localStorage persistence                 | Audio, canvas         |
+| `overlay.js`        | DOM controls — dot bar, buttons, progress                | Canvas, audio         |
+| `loader.js`         | Audio metadata preloading, frame-aware sequencing        | DOM, app state        |
+| `pausable-timer.js` | Pause-aware timer — used by audio.js and app.js          | Everything else       |
 
 ### Rules
 
@@ -104,7 +116,7 @@ Full system design: `docs/design/carbon-trace-system-design-v5.md` and `docs/ADR
 
 ## Performance / Lighthouse
 
-- **Targets**: 90%+ performance, 95%+ accessibility/best-practices, 90%+ SEO (enforced by `.lighthouserc.json`, desktop preset).
+- **Targets** (enforced in `.lighthouserc.json`): ≥90% performance, ≥95% accessibility, ≥95% best-practices, ≥90% SEO.
 - Images are WebP, 16:9, 2x resolution. Total asset budget <35MB.
 - Background preloading uses `Promise.all` to parallelize image and audio streams; within each stream, assets load sequentially. Audio metadata preloading uses native `Audio` elements; Howler handles actual playback.
 - Canvas render target: 60fps during effects (rAF loop).
