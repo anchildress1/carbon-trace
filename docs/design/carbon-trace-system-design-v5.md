@@ -93,50 +93,45 @@ DPR-aware. Respects `prefers-reduced-motion` — render loop self-stops when red
 ### audio.js
 
 ```
-// Scheduling API (ADR-005 session model)
-scheduleNarration(src, delay, onend, maxDurationMs) → delayed playback + safety timeout
-scheduleAmbient(src, volume, durationMs, loop)      → crossfade with error recovery
-scheduleMusic(config)                               → internal enter/exit timer chain
-pauseAll()                                          → freeze all audio + pending timers
-resumeAll()                                         → resume from saved state
-cancelAll()                                         → increment session, clear all, stop audio
+// Unified scheduling API (ADR-005)
+scheduleAudioCues(cues, opts)    → schedule all cues for a frame
+  opts.onNarrationEnd            → callback for auto-advance chain
+  opts.maxNarrationDurationMs    → safety timeout (caption-derived)
+  opts.crossfadeDurationMs       → ambient crossfade duration (default 800)
+cancelAudioCues()                → stop all Howls, cancel all timers, clear map
+pauseAudioCues()                 → pause all active Howls + freeze all pending timers
+resumeAudioCues()                → resume all paused Howls + reschedule all frozen timers
 
-// Low-level playback (used internally by scheduling API)
-playAmbient(src, volume, loop)           → start ambient track
-crossfadeAmbient(newSrc, volume, ms, loop) → fade out old, fade in new
-playNarration(src, onend)                → play narration with end callback
-cueNarration(src)                        → load + seek to 0, do NOT play (for hardCut)
-cueAmbient(src, volume, loop)            → load, do NOT play
-cueMusic(src, volume)                    → load, do NOT play
-stopNarration()                          → stop + unload current narration
-pauseNarration() / resumeNarration()
-pauseAmbient() / resumeAmbient()
-playMusic(src, volume)                   → start music track
-fadeMusic(toVolume, durationMs)          → volume transition
-pauseMusic() / resumeMusic()
-stopMusic()                              → stop + unload
-stopAll()                                → unload everything
-setMuted(bool)                           → global mute (affects volume, not playback)
-onNarrationBufferChange(callback)        → register buffer state listener
-preloadNarrationAhead(src)               → pre-create Howl for next scene
-clearNarrationCache()                    → unload ahead-of-time cache
+// Cueing (hardCut / replay-while-paused)
+cueAudioCues(cues)               → load all, seek to 0, do NOT play
+cancelCue(cueId)                 → stop + cancel one specific cue (for replay reset)
+reCueCue(cueId, cue)             → cancel + re-cue a single cue without touching others
+
+// Query
+getNarrationCue()                → returns active narration Howl (for replay)
+
+// Global
+setMuted(bool)                   → global mute (affects volume, not playback)
+onNarrationBufferChange(callback) → register buffer state listener
+preloadNarrationAhead(src)        → pre-create Howl for next scene
+clearNarrationCache()             → unload ahead-of-time cache
 ```
 
-All Howl instances use `html5: true` for streaming. Narration uses `preloadNarrationAhead` for one-scene-ahead buffering. Ambient and music create new Howl instances per scene (old instances unloaded after crossfade).
+Internal state uses `activeCues = new Map<cueId, { howl, timer, type, state }>`. No hardcoded timer variables — each cue gets its own `PausableTimer` entry. All Howl instances use `html5: true` for streaming.
 
-**Session model (ADR-005):** Internal `sessionId` counter. `cancelAll()` increments it. All scheduled callbacks capture sessionId at creation and check before executing, preventing stale playback after scene transitions.
+**Anchor resolution:** `resolveAnchors(cues, maxNarrationDurationMs)` computes `resolvedEnter` for each cue. Numeric enters pass through. Anchor objects (`{ ref, offset }`) resolve to `refEnter + refDuration + offset`. Unknown refs fall back to `enter: 0`.
 
-**Narration safety timeout:** `scheduleNarration` sets a safety timer at `maxDurationMs + 5000ms`. If no `end`/`loaderror`/`playerror` fires, force-stops narration and calls `onend`. `safeEnd` deduplicates — callback fires at most once. Duration authority is a 4-tier fallback chain: metadata → frame captions → project-wide max → 60s floor. Safety is never skipped.
+**Narration safety timeout:** `wireNarrationEnd` sets a safety timer at `enterDelay + maxDurationMs + 5000ms`. If no `end`/`loaderror`/`playerror` fires, force-stops narration and calls `safeEnd`. Deduplicates — callback fires at most once. Duration authority: metadata → frame captions → project-wide max → 60s floor.
 
-**Crossfade error recovery:** `scheduleAmbient` tracks old ambient during crossfade. On new ambient load/play error: cancels old fade-out, restores old ambient volume, guards ownership to prevent overwriting a third ambient.
+**Crossfade error recovery:** `crossfadeAmbientCue` defers old ambient unload until new ambient confirms playback (`play` event). On load/play error: restores old ambient to its *original* volume, not the new target. No blind `setTimeout` unload.
 
-**Music timer chain:** `scheduleMusic` owns enter delay and exit fade timers internally via `PausableTimer`. `pauseAll()`/`resumeAll()` handle them atomically — no orphaning possible.
+**Buffer exhaustion bridge:** `monitorNarrationBuffer` reports buffer exhaustion directly to `wireNarrationEnd` via `onExhaustion` callback, which triggers `safeEnd` immediately. No gap between buffer giving up and scene advancing.
 
-**Buffer recovery:** `monitorNarrationBuffer()` attaches `waiting`/`playing` event listeners to the underlying HTML5 audio node. On stall: tracks buffered ranges, attempts nudge-seek after 2 checks, full reload after 4 checks, gives up after 3 recovery attempts. Visual indicator via `.scene-stage.buffering` CSS class.
+**Buffer recovery:** Attaches `waiting`/`playing` event listeners to the underlying HTML5 audio node. On stall: tracks buffered ranges, attempts nudge-seek after 2 checks, full reload after 4 checks, gives up after 3 recovery attempts. Visual indicator via `.scene-stage.buffering` CSS class.
 
-**Mute:** Affects `howl.mute()`, not `howl.volume()`. `'end'` events still fire when muted. Auto-advance works while muted.
+**Mute:** Iterates `activeCues` and calls `howl.mute()`. `'end'` events still fire when muted. Auto-advance works while muted.
 
-**Audio failure graceful degradation:** Both `onloaderror` and `onplayerror` call the `onend` callback, which triggers the auto-advance chain. If narration fails to load/play, the scene still advances.
+**Audio failure graceful degradation:** Both `onloaderror` and `onplayerror` call `safeEnd`, which triggers the auto-advance chain. If narration fails to load/play, the scene still advances.
 
 ### text.js
 
@@ -255,40 +250,37 @@ FIELD    │ TYPE            │ DESCRIPTION
 ─────────┼─────────────────┼──────────────────────────────────────
 lines    │ array           │ Ghost-drift text lines with enter/exit/x/y/align
 captions │ array           │ Timed caption entries with text/start/end (ms)
-audio    │ string | null   │ Narration audio asset path. null = no narration audio
-delay    │ number          │ ms delay before narration audio starts
 ```
 
-`narration: null` = no narration at all (no text, no audio, no captions).
+`narration: null` = no narration at all (no text, no captions).
 
-`narration.audio: null` = text + captions but no audio (Scene 8: silence with ghost-drift text).
+`narration` with `lines`/`captions` but no narration cue in `audioCues` = text + captions but no audio (Scene 8: silence with ghost-drift text).
 
-### 4.3 ambient Object
+### 4.3 audioCues Array (ADR-003/ADR-005)
 
-```
-FIELD    │ TYPE            │ DESCRIPTION
-─────────┼─────────────────┼──────────────────────────────────────
-src      │ string          │ Ambient audio asset path
-volume   │ number          │ Target volume (0.0–1.0)
-loop     │ boolean         │ Loop playback (default true)
-```
-
-`ambient: null` = no ambient audio for this frame.
-
-First frame uses `playAmbient()` (direct start). All subsequent frames use `crossfadeAmbient()` (fade out old, fade in new over 800ms).
-
-### 4.4 music Object (Scene 11 only)
+Replaces the former `ambient`, `music`, and `narration.audio`/`narration.delay` slots.
 
 ```
-FIELD        │ TYPE            │ DESCRIPTION
-─────────────┼─────────────────┼──────────────────────────────────────
-src          │ string          │ Music audio asset path
-enter        │ number          │ ms after scene entry to begin playback
-exit         │ number | null   │ ms after scene entry to begin fade-out. null = no auto-fade.
-startVolume  │ number          │ Initial volume for fade-in start
-fullVolume   │ number          │ Target volume after crescendo
-crescendoMs  │ number          │ Duration of volume ramp from startVolume to fullVolume
+FIELD    │ TYPE                │ DESCRIPTION
+─────────┼─────────────────────┼──────────────────────────────────────
+id       │ string              │ Unique identifier within the frame (referenced by anchoring)
+type     │ string              │ "narration" | "ambient" | "sfx"
+src      │ string              │ Audio asset path
+enter    │ number | object     │ ms after scene entry, OR anchor { ref, offset }
+volume   │ number              │ Target volume (0.0–1.0)
+loop     │ boolean             │ Loop playback
+fadeIn   │ number              │ ms fade-in duration from 0 to target volume
+fadeOut  │ number | null       │ ms fade-out at end. null = no auto-fade.
 ```
+
+`audioCues: null` = no audio for this frame.
+
+**Anchor objects:** `{ ref: "narration", offset: -5000 }` resolves to `refEnter + refDuration + offset`. Requires `maxNarrationDurationMs` from caption data.
+
+**Type behavior:**
+- `narration`: fires `end` event for auto-advance. One per frame max. Replay targets this.
+- `ambient`: crossfades on scene transition via `crossfadeAmbientCue`. Can overlap with narration.
+- `sfx`: one-shot, no crossfade, no replay.
 
 Music is a separate audio channel from ambient and narration. Pause/resume/timer-remaining all tracked independently.
 
@@ -315,7 +307,7 @@ FRAME                │ holdUntilClick │ holdAfterNarration
 
 ```
 1. Narration (loudest, volume: 1.0)
-2. Emotional silence (narration.audio: null, ambient: null)
+2. Emotional silence (audioCues: null, no audio cues)
 3. Ambient texture (volume: 0.08–0.20, loop: true)
 4. End song (music channel, crescendo to 0.25)
 ```
@@ -433,11 +425,12 @@ function setupAutoAdvance(app) {
   const holdAfterNarration = frame.holdAfterNarration
     ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
 
-  if (!frame.narration?.audio) {
+  const hasNarrationAudio = frame.audioCues?.some(c => c.type === 'narration');
+  if (!hasNarrationAudio) {
     // No narration audio — schedule immediately on landing
     scheduleAutoAdvance(app, holdAfterNarration);
   }
-  // With narration audio — Howler 'end' callback triggers scheduleAutoAdvance
+  // With narration audio — onNarrationEnd callback triggers scheduleAutoAdvance
 }
 
 function shouldAutoAdvance(app, frame) {
@@ -484,7 +477,7 @@ else:
 
 **doPause():**
 - Set `paused = true`, `pausedFromState = current state`, `state = PAUSED`
-- `pauseAll()` — freezes all audio + internal timers (narration delay, music enter/exit, old ambient crossfade)
+- `pauseAudioCues()` — freezes all audio + pending timers in activeCues Map
 - Pause text timeline, effects canvas
 - `autoAdvanceTimer?.pause()` — saves remaining auto-advance time
 
@@ -494,13 +487,13 @@ else:
 ```
 if replayPending:
   replayPending = false
-  scheduleNarrationAudio(frame.narration)   // fresh onend for auto-advance
-  resumeAmbient()                           // resume — not resumeAll (narration is fresh)
-  resumeMusic()
-  textTimeline.play(0)                      // restart from beginning
+  cancelCue('narration')
+  scheduleAudioCues([narrationCue], { onNarrationEnd, maxNarrationDurationMs })
+  resumeAudioCues()                          // resume remaining cues (ambient, etc.)
+  textTimeline.play(0)                       // restart from beginning
   setupAutoAdvance()
 else:
-  resumeAll()                               // resume all audio + internal timers
+  resumeAudioCues()                          // resume all audio + pending timers
   textTimeline.resume()
 ```
 
@@ -816,11 +809,11 @@ Transition error                    │ Revert currentIndex + state to previous 
 Narration safety timeout            │ If Howler end/error never fires within
                                     │ maxDurationMs + 5s, force-stop narration
                                     │ and call onend. Prevents scene hang. (ADR-005)
-Crossfade ambient failure           │ scheduleAmbient: on new ambient load/play error,
-                                    │ cancel old fade-out, restore old ambient volume.
-                                    │ Ownership guard prevents overwrite. (ADR-005)
-Music timer orphaning               │ Eliminated. scheduleMusic owns enter/exit timers
-                                    │ internally. pauseAll/resumeAll handle atomically.
+Crossfade ambient failure           │ crossfadeAmbientCue: defers old unload until new
+                                    │ confirms play. On error, restores old ambient at
+                                    │ original volume. No blind setTimeout. (ADR-005)
+Timer orphaning                     │ Eliminated. activeCues Map with PausableTimer per
+                                    │ cue. pauseAudioCues/resumeAudioCues iterate map.
 Pause during ambient crossfade      │ Old ambient paused mid-fade. On resume, snapped
                                     │ to target volume (0) and unloaded. (ADR-005)
 ```
@@ -889,19 +882,19 @@ STATE:
   ✓ generation guards all async callbacks (onend, timers)
   ✓ pausedFromState preserves resume target
   ✓ autoAdvanceTimer is a PausableTimer — pause/resume/cancel built in
-  ✓ audio timers internal to audio.js — app.js calls pauseAll/resumeAll/cancelAll
+  ✓ audio timers internal to audio.js — app.js calls pauseAudioCues/resumeAudioCues/cancelAudioCues
   ✓ togglePause() queues as pendingPause during TRANSITIONING
   ✓ navigation queues as pendingNavIndex during TRANSITIONING
 
 AUDIO:
-  ✓ three channels: narration, ambient, music
+  ✓ unified activeCues Map — no hardcoded channels
   ✓ all Howls use html5: true (streaming)
   ✓ narration pre-buffered one scene ahead
   ✓ mute via howl.mute(), not volume — 'end' events still fire
   ✓ load/play errors call onend to maintain auto-advance chain
   ✓ buffer stall recovery: nudge → reload → give up
   ✓ audio.js owns all audio timer lifecycle (ADR-005)
-  ✓ session counter prevents stale audio scheduling callbacks
+  ✓ activeCues Map entry checks prevent stale audio callbacks
   ✓ narration safety timeout always set (4-tier duration fallback, never skipped)
   ✓ crossfade error recovery: restore old ambient on new failure
   ✓ play gate is hard no-play boundary — no audio before dismissal
