@@ -314,6 +314,8 @@ function showFrame(app, index) {
     cueAudioCues(frame.audioCues);
   } else if (app.userHasInteracted) {
     scheduleFrameAudio(app, frame);
+  } else {
+    app.els.btnReplay.disabled = true;
   }
 
   prebufferNextScene(app, index);
