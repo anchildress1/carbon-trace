@@ -476,10 +476,8 @@ export function setMuted(muted) {
 // --- Scheduling API (ADR-005) ---
 
 function clearNarrationSafetyTimer() {
-  if (narrationSafetyTimer) {
-    clearTimeout(narrationSafetyTimer);
-    narrationSafetyTimer = null;
-  }
+  narrationSafetyTimer?.cancel();
+  narrationSafetyTimer = null;
 }
 
 function cancelOldAmbientFade() {
@@ -510,7 +508,7 @@ export function scheduleNarration(src, delay, onend, maxDurationMs) {
     playNarration(src, safeEnd);
 
     if (maxDurationMs > 0) {
-      narrationSafetyTimer = setTimeout(() => {
+      narrationSafetyTimer = new PausableTimer(() => {
         narrationSafetyTimer = null;
         console.warn(`Narration safety timeout: ${src}`);
         stopNarration();
@@ -612,6 +610,7 @@ export function scheduleMusic(config) {
 
 export function pauseAll() {
   narrationDelayTimer?.pause();
+  narrationSafetyTimer?.pause();
   musicEnterTimer?.pause();
   musicExitTimer?.pause();
   pauseNarration();
@@ -627,6 +626,7 @@ export function pauseAll() {
 
 export function resumeAll() {
   narrationDelayTimer?.resume();
+  narrationSafetyTimer?.resume();
   musicEnterTimer?.resume();
   musicExitTimer?.resume();
   resumeNarration();

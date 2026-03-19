@@ -598,6 +598,9 @@ function doResume(app) {
     }
     resumeAmbient();
     resumeMusic();
+    // Clear caption DOM created as side effect of tl.pause(0) in
+    // replayNarration — play(0) will recreate them cleanly.
+    clearCaptionElements(app.captionEntries);
     if (app.textTimeline && !app.buffering) {
       app.textTimeline.play(0);
     }
@@ -661,6 +664,11 @@ function replayNarration(app) {
   if (app.state === State.TRANSITIONING || app.state === State.LOADING) return;
 
   app.userHasInteracted = true;
+
+  // Invalidate stale onend callbacks from prior narration play.
+  // Without this, a queued onend could pass the generation guard
+  // and schedule a spurious auto-advance.
+  app.generation++;
 
   // Cancel all audio scheduling (stops narration, clears delay timer, etc.)
   cancelAll();
