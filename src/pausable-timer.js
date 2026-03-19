@@ -27,7 +27,12 @@ export class PausableTimer {
   }
 
   resume() {
-    if (this.#remaining === null || this.#remaining <= 0) return;
+    if (this.#remaining === null) return;
+    if (this.#remaining <= 0) {
+      this.#remaining = null;
+      this.#callback();
+      return;
+    }
     this.#delay = this.#remaining;
     this.#start = performance.now();
     this.#id = setTimeout(() => {
@@ -52,6 +57,6 @@ export class PausableTimer {
   }
 
   get isPaused() {
-    return this.#remaining !== null && this.#remaining > 0;
+    return this.#remaining !== null;
   }
 }

@@ -118,6 +118,43 @@ describe('PausableTimer', () => {
       vi.advanceTimersByTime(1000);
       expect(cb).toHaveBeenCalledOnce();
     });
+
+    it('fires callback immediately when remaining is zero', () => {
+      const perfSpy = vi.spyOn(performance, 'now');
+      perfSpy.mockReturnValue(0);
+
+      const cb = vi.fn();
+      const timer = new PausableTimer(cb, 500);
+
+      // Simulate pause exactly at expiry
+      perfSpy.mockReturnValue(500);
+      timer.pause();
+
+      expect(timer.isPaused).toBe(true);
+      expect(cb).not.toHaveBeenCalled();
+
+      timer.resume();
+      expect(cb).toHaveBeenCalledOnce();
+
+      perfSpy.mockRestore();
+    });
+
+    it('fires callback immediately when elapsed exceeds delay', () => {
+      const perfSpy = vi.spyOn(performance, 'now');
+      perfSpy.mockReturnValue(0);
+
+      const cb = vi.fn();
+      const timer = new PausableTimer(cb, 500);
+
+      // Simulate pause after delay would have elapsed
+      perfSpy.mockReturnValue(600);
+      timer.pause();
+
+      timer.resume();
+      expect(cb).toHaveBeenCalledOnce();
+
+      perfSpy.mockRestore();
+    });
   });
 
   describe('cancel', () => {
