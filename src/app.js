@@ -250,6 +250,7 @@ function buildNarration(app, frame) {
 
   if (!frame.narration) {
     app.els.accessibleNarration.textContent = '';
+    app.els.btnReplay.disabled = true;
     app.textTimeline = null;
     app.captionEntries = [];
     return;
@@ -283,6 +284,8 @@ function buildNarration(app, frame) {
   } else {
     app.els.accessibleNarration.textContent = '';
   }
+
+  app.els.btnReplay.disabled = !(hasLines || narrationCue);
 }
 
 function buildSceneIndexMap(frames) {
@@ -353,13 +356,12 @@ function showFrame(app, index) {
 
   buildNarration(app, frame);
 
-  // Replay restarts the entire frame (text, audio, effects, timer) — enable
-  // on every frame except credits. Disable before first interaction so the
-  // play-gate is the only actionable element.
-  app.els.btnReplay.disabled = frame.holdUntilClick === null || !app.userHasInteracted;
-
-  if (!app.deferFrameAudioUntilResume && app.userHasInteracted) {
-    scheduleFrameAudio(app, frame);
+  if (!app.deferFrameAudioUntilResume) {
+    if (app.userHasInteracted) {
+      scheduleFrameAudio(app, frame);
+    } else {
+      app.els.btnReplay.disabled = true;
+    }
   }
 
   prebufferNextScene(app, index);
@@ -592,7 +594,10 @@ function updateNavButtons(app) {
 
 function handleFirstPlay(app) {
   const frame = app.frames[app.currentIndex];
-
+  app.els.btnReplay.disabled = !(
+    (Array.isArray(frame.narration?.lines) && frame.narration.lines.length > 0) ||
+    getNarrationCueFromFrame(frame)
+  );
   scheduleFrameAudio(app, frame);
   if (app.textTimeline) {
     app.textTimeline.play(0);
@@ -634,8 +639,8 @@ function doResume(app) {
 
   if (firstPlay) {
     app.els.playGate.hidden = true;
-    const frame = app.frames[app.currentIndex];
-    app.els.btnReplay.disabled = frame.holdUntilClick === null;
+    // Clear stranded 'cued' entries from showFrame's cueAudioCues call —
+    // handleFirstPlay will schedule audio fresh via scheduleFrameAudio.
     cancelAudioCues();
     handleFirstPlay(app);
   }
