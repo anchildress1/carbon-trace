@@ -176,7 +176,7 @@ vi.mock('../../src/scenes.json', () => ({
           captions: [{ text: 'Opening line', start: 0, end: 3000 }],
         },
         audioCues: [
-          { id: 'narration', type: 'narration', src: 'title-narration.m4a', enter: 0, volume: 1.0, loop: false, fadeIn: 0, fadeOut: 0 },
+          { id: 'narration', type: 'narration', src: 'title-narration.m4a', enter: 0, volume: 1, loop: false, fadeIn: 0, fadeOut: 0 },
         ],
         effects: { idle: null, entry: null },
         transition: { type: 'fade', duration: 400 },
@@ -193,7 +193,7 @@ vi.mock('../../src/scenes.json', () => ({
           captions: [{ text: 'Hello', start: 0, end: 2000 }],
         },
         audioCues: [
-          { id: 'narration', type: 'narration', src: 'narration.mp3', enter: 500, volume: 1.0, loop: false, fadeIn: 0, fadeOut: 0 },
+          { id: 'narration', type: 'narration', src: 'narration.mp3', enter: 500, volume: 1, loop: false, fadeIn: 0, fadeOut: 0 },
           { id: 'ambient-01', type: 'ambient', src: 'ambient.mp3', enter: 0, volume: 0.5, loop: true, fadeIn: 1000, fadeOut: null },
           { id: 'end-song', type: 'ambient', src: 'credits-music.mp3', enter: 100, volume: 0.5, loop: true, fadeIn: 2000, fadeOut: null },
         ],
@@ -241,17 +241,16 @@ import {
   cueAudioCues,
   cancelCue,
   reCueCue,
-  setMuted,
   onNarrationBufferChange,
 } from '../../src/audio.js';
-import { buildNarrationTimeline, clearNarrationLayer } from '../../src/text.js';
+import { buildNarrationTimeline } from '../../src/text.js';
 import { runEffect, clearEffects } from '../../src/effects.js';
 import {
   clearAll as clearCanvasEffects,
   pause as pauseCanvas,
   resume as resumeCanvas,
 } from '../../src/effects-canvas.js';
-import { drawImage as drawSceneImage, clearScene, drawFallback, loadImage } from '../../src/canvas.js';
+import { clearScene, drawFallback, loadImage } from '../../src/canvas.js';
 import { setCaptionsEnabled, areCaptionsEnabled, syncCaptionsToTime, clearCaptionElements } from '../../src/captions.js';
 import { initOverlay } from '../../src/overlay.js';
 import { preloadFirstFrameAudio } from '../../src/loader.js';
@@ -634,12 +633,12 @@ describe('app.js', () => {
       expect(gate.hidden).toBe(true);
     });
 
-    it('enables replay button on first play when frame has narration', () => {
+    it('enables replay button on first play for non-credits frame', () => {
       const btn = document.getElementById('btn-replay');
       // Before first play, replay is disabled (userHasInteracted was false)
       expect(btn.disabled).toBe(true);
 
-      // Click play gate — handleFirstPlay should re-enable replay
+      // Click play gate — showFrame re-runs with userHasInteracted=true
       document.getElementById('play-gate').click();
       expect(btn.disabled).toBe(false);
     });
