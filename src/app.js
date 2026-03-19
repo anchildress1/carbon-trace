@@ -189,6 +189,7 @@ function scheduleFrameAudio(app, frame) {
     onNarrationEnd,
     maxNarrationDurationMs,
     crossfadeDurationMs: 800,
+    audioDurations: app.audioDurations,
   });
 }
 
@@ -587,7 +588,11 @@ function doResume(app) {
         app.audioDurations,
         app.projectMaxCaptionMs,
       );
-      scheduleAudioCues([narrationCue], { onNarrationEnd, maxNarrationDurationMs });
+      scheduleAudioCues([narrationCue], {
+        onNarrationEnd,
+        maxNarrationDurationMs,
+        audioDurations: app.audioDurations,
+      });
     }
     // Clear caption DOM created as side effect of tl.pause(0) in
     // replayNarration — play(0) will recreate them cleanly.
@@ -701,6 +706,7 @@ function replayNarration(app) {
           app.audioDurations,
           app.projectMaxCaptionMs,
         ),
+        audioDurations: app.audioDurations,
       });
     }
     if (app.textTimeline) app.textTimeline.play(0);

@@ -77,6 +77,7 @@ scheduleAudioCues(cues, opts)       → schedule all cues for a frame
   opts.onNarrationEnd               → callback for auto-advance chain
   opts.maxNarrationDurationMs       → safety timeout (caption-derived)
   opts.crossfadeDurationMs          → ambient crossfade duration (default 800)
+  opts.audioDurations               → durations map for anchor resolution
 cancelAudioCues()                   → stop all Howls, cancel all timers, clear map
 pauseAudioCues()                    → pause all active Howls + freeze all pending timers
 resumeAudioCues()                   → resume all paused Howls + reschedule all frozen timers

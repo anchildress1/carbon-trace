@@ -8,6 +8,8 @@ let globalMuted = false;
 // Dynamic cue tracking — no hardcoded timer variables (ADR-005)
 const activeCues = new Map(); // Map<cueId, { howl, timer, type, state }>
 
+let isAudioPaused = false;
+
 // Buffer monitoring state
 let bufferChangeCallback = null;
 let narrationBuffering = false;
@@ -58,10 +60,12 @@ function reloadFromPosition(node) {
   node.src = '';
   node.src = src;
   node.currentTime = time;
-  node.play().catch((err) => {
-    console.warn('Buffer recovery play() failed:', err.message);
-    cleanupBufferMonitoring();
-  });
+  if (!isAudioPaused) {
+    node.play().catch((err) => {
+      console.warn('Buffer recovery play() failed:', err.message);
+      cleanupBufferMonitoring();
+    });
+  }
 }
 
 function checkBufferProgress(node, state, onExhaustion) {
@@ -79,10 +83,12 @@ function checkBufferProgress(node, state, onExhaustion) {
     const ahead = currentEnd - node.currentTime;
     const nearEnd = node.duration > 0 && node.duration - node.currentTime < 3;
     if (ahead >= 3 || nearEnd) {
-      node.play().catch((err) => {
-        console.warn('Buffer recovery play() failed:', err.message);
-        cleanupBufferMonitoring();
-      });
+      if (!isAudioPaused) {
+        node.play().catch((err) => {
+          console.warn('Buffer recovery play() failed:', err.message);
+          cleanupBufferMonitoring();
+        });
+      }
     }
   } else {
     state.stallChecks++;
@@ -180,11 +186,19 @@ export function clearNarrationCache() {
 
 // --- Anchor resolution ---
 
-function resolveAnchors(cues, maxNarrationDurationMs) {
+function resolveAnchors(cues, opts) {
   const durations = new Map();
+
+  if (opts && opts.audioDurations) {
+    for (const cue of cues) {
+      const metaDuration = opts.audioDurations.get(cue.src);
+      if (metaDuration > 0) durations.set(cue.id, metaDuration * 1000);
+    }
+  }
+
   const narrationCue = cues.find((c) => c.type === 'narration');
-  if (narrationCue && maxNarrationDurationMs) {
-    durations.set(narrationCue.id, maxNarrationDurationMs);
+  if (narrationCue && opts && opts.maxNarrationDurationMs) {
+    durations.set(narrationCue.id, opts.maxNarrationDurationMs);
   }
 
   return cues.map((cue) => {
@@ -304,7 +318,8 @@ function wireNarrationEnd(entry, cue, opts) {
   const safeEnd = () => {
     if (ended) return;
     ended = true;
-    if (safetyTimer) clearTimeout(safetyTimer);
+    if (safetyTimer) safetyTimer.cancel();
+    if (entry.timer === safetyTimer) entry.timer = null;
     cleanupBufferMonitoring();
     opts.onNarrationEnd?.();
   };
@@ -318,7 +333,7 @@ function wireNarrationEnd(entry, cue, opts) {
 
   if (opts.maxNarrationDurationMs > 0) {
     const enterDelay = cue.resolvedEnter || 0;
-    safetyTimer = setTimeout(
+    safetyTimer = new PausableTimer(
       () => {
         console.warn(`Narration safety timeout: ${cue.src}`);
         entry.howl?.unload();
@@ -326,6 +341,7 @@ function wireNarrationEnd(entry, cue, opts) {
       },
       enterDelay + opts.maxNarrationDurationMs + 5000,
     );
+    entry.timer = safetyTimer;
   }
 
   monitorNarrationBuffer(entry.howl, {
@@ -343,7 +359,7 @@ export function scheduleAudioCues(cues, opts = {}) {
   if (!cues || cues.length === 0) return;
 
   const crossfadeDurationMs = opts.crossfadeDurationMs ?? 800;
-  const resolved = resolveAnchors(cues, opts.maxNarrationDurationMs);
+  const resolved = resolveAnchors(cues, opts);
 
   for (const cue of resolved) {
     // Defensive: clean up any pre-existing entry with the same ID.
@@ -383,6 +399,7 @@ export function scheduleAudioCues(cues, opts = {}) {
 }
 
 export function cancelAudioCues() {
+  isAudioPaused = false;
   for (const [, entry] of activeCues) {
     entry.timer?.cancel();
     entry.howl?._crossfadeCleanup?.();
@@ -393,6 +410,7 @@ export function cancelAudioCues() {
 }
 
 export function pauseAudioCues() {
+  isAudioPaused = true;
   for (const [, entry] of activeCues) {
     entry.timer?.pause();
     if (entry.howl && entry.state === 'playing') entry.howl.pause();
@@ -400,6 +418,7 @@ export function pauseAudioCues() {
 }
 
 export function resumeAudioCues() {
+  isAudioPaused = false;
   for (const [, entry] of activeCues) {
     entry.timer?.resume();
     if (entry.howl && entry.state === 'playing') entry.howl.play();

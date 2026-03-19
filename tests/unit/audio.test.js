@@ -40,10 +40,13 @@ vi.mock('../../src/pausable-timer.js', () => {
     #cancelled = false;
     #fired = false;
     #timerId = null;
+    #start = null;
+    #remaining = null;
 
     constructor(callback, delay) {
       this.#callback = callback;
       this.#delay = delay;
+      this.#start = Date.now();
       this.#timerId = setTimeout(() => {
         if (this.#cancelled) return;
         this.#fired = true;
@@ -55,6 +58,8 @@ vi.mock('../../src/pausable-timer.js', () => {
     pause() {
       if (this.#fired || this.#cancelled) return;
       this.#paused = true;
+      const elapsed = Date.now() - this.#start;
+      this.#remaining = Math.max(0, this.#delay - elapsed);
       if (this.#timerId) {
         clearTimeout(this.#timerId);
         this.#timerId = null;
@@ -64,12 +69,14 @@ vi.mock('../../src/pausable-timer.js', () => {
     resume() {
       if (!this.#paused || this.#cancelled || this.#fired) return;
       this.#paused = false;
+      this.#delay = this.#remaining;
+      this.#start = Date.now();
       this.#timerId = setTimeout(() => {
         if (this.#cancelled) return;
         this.#fired = true;
         this.#timerId = null;
         this.#callback();
-      }, this.#delay);
+      }, this.#remaining);
     }
 
     cancel() {
@@ -227,6 +234,25 @@ describe('audio.js — unified cue API (ADR-005)', () => {
 
       vi.advanceTimersByTime(25000);
       expect(Howl).toHaveBeenCalledTimes(2); // song too
+    });
+
+    it('resolves anchor-based enter using audioDurations map', () => {
+      const ambientCue = makeCue({ type: 'ambient', id: 'bg', src: 'bg.mp3' });
+      const sfxCue = makeCue({
+        id: 'sfx',
+        type: 'sfx',
+        src: 'sfx.mp3',
+        enter: { ref: 'bg', offset: 1000 },
+      });
+
+      const audioDurations = new Map([['bg.mp3', 30]]); // 30 seconds -> 30000 ms
+      scheduleAudioCues([ambientCue, sfxCue], { audioDurations });
+      
+      // Ambient fires immediately (0)
+      expect(Howl).toHaveBeenCalledTimes(1);
+      
+      vi.advanceTimersByTime(31000);
+      expect(Howl).toHaveBeenCalledTimes(2); // sfx fires at 30000 + 1000
     });
 
     it('falls back to enter: 0 when anchor ref is unknown', () => {
@@ -415,6 +441,30 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('Narration safety timeout'),
       );
+      warnSpy.mockRestore();
+    });
+
+    it('pauses safety timeout when pauseAudioCues is called', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const onEnd = vi.fn();
+      scheduleAudioCues([makeCue()], {
+        onNarrationEnd: onEnd,
+        maxNarrationDurationMs: 3000,
+      });
+
+      // Safety timeout is at 8000ms. Advance 4000ms, then pause.
+      vi.advanceTimersByTime(4000);
+      pauseAudioCues();
+      
+      // Since it is paused, advancing 10000ms should do nothing.
+      vi.advanceTimersByTime(10000);
+      expect(onEnd).not.toHaveBeenCalled();
+
+      // Resume, advance the remaining 4000ms to trigger the timeout.
+      resumeAudioCues();
+      vi.advanceTimersByTime(4000);
+      expect(onEnd).toHaveBeenCalledOnce();
+
       warnSpy.mockRestore();
     });
 
@@ -655,6 +705,32 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       }
 
       warnSpy.mockRestore();
+    });
+
+    it('does not force play on buffer recovery if paused globally', () => {
+      scheduleAudioCues([makeCue({ src: 'test.m4a' })]);
+
+      const waitingCall = mockNode.addEventListener.mock.calls.find(
+        ([event]) => event === 'waiting',
+      );
+      if (waitingCall) {
+        waitingCall[1]();
+        
+        // Pause the experience!
+        pauseAudioCues();
+
+        // Simulate buffer recovery
+        mockNode.buffered.length = 1;
+        mockNode.buffered.end.mockReturnValue(5);
+        mockNode.currentTime = 0;
+        mockNode.duration = 60;
+        
+        // Advance timer to trigger progress check
+        vi.advanceTimersByTime(4000);
+        
+        // play() should NOT have been called by the buffer recovery loop
+        expect(mockNode.play).not.toHaveBeenCalled();
+      }
     });
   });
 });
