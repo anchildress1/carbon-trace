@@ -1,9 +1,25 @@
 import { Howl } from 'howler';
+import { PausableTimer } from './pausable-timer.js';
 
 let currentAmbient = null;
 let currentNarration = null;
 let currentMusic = null;
 let globalMuted = false;
+
+// Session model — cancelAll() increments sessionId, stale callbacks check before executing
+let sessionId = 0;
+
+// Internal scheduling timers
+let narrationDelayTimer = null;
+let narrationSafetyTimer = null;
+let musicEnterTimer = null;
+let musicExitTimer = null;
+
+// Crossfade tracking
+let oldAmbientRef = null;
+let oldAmbientFadeTimer = null;
+
+const SAFETY_MARGIN_MS = 5000;
 
 // Buffer monitoring state
 let bufferChangeCallback = null;
@@ -455,4 +471,185 @@ export function setMuted(muted) {
   if (currentMusic) {
     currentMusic.mute(muted);
   }
+}
+
+// --- Scheduling API (ADR-005) ---
+
+function clearNarrationSafetyTimer() {
+  if (narrationSafetyTimer) {
+    clearTimeout(narrationSafetyTimer);
+    narrationSafetyTimer = null;
+  }
+}
+
+function cancelOldAmbientFade() {
+  if (oldAmbientFadeTimer) {
+    clearTimeout(oldAmbientFadeTimer);
+    oldAmbientFadeTimer = null;
+  }
+  oldAmbientRef = null;
+}
+
+export function scheduleNarration(src, delay, onend, maxDurationMs) {
+  const mySession = sessionId;
+  let ended = false;
+
+  narrationDelayTimer?.cancel();
+  narrationDelayTimer = null;
+  clearNarrationSafetyTimer();
+
+  const safeEnd = () => {
+    if (ended) return;
+    ended = true;
+    clearNarrationSafetyTimer();
+    if (onend) onend();
+  };
+
+  const startPlayback = () => {
+    if (mySession !== sessionId) return;
+    playNarration(src, safeEnd);
+
+    if (maxDurationMs > 0) {
+      narrationSafetyTimer = setTimeout(() => {
+        narrationSafetyTimer = null;
+        console.warn(`Narration safety timeout: ${src}`);
+        stopNarration();
+        safeEnd();
+      }, maxDurationMs + SAFETY_MARGIN_MS);
+    }
+  };
+
+  if (delay > 0) {
+    narrationDelayTimer = new PausableTimer(startPlayback, delay);
+  } else {
+    startPlayback();
+  }
+}
+
+export function scheduleAmbient(newSrc, volume, durationMs, loop = true) {
+  const oldAmbient = currentAmbient;
+  let oldUnloaded = false;
+
+  // Set up old ambient fade-out FIRST (before play)
+  cancelOldAmbientFade();
+  if (oldAmbient) {
+    oldAmbientRef = oldAmbient;
+    oldAmbient.fade(oldAmbient.volume(), 0, durationMs);
+    oldAmbientFadeTimer = setTimeout(() => {
+      oldUnloaded = true;
+      oldAmbientRef = null;
+      oldAmbientFadeTimer = null;
+      oldAmbient.unload();
+    }, durationMs + 100);
+  }
+
+  const newHowl = new Howl({
+    src: [newSrc],
+    volume: 0,
+    loop,
+    html5: true,
+    mute: globalMuted,
+    onloaderror: (_id, err) => {
+      console.warn(`Failed to load ambient: ${newSrc}`, err);
+      if (currentAmbient === newHowl && !oldUnloaded && oldAmbient) {
+        if (oldAmbientFadeTimer) {
+          clearTimeout(oldAmbientFadeTimer);
+          oldAmbientFadeTimer = null;
+        }
+        oldAmbient.fade(oldAmbient.volume(), volume, 200);
+        currentAmbient = oldAmbient;
+        oldAmbientRef = null;
+      }
+    },
+    onplayerror: (_id, err) => {
+      console.warn(`Failed to play ambient: ${newSrc}`, err);
+      if (currentAmbient === newHowl && !oldUnloaded && oldAmbient) {
+        if (oldAmbientFadeTimer) {
+          clearTimeout(oldAmbientFadeTimer);
+          oldAmbientFadeTimer = null;
+        }
+        oldAmbient.fade(oldAmbient.volume(), volume, 200);
+        currentAmbient = oldAmbient;
+        oldAmbientRef = null;
+      }
+    },
+  });
+
+  currentAmbient = newHowl;
+  currentAmbient.play();
+  currentAmbient.fade(0, volume, durationMs);
+}
+
+export function scheduleMusic(config) {
+  const mySession = sessionId;
+  musicEnterTimer?.cancel();
+  musicEnterTimer = null;
+  musicExitTimer?.cancel();
+  musicExitTimer = null;
+  stopMusic();
+
+  const enter = config.enter || 0;
+  const startPlayback = () => {
+    if (mySession !== sessionId) return;
+    musicEnterTimer = null;
+    playMusic(config.src, config.startVolume);
+    fadeMusic(config.fullVolume, config.crescendoMs);
+
+    if (config.exit !== null && config.exit !== undefined) {
+      musicExitTimer = new PausableTimer(() => {
+        musicExitTimer = null;
+        fadeMusic(0, 2000);
+      }, config.exit - enter);
+    }
+  };
+
+  if (enter > 0) {
+    musicEnterTimer = new PausableTimer(startPlayback, enter);
+  } else {
+    startPlayback();
+  }
+}
+
+export function pauseAll() {
+  narrationDelayTimer?.pause();
+  musicEnterTimer?.pause();
+  musicExitTimer?.pause();
+  pauseNarration();
+  pauseAmbient();
+  pauseMusic();
+  // Pause old ambient mid-crossfade
+  if (oldAmbientRef) oldAmbientRef.pause();
+  if (oldAmbientFadeTimer) {
+    clearTimeout(oldAmbientFadeTimer);
+    oldAmbientFadeTimer = null;
+  }
+}
+
+export function resumeAll() {
+  narrationDelayTimer?.resume();
+  musicEnterTimer?.resume();
+  musicExitTimer?.resume();
+  resumeNarration();
+  resumeAmbient();
+  resumeMusic();
+  // Snap old ambient to target (0) and unload
+  if (oldAmbientRef) {
+    oldAmbientRef.volume(0);
+    oldAmbientRef.unload();
+    oldAmbientRef = null;
+  }
+}
+
+export function cancelAll() {
+  sessionId++;
+  narrationDelayTimer?.cancel();
+  narrationDelayTimer = null;
+  clearNarrationSafetyTimer();
+  musicEnterTimer?.cancel();
+  musicEnterTimer = null;
+  musicExitTimer?.cancel();
+  musicExitTimer = null;
+  cancelOldAmbientFade();
+  stopNarration();
+  stopMusic();
 }
