@@ -34,7 +34,8 @@ export function preloadAudio(src) {
 }
 
 export function audioSrcsFromEntry(entry) {
-  return [entry.ambient?.src, entry.narration?.audio, entry.music?.src].filter(Boolean);
+  if (!entry.audioCues) return [];
+  return entry.audioCues.map((c) => c.src).filter(Boolean);
 }
 
 export function preloadFirstFrameAudio(frames, onLoaded) {
