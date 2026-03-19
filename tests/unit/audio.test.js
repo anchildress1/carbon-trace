@@ -1470,9 +1470,6 @@ describe('audio.js', () => {
       vi.clearAllMocks();
       vi.advanceTimersByTime(4900); // exit: 5000 - enter: 100 = 4900
 
-      const howl = Howl.mock.results?.[0]?.value;
-      // fadeMusic(0, 2000) should have been called
-      // Since mock returns same instance, check the mock
       expect(mockHowlInstance.fade).toHaveBeenCalled();
     });
 

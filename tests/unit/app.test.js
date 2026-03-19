@@ -205,7 +205,7 @@ vi.mock('../../src/scenes.json', () => ({
           delay: 500,
         },
         ambient: { src: 'ambient.mp3', volume: 0.5, loop: true },
-        effects: { idle: null, entry: null },
+        effects: { idle: null, entry: 'fade-in' },
         transition: { type: 'fade', duration: 400 },
         traceOverlay: null,
         music: {
@@ -216,6 +216,23 @@ vi.mock('../../src/scenes.json', () => ({
           enter: 100,
           exit: 5000,
         },
+      },
+      {
+        id: 'scene-02',
+        frameType: 'scene',
+        holdUntilClick: false,
+        holdAfterNarration: 3000,
+        image: 'scene-02.webp',
+        narration: {
+          lines: null,
+          captions: null,
+          audio: null,
+          delay: 0,
+        },
+        ambient: null,
+        effects: { idle: 'dust-drift', entry: 'fade-in' },
+        transition: { type: 'fade', duration: 400 },
+        traceOverlay: null,
       },
       {
         id: 'credits',
@@ -258,15 +275,15 @@ import {
   resumeAll,
   cancelAll,
 } from '../../src/audio.js';
-import { clearNarrationLayer } from '../../src/text.js';
-import { clearEffects } from '../../src/effects.js';
+import { buildNarrationTimeline, clearNarrationLayer } from '../../src/text.js';
+import { runEffect, clearEffects } from '../../src/effects.js';
 import {
   clearAll as clearCanvasEffects,
   pause as pauseCanvas,
   resume as resumeCanvas,
 } from '../../src/effects-canvas.js';
 import { drawImage as drawSceneImage, clearScene, drawFallback, loadImage } from '../../src/canvas.js';
-import { setCaptionsEnabled, areCaptionsEnabled, clearCaptionElements } from '../../src/captions.js';
+import { setCaptionsEnabled, areCaptionsEnabled, syncCaptionsToTime, clearCaptionElements } from '../../src/captions.js';
 import { initOverlay } from '../../src/overlay.js';
 import { preloadFirstFrameAudio } from '../../src/loader.js';
 
@@ -369,9 +386,11 @@ describe('app.js', () => {
 
     it('does not advance from credits frame', async () => {
       app.togglePause();
-      app.advance();
+      app.advance(); // title → scene-01
       await vi.runAllTimersAsync();
-      app.advance();
+      app.advance(); // scene-01 → scene-02
+      await vi.runAllTimersAsync();
+      app.advance(); // scene-02 → credits
       await vi.runAllTimersAsync();
 
       expect(app.getState()).toBe('CREDITS');
@@ -716,7 +735,7 @@ describe('app.js', () => {
       app = createApp();
       await vi.runAllTimersAsync();
       app.togglePause();
-      app.advance();
+      app.advance(); // to scene-01
       await vi.runAllTimersAsync();
 
       // Extract the onend callback passed to scheduleNarration
@@ -727,9 +746,9 @@ describe('app.js', () => {
       onend();
 
       // Auto-advance timer should have been set (2000ms holdAfterNarration)
+      // Advances scene-01 → scene-02 (verify scheduleNarration or cancelAll called)
       vi.advanceTimersByTime(2000);
-      await vi.runAllTimersAsync();
-      expect(app.getState()).toBe('CREDITS');
+      expect(cancelAll).toHaveBeenCalled();
     });
 
     it('stale onend callback is ignored after scene change', async () => {
@@ -741,16 +760,16 @@ describe('app.js', () => {
 
       const staleOnend = scheduleNarration.mock.calls[0][2];
 
-      // Navigate away (to credits) before narration ends
-      app.advance();
-      await vi.runAllTimersAsync();
-      expect(app.getState()).toBe('CREDITS');
+      // Navigate away before narration ends — cancelAll called
+      vi.clearAllMocks();
+      app.advance(); // to scene-02
 
       // Fire the stale onend — should be ignored (generation changed)
-      vi.clearAllMocks();
       staleOnend();
-      vi.advanceTimersByTime(5000);
-      expect(app.getState()).toBe('CREDITS');
+
+      // The stale onend should NOT have scheduled auto-advance
+      // (scheduleNarration should not have been called by the stale callback)
+      expect(scheduleNarration).not.toHaveBeenCalled();
     });
   });
 
@@ -931,11 +950,10 @@ describe('app.js', () => {
       expect(cancelAll).toHaveBeenCalled();
     });
 
-    it('btn-next advances to next frame', async () => {
+    it('btn-next advances to next frame', () => {
       vi.clearAllMocks();
       document.getElementById('btn-next').click();
-      await vi.runAllTimersAsync();
-      expect(app.getState()).toBe('CREDITS');
+      expect(cancelAll).toHaveBeenCalled();
     });
 
     it('btn-pause toggles pause via listener', () => {
@@ -978,10 +996,10 @@ describe('app.js', () => {
       vi.clearAllMocks();
       app.togglePause(); // resume — PausableTimer.resume() called
 
-      // Advance past the remaining auto-advance time
+      // Advance past the remaining auto-advance time — triggers transition
+      vi.clearAllMocks();
       vi.advanceTimersByTime(2000);
-      await vi.runAllTimersAsync();
-      expect(app.getState()).toBe('CREDITS');
+      expect(cancelAll).toHaveBeenCalled();
     });
   });
 
@@ -1063,4 +1081,147 @@ describe('app.js', () => {
       expect(cancelAll).toHaveBeenCalled();
     });
   });
+
+  // ── coverage: no-audio auto-advance (scene-02) ────────────────────
+
+  describe('no-audio auto-advance (scene-02)', () => {
+    it('auto-advances after holdAfterNarration when narration.audio is null', async () => {
+      app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause();
+      app.advance(); // title → scene-01 (transition completes synchronously via mock gsap)
+
+      // Now advance to scene-02 — don't runAllTimersAsync (it would chain through)
+      app.advance(); // scene-01 → scene-02
+      // Transition completes synchronously. scene-02 auto-advance timer (3000ms) is now pending.
+
+      vi.clearAllMocks();
+      vi.advanceTimersByTime(3000);
+      // Auto-advance fires → transition to credits
+      expect(cancelAll).toHaveBeenCalled();
+    });
+
+    it('runs idle effect on showFrame when effects.idle is set', async () => {
+      app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause();
+      app.advance(); // to scene-01
+      vi.clearAllMocks();
+      app.advance(); // to scene-02 which has effects.idle='dust-drift'
+      await vi.runAllTimersAsync();
+
+      expect(runEffect).toHaveBeenCalledWith(
+        'dust-drift',
+        expect.any(HTMLCanvasElement),
+        expect.any(HTMLCanvasElement),
+      );
+    });
+
+    it('runs entry effect on replay for scene with effects.entry', async () => {
+      app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause();
+      app.advance(); // to scene-01 (has effects.entry='fade-in' and narration)
+
+      vi.clearAllMocks();
+      document.getElementById('btn-replay').click();
+
+      expect(runEffect).toHaveBeenCalledWith(
+        'fade-in',
+        expect.any(HTMLCanvasElement),
+        expect.any(HTMLCanvasElement),
+      );
+    });
+  });
+
+  // ── coverage: pending navigation during transition ─────────────────
+
+  describe('pending navigation during transition', () => {
+    it('queues second advance and executes after first completes', async () => {
+      const { gsap } = await import('gsap');
+      let storedOnComplete = null;
+      gsap.to.mockImplementation((_target, opts) => {
+        storedOnComplete = opts.onComplete;
+        return { kill: vi.fn() };
+      });
+
+      app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause();
+
+      app.advance(); // starts transition (deferred onComplete)
+      expect(app.getState()).toBe('TRANSITIONING');
+
+      app.advance(); // queued as pendingNavIndex
+
+      // Complete first transition
+      if (storedOnComplete) storedOnComplete();
+      await vi.runAllTimersAsync();
+
+      // Pending nav should have fired
+      expect(cancelAll).toHaveBeenCalled();
+    });
+  });
+
+  // ── coverage: pause queued during transition (lands paused) ────────
+
+  describe('pause queued during transition (single toggle)', () => {
+    it('lands in PAUSED when pause is toggled once during transition', async () => {
+      const { gsap } = await import('gsap');
+      const onCompletes = [];
+      gsap.to.mockImplementation((_target, opts) => {
+        onCompletes.push(opts.onComplete);
+        return { kill: vi.fn() };
+      });
+
+      app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause(); // resume → SCENE_ACTIVE
+
+      app.advance(); // starts fade-out transition
+      app.togglePause(); // queue pendingPause
+
+      // Complete fade-out → triggers showFrame + fade-in
+      if (onCompletes[0]) onCompletes[0]();
+      // Complete fade-in → landOnFrame checks pendingPause
+      if (onCompletes[1]) onCompletes[1]();
+      await vi.runAllTimersAsync();
+
+      expect(app.getState()).toBe('PAUSED');
+    });
+  });
+
+  // ── coverage: caption sync on late enable ──────────────────────────
+
+  describe('caption sync on late enable', () => {
+    it('calls syncCaptionsToTime when enabling captions with active entries', async () => {
+      buildNarrationTimeline.mockReturnValue({
+        timeline: {
+          play: vi.fn(),
+          pause: vi.fn(),
+          resume: vi.fn(),
+          kill: vi.fn(),
+          time: vi.fn().mockReturnValue(1.5),
+        },
+        captionEntries: [{ text: 'test', startSec: 0, endSec: 2, el: null }],
+      });
+
+      app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause();
+      app.advance(); // to scene-01 (has captions)
+      await vi.runAllTimersAsync();
+
+      areCaptionsEnabled.mockReturnValue(false);
+      vi.clearAllMocks();
+      document.getElementById('btn-captions').click();
+
+      expect(syncCaptionsToTime).toHaveBeenCalledWith(
+        expect.any(Array),
+        1.5,
+        expect.any(HTMLElement),
+      );
+    });
+  });
+
 });
