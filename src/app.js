@@ -5,7 +5,6 @@ import {
   cancelAudioCues,
   pauseAudioCues,
   resumeAudioCues,
-  cueAudioCues,
   cancelCue,
   reCueCue,
   setMuted,
@@ -193,6 +192,52 @@ function scheduleFrameAudio(app, frame) {
   });
 }
 
+function scheduleReplayNarration(app, frame, narrationCue) {
+  if (!narrationCue) return;
+
+  const holdAfterNarration =
+    frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
+  const onNarrationEnd = makeNarrationEndCallback(app, frame, holdAfterNarration);
+  const maxNarrationDurationMs = getMaxNarrationDuration(
+    frame,
+    app.audioDurations,
+    app.projectMaxCaptionMs,
+  );
+
+  scheduleAudioCues([narrationCue], {
+    onNarrationEnd,
+    maxNarrationDurationMs,
+    audioDurations: app.audioDurations,
+  });
+}
+
+function resumeDeferredFrameAudio(app, { cancelExisting = false } = {}) {
+  if (!app.deferFrameAudioUntilResume) return false;
+
+  app.deferFrameAudioUntilResume = false;
+  if (cancelExisting) {
+    cancelAudioCues();
+  }
+  scheduleFrameAudio(app, app.frames[app.currentIndex]);
+  return true;
+}
+
+function resumeReplayPendingAudio(app) {
+  app.replayPending = false;
+  const frame = app.frames[app.currentIndex];
+  const narrationCue = getNarrationCueFromFrame(frame);
+
+  if (resumeDeferredFrameAudio(app, { cancelExisting: true })) {
+    return;
+  }
+
+  if (narrationCue) {
+    cancelCue('narration');
+  }
+  resumeAudioCues();
+  scheduleReplayNarration(app, frame, narrationCue);
+}
+
 function buildNarration(app, frame) {
   try {
     app.textTimeline?.kill();
@@ -311,12 +356,12 @@ function showFrame(app, index) {
 
   buildNarration(app, frame);
 
-  if (app.cueOnly) {
-    cueAudioCues(frame.audioCues);
-  } else if (app.userHasInteracted) {
-    scheduleFrameAudio(app, frame);
-  } else {
-    app.els.btnReplay.disabled = true;
+  if (!app.deferFrameAudioUntilResume) {
+    if (app.userHasInteracted) {
+      scheduleFrameAudio(app, frame);
+    } else {
+      app.els.btnReplay.disabled = true;
+    }
   }
 
   prebufferNextScene(app, index);
@@ -387,6 +432,7 @@ function cleanupCurrentScene(app) {
   app.textTimeline = null;
   app.captionEntries = [];
 
+  app.deferFrameAudioUntilResume = false;
   app.replayPending = false;
 }
 
@@ -419,7 +465,7 @@ function transition(app, toIndex) {
       const prevIndex = app.currentIndex;
       const prevFrame = app.frames[prevIndex];
       app.currentIndex = toIndex;
-      app.cueOnly = true;
+      app.deferFrameAudioUntilResume = true;
       try {
         showFrame(app, toIndex);
         app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
@@ -428,7 +474,6 @@ function transition(app, toIndex) {
         app.currentIndex = prevIndex;
         app.state = STATE_BY_FRAME_TYPE[prevFrame.frameType] || State.SCENE_ACTIVE;
       }
-      app.cueOnly = false;
       doPause(app);
       completePendingNav(app);
     };
@@ -567,33 +612,7 @@ function doResume(app) {
   app.pausedFromState = null;
 
   if (app.replayPending) {
-    // Replay happened while paused — narration was cued, not played.
-    // Schedule fresh narration with onend callback for auto-advance.
-    app.replayPending = false;
-    const frame = app.frames[app.currentIndex];
-    const narrationCue = getNarrationCueFromFrame(frame);
-    // Resume ambient/music first, then schedule fresh narration on top.
-    // Order matters: resumeAudioCues before scheduleAudioCues prevents
-    // the newly scheduled narration from being double-played.
-    if (narrationCue) {
-      cancelCue('narration');
-    }
-    resumeAudioCues();
-    if (narrationCue) {
-      const holdAfterNarration =
-        frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
-      const onNarrationEnd = makeNarrationEndCallback(app, frame, holdAfterNarration);
-      const maxNarrationDurationMs = getMaxNarrationDuration(
-        frame,
-        app.audioDurations,
-        app.projectMaxCaptionMs,
-      );
-      scheduleAudioCues([narrationCue], {
-        onNarrationEnd,
-        maxNarrationDurationMs,
-        audioDurations: app.audioDurations,
-      });
-    }
+    resumeReplayPendingAudio(app);
     // Clear caption DOM created as side effect of tl.pause(0) in
     // replayNarration — play(0) will recreate them cleanly.
     clearCaptionElements(app.captionEntries);
@@ -602,7 +621,9 @@ function doResume(app) {
     }
     setupAutoAdvance(app);
   } else {
-    resumeAudioCues();
+    if (!resumeDeferredFrameAudio(app)) {
+      resumeAudioCues();
+    }
     if (app.textTimeline && !app.buffering) {
       app.textTimeline.resume();
     }
@@ -896,7 +917,7 @@ export function createApp() {
     autoAdvanceTimer: null,
     pendingNavIndex: null,
     generation: 0,
-    cueOnly: false,
+    deferFrameAudioUntilResume: false,
     replayPending: false,
     pendingPause: false,
     buffering: false,

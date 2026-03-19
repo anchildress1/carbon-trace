@@ -441,12 +441,11 @@ describe('app.js', () => {
       expect(cancelAudioCues).toHaveBeenCalled();
     });
 
-    it('cues narration instead of playing during hard cut', async () => {
+    it('defers frame audio during hard cut', async () => {
       vi.clearAllMocks();
       app.advance();
       await vi.runAllTimersAsync();
-      // During hard cut (paused), audioCues should be cued, not scheduled
-      expect(cueAudioCues).toHaveBeenCalled();
+      expect(cueAudioCues).not.toHaveBeenCalled();
       expect(scheduleAudioCues).not.toHaveBeenCalled();
     });
 
@@ -458,22 +457,29 @@ describe('app.js', () => {
       expect(clearCanvasEffects).toHaveBeenCalled();
     });
 
-    it('cues ambient instead of playing during hard cut', async () => {
+    it('does not start ambient during hard cut', async () => {
       vi.clearAllMocks();
       app.advance();
       await vi.runAllTimersAsync();
-      // All cues (including ambient) are cued together via cueAudioCues
-      expect(cueAudioCues).toHaveBeenCalled();
+      expect(cueAudioCues).not.toHaveBeenCalled();
       expect(scheduleAudioCues).not.toHaveBeenCalled();
     });
 
-    it('cues music instead of scheduling during hard cut', async () => {
+    it('schedules fresh frame audio on resume after hard cut', async () => {
       vi.clearAllMocks();
       app.advance();
       await vi.runAllTimersAsync();
-      // All cues (including music) are cued together via cueAudioCues
-      expect(cueAudioCues).toHaveBeenCalled();
-      expect(scheduleAudioCues).not.toHaveBeenCalled();
+      vi.clearAllMocks();
+      app.togglePause();
+      expect(scheduleAudioCues).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.objectContaining({
+          onNarrationEnd: expect.any(Function),
+          maxNarrationDurationMs: expect.any(Number),
+          audioDurations: expect.any(Map),
+        }),
+      );
+      expect(resumeAudioCues).not.toHaveBeenCalled();
     });
   });
 
@@ -853,9 +859,10 @@ describe('app.js', () => {
       // Navigate to next scene instead of resuming
       app.advance();
       await vi.runAllTimersAsync();
-      // Resume on the new scene — should do normal resume (resumeAudioCues), not replay path
+      // Resume on the new scene — hard cut should schedule fresh frame audio.
       app.togglePause(); // resume
-      expect(resumeAudioCues).toHaveBeenCalled();
+      expect(scheduleAudioCues).toHaveBeenCalled();
+      expect(resumeAudioCues).not.toHaveBeenCalled();
     });
   });
 
