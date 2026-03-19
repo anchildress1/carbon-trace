@@ -741,10 +741,6 @@ function replayNarration(app) {
     if (app.textTimeline) app.textTimeline.play(0);
     setupAutoAdvance(app);
   }
-
-  if (frame.effects?.entry) {
-    runEffect(frame.effects.entry, app.els.effectsCanvas, app.els.sceneCanvas);
-  }
 }
 
 function handleKeydown(app, e) {

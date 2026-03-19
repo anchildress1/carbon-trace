@@ -1117,7 +1117,7 @@ describe('app.js', () => {
       );
     });
 
-    it('runs entry effect on replay for scene with effects.entry', async () => {
+    it('does not re-run entry effect on replay', async () => {
       app = createApp();
       await vi.runAllTimersAsync();
       app.togglePause();
@@ -1126,7 +1126,8 @@ describe('app.js', () => {
       vi.clearAllMocks();
       document.getElementById('btn-replay').click();
 
-      expect(runEffect).toHaveBeenCalledWith(
+      // Entry effects belong to scene transitions, not narration replays
+      expect(runEffect).not.toHaveBeenCalledWith(
         'fade-in',
         expect.any(HTMLCanvasElement),
         expect.any(HTMLCanvasElement),
