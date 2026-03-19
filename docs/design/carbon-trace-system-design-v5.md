@@ -220,7 +220,6 @@ Every frame has identical shape via `meta.frameDefaults` merge. `null` = skip fe
     {
       "id": "scene-01-seam",
       "frameType": "scene",
-      "holdUntilClick": false,
       "holdAfterNarration": 2000,
       "description": "Coal seam wall, lamp upper left — carbon buried under pressure",
       "image": "assets/images/scene-01-seam.webp",
@@ -282,24 +281,28 @@ fadeOut  │ number | null       │ ms fade-out at end. null = no auto-fade.
 - `ambient`: crossfades on scene transition via `crossfadeAmbientCue`. Can overlap with narration.
 - `sfx`: one-shot, no crossfade, no replay.
 
-### 4.5 holdUntilClick Map
+### 4.5 holdAfterNarration Map
 
 ```
-FRAME                │ holdUntilClick │ holdAfterNarration
-─────────────────────┼────────────────┼────────────────────
-00 Title             │ false          │ null
-01 Seam              │ false          │ 2000
-02 Travel            │ false          │ 2000
-03 Reach             │ false          │ 3000
-04 Pocket            │ false          │ 2000
-05 Rinse             │ false          │ 2500
-06 Storage           │ false          │ 2000
-07 Empty             │ false          │ 2000
-08 Stillness         │ false          │ 8000
-09 Return            │ false          │ 2000
-10 Building          │ false          │ 3000
-11 Music             │ null           │ null
+FRAME                │ holdAfterNarration
+─────────────────────┼────────────────────
+00 Title             │ null (default 2000)
+01 Seam              │ 2000
+02 Travel            │ 2000
+03 Reach             │ 3000
+04 Pocket            │ 2000
+05 Rinse             │ 2500
+06 Storage           │ 2000
+07 Empty             │ 2000
+08 Stillness         │ 8000
+09 Return            │ 2000
+10 Building          │ 3000
+11 Music (credits)   │ n/a (last frame, no advance)
 ```
+
+All frames auto-advance after narration + holdAfterNarration. The credits frame
+is the last frame, so `shouldAutoAdvance` returns false and `advance()` is blocked
+by the CREDITS state.
 
 ### 4.6 Audio Hierarchy
 
@@ -433,8 +436,7 @@ function setupAutoAdvance(app) {
   // With narration audio — onNarrationEnd callback triggers scheduleAutoAdvance
 }
 
-function shouldAutoAdvance(app, frame) {
-  if (frame.holdUntilClick === true || frame.holdUntilClick === null) return false;
+function shouldAutoAdvance(app) {
   if (app.currentIndex >= app.frames.length - 1) return false;
   return true;
 }
@@ -573,8 +575,7 @@ Auto-advance       │ (internal)           │ (internal)         │ advance(c
 - **Stage click/tap does NOT navigate** — reserved for visual effects (hover text, particle triggers). Mobile has no hover, so tap is the mobile equivalent for triggering scene interactions. Navigation is exclusively via buttons, dots, and keyboard.
 - TRANSITIONING: navigation queued as pendingNavIndex, pause queued as pendingPause
 - PAUSED: hardJump — no lock, rapid dot-clicking works
-- CREDITS: advance disabled (`holdUntilClick === null`)
-- holdUntilClick scenes: no auto-advance, forward button still navigates
+- CREDITS: advance disabled (last frame + CREDITS state)
 
 ---
 
@@ -652,7 +653,7 @@ line 3:  ░░░░░░░░░░░░░░░▓▓▓▓▓▓▓▓�
 - Exit: clear → blur(3px) + y:-10 (0.9s, power2.in)
 - Lines enter/exit independently, overlap allowed
 - If user navigates mid-drift: kill timeline, transition. Interrupt, not queue
-- Scene 8: text only, no audio — holdUntilClick waits for user
+- Scene 8: text only, no audio — auto-advances after holdAfterNarration (8000ms)
 - Reduced motion: simple opacity fade (0.3s), no spatial movement, no blur
 - `aria-live="polite"` region mirrors caption text for screen readers
 
@@ -785,7 +786,7 @@ Pause during transition             │ pendingPause. Transition finishes, then 
 Pause during holdAfterNarration     │ Save remaining. Resume: reschedule.
 Scene 8 + paused                    │ holdAfterNarration timer paused. Nav = hardJump.
 Scene 8 + playing                   │ Auto-advances after 8s hold.
-Credits (Scene 11)                  │ holdUntilClick: null. No advance. Music plays.
+Credits (Scene 11)                  │ Last frame + CREDITS state. No advance. Music plays.
 Replay while playing                │ Restart narration + text. Clear timer.
                                     │ 'end' re-arms auto-advance. (ADR-004)
 Replay while paused                 │ Hard jump reset. Narration cued (loaded,

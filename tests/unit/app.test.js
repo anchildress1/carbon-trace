@@ -169,7 +169,7 @@ vi.mock('../../src/scenes.json', () => ({
       {
         id: 'title',
         frameType: 'title',
-        holdUntilClick: false,
+
         holdAfterNarration: null,
         narration: {
           lines: [{ text: 'Opening line', enter: 0, exit: 3000 }],
@@ -185,7 +185,7 @@ vi.mock('../../src/scenes.json', () => ({
       {
         id: 'scene-01',
         frameType: 'scene',
-        holdUntilClick: false,
+
         holdAfterNarration: 2000,
         image: 'scene-01.webp',
         narration: {
@@ -204,7 +204,7 @@ vi.mock('../../src/scenes.json', () => ({
       {
         id: 'scene-02',
         frameType: 'scene',
-        holdUntilClick: false,
+
         holdAfterNarration: 3000,
         image: 'scene-02.webp',
         narration: {
@@ -219,7 +219,7 @@ vi.mock('../../src/scenes.json', () => ({
       {
         id: 'credits',
         frameType: 'credits',
-        holdUntilClick: null,
+
         holdAfterNarration: null,
         image: 'credits.webp',
         narration: null,
@@ -1292,7 +1292,7 @@ describe('app.js', () => {
       document.getElementById('btn-prev').click();
       await vi.runAllTimersAsync();
 
-      // Title: holdUntilClick=true, no narration audio
+      // Title: no narration audio scheduled yet (handleFirstPlay not called)
       expect(app.getState()).toBe('SCENE_ACTIVE');
 
       // Advance back to scene-01
@@ -1590,7 +1590,7 @@ describe('app.js', () => {
     });
   });
 
-  // ── title auto-advance (holdUntilClick=false) ─────────────────────
+  // ── title auto-advance ─────────────────────────────────────────────
 
   describe('title auto-advance', () => {
     it('auto-advances title frame when onNarrationEnd fires', async () => {

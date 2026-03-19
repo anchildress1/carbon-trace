@@ -115,9 +115,7 @@ function scheduleAutoAdvance(app, delay) {
   }, delay);
 }
 
-function shouldAutoAdvance(app, frame) {
-  // holdUntilClick: true = wait for click (no auto-advance), false = auto-advance after narration, null = no advance allowed (credits)
-  if (frame.holdUntilClick === true || frame.holdUntilClick === null) return false;
+function shouldAutoAdvance(app) {
   if (app.currentIndex >= app.frames.length - 1) return false;
   return true;
 }
@@ -125,7 +123,7 @@ function shouldAutoAdvance(app, frame) {
 function setupAutoAdvance(app) {
   clearAutoAdvance(app);
   const frame = app.frames[app.currentIndex];
-  if (!shouldAutoAdvance(app, frame)) return;
+  if (!shouldAutoAdvance(app)) return;
 
   const holdAfterNarration =
     frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
@@ -168,7 +166,7 @@ function makeNarrationEndCallback(app, frame, holdAfterNarration) {
   const gen = app.generation;
   return () => {
     if (gen !== app.generation) return;
-    if (shouldAutoAdvance(app, frame)) {
+    if (shouldAutoAdvance(app)) {
       scheduleAutoAdvance(app, holdAfterNarration);
     }
   };
@@ -590,10 +588,8 @@ function retreat(app) {
 }
 
 function updateNavButtons(app) {
-  const frame = app.frames[app.currentIndex];
   app.els.btnPrev.disabled = app.currentIndex === 0;
-  app.els.btnNext.disabled =
-    app.currentIndex >= app.frames.length - 1 || frame.holdUntilClick === null;
+  app.els.btnNext.disabled = app.currentIndex >= app.frames.length - 1;
 }
 
 function handleFirstPlay(app) {
