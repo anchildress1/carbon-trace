@@ -134,7 +134,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #0e0e0e;
+  background: radial-gradient(ellipse at 50% 40%, #1a1816, #12100e);
 }
 
 .scene-canvas {
