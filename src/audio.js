@@ -468,6 +468,43 @@ export function cancelCue(cueId) {
   if (entry.type === 'narration') cleanupBufferMonitoring();
 }
 
+/**
+ * Restart narration using the existing Howl instance (stop → play from 0).
+ * Avoids allocating a new HTML5 Audio element, preventing pool exhaustion
+ * on rapid replay clicks.
+ * Returns true if an existing Howl was restarted, false if caller must
+ * fall back to cancelCue + scheduleAudioCues.
+ */
+export function restartNarrationCue(cue, opts) {
+  const entry = activeCues.get('narration');
+  if (!entry?.howl) return false;
+
+  // Cancel pending scheduling delay or safety timer
+  if (entry.timer) {
+    entry.timer.cancel();
+    entry.timer = null;
+  }
+
+  cleanupBufferMonitoring();
+
+  // Remove old event handlers so stale safeEnd doesn't fire
+  entry.howl.off('end');
+  entry.howl.off('loaderror');
+  entry.howl.off('playerror');
+
+  // Restart from beginning — reuses the same <audio> element
+  entry.howl.stop();
+  entry.howl.play();
+  entry.state = 'playing';
+
+  // Re-wire narration end with fresh callbacks
+  if (opts?.onNarrationEnd) {
+    wireNarrationEnd(entry, { ...cue, resolvedEnter: 0 }, opts);
+  }
+
+  return true;
+}
+
 export function reCueCue(cueId, cue) {
   cancelCue(cueId);
   const howl = new Howl({

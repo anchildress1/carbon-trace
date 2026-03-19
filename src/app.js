@@ -6,6 +6,7 @@ import {
   pauseAudioCues,
   resumeAudioCues,
   cancelCue,
+  restartNarrationCue,
   reCueCue,
   setMuted,
   onNarrationBufferChange,
@@ -716,15 +717,11 @@ function replayNarration(app) {
       app.textTimeline.pause(0);
     }
   } else {
-    if (narrationCue) {
-      cancelCue('narration');
-    }
     buildNarration(app, frame);
-    // Only re-schedule narration — ambient/music should continue uninterrupted.
     if (narrationCue) {
       const holdAfterNarration =
         frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
-      scheduleAudioCues([narrationCue], {
+      const narrationOpts = {
         onNarrationEnd: makeNarrationEndCallback(app, frame, holdAfterNarration),
         maxNarrationDurationMs: getMaxNarrationDuration(
           frame,
@@ -732,7 +729,13 @@ function replayNarration(app) {
           app.projectMaxCaptionMs,
         ),
         audioDurations: app.audioDurations,
-      });
+      };
+      // Reuse existing Howl to avoid HTML5 Audio pool exhaustion on rapid replays.
+      // Falls back to cancel + fresh schedule if no Howl exists yet.
+      if (!restartNarrationCue(narrationCue, narrationOpts)) {
+        cancelCue('narration');
+        scheduleAudioCues([narrationCue], narrationOpts);
+      }
     }
     if (app.textTimeline) app.textTimeline.play(0);
     setupAutoAdvance(app);

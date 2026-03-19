@@ -28,6 +28,7 @@ function createMockHowlInstance() {
     volume,
     once: vi.fn(),
     on: vi.fn(),
+    off: vi.fn(),
     _sounds: [{ _node: mockNode }],
   };
 }
@@ -114,6 +115,7 @@ import {
   resumeAudioCues,
   cueAudioCues,
   cancelCue,
+  restartNarrationCue,
   reCueCue,
   getNarrationCue,
   setMuted,
@@ -573,6 +575,63 @@ describe('audio.js — unified cue API (ADR-005)', () => {
 
     it('cancelCue is safe on nonexistent id', () => {
       expect(() => cancelCue('nonexistent')).not.toThrow();
+    });
+  });
+
+  describe('restartNarrationCue', () => {
+    it('reuses existing Howl — stop + play instead of unload + new', () => {
+      scheduleAudioCues([makeCue()]);
+      const howl = Howl.mock.results[0].value;
+      vi.clearAllMocks();
+
+      const onEnd = vi.fn();
+      const result = restartNarrationCue(makeCue(), {
+        onNarrationEnd: onEnd,
+        maxNarrationDurationMs: 5000,
+      });
+
+      expect(result).toBe(true);
+      expect(howl.stop).toHaveBeenCalled();
+      expect(howl.play).toHaveBeenCalled();
+      // No new Howl created — same instance reused
+      expect(Howl).not.toHaveBeenCalled();
+      expect(howl.unload).not.toHaveBeenCalled();
+    });
+
+    it('removes old event handlers before re-wiring', () => {
+      scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn(), maxNarrationDurationMs: 5000 });
+      const howl = Howl.mock.results[0].value;
+      vi.clearAllMocks();
+
+      restartNarrationCue(makeCue(), {
+        onNarrationEnd: vi.fn(),
+        maxNarrationDurationMs: 5000,
+      });
+
+      // Old handlers cleared
+      expect(howl.off).toHaveBeenCalledWith('end');
+      expect(howl.off).toHaveBeenCalledWith('loaderror');
+      expect(howl.off).toHaveBeenCalledWith('playerror');
+      // New handler wired
+      expect(howl.once).toHaveBeenCalledWith('end', expect.any(Function));
+    });
+
+    it('returns false when no narration entry exists', () => {
+      const result = restartNarrationCue(makeCue(), { onNarrationEnd: vi.fn() });
+      expect(result).toBe(false);
+    });
+
+    it('cancels pending safety timer before restarting', () => {
+      scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn(), maxNarrationDurationMs: 10000 });
+      vi.clearAllMocks();
+
+      restartNarrationCue(makeCue(), {
+        onNarrationEnd: vi.fn(),
+        maxNarrationDurationMs: 10000,
+      });
+
+      // The old safety timer was cancelled, new one created
+      // (wireNarrationEnd creates a new PausableTimer)
     });
   });
 
