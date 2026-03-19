@@ -1224,4 +1224,210 @@ describe('app.js', () => {
     });
   });
 
+  // ── edge: rapid replay while playing ──────────────────────────────
+
+  describe('rapid replay while playing', () => {
+    beforeEach(async () => {
+      app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause();
+      app.advance(); // to scene-01
+      await vi.runAllTimersAsync();
+    });
+
+    it('three rapid replays leave state SCENE_ACTIVE with fresh narration', () => {
+      vi.clearAllMocks();
+      document.getElementById('btn-replay').click();
+      document.getElementById('btn-replay').click();
+      document.getElementById('btn-replay').click();
+
+      expect(app.getState()).toBe('SCENE_ACTIVE');
+      // cancelAll called each time (3×)
+      expect(cancelAll).toHaveBeenCalledTimes(3);
+      // Only the last scheduleNarration matters — verify it was called
+      expect(scheduleNarration).toHaveBeenLastCalledWith(
+        'narration.mp3',
+        500,
+        expect.any(Function),
+        expect.any(Number),
+      );
+    });
+
+    it('stale onend from first replay does not trigger auto-advance after third', () => {
+      // Capture onend from first replay
+      document.getElementById('btn-replay').click();
+      const firstOnend = scheduleNarration.mock.calls[0]?.[2];
+
+      // Two more replays (generation increments each time)
+      document.getElementById('btn-replay').click();
+      document.getElementById('btn-replay').click();
+      vi.clearAllMocks();
+
+      // Fire stale onend — should be ignored (generation changed)
+      if (firstOnend) firstOnend();
+      vi.advanceTimersByTime(5000);
+
+      // Should still be on scene-01, no spurious advance
+      expect(app.getState()).toBe('SCENE_ACTIVE');
+      expect(cancelAll).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── edge: retreat to title then advance again ─────────────────────
+
+  describe('retreat to title then advance', () => {
+    beforeEach(async () => {
+      app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause();
+      app.advance(); // to scene-01
+      await vi.runAllTimersAsync();
+    });
+
+    it('retreats to title and re-advances to scene-01 with narration', async () => {
+      vi.clearAllMocks();
+      // Retreat to title (index 0)
+      document.getElementById('btn-prev').click();
+      await vi.runAllTimersAsync();
+
+      // Title: holdUntilClick=true, no narration audio
+      expect(app.getState()).toBe('SCENE_ACTIVE');
+
+      // Advance back to scene-01
+      vi.clearAllMocks();
+      app.advance();
+      await vi.runAllTimersAsync();
+
+      // Should schedule narration fresh
+      expect(scheduleNarration).toHaveBeenCalledWith(
+        'narration.mp3',
+        500,
+        expect.any(Function),
+        expect.any(Number),
+      );
+      expect(crossfadeAmbient).toHaveBeenCalledWith('ambient.mp3', 0.5, 800, true);
+    });
+  });
+
+  // ── edge: replay during buffering ─────────────────────────────────
+
+  describe('replay during buffering', () => {
+    it('clears buffering state and schedules fresh narration', async () => {
+      let bufferCb;
+      onNarrationBufferChange.mockImplementation((cb) => {
+        bufferCb = cb;
+      });
+
+      app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause();
+      app.advance(); // to scene-01
+      await vi.runAllTimersAsync();
+
+      // Simulate buffer stall
+      bufferCb(true);
+      const stage = document.getElementById('scene-stage');
+      expect(stage.classList.contains('buffering')).toBe(true);
+
+      vi.clearAllMocks();
+      document.getElementById('btn-replay').click();
+
+      expect(stage.classList.contains('buffering')).toBe(false);
+      expect(cancelAll).toHaveBeenCalled();
+      expect(scheduleNarration).toHaveBeenCalled();
+    });
+  });
+
+  // ── edge: dot navigation to current scene (no-op) ─────────────────
+
+  describe('dot navigation to current scene', () => {
+    it('does not trigger transition when clicking dot for current scene', async () => {
+      let dotClickCb;
+      initOverlay.mockImplementation((count, cb) => {
+        dotClickCb = cb;
+      });
+
+      app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause();
+      app.advance(); // to scene-01 (frame index 1, scene index 1)
+      await vi.runAllTimersAsync();
+
+      vi.clearAllMocks();
+      // Click the dot for the current scene (scene index 1 → frame index 1)
+      dotClickCb(1);
+
+      // Should NOT trigger a transition
+      expect(cancelAll).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── edge: keyboard guards inside overlay-controls ──────────────────
+
+  describe('keyboard events inside overlay-controls', () => {
+    beforeEach(async () => {
+      app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause(); // resume → SCENE_ACTIVE
+    });
+
+    it('Space inside overlay-controls does not toggle pause', () => {
+      const controls = document.getElementById('overlay-controls');
+      controls.dispatchEvent(
+        new KeyboardEvent('keydown', { key: ' ', bubbles: true }),
+      );
+
+      // Should still be SCENE_ACTIVE — Space suppressed inside controls
+      expect(app.getState()).toBe('SCENE_ACTIVE');
+    });
+
+    it('Enter inside overlay-controls does not advance', () => {
+      vi.clearAllMocks();
+      const controls = document.getElementById('overlay-controls');
+      controls.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+      );
+
+      expect(cancelAll).not.toHaveBeenCalled();
+    });
+
+    it('ArrowRight inside overlay-controls does not advance', () => {
+      vi.clearAllMocks();
+      const controls = document.getElementById('overlay-controls');
+      controls.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }),
+      );
+
+      expect(cancelAll).not.toHaveBeenCalled();
+    });
+
+    it('ArrowLeft still retreats from inside overlay-controls', async () => {
+      app.advance(); // to scene-01
+      await vi.runAllTimersAsync();
+
+      vi.clearAllMocks();
+      const controls = document.getElementById('overlay-controls');
+      controls.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }),
+      );
+
+      // ArrowLeft has no closest('#overlay-controls') guard — should retreat
+      expect(cancelAll).toHaveBeenCalled();
+    });
+  });
+
+  // ── edge: togglePause during LOADING state ────────────────────────
+
+  describe('togglePause during LOADING state', () => {
+    it('is a no-op before init completes', () => {
+      app = createApp();
+      // State is LOADING — init hasn't resolved yet
+      expect(app.getState()).toBe('LOADING');
+
+      app.togglePause();
+      // Should still be LOADING — togglePause returns early
+      expect(app.getState()).toBe('LOADING');
+      expect(pauseAll).not.toHaveBeenCalled();
+    });
+  });
 });
