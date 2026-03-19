@@ -1,6 +1,22 @@
 import { Howl } from 'howler';
 import { PausableTimer } from './pausable-timer.js';
 
+// Centralized Howl factory — every Howl in this project uses html5: true,
+// which acquires from Howler's internal Audio element pool. A failed load
+// that doesn't unload leaks that pool slot. This factory wraps onloaderror
+// to guarantee unload on failure, regardless of what the caller's handler does.
+function createHowl(options) {
+  const userHandler = options.onloaderror;
+  const howl = new Howl({
+    ...options,
+    onloaderror: (_id, err) => {
+      if (userHandler) userHandler(_id, err);
+      howl.unload();
+    },
+  });
+  return howl;
+}
+
 let currentAmbient = null;
 let currentNarration = null;
 let currentMusic = null;
@@ -168,7 +184,7 @@ function monitorNarrationBuffer(howl) {
 export function preloadNarrationAhead(src) {
   if (narrationCache.has(src)) return;
 
-  const howl = new Howl({
+  const howl = createHowl({
     src: [src],
     html5: true,
     preload: true,
@@ -194,7 +210,7 @@ export function playAmbient(src, volume, loop) {
     currentAmbient.unload();
   }
 
-  const howl = new Howl({
+  const howl = createHowl({
     src: [src],
     volume: volume,
     loop: loop,
@@ -219,7 +235,7 @@ export function cueAmbient(src, volume, loop) {
     currentAmbient.unload();
   }
 
-  const howl = new Howl({
+  const howl = createHowl({
     src: [src],
     volume: volume,
     loop: loop,
@@ -239,7 +255,7 @@ export function cueAmbient(src, volume, loop) {
 export function crossfadeAmbient(newSrc, volume, durationMs, loop = true) {
   const oldAmbient = currentAmbient;
 
-  const howl = new Howl({
+  const howl = createHowl({
     src: [newSrc],
     volume: 0,
     loop: loop,
@@ -288,7 +304,7 @@ export function playNarration(src, onend) {
       if (onend) onend();
     });
   } else {
-    howl = new Howl({
+    howl = createHowl({
       src: [src],
       volume: 1,
       html5: true,
@@ -328,7 +344,7 @@ export function cueNarration(src) {
       if (currentNarration === howl) currentNarration = null;
     });
   } else {
-    howl = new Howl({
+    howl = createHowl({
       src: [src],
       volume: 1,
       html5: true,
@@ -382,7 +398,7 @@ export function playMusic(src, volume) {
     currentMusic.unload();
   }
 
-  const howl = new Howl({
+  const howl = createHowl({
     src: [src],
     volume: volume,
     loop: true,
@@ -407,7 +423,7 @@ export function cueMusic(src, volume) {
     currentMusic.unload();
   }
 
-  const howl = new Howl({
+  const howl = createHowl({
     src: [src],
     volume: volume,
     loop: true,
@@ -541,7 +557,7 @@ export function scheduleAmbient(newSrc, volume, durationMs, loop = true) {
     }, durationMs + 100);
   }
 
-  const newHowl = new Howl({
+  const newHowl = createHowl({
     src: [newSrc],
     volume: 0,
     loop,
