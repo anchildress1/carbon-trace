@@ -251,29 +251,46 @@ function crossfadeAmbientCue(cue, crossfadeDurationMs) {
   });
 
   let unloaded = false;
+  let fadeOutTimerId = null;
 
   // Unload old ONLY after new confirms playback
   newHowl.once('play', () => {
     if (oldHowl && !unloaded) {
       oldHowl.fade(oldHowl.volume(), 0, crossfadeDurationMs);
-      setTimeout(() => {
+      fadeOutTimerId = setTimeout(() => {
+        fadeOutTimerId = null;
         oldHowl.unload();
         unloaded = true;
       }, crossfadeDurationMs + 100);
     }
   });
 
-  newHowl.on('loaderror', (_id, err) => {
-    console.warn(`Ambient load failed: ${cue.src}`, err);
+  const handleError = (label, _id, err) => {
+    console.warn(`Ambient ${label} failed: ${cue.src}`, err);
     newHowl.unload();
     if (oldHowl && !unloaded) oldHowl.fade(oldHowl.volume(), oldVolume, 200);
-  });
+    // Mark the entry as failed so pauseAudioCues/resumeAudioCues skip it
+    const entry = activeCues.get(cue.id);
+    if (entry && entry.howl === newHowl) {
+      entry.howl = null;
+      entry.state = 'error';
+    }
+  };
 
-  newHowl.on('playerror', (_id, err) => {
-    console.warn(`Ambient play failed: ${cue.src}`, err);
-    newHowl.unload();
-    if (oldHowl && !unloaded) oldHowl.fade(oldHowl.volume(), oldVolume, 200);
-  });
+  newHowl.on('loaderror', (id, err) => handleError('load', id, err));
+  newHowl.on('playerror', (id, err) => handleError('play', id, err));
+
+  // Store cleanup hook so cancelAudioCues can drain the deferred unload
+  newHowl._crossfadeCleanup = () => {
+    if (fadeOutTimerId) {
+      clearTimeout(fadeOutTimerId);
+      fadeOutTimerId = null;
+    }
+    if (oldHowl && !unloaded) {
+      oldHowl.unload();
+      unloaded = true;
+    }
+  };
 
   newHowl.play();
   newHowl.fade(0, cue.volume, cue.fadeIn > 0 ? cue.fadeIn : crossfadeDurationMs);
@@ -329,6 +346,15 @@ export function scheduleAudioCues(cues, opts = {}) {
   const resolved = resolveAnchors(cues, opts.maxNarrationDurationMs);
 
   for (const cue of resolved) {
+    // Defensive: clean up any pre-existing entry with the same ID.
+    // Skip for ambient→ambient: crossfadeAmbientCue handles the transition.
+    const existing = activeCues.get(cue.id);
+    if (existing && !(cue.type === 'ambient' && existing.type === 'ambient')) {
+      existing.timer?.cancel();
+      existing.howl?._crossfadeCleanup?.();
+      existing.howl?.unload();
+    }
+
     const entry = { howl: null, timer: null, type: cue.type, state: 'pending' };
 
     const startCue = () => {
@@ -359,6 +385,7 @@ export function scheduleAudioCues(cues, opts = {}) {
 export function cancelAudioCues() {
   for (const [, entry] of activeCues) {
     entry.timer?.cancel();
+    entry.howl?._crossfadeCleanup?.();
     entry.howl?.unload();
   }
   activeCues.clear();

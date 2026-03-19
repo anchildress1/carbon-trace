@@ -571,8 +571,14 @@ function doResume(app) {
     app.replayPending = false;
     const frame = app.frames[app.currentIndex];
     const narrationCue = getNarrationCueFromFrame(frame);
+    // Resume ambient/music first, then schedule fresh narration on top.
+    // Order matters: resumeAudioCues before scheduleAudioCues prevents
+    // the newly scheduled narration from being double-played.
     if (narrationCue) {
       cancelCue('narration');
+    }
+    resumeAudioCues();
+    if (narrationCue) {
       const holdAfterNarration =
         frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
       const onNarrationEnd = makeNarrationEndCallback(app, frame, holdAfterNarration);
@@ -583,7 +589,6 @@ function doResume(app) {
       );
       scheduleAudioCues([narrationCue], { onNarrationEnd, maxNarrationDurationMs });
     }
-    resumeAudioCues();
     // Clear caption DOM created as side effect of tl.pause(0) in
     // replayNarration — play(0) will recreate them cleanly.
     clearCaptionElements(app.captionEntries);
@@ -604,6 +609,9 @@ function doResume(app) {
 
   if (firstPlay) {
     app.els.playGate.hidden = true;
+    // Clear stranded 'cued' entries from showFrame's cueAudioCues call —
+    // handleFirstPlay will schedule audio fresh via scheduleFrameAudio.
+    cancelAudioCues();
     handleFirstPlay(app);
   }
 
@@ -682,7 +690,19 @@ function replayNarration(app) {
       cancelCue('narration');
     }
     buildNarration(app, frame);
-    scheduleFrameAudio(app, frame);
+    // Only re-schedule narration — ambient/music should continue uninterrupted.
+    if (narrationCue) {
+      const holdAfterNarration =
+        frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
+      scheduleAudioCues([narrationCue], {
+        onNarrationEnd: makeNarrationEndCallback(app, frame, holdAfterNarration),
+        maxNarrationDurationMs: getMaxNarrationDuration(
+          frame,
+          app.audioDurations,
+          app.projectMaxCaptionMs,
+        ),
+      });
+    }
     if (app.textTimeline) app.textTimeline.play(0);
     setupAutoAdvance(app);
   }

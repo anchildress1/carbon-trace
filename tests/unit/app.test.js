@@ -644,7 +644,7 @@ describe('app.js', () => {
   // ── ambient audio ──────────────────────────────────────────────────
 
   describe('ambient audio', () => {
-    it('applies crossfadeAmbient when advancing to a scene with ambient', async () => {
+    it('schedules ambient crossfade when advancing to a scene with ambient', async () => {
       app = createApp();
       await vi.runAllTimersAsync();
       app.togglePause();
@@ -665,7 +665,7 @@ describe('app.js', () => {
       app.togglePause();
     });
 
-    it('calls scheduleMusic when advancing to a scene with music', async () => {
+    it('schedules audio cues including music when advancing', async () => {
       vi.clearAllMocks();
       app.advance();
       await vi.runAllTimersAsync();
@@ -677,7 +677,7 @@ describe('app.js', () => {
   // ── narration scheduling ─────────────────────────────────────────
 
   describe('narration scheduling', () => {
-    it('calls scheduleNarration when advancing to a scene with narration', async () => {
+    it('schedules audio cues with onNarrationEnd when advancing to narration scene', async () => {
       app = createApp();
       await vi.runAllTimersAsync();
       app.togglePause();
@@ -694,7 +694,7 @@ describe('app.js', () => {
       );
     });
 
-    it('onend callback from scheduleNarration triggers auto-advance', async () => {
+    it('onNarrationEnd callback triggers auto-advance', async () => {
       app = createApp();
       await vi.runAllTimersAsync();
       app.togglePause();
@@ -1404,6 +1404,58 @@ describe('app.js', () => {
       // Should still be LOADING — togglePause returns early
       expect(app.getState()).toBe('LOADING');
       expect(pauseAudioCues).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── edge: rapid play/pause toggle ───────────────────────────────
+
+  describe('rapid play/pause toggle', () => {
+    it('survives 5 rapid toggles and lands in consistent state', async () => {
+      app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause(); // resume (firstPlay)
+      vi.clearAllMocks();
+
+      app.togglePause(); // pause
+      app.togglePause(); // resume
+      app.togglePause(); // pause
+      app.togglePause(); // resume
+      app.togglePause(); // pause
+
+      expect(app.getState()).toBe('PAUSED');
+      expect(pauseAudioCues).toHaveBeenCalled();
+    });
+  });
+
+  // ── edge: multi-type cancelAudioCues ────────────────────────────
+
+  describe('cancelAudioCues on scene with multiple cue types', () => {
+    it('calls cancelAudioCues which clears all cue types on transition', async () => {
+      app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause(); // resume
+      app.advance(); // to scene-01 (has narration + ambient + music cues)
+      await vi.runAllTimersAsync();
+
+      vi.clearAllMocks();
+      app.advance(); // to scene-02 (audioCues: null)
+      await vi.runAllTimersAsync();
+
+      // cancelAudioCues called during cleanupCurrentScene — stops all cue types
+      expect(cancelAudioCues).toHaveBeenCalled();
+    });
+  });
+
+  // ── edge: no audio before play-gate ─────────────────────────────
+
+  describe('play-gate audio suppression', () => {
+    it('does not call scheduleAudioCues before play-gate click', async () => {
+      app = createApp();
+      await vi.runAllTimersAsync();
+
+      // App is paused with play-gate visible. No audio should be scheduled.
+      expect(app.getState()).toBe('PAUSED');
+      expect(scheduleAudioCues).not.toHaveBeenCalled();
     });
   });
 });
