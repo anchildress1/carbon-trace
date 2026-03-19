@@ -16,7 +16,7 @@
     {
       "id": "scene-00-title",
       "frameType": "title",
-      "holdUntilClick": true,
+      "holdUntilClick": false,
       "holdAfterNarration": null,
       "description": "Title card — opening narration on a dark field",
       "image": null,
