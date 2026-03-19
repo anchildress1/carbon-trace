@@ -189,7 +189,7 @@ export function clearNarrationCache() {
 function resolveAnchors(cues, opts) {
   const durations = new Map();
 
-  if (opts && opts.audioDurations) {
+  if (opts?.audioDurations) {
     for (const cue of cues) {
       const metaDuration = opts.audioDurations.get(cue.src);
       if (metaDuration > 0) durations.set(cue.id, metaDuration * 1000);
@@ -197,7 +197,7 @@ function resolveAnchors(cues, opts) {
   }
 
   const narrationCue = cues.find((c) => c.type === 'narration');
-  if (narrationCue && opts && opts.maxNarrationDurationMs) {
+  if (narrationCue && opts?.maxNarrationDurationMs) {
     durations.set(narrationCue.id, opts.maxNarrationDurationMs);
   }
 
@@ -223,6 +223,13 @@ function findActiveAmbient() {
     if (entry.type === 'ambient' && entry.state === 'playing') return entry;
   }
   return null;
+}
+
+function removeEntryIfCurrent(entry) {
+  if (!entry?.id) return;
+  if (activeCues.get(entry.id) === entry) {
+    activeCues.delete(entry.id);
+  }
 }
 
 function playCue(cue) {
@@ -270,11 +277,13 @@ function crossfadeAmbientCue(cue, crossfadeDurationMs) {
   // Unload old ONLY after new confirms playback
   newHowl.once('play', () => {
     if (oldHowl && !unloaded) {
+      oldEntry.state = 'fading-out';
       oldHowl.fade(oldHowl.volume(), 0, crossfadeDurationMs);
       fadeOutTimerId = setTimeout(() => {
         fadeOutTimerId = null;
         oldHowl.unload();
         unloaded = true;
+        removeEntryIfCurrent(oldEntry);
       }, crossfadeDurationMs + 100);
     }
   });
@@ -282,7 +291,10 @@ function crossfadeAmbientCue(cue, crossfadeDurationMs) {
   const handleError = (label, _id, err) => {
     console.warn(`Ambient ${label} failed: ${cue.src}`, err);
     newHowl.unload();
-    if (oldHowl && !unloaded) oldHowl.fade(oldHowl.volume(), oldVolume, 200);
+    if (oldHowl && !unloaded) {
+      oldEntry.state = 'playing';
+      oldHowl.fade(oldHowl.volume(), oldVolume, 200);
+    }
     // Mark the entry as failed so pauseAudioCues/resumeAudioCues skip it
     const entry = activeCues.get(cue.id);
     if (entry && entry.howl === newHowl) {
@@ -303,6 +315,7 @@ function crossfadeAmbientCue(cue, crossfadeDurationMs) {
     if (oldHowl && !unloaded) {
       oldHowl.unload();
       unloaded = true;
+      removeEntryIfCurrent(oldEntry);
     }
   };
 
@@ -371,7 +384,7 @@ export function scheduleAudioCues(cues, opts = {}) {
       existing.howl?.unload();
     }
 
-    const entry = { howl: null, timer: null, type: cue.type, state: 'pending' };
+    const entry = { id: cue.id, howl: null, timer: null, type: cue.type, state: 'pending' };
 
     const startCue = () => {
       entry.timer = null;

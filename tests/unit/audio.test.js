@@ -12,23 +12,30 @@ const mockNode = {
   src: '',
 };
 
-const mockHowlInstance = {
-  play: vi.fn(),
-  stop: vi.fn(),
-  fade: vi.fn(),
-  mute: vi.fn(),
-  pause: vi.fn(),
-  unload: vi.fn(),
-  volume: vi.fn().mockReturnValue(0.15),
-  once: vi.fn(),
-  on: vi.fn(),
-  _sounds: [{ _node: mockNode }],
-};
+function createMockHowlInstance() {
+  const volume = vi.fn((value) => {
+    if (value === undefined) return 0.15;
+    return undefined;
+  });
+
+  return {
+    play: vi.fn(),
+    stop: vi.fn(),
+    fade: vi.fn(),
+    mute: vi.fn(),
+    pause: vi.fn(),
+    unload: vi.fn(),
+    volume,
+    once: vi.fn(),
+    on: vi.fn(),
+    _sounds: [{ _node: mockNode }],
+  };
+}
 
 vi.mock('howler', () => ({
   Howl: vi.fn((opts) => {
     lastHowlOptions = opts;
-    return { ...mockHowlInstance };
+    return createMockHowlInstance();
   }),
 }));
 
@@ -400,6 +407,30 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       const cue = makeCue({ type: 'ambient', id: 'ambient-1' });
       expect(() => scheduleAudioCues([cue])).not.toThrow();
     });
+
+    it('uses the current ambient as the next crossfade source after cleanup', () => {
+      const oldCue = makeCue({ type: 'ambient', id: 'ambient-1', src: 'old.mp3' });
+      scheduleAudioCues([oldCue]);
+      const oldHowl = Howl.mock.results[0].value;
+
+      const newCue = makeCue({ type: 'ambient', id: 'ambient-2', src: 'new.mp3' });
+      scheduleAudioCues([newCue]);
+      const newHowl = Howl.mock.results[1].value;
+      const newPlayHandler = newHowl.once.mock.calls.find(([e]) => e === 'play');
+      newPlayHandler[1]();
+      vi.advanceTimersByTime(900);
+
+      vi.clearAllMocks();
+
+      const finalCue = makeCue({ type: 'ambient', id: 'ambient-3', src: 'final.mp3' });
+      scheduleAudioCues([finalCue]);
+      const finalHowl = Howl.mock.results[0].value;
+      const finalPlayHandler = finalHowl.once.mock.calls.find(([e]) => e === 'play');
+      finalPlayHandler[1]();
+
+      expect(newHowl.fade).toHaveBeenCalledWith(0.15, 0, 800);
+      expect(oldHowl.fade).not.toHaveBeenCalled();
+    });
   });
 
   describe('narration safety and buffer exhaustion', () => {
@@ -525,13 +556,14 @@ describe('audio.js — unified cue API (ADR-005)', () => {
 
     it('reCueCue replaces a cue with a loaded-but-not-playing Howl', () => {
       scheduleAudioCues([makeCue()]);
+      const oldHowl = Howl.mock.results[0].value;
 
       vi.clearAllMocks();
       const newCue = makeCue({ src: 'new.m4a' });
       const result = reCueCue('narration', newCue);
 
       // Old howl unloaded (via cancelCue)
-      expect(mockHowlInstance.unload).toHaveBeenCalled();
+      expect(oldHowl.unload).toHaveBeenCalled();
       // New howl created with preload but not played
       expect(Howl).toHaveBeenCalledWith(
         expect.objectContaining({ src: ['new.m4a'], preload: true }),
