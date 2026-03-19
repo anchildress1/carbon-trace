@@ -1484,4 +1484,212 @@ describe('app.js', () => {
       expect(scheduleAudioCues).not.toHaveBeenCalled();
     });
   });
+
+  // ── play gate → audio scheduling ──────────────────────────────────
+
+  describe('play gate audio scheduling', () => {
+    beforeEach(async () => {
+      app = createApp();
+      await vi.runAllTimersAsync();
+    });
+
+    it('schedules audio cues for the title frame on play-gate click', () => {
+      vi.clearAllMocks();
+      document.getElementById('play-gate').click();
+
+      // handleFirstPlay must call scheduleAudioCues with the title frame's audioCues
+      expect(scheduleAudioCues).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ type: 'narration', src: 'title-narration.m4a' }),
+        ]),
+        expect.objectContaining({
+          onNarrationEnd: expect.any(Function),
+          maxNarrationDurationMs: expect.any(Number),
+          crossfadeDurationMs: 800,
+          audioDurations: expect.any(Map),
+        }),
+      );
+    });
+
+    it('cancels stale cues before scheduling fresh audio on first play', () => {
+      const callOrder = [];
+      cancelAudioCues.mockImplementation(() => callOrder.push('cancel'));
+      scheduleAudioCues.mockImplementation(() => callOrder.push('schedule'));
+
+      document.getElementById('play-gate').click();
+
+      // doResume calls cancelAudioCues, then handleFirstPlay → scheduleFrameAudio
+      // The last cancel must precede the first schedule.
+      const lastCancel = callOrder.lastIndexOf('cancel');
+      const firstSchedule = callOrder.indexOf('schedule');
+      expect(lastCancel).toBeGreaterThanOrEqual(0);
+      expect(firstSchedule).toBeGreaterThan(lastCancel);
+    });
+
+    it('plays narration timeline from position 0 on first play', () => {
+      document.getElementById('play-gate').click();
+
+      // handleFirstPlay calls textTimeline.play(0) — not just resume
+      expect(buildNarrationTimeline).toHaveBeenCalled();
+      const tl = buildNarrationTimeline.mock.results[0].value.timeline;
+      expect(tl.play).toHaveBeenCalledWith(0);
+    });
+  });
+
+  // ── narration–caption alignment ───────────────────────────────────
+
+  describe('narration–caption alignment', () => {
+    it('passes captionDelay=0 for title frame (narration enter=0)', async () => {
+      app = createApp();
+      await vi.runAllTimersAsync();
+
+      // buildNarration runs during showFrame(0) in init — before play gate click.
+      // Title narration cue has enter: 0 → captionDelay must be 0.
+      expect(buildNarrationTimeline).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.any(HTMLElement),
+        expect.objectContaining({ captionDelay: 0 }),
+      );
+    });
+
+    it('passes captionDelay=500 for scene-01 (narration enter=500)', async () => {
+      app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause();
+      vi.clearAllMocks();
+      app.advance(); // title → scene-01
+      await vi.runAllTimersAsync();
+
+      // scene-01 narration cue has enter: 500 → captionDelay must be 500
+      expect(buildNarrationTimeline).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.any(HTMLElement),
+        expect.objectContaining({ captionDelay: 500 }),
+      );
+    });
+
+    it('passes captions array to buildNarrationTimeline when frame has captions', async () => {
+      app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause();
+      vi.clearAllMocks();
+      app.advance(); // to scene-01 which has captions
+      await vi.runAllTimersAsync();
+
+      expect(buildNarrationTimeline).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.any(HTMLElement),
+        expect.objectContaining({
+          captions: expect.arrayContaining([
+            expect.objectContaining({ text: 'Hello', start: 0, end: 2000 }),
+          ]),
+          captionContainer: expect.any(HTMLElement),
+          isCaptionEnabled: expect.any(Function),
+        }),
+      );
+    });
+  });
+
+  // ── title auto-advance (holdUntilClick=false) ─────────────────────
+
+  describe('title auto-advance', () => {
+    it('auto-advances title frame when onNarrationEnd fires', async () => {
+      app = createApp();
+      await vi.runAllTimersAsync();
+      vi.clearAllMocks();
+
+      // Click play gate → handleFirstPlay → scheduleAudioCues for title
+      document.getElementById('play-gate').click();
+
+      // Extract onNarrationEnd from the scheduleAudioCues call for the title frame
+      const titleCall = scheduleAudioCues.mock.calls.find(
+        (call) => call[0]?.some((c) => c.src === 'title-narration.m4a'),
+      );
+      expect(titleCall).toBeDefined();
+
+      const onNarrationEnd = titleCall[1].onNarrationEnd;
+      expect(onNarrationEnd).toBeInstanceOf(Function);
+
+      vi.clearAllMocks();
+      onNarrationEnd(); // simulate narration ending
+
+      // holdAfterNarration is null → defaults to 2000ms
+      vi.advanceTimersByTime(2000);
+
+      // Should have triggered transition (cancelAudioCues called during cleanup)
+      expect(cancelAudioCues).toHaveBeenCalled();
+    });
+
+    it('does not auto-advance title if user navigates before narration ends', async () => {
+      app = createApp();
+      await vi.runAllTimersAsync();
+
+      document.getElementById('play-gate').click();
+
+      const titleCall = scheduleAudioCues.mock.calls.find(
+        (call) => call[0]?.some((c) => c.src === 'title-narration.m4a'),
+      );
+      const staleOnend = titleCall[1].onNarrationEnd;
+
+      // User manually advances before narration ends
+      app.advance();
+      await vi.runAllTimersAsync();
+
+      // Fire stale callback — generation check should reject it
+      vi.clearAllMocks();
+      staleOnend();
+      vi.advanceTimersByTime(5000);
+      expect(cancelAudioCues).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── replay → auto-advance ─────────────────────────────────────────
+
+  describe('replay auto-advance', () => {
+    beforeEach(async () => {
+      app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause();
+      app.advance(); // to scene-01
+      await vi.runAllTimersAsync();
+    });
+
+    it('auto-advances after replay narration ends while playing', () => {
+      vi.clearAllMocks();
+      document.getElementById('btn-replay').click();
+
+      // Extract onNarrationEnd from the replay's scheduleAudioCues call
+      const replayCall = scheduleAudioCues.mock.calls[0];
+      expect(replayCall).toBeDefined();
+      expect(replayCall[1].onNarrationEnd).toBeInstanceOf(Function);
+
+      const onend = replayCall[1].onNarrationEnd;
+      vi.clearAllMocks();
+      onend(); // narration ends after replay
+
+      // scene-01 holdAfterNarration=2000
+      vi.advanceTimersByTime(2000);
+      expect(cancelAudioCues).toHaveBeenCalled();
+    });
+
+    it('auto-advances after replay-while-paused then resume then narration ends', () => {
+      app.togglePause(); // pause
+      document.getElementById('btn-replay').click(); // replay while paused
+      vi.clearAllMocks();
+      app.togglePause(); // resume
+
+      // resumeReplayPendingAudio → scheduleReplayNarration → scheduleAudioCues
+      const replayCall = scheduleAudioCues.mock.calls.find(
+        (call) => call[0]?.some((c) => c.type === 'narration'),
+      );
+      expect(replayCall).toBeDefined();
+
+      const onend = replayCall[1].onNarrationEnd;
+      vi.clearAllMocks();
+      onend(); // narration ends
+
+      vi.advanceTimersByTime(2000);
+      expect(cancelAudioCues).toHaveBeenCalled();
+    });
+  });
 });
