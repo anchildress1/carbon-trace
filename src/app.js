@@ -635,8 +635,6 @@ function doResume(app) {
 
   if (firstPlay) {
     app.els.playGate.hidden = true;
-    // Clear stranded 'cued' entries from showFrame's cueAudioCues call —
-    // handleFirstPlay will schedule audio fresh via scheduleFrameAudio.
     cancelAudioCues();
     handleFirstPlay(app);
   }
