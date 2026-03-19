@@ -68,17 +68,18 @@ Full system design: `docs/design/carbon-trace-system-design-v5.md` and `docs/ADR
 
 ### Module responsibilities
 
-| Module              | Job                                                             | Does NOT know about   |
-| ------------------- | --------------------------------------------------------------- | --------------------- |
-| `app.js`            | State machine, orchestrator                                     | Pixel rendering       |
-| `canvas.js`         | Canvas 2D — image drawing, cover-fit, resize                    | Frame ordering, audio |
-| `effects-canvas.js` | Canvas 2D effects overlay, render loop                          | Frame ordering, audio |
-| `effects.js`        | Effect registry, `runEffect`/`clearEffects` API                 | Canvas internals      |
-| `audio.js`          | Howler — ambient crossfade, narration, music, buffer monitoring | DOM, canvas           |
-| `text.js`           | Ghost-drift GSAP timelines from config                          | Audio, canvas         |
-| `captions.js`       | Timed captions, localStorage persistence                        | Audio, canvas         |
-| `overlay.js`        | DOM controls — dot bar, buttons, progress                       | Canvas, audio         |
-| `loader.js`         | Audio metadata preloading, frame-aware sequencing               | DOM, app state        |
+| Module              | Job                                                      | Does NOT know about   |
+| ------------------- | -------------------------------------------------------- | --------------------- |
+| `app.js`            | State machine, orchestrator                              | Pixel rendering       |
+| `canvas.js`         | Canvas 2D — image drawing, cover-fit, resize             | Frame ordering, audio |
+| `effects-canvas.js` | Canvas 2D effects overlay, render loop                   | Frame ordering, audio |
+| `effects.js`        | Effect registry, `runEffect`/`clearEffects` API          | Canvas internals      |
+| `audio.js`          | Howler — ambient crossfade, narration, buffer monitoring | DOM, canvas           |
+| `text.js`           | Ghost-drift GSAP timelines from config                   | Audio, canvas         |
+| `captions.js`       | Timed captions, localStorage persistence                 | Audio, canvas         |
+| `overlay.js`        | DOM controls — dot bar, buttons, progress                | Canvas, audio         |
+| `loader.js`         | Audio metadata preloading, frame-aware sequencing        | DOM, app state        |
+| `pausable-timer.js` | Pause-aware timer — used by audio.js and app.js          | Everything else       |
 
 ### Rules
 

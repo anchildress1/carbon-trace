@@ -232,6 +232,21 @@ function crossfadeAmbientCue(cue, crossfadeDurationMs) {
     if (oldHowl && !unloaded) oldHowl.fade(oldHowl.volume(), oldVolume, 200);
   });
 
+  // Store cleanup/pause/resume hooks for cancelAudioCues and pauseAudioCues
+  newHowl._crossfadeCleanup = () => {
+    cancelled = true;
+    if (fadeOutTimerId) { fadeOutTimerId.cancel(); fadeOutTimerId = null; }
+    if (oldHowl && !unloaded) { oldHowl.unload(); unloaded = true; removeEntryIfCurrent(oldEntry); }
+  };
+  newHowl._crossfadePause = () => {
+    fadeOutTimerId?.pause();
+    if (oldHowl && !unloaded) oldHowl.pause();
+  };
+  newHowl._crossfadeResume = () => {
+    fadeOutTimerId?.resume();
+    if (oldHowl && !unloaded) oldHowl.play();
+  };
+
   newHowl.play();
   newHowl.fade(0, cue.volume, crossfadeDurationMs);
   return newHowl;
@@ -248,7 +263,7 @@ function wireNarrationEnd(entry, cue, opts) {
   const safeEnd = () => {
     if (ended) return;
     ended = true;
-    if (safetyTimer) clearTimeout(safetyTimer);
+    safetyTimer?.cancel();
     cleanupBufferMonitoring();
     opts.onNarrationEnd?.();
   };
@@ -259,11 +274,12 @@ function wireNarrationEnd(entry, cue, opts) {
 
   if (opts.maxNarrationDurationMs > 0) {
     const enterDelay = cue.resolvedEnter || 0;
-    safetyTimer = setTimeout(() => {
+    safetyTimer = new PausableTimer(() => {
       console.warn(`Narration safety timeout: ${cue.src}`);
       entry.howl?.unload();
       safeEnd();
     }, enterDelay + opts.maxNarrationDurationMs + 5000);
+    entry.timer = safetyTimer;
   }
 
   // Bridge: buffer monitor exhaustion → safeEnd immediately
@@ -294,7 +310,7 @@ function reCueCue(cueId, cue) {
     src: [cue.src], volume: cue.volume,
     html5: true, mute: globalMuted, preload: true,
   });
-  activeCues.set(cueId, { howl, timer: null, type: cue.type, state: 'cued' });
+  activeCues.set(cueId, { id: cueId, howl, timer: null, type: cue.type, state: 'cued' });
   return howl;
 }
 ```
@@ -329,7 +345,12 @@ class PausableTimer {
   }
 
   resume() {
-    if (this.#remaining === null || this.#remaining <= 0) return;
+    if (this.#remaining === null) return;
+    if (this.#remaining <= 0) {
+      this.#remaining = null;
+      this.#callback();
+      return;
+    }
     this.#delay = this.#remaining;
     this.#start = Date.now();
     this.#id = setTimeout(() => {
@@ -345,7 +366,7 @@ class PausableTimer {
   }
 
   get isActive() { return this.#id !== null; }
-  get isPaused() { return this.#remaining !== null && this.#remaining > 0; }
+  get isPaused() { return this.#remaining !== null; }
 }
 ```
 
@@ -451,5 +472,5 @@ scheduleAudioCues([narrationCue], {
 
 - **[P0] ADR-004 replay** — ✅ Resolved on `docs/adr-004-option-b-alignment`. ADR-005 changes replay path from `cueNarration(src)` to `reCueCue('narration', cue)` — same behavior, unified API.
 - **[P1] Stage click advance** — ✅ Resolved.
-- **[P1] validateEffects** — Withdrawn (exists and works).
+- **[P1] validateEffects** — Withdrawn (removed from codebase).
 - **[P2] Lighthouse gap** — AGENTS.md 100 vs CI 90. Recommend aligning to 90.
