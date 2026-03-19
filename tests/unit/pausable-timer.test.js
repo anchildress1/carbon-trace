@@ -120,14 +120,14 @@ describe('PausableTimer', () => {
     });
 
     it('fires callback immediately when remaining is zero', () => {
-      const perfSpy = vi.spyOn(performance, 'now');
-      perfSpy.mockReturnValue(0);
+      const dateSpy = vi.spyOn(Date, 'now');
+      dateSpy.mockReturnValue(0);
 
       const cb = vi.fn();
       const timer = new PausableTimer(cb, 500);
 
       // Simulate pause exactly at expiry
-      perfSpy.mockReturnValue(500);
+      dateSpy.mockReturnValue(500);
       timer.pause();
 
       expect(timer.isPaused).toBe(true);
@@ -136,24 +136,24 @@ describe('PausableTimer', () => {
       timer.resume();
       expect(cb).toHaveBeenCalledOnce();
 
-      perfSpy.mockRestore();
+      dateSpy.mockRestore();
     });
 
     it('fires callback immediately when elapsed exceeds delay', () => {
-      const perfSpy = vi.spyOn(performance, 'now');
-      perfSpy.mockReturnValue(0);
+      const dateSpy = vi.spyOn(Date, 'now');
+      dateSpy.mockReturnValue(0);
 
       const cb = vi.fn();
       const timer = new PausableTimer(cb, 500);
 
       // Simulate pause after delay would have elapsed
-      perfSpy.mockReturnValue(600);
+      dateSpy.mockReturnValue(600);
       timer.pause();
 
       timer.resume();
       expect(cb).toHaveBeenCalledOnce();
 
-      perfSpy.mockRestore();
+      dateSpy.mockRestore();
     });
   });
 
@@ -248,19 +248,19 @@ describe('PausableTimer', () => {
 
   describe('uses performance.now()', () => {
     it('computes remaining time using performance.now', () => {
-      const perfSpy = vi.spyOn(performance, 'now');
-      perfSpy.mockReturnValue(1000);
+      const dateSpy = vi.spyOn(Date, 'now');
+      dateSpy.mockReturnValue(1000);
 
       const cb = vi.fn();
       const timer = new PausableTimer(cb, 500);
 
-      perfSpy.mockReturnValue(1200);
+      dateSpy.mockReturnValue(1200);
       timer.pause();
 
       // Remaining should be ~300ms (500 - 200 elapsed)
       expect(timer.isPaused).toBe(true);
 
-      perfSpy.mockRestore();
+      dateSpy.mockRestore();
     });
   });
 });

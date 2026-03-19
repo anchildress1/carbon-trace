@@ -8,7 +8,7 @@ export class PausableTimer {
   constructor(callback, delay) {
     this.#callback = callback;
     this.#delay = delay;
-    this.#start = performance.now();
+    this.#start = Date.now();
     this.#id = setTimeout(() => {
       this.#id = null;
       this.#start = null;
@@ -19,7 +19,7 @@ export class PausableTimer {
 
   pause() {
     if (this.#id === null) return;
-    const elapsed = performance.now() - this.#start;
+    const elapsed = Date.now() - this.#start;
     this.#remaining = Math.max(0, this.#delay - elapsed);
     clearTimeout(this.#id);
     this.#id = null;
@@ -34,7 +34,7 @@ export class PausableTimer {
       return;
     }
     this.#delay = this.#remaining;
-    this.#start = performance.now();
+    this.#start = Date.now();
     this.#id = setTimeout(() => {
       this.#id = null;
       this.#start = null;
