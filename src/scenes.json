@@ -786,8 +786,8 @@
     {
       "id": "scene-08-stillness",
       "frameType": "scene",
-      "holdUntilClick": true,
-      "holdAfterNarration": null,
+      "holdUntilClick": false,
+      "holdAfterNarration": 8000,
       "description": "Stripped bed, empty chair, tin glowing — a space where someone should be but isn't",
       "image": "assets/images/scene-08-stillness.webp",
       "narration": {

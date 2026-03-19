@@ -305,7 +305,7 @@ FRAME                │ holdUntilClick │ holdAfterNarration
 05 Rinse             │ false          │ 2500
 06 Storage           │ false          │ 2000
 07 Empty             │ false          │ 2000
-08 Stillness         │ true           │ null
+08 Stillness         │ false          │ 8000
 09 Return            │ false          │ 2000
 10 Building          │ false          │ 3000
 11 Music             │ null           │ null
@@ -777,8 +777,8 @@ connect-src 'none'; object-src 'none'; base-uri 'self'
 CASE                                │ BEHAVIOR
 ────────────────────────────────────┼──────────────────────────────
 Muted audio                         │ 'end' still fires. Auto-advance works.
-No narration audio (Scene 8)        │ holdAfterNarration used as scene duration.
-                                    │ (Scene 8 also has holdUntilClick: true.)
+No narration audio (Scene 8)        │ holdAfterNarration (8s) used as scene duration.
+                                    │ Auto-advances after the long hold.
 Skip mid-narration (playing)        │ cleanupCurrentScene: stop narration,
                                     │ crossfade ambient, clear all timers.
 Nav during transition (playing)     │ Queued as pendingNavIndex. Executes after
@@ -786,8 +786,8 @@ Nav during transition (playing)     │ Queued as pendingNavIndex. Executes afte
 Navigate while paused               │ hardJump. Lands paused. Play to start.
 Pause during transition             │ pendingPause. Transition finishes, then freezes.
 Pause during holdAfterNarration     │ Save remaining. Resume: reschedule.
-Scene 8 + paused                    │ No timer. Pause freezes text. Nav = hardJump.
-Scene 8 + playing                   │ No timer. Holds until click/tap/arrow.
+Scene 8 + paused                    │ holdAfterNarration timer paused. Nav = hardJump.
+Scene 8 + playing                   │ Auto-advances after 8s hold.
 Credits (Scene 11)                  │ holdUntilClick: null. No advance. Music plays.
 Replay while playing                │ Restart narration + text. Clear timer.
                                     │ 'end' re-arms auto-advance. (ADR-004)
