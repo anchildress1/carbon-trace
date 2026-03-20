@@ -185,7 +185,7 @@ import {
   onNarrationBufferChange,
 } from '../../src/audio.js';
 import { buildNarrationTimeline } from '../../src/text.js';
-import { runEffect, clearEffects } from '../../src/effects.js';
+import { runEffect, clearEffects, effectExists } from '../../src/effects.js';
 import {
   clearAll as clearCanvasEffects,
   pause as pauseCanvas,
@@ -347,7 +347,26 @@ describe('app.js', () => {
       vi.clearAllMocks();
       app.togglePause();
       expect(resumeAudioCues).toHaveBeenCalled();
+    });
+
+    it('calls resumeCanvas when resuming on a frame with a registered effect', () => {
+      app.togglePause();
+      app.advance(); // to scene-01
+      app.advance(); // to scene-02 (effects.idle='dust-drift')
+      effectExists.mockReturnValue(true);
+      app.togglePause(); // pause
+      vi.clearAllMocks();
+      app.togglePause(); // resume
       expect(resumeCanvas).toHaveBeenCalled();
+      effectExists.mockReturnValue(false);
+    });
+
+    it('skips resumeCanvas when no registered effect exists', () => {
+      app.togglePause();
+      app.togglePause();
+      vi.clearAllMocks();
+      app.togglePause();
+      expect(resumeCanvas).not.toHaveBeenCalled();
     });
 
     it('updates aria-pressed on pause button', () => {
@@ -1097,6 +1116,29 @@ describe('app.js', () => {
         expect.any(HTMLCanvasElement),
         expect.any(HTMLCanvasElement),
       );
+    });
+
+    it('does not call resumeCanvas during showFrame when no registered effects', async () => {
+      app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause();
+      vi.clearAllMocks();
+      app.advance(); // to scene-01 (effects.idle=null, not registered)
+      await vi.runAllTimersAsync();
+      expect(resumeCanvas).not.toHaveBeenCalled();
+    });
+
+    it('calls resumeCanvas during showFrame when effect is registered', async () => {
+      effectExists.mockReturnValue(true);
+      app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause();
+      app.advance(); // to scene-01
+      vi.clearAllMocks();
+      app.advance(); // to scene-02 (effects.idle='dust-drift')
+      await vi.runAllTimersAsync();
+      expect(resumeCanvas).toHaveBeenCalled();
+      effectExists.mockReturnValue(false);
     });
 
     it('does not re-run entry effect on replay', async () => {

@@ -15,7 +15,7 @@ import {
 } from './audio.js';
 import { PausableTimer } from './pausable-timer.js';
 import { buildNarrationTimeline, clearNarrationLayer } from './text.js';
-import { runEffect, clearEffects } from './effects.js';
+import { runEffect, clearEffects, effectExists } from './effects.js';
 import {
   initCanvas,
   pause as pauseCanvas,
@@ -346,8 +346,11 @@ function showFrame(app, index) {
 
   // Start the effects render loop early so it is already running when the
   // fade-in begins. Without this, effects would appear to 'pop in' after
-  // the transition completes.
-  resumeCanvas();
+  // the transition completes. Skip the loop entirely when no registered
+  // effect will draw into the canvas — avoids spinning rAF for zero output.
+  if (effectExists(frame.effects?.idle)) {
+    resumeCanvas();
+  }
 
   const sceneIdx = app.sceneMap.byFrame.get(index);
   if (sceneIdx !== undefined) {
@@ -631,7 +634,9 @@ function doResume(app) {
     }
   }
 
-  resumeCanvas();
+  if (effectExists(app.frames[app.currentIndex].effects?.idle)) {
+    resumeCanvas();
+  }
 
   app.autoAdvanceTimer?.resume();
 
