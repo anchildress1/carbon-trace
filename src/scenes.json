@@ -773,12 +773,12 @@
       ]
     },
     {
-      "id": "scene-07-empty",
+      "id": "scene-07-missing",
       "frameType": "scene",
 
       "holdAfterNarration": 2000,
       "description": "Bedroom with empty bed and woman silhouette — carbon suspended in silence, barely moving",
-      "image": "assets/images/scene-07-empty.webp",
+      "image": "assets/images/scene-07-missing.webp",
       "narration": {
         "lines": [
           {
@@ -857,7 +857,7 @@
         {
           "id": "narration",
           "type": "narration",
-          "src": "assets/audio/narration/07-empty.m4a",
+          "src": "assets/audio/narration/07-missing.m4a",
           "enter": 500,
           "volume": 1,
           "loop": false,
@@ -867,12 +867,12 @@
       ]
     },
     {
-      "id": "scene-08-stillness",
+      "id": "scene-08-empty",
       "frameType": "scene",
 
       "holdAfterNarration": 8000,
       "description": "Stripped bed, empty chair, tin glowing — a space where someone should be but isn't",
-      "image": "assets/images/scene-08-stillness.webp",
+      "image": "assets/images/scene-08-empty.webp",
       "narration": {
         "lines": [
           {

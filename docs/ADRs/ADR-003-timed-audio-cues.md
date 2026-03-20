@@ -149,7 +149,7 @@ Song begins fading in 5s before narration ends. 3s fade. Both play simultaneousl
 
 ```jsonc
 {
-  "id": "scene-08-stillness",
+  "id": "scene-08-empty",
   "audioCues": null
 }
 ```

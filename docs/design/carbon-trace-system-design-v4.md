@@ -224,10 +224,10 @@ Every frame has identical shape. `null` = skip feature.
 
     // Scene 8 — holdUntilClick, ghost-drift text, no audio
     {
-      "id": "scene-08-stillness",
+      "id": "scene-08-empty",
       "index": 8,
       "frameType": "scene",
-      "image": "assets/images/scene-08-stillness.webp",
+      "image": "assets/images/scene-08-empty.webp",
       "holdUntilClick": true,
       "holdAfterNarration": null,
       "textMode": "ghost-drift",
