@@ -15,7 +15,8 @@ on:
         type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # Keep deploy runs serialized per ref without colliding with caller workflow groups.
+  group: deploy-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
