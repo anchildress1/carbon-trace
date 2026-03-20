@@ -1,2 +1,8 @@
 # Trivy ignore rules
 # Add CVE IDs or package names to suppress known false positives
+
+# License detections — not security vulnerabilities
+# howler.js uses MIT (permissive, no risk)
+howler:MIT
+# GSAP standard "no charge" license (free for public, non-commercial use)
+gsap:Standard 'no charge' license: https://gsap.com/standard-license.
