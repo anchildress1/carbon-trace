@@ -353,12 +353,11 @@ describe('app.js', () => {
       app.togglePause();
       app.advance(); // to scene-01
       app.advance(); // to scene-02 (effects.idle='dust-drift')
-      effectExists.mockReturnValue(true);
+      effectExists.mockReturnValueOnce(true);
       app.togglePause(); // pause
       vi.clearAllMocks();
       app.togglePause(); // resume
       expect(resumeCanvas).toHaveBeenCalled();
-      effectExists.mockReturnValue(false);
     });
 
     it('skips resumeCanvas when no registered effect exists', () => {
