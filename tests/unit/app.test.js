@@ -526,6 +526,45 @@ describe('app.js', () => {
     });
   });
 
+  // ── first-play via keyboard ────────────────────────────────────────
+
+  describe('first-play via keyboard', () => {
+    beforeEach(async () => {
+      app = createApp();
+      await vi.runAllTimersAsync();
+    });
+
+    it('Space key triggers handleFirstPlay on first play', () => {
+      vi.clearAllMocks();
+      const stage = document.getElementById('scene-stage');
+      stage.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+      // handleFirstPlay calls scheduleFrameAudio → scheduleAudioCues
+      expect(scheduleAudioCues).toHaveBeenCalled();
+    });
+
+    it('Space key hides play gate on first play', () => {
+      const gate = document.getElementById('play-gate');
+      expect(gate.hidden).toBe(false);
+      const stage = document.getElementById('scene-stage');
+      stage.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+      expect(gate.hidden).toBe(true);
+    });
+
+    it('double Space does not call handleFirstPlay twice', () => {
+      vi.clearAllMocks();
+      const stage = document.getElementById('scene-stage');
+      stage.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+      // First space: handleFirstPlay → scheduleAudioCues (after cancelAudioCues)
+      const firstCallCount = scheduleAudioCues.mock.calls.length;
+      expect(firstCallCount).toBe(1);
+
+      vi.clearAllMocks();
+      stage.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+      // Second space: togglePause → doPause (no scheduleAudioCues)
+      expect(scheduleAudioCues).not.toHaveBeenCalled();
+    });
+  });
+
   // ── error handling ─────────────────────────────────────────────────
 
   describe('error handling', () => {

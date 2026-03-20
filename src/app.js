@@ -593,6 +593,7 @@ function updateNavButtons(app) {
 }
 
 function handleFirstPlay(app) {
+  app.firstPlayCompleted = true;
   const frame = app.frames[app.currentIndex];
   app.els.btnReplay.disabled = !(
     (Array.isArray(frame.narration?.lines) && frame.narration.lines.length > 0) ||
@@ -606,10 +607,7 @@ function handleFirstPlay(app) {
 }
 
 function doResume(app) {
-  const firstPlay = !app.userHasInteracted;
-  if (firstPlay) {
-    app.userHasInteracted = true;
-  }
+  const firstPlay = !app.firstPlayCompleted;
 
   app.paused = false;
   app.state = app.pausedFromState ?? State.SCENE_ACTIVE;
@@ -914,6 +912,7 @@ export function createApp() {
     paused: false,
     pausedFromState: null,
     userHasInteracted: false,
+    firstPlayCompleted: false,
     textTimeline: null,
     captionEntries: [],
     autoAdvanceTimer: null,
