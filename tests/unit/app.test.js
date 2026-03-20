@@ -38,67 +38,6 @@ vi.mock('../../src/audio.js', () => ({
   clearNarrationCache: vi.fn(),
 }));
 
-vi.mock('../../src/pausable-timer.js', () => {
-  class MockPausableTimer {
-    #callback;
-    #delay;
-    #paused = false;
-    #cancelled = false;
-    #fired = false;
-    #timerId = null;
-
-    constructor(callback, delay) {
-      this.#callback = callback;
-      this.#delay = delay;
-      this.#timerId = setTimeout(() => {
-        if (this.#cancelled) return;
-        this.#fired = true;
-        this.#timerId = null;
-        this.#callback();
-      }, delay);
-    }
-
-    pause() {
-      if (this.#fired || this.#cancelled) return;
-      this.#paused = true;
-      if (this.#timerId) {
-        clearTimeout(this.#timerId);
-        this.#timerId = null;
-      }
-    }
-
-    resume() {
-      if (!this.#paused || this.#cancelled || this.#fired) return;
-      this.#paused = false;
-      this.#timerId = setTimeout(() => {
-        if (this.#cancelled) return;
-        this.#fired = true;
-        this.#timerId = null;
-        this.#callback();
-      }, this.#delay);
-    }
-
-    cancel() {
-      this.#cancelled = true;
-      this.#paused = false;
-      if (this.#timerId) {
-        clearTimeout(this.#timerId);
-        this.#timerId = null;
-      }
-    }
-
-    get isActive() {
-      return this.#timerId !== null;
-    }
-
-    get isPaused() {
-      return this.#paused;
-    }
-  }
-
-  return { PausableTimer: MockPausableTimer };
-});
-
 vi.mock('../../src/text.js', () => ({
   buildNarrationTimeline: vi.fn(() => ({
     timeline: {
