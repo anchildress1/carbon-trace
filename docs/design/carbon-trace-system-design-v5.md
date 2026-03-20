@@ -715,7 +715,7 @@ See `Dockerfile` and `nginx.conf` at repo root for the canonical deployment conf
 - **Non-root runtime:** runs as `nginx` user with `chown` on `/run` and cache directories
 - **Port 8080:** Cloud Run requirement
 - **Health check:** `wget` against localhost for container orchestrator liveness
-- **Caching strategy:** immutable hashed assets (1 year), images/audio (30 days), security headers on all responses
+- **Caching strategy:** immutable hashed assets (1 year), images/audio (30 days); security headers configured in nginx
 - **Gzip:** enabled for text-based assets (JS, CSS, JSON, SVG)
 
 CSP in `index.html`:
