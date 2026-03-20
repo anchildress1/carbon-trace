@@ -26,6 +26,11 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # Copy custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
+# Allow nginx user to write pid file and cache dirs at runtime
+RUN chown -R nginx:nginx /var/cache/nginx \
+    && touch /run/nginx.pid \
+    && chown nginx:nginx /run/nginx.pid
+
 # Cloud Run requires port 8080
 EXPOSE 8080
 
