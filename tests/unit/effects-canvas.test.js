@@ -53,10 +53,10 @@ describe('effects-canvas.js', () => {
     vi.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(() => {});
 
     // Mock ResizeObserver
-    globalThis.ResizeObserver = vi.fn().mockImplementation(() => ({
-      observe: vi.fn(),
-      disconnect: vi.fn(),
-    }));
+    globalThis.ResizeObserver = vi.fn(function () {
+      this.observe = vi.fn();
+      this.disconnect = vi.fn();
+    });
 
     // Default: no reduced motion preference
     globalThis.matchMedia = vi.fn().mockReturnValue({ matches: false });

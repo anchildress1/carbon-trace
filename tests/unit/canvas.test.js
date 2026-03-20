@@ -43,10 +43,10 @@ describe('canvas.js', () => {
     destroySceneCanvas();
     getImageCache().clear();
 
-    globalThis.ResizeObserver = vi.fn().mockImplementation(() => ({
-      observe: vi.fn(),
-      disconnect: vi.fn(),
-    }));
+    globalThis.ResizeObserver = vi.fn(function () {
+      this.observe = vi.fn();
+      this.disconnect = vi.fn();
+    });
 
     originalImage = globalThis.Image;
     globalThis.Image = class MockImage {
