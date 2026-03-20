@@ -4,6 +4,13 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - "*.md"
+      - "docs/**"
+      - "LICENSE"
+      - ".github/**"
+      - "lefthook.yml"
+      - ".lighthouserc.json"
   workflow_dispatch:
 
 concurrency:
