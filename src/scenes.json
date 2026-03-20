@@ -189,6 +189,16 @@
           "loop": false,
           "fadeIn": 0,
           "fadeOut": 0
+        },
+        {
+          "id": "ambient-01",
+          "type": "ambient",
+          "src": "assets/audio/ambient/scene-01-seam.m4a",
+          "enter": 0,
+          "volume": 0.15,
+          "loop": true,
+          "fadeIn": 1500,
+          "fadeOut": null
         }
       ]
     },
@@ -308,6 +318,16 @@
           "loop": false,
           "fadeIn": 0,
           "fadeOut": 0
+        },
+        {
+          "id": "ambient-02",
+          "type": "ambient",
+          "src": "assets/audio/ambient/scene-02-travel.m4a",
+          "enter": 0,
+          "volume": 0.18,
+          "loop": true,
+          "fadeIn": 1500,
+          "fadeOut": null
         }
       ]
     },
@@ -417,6 +437,16 @@
           "loop": false,
           "fadeIn": 0,
           "fadeOut": 0
+        },
+        {
+          "id": "ambient-03",
+          "type": "ambient",
+          "src": "assets/audio/ambient/scene-03-reach.m4a",
+          "enter": 0,
+          "volume": 0.12,
+          "loop": true,
+          "fadeIn": 1500,
+          "fadeOut": null
         }
       ]
     },
@@ -536,6 +566,16 @@
           "loop": false,
           "fadeIn": 0,
           "fadeOut": 0
+        },
+        {
+          "id": "ambient-04",
+          "type": "ambient",
+          "src": "assets/audio/ambient/scene-04-pocket.m4a",
+          "enter": 0,
+          "volume": 0.1,
+          "loop": true,
+          "fadeIn": 1500,
+          "fadeOut": null
         }
       ]
     },
@@ -655,6 +695,16 @@
           "loop": false,
           "fadeIn": 0,
           "fadeOut": 0
+        },
+        {
+          "id": "ambient-05",
+          "type": "ambient",
+          "src": "assets/audio/ambient/scene-05-rinse.m4a",
+          "enter": 0,
+          "volume": 0.2,
+          "loop": true,
+          "fadeIn": 1500,
+          "fadeOut": null
         }
       ]
     },
@@ -769,6 +819,16 @@
           "loop": false,
           "fadeIn": 0,
           "fadeOut": 0
+        },
+        {
+          "id": "ambient-06",
+          "type": "ambient",
+          "src": "assets/audio/ambient/scene-06-storage.m4a",
+          "enter": 0,
+          "volume": 0.08,
+          "loop": true,
+          "fadeIn": 1500,
+          "fadeOut": null
         }
       ]
     },
@@ -863,6 +923,16 @@
           "loop": false,
           "fadeIn": 0,
           "fadeOut": 0
+        },
+        {
+          "id": "ambient-07",
+          "type": "ambient",
+          "src": "assets/audio/ambient/scene-07-missing.m4a",
+          "enter": 0,
+          "volume": 0.1,
+          "loop": true,
+          "fadeIn": 1500,
+          "fadeOut": null
         }
       ]
     },
@@ -911,7 +981,18 @@
       "traceOverlay": {
         "opacity": 0.3
       },
-      "audioCues": null
+      "audioCues": [
+        {
+          "id": "ambient-08",
+          "type": "ambient",
+          "src": "assets/audio/ambient/scene-08-empty.m4a",
+          "enter": 0,
+          "volume": 0.18,
+          "loop": true,
+          "fadeIn": 1500,
+          "fadeOut": null
+        }
+      ]
     },
     {
       "id": "scene-09-return",
@@ -1014,6 +1095,16 @@
           "loop": false,
           "fadeIn": 0,
           "fadeOut": 0
+        },
+        {
+          "id": "ambient-09",
+          "type": "ambient",
+          "src": "assets/audio/ambient/scene-09-return.m4a",
+          "enter": 0,
+          "volume": 0.15,
+          "loop": true,
+          "fadeIn": 1500,
+          "fadeOut": null
         }
       ]
     },
@@ -1118,6 +1209,16 @@
           "loop": false,
           "fadeIn": 0,
           "fadeOut": 0
+        },
+        {
+          "id": "ambient-10",
+          "type": "ambient",
+          "src": "assets/audio/ambient/scene-10-building.m4a",
+          "enter": 0,
+          "volume": 0.2,
+          "loop": true,
+          "fadeIn": 1500,
+          "fadeOut": null
         }
       ]
     },
@@ -1217,13 +1318,10 @@
           "id": "end-song",
           "type": "ambient",
           "src": "assets/audio/sfx/BridgeCitySinners_BreakTheChain.mp3",
-          "enter": {
-            "ref": "narration",
-            "offset": -5000
-          },
-          "volume": 0.25,
+          "enter": 5000,
+          "volume": 0.75,
           "loop": true,
-          "fadeIn": 45000,
+          "fadeIn": 30000,
           "fadeOut": null
         }
       ]
