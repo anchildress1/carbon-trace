@@ -493,7 +493,11 @@ export function restartNarrationCue(cue, opts) {
 
   cleanupBufferMonitoring();
 
-  // Remove old event handlers so stale safeEnd doesn't fire
+  // Remove old event handlers so stale safeEnd doesn't fire.
+  // Blanket .off() is safe: Howl instances live in the module-private
+  // activeCues Map, so audio.js is the sole listener owner. Targeted
+  // removal (storing handler refs) would add complexity defending against
+  // an architecture violation, not a realistic code path.
   entry.howl.off('end');
   entry.howl.off('loaderror');
   entry.howl.off('playerror');
