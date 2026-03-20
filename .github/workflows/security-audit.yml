@@ -43,9 +43,8 @@ jobs:
           format: "sarif"
           output: "results.sarif"
           scanners: "misconfig,secret,license"
-          severity: "HIGH,CRITICAL"
-          ignore-unfixed: true
-          trivyignores: ".trivyignore"
+          exit-code: "1"
+          trivyignores: ".trivyignore.yaml"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6

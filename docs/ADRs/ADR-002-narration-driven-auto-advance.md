@@ -26,7 +26,7 @@ Root cause: click-to-advance is the wrong primary input for narrated, paced, aut
 | UX fit | High — narration drives the experience it was designed for |
 | WCAG compliance | Full — play/pause button satisfies 2.2.2 |
 
-**Pros:** Eliminates dead zone. Narration IS the pacing clock. Clean pause semantics. holdUntilClick handles title + Scene 8 (stillness).
+**Pros:** Eliminates dead zone. Narration IS the pacing clock. Clean pause semantics. `holdAfterNarration` handles per-scene timing; credits use frame-index bound check.
 
 **Cons:** Adds state (4 vars instead of 2). Paused navigation has no visual transition (hard cut). pendingPause pattern for mid-transition pause adds edge case logic.
 
@@ -60,7 +60,7 @@ Root cause: click-to-advance is the wrong primary input for narrated, paced, aut
 
 **Option A: Narration-driven auto-advance.**
 
-Scenes auto-advance when narration completes plus a configurable hold time (`holdAfterNarration`). Click/tap anywhere skips forward immediately. Play/pause controls the entire flow. Specific scenes opt out via `holdUntilClick: true`.
+Scenes auto-advance when narration completes plus a configurable hold time (`holdAfterNarration`). Click/tap anywhere skips forward immediately. Play/pause controls the entire flow. Credits do not auto-advance (determined by `shouldAutoAdvance()` checking frame index bounds).
 
 **Hard rule on pause:** If paused, navigation is a hard cut — no crossfade, no GSAP transition, no temporary un-pause. Draw the new scene image, set up content, freeze everything. The viewer presses play to start the scene. This eliminates the entire class of pause-vs-transition state bugs.
 
@@ -99,10 +99,11 @@ Scenes auto-advance when narration completes plus a configurable hold time (`hol
 
 ```jsonc
 {
-  "holdUntilClick": false,  // true = no auto-advance, null = credits (no advance at all)
   "holdAfterNarration": 2000  // ms after narration ends before auto-advance
 }
 ```
+
+Credits auto-advance is suppressed by `shouldAutoAdvance()` checking `currentIndex < frames.length - 1` — no schema field needed.
 
 ## State Changes
 

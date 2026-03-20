@@ -454,17 +454,17 @@ scheduleAudioCues([narrationCue], {
 
 ## Action Items
 
-1. [ ] Implement `PausableTimer` in `src/pausable-timer.js` (standalone, unit tested)
-2. [ ] Migrate `scenes.json` from `narration`/`ambient`/`music` slots to `audioCues` array
-3. [ ] Rewrite `audio.js`: `scheduleAudioCues`/`cancelAudioCues`/`pauseAudioCues`/`resumeAudioCues` with `Map<cueId, entry>` + `PausableTimer`
-4. [ ] Implement anchor resolution using caption-derived duration
-5. [ ] Implement crossfade error recovery: defer old-ambient unload until new-ambient `play`
-6. [ ] Implement narration safety timeout + buffer exhaustion → `safeEnd()` bridge
-7. [ ] Add `cancelCue(id)` / `reCueCue(id, cue)` for ADR-004 replay
-8. [ ] Refactor `app.js`: remove 12 timer state fields, use unified audio API
-9. [ ] Replace `autoAdvanceTimer` with `PausableTimer` in app.js
-10. [ ] Move timer scheduling tests from app.test.js to audio.test.js
-11. [ ] Update v5 spec §3 + §4 + §5.2
+1. [x] Implement `PausableTimer` in `src/pausable-timer.js` (standalone, unit tested)
+2. [x] Migrate `scenes.json` from `narration`/`ambient`/`music` slots to `audioCues` array
+3. [x] Rewrite `audio.js`: `scheduleAudioCues`/`cancelAudioCues`/`pauseAudioCues`/`resumeAudioCues` with `Map<cueId, entry>` + `PausableTimer`
+4. [x] Implement anchor resolution using caption-derived duration
+5. [x] Implement crossfade error recovery: defer old-ambient unload until new-ambient `play`
+6. [x] Implement narration safety timeout + buffer exhaustion → `safeEnd()` bridge
+7. [x] Add `cancelCue(id)` / `reCueCue(id, cue)` for ADR-004 replay
+8. [x] Refactor `app.js`: remove 12 timer state fields, use unified audio API
+9. [x] Replace `autoAdvanceTimer` with `PausableTimer` in app.js
+10. [x] Move timer scheduling tests from app.test.js to audio.test.js
+11. [x] Update v5 spec §3 + §4 + §5.2
 
 ---
 

@@ -113,6 +113,7 @@ reCueCue(cueId, cue)             → cancel + re-cue a single cue without touchi
 
 // Query
 getNarrationCue()                → returns active narration Howl (for replay)
+restartNarrationCue(cue, opts)   → stop + play existing narration Howl from 0 (avoids Audio pool exhaustion on rapid replay)
 
 // Global
 setMuted(bool)                   → global mute (affects volume, not playback)
@@ -708,42 +709,14 @@ On each `showFrame()` call, `prebufferNextScene()`:
 
 ## 12. Deployment
 
-```dockerfile
-# Build stage — install deps and run Vite build
-FROM node:22-alpine AS builder
-RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
-WORKDIR /app
-COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
-COPY index.html vite.config.js ./
-COPY src/ src/
-COPY public/ public/
-RUN pnpm build
+See `Dockerfile` and `nginx.conf` at repo root for the canonical deployment configuration. Key design points:
 
-# Production stage — serve static files with nginx
-FROM nginx:1-alpine
-RUN rm -rf /usr/share/nginx/html/*
-COPY --from=builder /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget -qO /dev/null http://localhost:8080/ || exit 1
-USER nginx
-CMD ["nginx", "-g", "daemon off;"]
-```
-
-```nginx
-server {
-    listen 8080;
-    root /usr/share/nginx/html;
-    index index.html;
-    location / { try_files $uri $uri/ /index.html; }
-    location ~* \.(webp|mp3|m4a|woff2)$ {
-        expires 30d;
-        add_header Cache-Control "public, immutable";
-    }
-}
-```
+- **Two-stage build:** `node:22-alpine` builder → `nginx:1-alpine` production image
+- **Non-root runtime:** runs as `nginx` user with `chown` on `/run` and cache directories
+- **Port 8080:** Cloud Run requirement
+- **Health check:** `wget` against localhost for container orchestrator liveness
+- **Caching strategy:** immutable hashed assets (1 year), images/audio (30 days); security headers configured in nginx
+- **Gzip:** enabled for text-based assets (JS, CSS, JSON, SVG)
 
 CSP in `index.html`:
 ```

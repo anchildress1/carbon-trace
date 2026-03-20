@@ -1,9 +1,18 @@
 name: Deploy to Cloud Run
 
 on:
-  push:
-    branches: [main]
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag to deploy (e.g. v1.2.3)
+        required: true
+        type: string
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to deploy (e.g. v1.2.3)
+        required: true
+        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -20,6 +29,7 @@ jobs:
       PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
       REGION: ${{ vars.GCP_REGION }}
       SERVICE_NAME: ${{ vars.CLOUD_RUN_SERVICE }}
+      DEPLOY_TAG: ${{ inputs.tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -38,7 +48,7 @@ jobs:
       - name: Build image with Cloud Build
         run: |
           gcloud builds submit \
-            --tag "${REGION}-docker.pkg.dev/${PROJECT_ID}/${SERVICE_NAME}/${SERVICE_NAME}:latest" \
+            --tag "${REGION}-docker.pkg.dev/${PROJECT_ID}/${SERVICE_NAME}/${SERVICE_NAME}:${DEPLOY_TAG}" \
             --project "${PROJECT_ID}" \
             --suppress-logs \
             --quiet
@@ -46,7 +56,7 @@ jobs:
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy "${SERVICE_NAME}" \
-            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${SERVICE_NAME}/${SERVICE_NAME}:latest" \
+            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${SERVICE_NAME}/${SERVICE_NAME}:${DEPLOY_TAG}" \
             --region "${REGION}" \
             --port 8080 \
             --allow-unauthenticated \

@@ -1,0 +1,5 @@
+licenses:
+  # howler.js — MIT is permissive, no compliance risk
+  - id: MIT
+  # GSAP — free for public, non-commercial use (WeCoded art entry)
+  - id: "Standard 'no charge' license: https://gsap.com/standard-license."

@@ -15,7 +15,7 @@ import {
 } from './audio.js';
 import { PausableTimer } from './pausable-timer.js';
 import { buildNarrationTimeline, clearNarrationLayer } from './text.js';
-import { runEffect, clearEffects } from './effects.js';
+import { runEffect, clearEffects, effectExists } from './effects.js';
 import {
   initCanvas,
   pause as pauseCanvas,
@@ -346,8 +346,11 @@ function showFrame(app, index) {
 
   // Start the effects render loop early so it is already running when the
   // fade-in begins. Without this, effects would appear to 'pop in' after
-  // the transition completes.
-  resumeCanvas();
+  // the transition completes. Skip the loop entirely when no registered
+  // effect will draw into the canvas — avoids spinning rAF for zero output.
+  if (effectExists(frame.effects?.idle)) {
+    resumeCanvas();
+  }
 
   const sceneIdx = app.sceneMap.byFrame.get(index);
   if (sceneIdx !== undefined) {
@@ -593,6 +596,7 @@ function updateNavButtons(app) {
 }
 
 function handleFirstPlay(app) {
+  app.firstPlayCompleted = true;
   const frame = app.frames[app.currentIndex];
   app.els.btnReplay.disabled = !(
     (Array.isArray(frame.narration?.lines) && frame.narration.lines.length > 0) ||
@@ -606,13 +610,10 @@ function handleFirstPlay(app) {
 }
 
 function doResume(app) {
-  const firstPlay = !app.userHasInteracted;
-  if (firstPlay) {
-    app.userHasInteracted = true;
-  }
+  const firstPlay = !app.firstPlayCompleted;
 
   app.paused = false;
-  app.state = app.pausedFromState;
+  app.state = app.pausedFromState ?? State.SCENE_ACTIVE;
   app.pausedFromState = null;
 
   if (app.replayPending) {
@@ -633,7 +634,9 @@ function doResume(app) {
     }
   }
 
-  resumeCanvas();
+  if (effectExists(app.frames[app.currentIndex].effects?.idle)) {
+    resumeCanvas();
+  }
 
   app.autoAdvanceTimer?.resume();
 
@@ -914,6 +917,7 @@ export function createApp() {
     paused: false,
     pausedFromState: null,
     userHasInteracted: false,
+    firstPlayCompleted: false,
     textTimeline: null,
     captionEntries: [],
     autoAdvanceTimer: null,

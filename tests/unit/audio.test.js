@@ -34,79 +34,11 @@ function createMockHowlInstance() {
 }
 
 vi.mock('howler', () => ({
-  Howl: vi.fn((opts) => {
+  Howl: vi.fn(function (opts) {
     lastHowlOptions = opts;
-    return createMockHowlInstance();
+    Object.assign(this, createMockHowlInstance());
   }),
 }));
-
-vi.mock('../../src/pausable-timer.js', () => {
-  class MockPausableTimer {
-    #callback;
-    #delay;
-    #paused = false;
-    #cancelled = false;
-    #fired = false;
-    #timerId = null;
-    #start = null;
-    #remaining = null;
-
-    constructor(callback, delay) {
-      this.#callback = callback;
-      this.#delay = delay;
-      this.#start = Date.now();
-      this.#timerId = setTimeout(() => {
-        if (this.#cancelled) return;
-        this.#fired = true;
-        this.#timerId = null;
-        this.#callback();
-      }, delay);
-    }
-
-    pause() {
-      if (this.#fired || this.#cancelled) return;
-      this.#paused = true;
-      const elapsed = Date.now() - this.#start;
-      this.#remaining = Math.max(0, this.#delay - elapsed);
-      if (this.#timerId) {
-        clearTimeout(this.#timerId);
-        this.#timerId = null;
-      }
-    }
-
-    resume() {
-      if (!this.#paused || this.#cancelled || this.#fired) return;
-      this.#paused = false;
-      this.#delay = this.#remaining;
-      this.#start = Date.now();
-      this.#timerId = setTimeout(() => {
-        if (this.#cancelled) return;
-        this.#fired = true;
-        this.#timerId = null;
-        this.#callback();
-      }, this.#remaining);
-    }
-
-    cancel() {
-      this.#cancelled = true;
-      this.#paused = false;
-      if (this.#timerId) {
-        clearTimeout(this.#timerId);
-        this.#timerId = null;
-      }
-    }
-
-    get isActive() {
-      return this.#timerId !== null;
-    }
-
-    get isPaused() {
-      return this.#paused;
-    }
-  }
-
-  return { PausableTimer: MockPausableTimer };
-});
 
 import {
   scheduleAudioCues,
@@ -377,7 +309,7 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       const newHowl = Howl.mock.results[0].value;
 
       // Trigger load error
-      const errorHandler = newHowl.on.mock.calls.find(([e]) => e === 'loaderror');
+      const errorHandler = newHowl.once.mock.calls.find(([e]) => e === 'loaderror');
       errorHandler[1](1, 'network');
 
       // Old ambient restored to original volume (0.15 from mockHowlInstance.volume())
@@ -398,7 +330,7 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       const newHowl = Howl.mock.results[0].value;
 
       // Trigger play error
-      const errorHandler = newHowl.on.mock.calls.find(([e]) => e === 'playerror');
+      const errorHandler = newHowl.once.mock.calls.find(([e]) => e === 'playerror');
       errorHandler[1](1, 'blocked');
 
       expect(oldHowl.fade).toHaveBeenCalledWith(0.15, 0.15, 200);
@@ -453,7 +385,7 @@ describe('audio.js — unified cue API (ADR-005)', () => {
 
       const howl = Howl.mock.results[0].value;
       const endHandler = howl.once.mock.calls.find(([e]) => e === 'end');
-      const errorHandler = howl.on.mock.calls.find(([e]) => e === 'playerror');
+      const errorHandler = howl.once.mock.calls.find(([e]) => e === 'playerror');
 
       endHandler[1]();
       errorHandler[1]();
@@ -506,7 +438,7 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       scheduleAudioCues([makeCue()], { onNarrationEnd: onEnd });
 
       const howl = Howl.mock.results[0].value;
-      const errorHandler = howl.on.mock.calls.find(([e]) => e === 'loaderror');
+      const errorHandler = howl.once.mock.calls.find(([e]) => e === 'loaderror');
       errorHandler[1]();
 
       expect(onEnd).toHaveBeenCalledOnce();
@@ -735,24 +667,22 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       const cb = vi.fn();
       onNarrationBufferChange(cb);
 
-      scheduleAudioCues([makeCue()]);
+      scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn() });
 
-      // Find the waiting listener
       const waitingCall = mockNode.addEventListener.mock.calls.find(
         ([event]) => event === 'waiting',
       );
-      if (waitingCall) {
-        waitingCall[1]();
-        expect(cb).toHaveBeenCalledWith(true);
-        expect(isNarrationBuffering()).toBe(true);
-      }
+      expect(waitingCall).toBeDefined();
+      waitingCall[1]();
+      expect(cb).toHaveBeenCalledWith(true);
+      expect(isNarrationBuffering()).toBe(true);
     });
 
     it('clears buffer state on playing event', () => {
       const cb = vi.fn();
       onNarrationBufferChange(cb);
 
-      scheduleAudioCues([makeCue()]);
+      scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn() });
 
       const waitingCall = mockNode.addEventListener.mock.calls.find(
         ([event]) => event === 'waiting',
@@ -760,14 +690,14 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       const playingCall = mockNode.addEventListener.mock.calls.find(
         ([event]) => event === 'playing',
       );
+      expect(waitingCall).toBeDefined();
+      expect(playingCall).toBeDefined();
 
-      if (waitingCall && playingCall) {
-        waitingCall[1]();
-        cb.mockClear();
-        playingCall[1]();
-        expect(cb).toHaveBeenCalledWith(false);
-        expect(isNarrationBuffering()).toBe(false);
-      }
+      waitingCall[1]();
+      cb.mockClear();
+      playingCall[1]();
+      expect(cb).toHaveBeenCalledWith(false);
+      expect(isNarrationBuffering()).toBe(false);
     });
 
     it('buffer exhaustion triggers onExhaustion callback', () => {
@@ -783,47 +713,47 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       const waitingCall = mockNode.addEventListener.mock.calls.find(
         ([event]) => event === 'waiting',
       );
-      if (waitingCall) {
-        mockNode.buffered.length = 1;
-        mockNode.buffered.end.mockReturnValue(5);
-        waitingCall[1]();
+      expect(waitingCall).toBeDefined();
 
-        // Exhaust retries: 4 checks × 3 recovery attempts = stalled
-        mockNode.buffered.end.mockReturnValue(5); // no progress
-        for (let i = 0; i < 12; i++) {
-          vi.advanceTimersByTime(4000);
-        }
+      mockNode.buffered.length = 1;
+      mockNode.buffered.end.mockReturnValue(5);
+      waitingCall[1]();
 
-        expect(onEnd).toHaveBeenCalled();
+      // Exhaust retries: 4 checks × 3 recovery attempts = stalled
+      mockNode.buffered.end.mockReturnValue(5); // no progress
+      for (let i = 0; i < 12; i++) {
+        vi.advanceTimersByTime(4000);
       }
+
+      expect(onEnd).toHaveBeenCalled();
 
       warnSpy.mockRestore();
     });
 
     it('does not force play on buffer recovery if paused globally', () => {
-      scheduleAudioCues([makeCue({ src: 'test.m4a' })]);
+      scheduleAudioCues([makeCue({ src: 'test.m4a' })], { onNarrationEnd: vi.fn() });
 
       const waitingCall = mockNode.addEventListener.mock.calls.find(
         ([event]) => event === 'waiting',
       );
-      if (waitingCall) {
-        waitingCall[1]();
-        
-        // Pause the experience!
-        pauseAudioCues();
+      expect(waitingCall).toBeDefined();
 
-        // Simulate buffer recovery
-        mockNode.buffered.length = 1;
-        mockNode.buffered.end.mockReturnValue(5);
-        mockNode.currentTime = 0;
-        mockNode.duration = 60;
-        
-        // Advance timer to trigger progress check
-        vi.advanceTimersByTime(4000);
-        
-        // play() should NOT have been called by the buffer recovery loop
-        expect(mockNode.play).not.toHaveBeenCalled();
-      }
+      waitingCall[1]();
+
+      // Pause the experience!
+      pauseAudioCues();
+
+      // Simulate buffer recovery
+      mockNode.buffered.length = 1;
+      mockNode.buffered.end.mockReturnValue(5);
+      mockNode.currentTime = 0;
+      mockNode.duration = 60;
+
+      // Advance timer to trigger progress check
+      vi.advanceTimersByTime(4000);
+
+      // play() should NOT have been called by the buffer recovery loop
+      expect(mockNode.play).not.toHaveBeenCalled();
     });
   });
 });

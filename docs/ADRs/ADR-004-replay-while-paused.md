@@ -167,9 +167,9 @@ Replay while paused, then play      │ doResume() sees replayPending, calls
 Replay while paused, then navigate  │ Normal hardCut to new scene. replayPending
                                     │ cleared by cleanupCurrentScene.
 Replay while paused on Scene 8      │ Text reset to start. No audio to cue.
-                                    │ holdUntilClick prevents auto-advance anyway.
+                                    │ holdAfterNarration drives scene duration.
 Replay while paused on credits      │ Narration cued, text reset. No advance
-                                    │ possible (holdUntilClick: null).
+                                    │ possible (shouldAutoAdvance() returns false).
 Multiple replays while paused       │ Each replay re-cues from top. replayPending
                                     │ stays true. Idempotent. No leaked timers.
 ```
