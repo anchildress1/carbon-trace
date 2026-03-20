@@ -34,9 +34,9 @@ function createMockHowlInstance() {
 }
 
 vi.mock('howler', () => ({
-  Howl: vi.fn((opts) => {
+  Howl: vi.fn(function (opts) {
     lastHowlOptions = opts;
-    return createMockHowlInstance();
+    Object.assign(this, createMockHowlInstance());
   }),
 }));
 
