@@ -38,67 +38,6 @@ vi.mock('../../src/audio.js', () => ({
   clearNarrationCache: vi.fn(),
 }));
 
-vi.mock('../../src/pausable-timer.js', () => {
-  class MockPausableTimer {
-    #callback;
-    #delay;
-    #paused = false;
-    #cancelled = false;
-    #fired = false;
-    #timerId = null;
-
-    constructor(callback, delay) {
-      this.#callback = callback;
-      this.#delay = delay;
-      this.#timerId = setTimeout(() => {
-        if (this.#cancelled) return;
-        this.#fired = true;
-        this.#timerId = null;
-        this.#callback();
-      }, delay);
-    }
-
-    pause() {
-      if (this.#fired || this.#cancelled) return;
-      this.#paused = true;
-      if (this.#timerId) {
-        clearTimeout(this.#timerId);
-        this.#timerId = null;
-      }
-    }
-
-    resume() {
-      if (!this.#paused || this.#cancelled || this.#fired) return;
-      this.#paused = false;
-      this.#timerId = setTimeout(() => {
-        if (this.#cancelled) return;
-        this.#fired = true;
-        this.#timerId = null;
-        this.#callback();
-      }, this.#delay);
-    }
-
-    cancel() {
-      this.#cancelled = true;
-      this.#paused = false;
-      if (this.#timerId) {
-        clearTimeout(this.#timerId);
-        this.#timerId = null;
-      }
-    }
-
-    get isActive() {
-      return this.#timerId !== null;
-    }
-
-    get isPaused() {
-      return this.#paused;
-    }
-  }
-
-  return { PausableTimer: MockPausableTimer };
-});
-
 vi.mock('../../src/text.js', () => ({
   buildNarrationTimeline: vi.fn(() => ({
     timeline: {
@@ -246,7 +185,7 @@ import {
   onNarrationBufferChange,
 } from '../../src/audio.js';
 import { buildNarrationTimeline } from '../../src/text.js';
-import { runEffect, clearEffects } from '../../src/effects.js';
+import { runEffect, clearEffects, effectExists } from '../../src/effects.js';
 import {
   clearAll as clearCanvasEffects,
   pause as pauseCanvas,
@@ -408,7 +347,25 @@ describe('app.js', () => {
       vi.clearAllMocks();
       app.togglePause();
       expect(resumeAudioCues).toHaveBeenCalled();
+    });
+
+    it('calls resumeCanvas when resuming on a frame with a registered effect', () => {
+      app.togglePause();
+      app.advance(); // to scene-01
+      app.advance(); // to scene-02 (effects.idle='dust-drift')
+      effectExists.mockReturnValueOnce(true);
+      app.togglePause(); // pause
+      vi.clearAllMocks();
+      app.togglePause(); // resume
       expect(resumeCanvas).toHaveBeenCalled();
+    });
+
+    it('skips resumeCanvas when no registered effect exists', () => {
+      app.togglePause();
+      app.togglePause();
+      vi.clearAllMocks();
+      app.togglePause();
+      expect(resumeCanvas).not.toHaveBeenCalled();
     });
 
     it('updates aria-pressed on pause button', () => {
@@ -584,6 +541,45 @@ describe('app.js', () => {
       stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
       await vi.runAllTimersAsync();
       expect(cancelAudioCues).toHaveBeenCalled();
+    });
+  });
+
+  // ── first-play via keyboard ────────────────────────────────────────
+
+  describe('first-play via keyboard', () => {
+    beforeEach(async () => {
+      app = createApp();
+      await vi.runAllTimersAsync();
+    });
+
+    it('Space key triggers handleFirstPlay on first play', () => {
+      vi.clearAllMocks();
+      const stage = document.getElementById('scene-stage');
+      stage.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+      // handleFirstPlay calls scheduleFrameAudio → scheduleAudioCues
+      expect(scheduleAudioCues).toHaveBeenCalled();
+    });
+
+    it('Space key hides play gate on first play', () => {
+      const gate = document.getElementById('play-gate');
+      expect(gate.hidden).toBe(false);
+      const stage = document.getElementById('scene-stage');
+      stage.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+      expect(gate.hidden).toBe(true);
+    });
+
+    it('double Space does not call handleFirstPlay twice', () => {
+      vi.clearAllMocks();
+      const stage = document.getElementById('scene-stage');
+      stage.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+      // First space: handleFirstPlay → scheduleAudioCues (after cancelAudioCues)
+      const firstCallCount = scheduleAudioCues.mock.calls.length;
+      expect(firstCallCount).toBe(1);
+
+      vi.clearAllMocks();
+      stage.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+      // Second space: togglePause → doPause (no scheduleAudioCues)
+      expect(scheduleAudioCues).not.toHaveBeenCalled();
     });
   });
 
@@ -1119,6 +1115,29 @@ describe('app.js', () => {
         expect.any(HTMLCanvasElement),
         expect.any(HTMLCanvasElement),
       );
+    });
+
+    it('does not call resumeCanvas during showFrame when no registered effects', async () => {
+      app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause();
+      vi.clearAllMocks();
+      app.advance(); // to scene-01 (effects.idle=null, not registered)
+      await vi.runAllTimersAsync();
+      expect(resumeCanvas).not.toHaveBeenCalled();
+    });
+
+    it('calls resumeCanvas during showFrame when effect is registered', async () => {
+      effectExists.mockReturnValue(true);
+      app = createApp();
+      await vi.runAllTimersAsync();
+      app.togglePause();
+      app.advance(); // to scene-01
+      vi.clearAllMocks();
+      app.advance(); // to scene-02 (effects.idle='dust-drift')
+      await vi.runAllTimersAsync();
+      expect(resumeCanvas).toHaveBeenCalled();
+      effectExists.mockReturnValue(false);
     });
 
     it('does not re-run entry effect on replay', async () => {

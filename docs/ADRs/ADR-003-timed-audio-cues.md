@@ -24,7 +24,7 @@ Replace `ambient` and `narration` config slots with a unified `audioCues` array 
 "audioCues": [
   {
     "id": "narration",
-    "src": "assets/audio/narration/scene-01-seam.mp3",
+    "src": "assets/audio/narration/01-seam.m4a",
     "type": "narration",
     "enter": 500,
     "volume": 1.0,
@@ -34,7 +34,7 @@ Replace `ambient` and `narration` config slots with a unified `audioCues` array 
   },
   {
     "id": "ambient-01",
-    "src": "assets/audio/ambient/scene-01-seam.mp3",
+    "src": "assets/audio/ambient/01-seam.m4a",
     "type": "ambient",
     "enter": 0,
     "volume": 0.15,
@@ -64,7 +64,7 @@ Replace `ambient` and `narration` config slots with a unified `audioCues` array 
 ```jsonc
 {
   "id": "end-song",
-  "src": "assets/audio/ambient/end-song.mp3",
+  "src": "assets/audio/sfx/end-song.m4a",
   "type": "ambient",
   "enter": { "ref": "narration", "offset": -5000 },
   "volume": 0.6,
@@ -91,7 +91,7 @@ This computes to: `triggerTime = cueRefDuration + cueRefEnter + offset`. Require
   "audioCues": [
     {
       "id": "narration",
-      "src": "assets/audio/narration/scene-11-music.mp3",
+      "src": "assets/audio/narration/11-music.m4a",
       "type": "narration",
       "enter": 500,
       "volume": 1.0,
@@ -101,7 +101,7 @@ This computes to: `triggerTime = cueRefDuration + cueRefEnter + offset`. Require
     },
     {
       "id": "end-song",
-      "src": "assets/audio/ambient/end-song.mp3",
+      "src": "assets/audio/sfx/end-song.m4a",
       "type": "ambient",
       "enter": { "ref": "narration", "offset": -5000 },
       "volume": 0.6,
@@ -123,7 +123,7 @@ Song begins fading in 5s before narration ends. 3s fade. Both play simultaneousl
   "audioCues": [
     {
       "id": "narration",
-      "src": "assets/audio/narration/scene-03-reach.mp3",
+      "src": "assets/audio/narration/03-reach.m4a",
       "type": "narration",
       "enter": 500,
       "volume": 1.0,
@@ -133,7 +133,7 @@ Song begins fading in 5s before narration ends. 3s fade. Both play simultaneousl
     },
     {
       "id": "ambient-03",
-      "src": "assets/audio/ambient/scene-03-reach.mp3",
+      "src": "assets/audio/ambient/03-reach.m4a",
       "type": "ambient",
       "enter": 2000,
       "volume": 0.12,
@@ -149,7 +149,7 @@ Song begins fading in 5s before narration ends. 3s fade. Both play simultaneousl
 
 ```jsonc
 {
-  "id": "scene-08-stillness",
+  "id": "scene-08-empty",
   "audioCues": null
 }
 ```
@@ -236,9 +236,9 @@ The breaking schema change is acceptable because no production config exists yet
 
 ## Action Items
 
-1. [ ] Replace `ambient` + `narration` slots with `audioCues` array in schema
-2. [ ] Rewrite audio.js around cue scheduling
-3. [ ] Implement anchor resolution with duration metadata
-4. [ ] Update all 12 frame configs in scenes.json
-5. [ ] Update app.js: buildAndRunTimeline, hardCut, togglePause to use new audio API
-6. [ ] Update v4 spec
+1. [x] Replace `ambient` + `narration` slots with `audioCues` array in schema
+2. [x] Rewrite audio.js around cue scheduling
+3. [x] Implement anchor resolution with duration metadata
+4. [x] Update all 12 frame configs in scenes.json
+5. [x] Update app.js: buildAndRunTimeline, hardCut, togglePause to use new audio API
+6. [x] Update v4 spec (superseded by v5)
