@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ─── Configuration ──────────────────────────────────────────────────────────────
-SERVICE_NAME="carbon-trace-unstable"
+SERVICE_NAME="carbon-trace"
 REGION="us-east1"
 PORT="8080"
 

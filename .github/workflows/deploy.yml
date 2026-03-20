@@ -40,6 +40,7 @@ jobs:
           gcloud builds submit \
             --tag "${REGION}-docker.pkg.dev/${PROJECT_ID}/${SERVICE_NAME}/${SERVICE_NAME}:latest" \
             --project "${PROJECT_ID}" \
+            --suppress-logs \
             --quiet
 
       - name: Deploy to Cloud Run
