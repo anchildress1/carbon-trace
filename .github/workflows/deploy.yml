@@ -38,7 +38,7 @@ jobs:
       - name: Build image with Cloud Build
         run: |
           gcloud builds submit \
-            --tag "${REGION}-docker.pkg.dev/${PROJECT_ID}/${SERVICE_NAME}/${SERVICE_NAME}:latest" \
+            --tag "${REGION}-docker.pkg.dev/${PROJECT_ID}/${SERVICE_NAME}/${SERVICE_NAME}:${{ github.ref_name }}" \
             --project "${PROJECT_ID}" \
             --suppress-logs \
             --quiet
@@ -46,7 +46,7 @@ jobs:
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy "${SERVICE_NAME}" \
-            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${SERVICE_NAME}/${SERVICE_NAME}:latest" \
+            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${SERVICE_NAME}/${SERVICE_NAME}:${{ github.ref_name }}" \
             --region "${REGION}" \
             --port 8080 \
             --allow-unauthenticated \
