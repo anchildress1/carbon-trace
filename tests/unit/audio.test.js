@@ -735,24 +735,22 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       const cb = vi.fn();
       onNarrationBufferChange(cb);
 
-      scheduleAudioCues([makeCue()]);
+      scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn() });
 
-      // Find the waiting listener
       const waitingCall = mockNode.addEventListener.mock.calls.find(
         ([event]) => event === 'waiting',
       );
-      if (waitingCall) {
-        waitingCall[1]();
-        expect(cb).toHaveBeenCalledWith(true);
-        expect(isNarrationBuffering()).toBe(true);
-      }
+      expect(waitingCall).toBeDefined();
+      waitingCall[1]();
+      expect(cb).toHaveBeenCalledWith(true);
+      expect(isNarrationBuffering()).toBe(true);
     });
 
     it('clears buffer state on playing event', () => {
       const cb = vi.fn();
       onNarrationBufferChange(cb);
 
-      scheduleAudioCues([makeCue()]);
+      scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn() });
 
       const waitingCall = mockNode.addEventListener.mock.calls.find(
         ([event]) => event === 'waiting',
@@ -760,14 +758,14 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       const playingCall = mockNode.addEventListener.mock.calls.find(
         ([event]) => event === 'playing',
       );
+      expect(waitingCall).toBeDefined();
+      expect(playingCall).toBeDefined();
 
-      if (waitingCall && playingCall) {
-        waitingCall[1]();
-        cb.mockClear();
-        playingCall[1]();
-        expect(cb).toHaveBeenCalledWith(false);
-        expect(isNarrationBuffering()).toBe(false);
-      }
+      waitingCall[1]();
+      cb.mockClear();
+      playingCall[1]();
+      expect(cb).toHaveBeenCalledWith(false);
+      expect(isNarrationBuffering()).toBe(false);
     });
 
     it('buffer exhaustion triggers onExhaustion callback', () => {
@@ -783,47 +781,47 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       const waitingCall = mockNode.addEventListener.mock.calls.find(
         ([event]) => event === 'waiting',
       );
-      if (waitingCall) {
-        mockNode.buffered.length = 1;
-        mockNode.buffered.end.mockReturnValue(5);
-        waitingCall[1]();
+      expect(waitingCall).toBeDefined();
 
-        // Exhaust retries: 4 checks × 3 recovery attempts = stalled
-        mockNode.buffered.end.mockReturnValue(5); // no progress
-        for (let i = 0; i < 12; i++) {
-          vi.advanceTimersByTime(4000);
-        }
+      mockNode.buffered.length = 1;
+      mockNode.buffered.end.mockReturnValue(5);
+      waitingCall[1]();
 
-        expect(onEnd).toHaveBeenCalled();
+      // Exhaust retries: 4 checks × 3 recovery attempts = stalled
+      mockNode.buffered.end.mockReturnValue(5); // no progress
+      for (let i = 0; i < 12; i++) {
+        vi.advanceTimersByTime(4000);
       }
+
+      expect(onEnd).toHaveBeenCalled();
 
       warnSpy.mockRestore();
     });
 
     it('does not force play on buffer recovery if paused globally', () => {
-      scheduleAudioCues([makeCue({ src: 'test.m4a' })]);
+      scheduleAudioCues([makeCue({ src: 'test.m4a' })], { onNarrationEnd: vi.fn() });
 
       const waitingCall = mockNode.addEventListener.mock.calls.find(
         ([event]) => event === 'waiting',
       );
-      if (waitingCall) {
-        waitingCall[1]();
-        
-        // Pause the experience!
-        pauseAudioCues();
+      expect(waitingCall).toBeDefined();
 
-        // Simulate buffer recovery
-        mockNode.buffered.length = 1;
-        mockNode.buffered.end.mockReturnValue(5);
-        mockNode.currentTime = 0;
-        mockNode.duration = 60;
-        
-        // Advance timer to trigger progress check
-        vi.advanceTimersByTime(4000);
-        
-        // play() should NOT have been called by the buffer recovery loop
-        expect(mockNode.play).not.toHaveBeenCalled();
-      }
+      waitingCall[1]();
+
+      // Pause the experience!
+      pauseAudioCues();
+
+      // Simulate buffer recovery
+      mockNode.buffered.length = 1;
+      mockNode.buffered.end.mockReturnValue(5);
+      mockNode.currentTime = 0;
+      mockNode.duration = 60;
+
+      // Advance timer to trigger progress check
+      vi.advanceTimersByTime(4000);
+
+      // play() should NOT have been called by the buffer recovery loop
+      expect(mockNode.play).not.toHaveBeenCalled();
     });
   });
 });
