@@ -377,7 +377,7 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       const newHowl = Howl.mock.results[0].value;
 
       // Trigger load error
-      const errorHandler = newHowl.on.mock.calls.find(([e]) => e === 'loaderror');
+      const errorHandler = newHowl.once.mock.calls.find(([e]) => e === 'loaderror');
       errorHandler[1](1, 'network');
 
       // Old ambient restored to original volume (0.15 from mockHowlInstance.volume())
@@ -398,7 +398,7 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       const newHowl = Howl.mock.results[0].value;
 
       // Trigger play error
-      const errorHandler = newHowl.on.mock.calls.find(([e]) => e === 'playerror');
+      const errorHandler = newHowl.once.mock.calls.find(([e]) => e === 'playerror');
       errorHandler[1](1, 'blocked');
 
       expect(oldHowl.fade).toHaveBeenCalledWith(0.15, 0.15, 200);
@@ -453,7 +453,7 @@ describe('audio.js — unified cue API (ADR-005)', () => {
 
       const howl = Howl.mock.results[0].value;
       const endHandler = howl.once.mock.calls.find(([e]) => e === 'end');
-      const errorHandler = howl.on.mock.calls.find(([e]) => e === 'playerror');
+      const errorHandler = howl.once.mock.calls.find(([e]) => e === 'playerror');
 
       endHandler[1]();
       errorHandler[1]();
@@ -506,7 +506,7 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       scheduleAudioCues([makeCue()], { onNarrationEnd: onEnd });
 
       const howl = Howl.mock.results[0].value;
-      const errorHandler = howl.on.mock.calls.find(([e]) => e === 'loaderror');
+      const errorHandler = howl.once.mock.calls.find(([e]) => e === 'loaderror');
       errorHandler[1]();
 
       expect(onEnd).toHaveBeenCalledOnce();

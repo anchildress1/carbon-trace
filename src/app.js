@@ -612,7 +612,7 @@ function doResume(app) {
   }
 
   app.paused = false;
-  app.state = app.pausedFromState;
+  app.state = app.pausedFromState ?? State.SCENE_ACTIVE;
   app.pausedFromState = null;
 
   if (app.replayPending) {

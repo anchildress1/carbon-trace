@@ -303,8 +303,8 @@ function crossfadeAmbientCue(cue, crossfadeDurationMs) {
     }
   };
 
-  newHowl.on('loaderror', (id, err) => handleError('load', id, err));
-  newHowl.on('playerror', (id, err) => handleError('play', id, err));
+  newHowl.once('loaderror', (id, err) => handleError('load', id, err));
+  newHowl.once('playerror', (id, err) => handleError('play', id, err));
 
   // Store cleanup hook so cancelAudioCues can drain the deferred unload
   newHowl._crossfadeCleanup = () => {
@@ -338,11 +338,14 @@ function wireNarrationEnd(entry, cue, opts) {
   };
 
   entry.howl.once('end', safeEnd);
-  entry.howl.on('loaderror', () => {
+  entry.howl.once('loaderror', () => {
     entry.howl.unload();
     safeEnd();
   });
-  entry.howl.on('playerror', () => safeEnd());
+  entry.howl.once('playerror', () => {
+    entry.howl.unload();
+    safeEnd();
+  });
 
   if (opts.maxNarrationDurationMs > 0) {
     const enterDelay = cue.resolvedEnter || 0;
