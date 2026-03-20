@@ -22,7 +22,9 @@ jobs:
   trivy:
     name: Trivy Scan
     runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false || github.event_name != 'pull_request'
+    if: >-
+      (github.event_name != 'pull_request' || github.event.pull_request.draft == false) &&
+      !startsWith(github.head_ref, 'release-please--')
     timeout-minutes: 10
     permissions:
       contents: read
