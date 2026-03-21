@@ -193,9 +193,9 @@
           "type": "ambient",
           "src": "assets/audio/ambient/scene-01-seam.m4a",
           "enter": 0,
-          "volume": 0.55,
+          "volume": 1,
           "loop": true,
-          "fadeIn": 1500,
+          "fadeIn": 500,
           "fadeOut": null
         }
       ]
@@ -440,7 +440,7 @@
           "type": "ambient",
           "src": "assets/audio/ambient/scene-03-reach.m4a",
           "enter": 0,
-          "volume": 0.45,
+          "volume": 0.4,
           "loop": true,
           "fadeIn": 1500,
           "fadeOut": null
@@ -1302,6 +1302,16 @@
           "loop": false,
           "fadeIn": 0,
           "fadeOut": 0
+        },
+        {
+          "id": "ambient-11",
+          "type": "ambient",
+          "src": "assets/audio/ambient/scene-11-music.m4a",
+          "enter": 0,
+          "volume": 0.2,
+          "loop": true,
+          "fadeIn": 1500,
+          "fadeOut": null
         },
         {
           "id": "end-song",
