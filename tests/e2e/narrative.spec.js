@@ -268,7 +268,7 @@ test.describe('carbon-trace — scene alignment', () => {
     await page.click('#btn-next');
     const stage = page.locator('#scene-stage');
     const label = await stage.getAttribute('aria-label');
-    expect(label).toContain('Coal seam');
+    expect(label).toContain('mine tunnel');
   });
 
   test('scene-02 description appears after advancing twice', async ({ page }) => {
