@@ -324,9 +324,14 @@ function prebufferNextScene(app, index) {
       if (img) app.imageCache.set(nextFrame.image, img);
     });
   }
-  const nextNarrationCue = getNarrationCueFromFrame(nextFrame || {});
-  if (nextNarrationCue?.src) {
-    preloadNarrationAhead(nextNarrationCue.src);
+  // Only preload narration via Howler after user interaction — Howler's
+  // HTML5 Audio pool is empty until the browser unlocks audio on first
+  // gesture, so early Howl creation triggers "pool exhausted" warnings.
+  if (app.userHasInteracted) {
+    const nextNarrationCue = getNarrationCueFromFrame(nextFrame || {});
+    if (nextNarrationCue?.src) {
+      preloadNarrationAhead(nextNarrationCue.src);
+    }
   }
 }
 

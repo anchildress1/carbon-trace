@@ -222,7 +222,7 @@ Every frame has identical shape via `meta.frameDefaults` merge. `null` = skip fe
       "id": "scene-01-seam",
       "frameType": "scene",
       "holdAfterNarration": 2000,
-      "description": "Coal seam wall, lamp upper left — carbon buried under pressure",
+      "description": "Underground mine tunnel with timber supports, lantern on left wall, diamond barely visible in coal seam — carbon buried under immense pressure",
       "image": "assets/images/scene-01-seam.webp",
       "narration": {
         "lines": [
@@ -310,8 +310,8 @@ by the CREDITS state.
 ```
 1. Narration (loudest, volume: 1.0)
 2. Emotional silence (audioCues: null, no audio cues)
-3. Ambient texture (volume: 0.08–0.20, loop: true)
-4. End song (type: "ambient", anchor-based entry, crescendo to 0.25 over 45s)
+3. Ambient texture (volume: 0.1–1.0, scene-dependent; loop: true, 1.5s fade-in)
+4. End song (type: "ambient", anchored entry 5s before narration ends, crescendo to 0.75 over 10s)
 ```
 
 ---
@@ -771,10 +771,9 @@ Audio load failure                  │ onloaderror/onplayerror call onend.
                                     │ Auto-advance chain continues.
 Narration buffer stall              │ .buffering CSS spinner. Text timeline pauses.
                                     │ Recovery: nudge-seek → reload → give up.
-Scene 11 music + narration          │ End song (type: ambient) scheduled via anchor
-                                    │ (ref: narration, offset: -5000). Crescendo from 0
-                                    │ to 0.25 over 45s. Both play simultaneously.
-                                    │ Terminal — no advance.
+Scene 11 music + narration          │ End song (type: ambient) anchored to narration
+                                    │ end (offset: -5s). Crescendo 0→0.75 over 10s. Both
+                                    │ play simultaneously. Terminal — no advance.
 Scene 11 skip (nav away)            │ cleanupCurrentScene stops music. Normal.
                                     │ Return = restart from top.
 First interaction (play gate)       │ doResume → handleFirstPlay: trigger narration
@@ -805,7 +804,7 @@ First paint         │ <2s (loading screen)
 First frame visible │ <4s (first image + audio metadata)
 Background preload  │ Deferred 4s after first frame
 Total images        │ ~2-5MB (12 WebP at 1536×824)
-Total audio         │ TBD (narration .m4a + end song .mp3)
+Total audio         │ ~17MB (narration 6.4MB + ambient 3.2MB + end song 7.4MB)
 Canvas render       │ 60fps during effects
 Transition          │ ~0.6-0.75s (half of transition duration, each direction)
 ```
@@ -830,7 +829,7 @@ Progressive loading: first frame blocks, background assets load sequentially by 
 - Accessibility: aria-live, reduced-motion, keyboard, WCAG 2.2.2, captions
 - Cloud Run deploy with CI/CD
 - Effects registry wired but no-op until implementations added
-- End song on Scene 11 using type: ambient with anchor-based entry and 45s crescendo
+- End song on Scene 11 using type: ambient with anchor-based entry and 10s crescendo to 0.75
 
 ---
 

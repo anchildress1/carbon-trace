@@ -75,6 +75,25 @@ describe('loader.js', () => {
       expect(result).toEqual({ src: null, duration: 0 });
       warnSpy.mockRestore();
     });
+
+    it('cleans up handlers and src on timeout', async () => {
+      let audioInstance;
+      globalThis.Audio = class MockAudio {
+        constructor() { audioInstance = this; }
+        set preload(_v) {}
+        set src(v) { this._src = v; }
+        get src() { return this._src; }
+      };
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const p = preloadAudio('stall.m4a');
+      vi.advanceTimersByTime(5000);
+      await p;
+
+      expect(audioInstance.onloadedmetadata).toBeNull();
+      expect(audioInstance.onerror).toBeNull();
+      expect(audioInstance.src).toBe('');
+    });
   });
 
   describe('audioSrcsFromEntry', () => {

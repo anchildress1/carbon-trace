@@ -16,7 +16,6 @@
     {
       "id": "scene-00-title",
       "frameType": "title",
-
       "holdAfterNarration": null,
       "description": "Title card — opening narration on a dark field",
       "image": null,
@@ -42,7 +41,7 @@
         "captions": [
           {
             "text": "[Appalachian English dialect]",
-            "start": 0,
+            "start": 10,
             "end": 1000
           },
           {
@@ -87,9 +86,8 @@
     {
       "id": "scene-01-seam",
       "frameType": "scene",
-
       "holdAfterNarration": 2000,
-      "description": "Coal seam wall, lamp upper left, diamond barely visible — carbon buried under immense pressure",
+      "description": "Underground mine tunnel with timber supports, lantern on left wall, diamond barely visible in coal seam — carbon buried under immense pressure",
       "image": "assets/images/scene-01-seam.webp",
       "narration": {
         "lines": [
@@ -189,6 +187,16 @@
           "loop": false,
           "fadeIn": 0,
           "fadeOut": 0
+        },
+        {
+          "id": "ambient-01",
+          "type": "ambient",
+          "src": "assets/audio/ambient/scene-01-seam.m4a",
+          "enter": 0,
+          "volume": 0.1,
+          "loop": true,
+          "fadeIn": 500,
+          "fadeOut": null
         }
       ]
     },
@@ -197,7 +205,7 @@
       "frameType": "scene",
 
       "holdAfterNarration": 2000,
-      "description": "Mine tunnel with coal car and miner silhouette — carbon in transit through the earth",
+      "description": "Mine tunnel with coal cart and miner walking with headlamp, diamond glowing in the coal — carbon in transit through the earth",
       "image": "assets/images/scene-02-travel.webp",
       "narration": {
         "lines": [
@@ -308,15 +316,24 @@
           "loop": false,
           "fadeIn": 0,
           "fadeOut": 0
+        },
+        {
+          "id": "ambient-02",
+          "type": "ambient",
+          "src": "assets/audio/ambient/scene-02-travel.m4a",
+          "enter": 0,
+          "volume": 0.4,
+          "loop": true,
+          "fadeIn": 1500,
+          "fadeOut": null
         }
       ]
     },
     {
       "id": "scene-03-reach",
       "frameType": "scene",
-
       "holdAfterNarration": 3000,
-      "description": "Coke oven mouth with fire and a hand reaching in — carbon released as heat at the threshold of use",
+      "description": "Hand reaching toward diamond in a pile of burning coals, intense fire behind — carbon released as heat at the threshold of use",
       "image": "assets/images/scene-03-reach.webp",
       "narration": {
         "lines": [
@@ -417,15 +434,24 @@
           "loop": false,
           "fadeIn": 0,
           "fadeOut": 0
+        },
+        {
+          "id": "ambient-03",
+          "type": "ambient",
+          "src": "assets/audio/ambient/scene-03-reach.m4a",
+          "enter": 0,
+          "volume": 0.75,
+          "loop": true,
+          "fadeIn": 1500,
+          "fadeOut": null
         }
       ]
     },
     {
       "id": "scene-04-pocket",
       "frameType": "scene",
-
       "holdAfterNarration": 2000,
-      "description": "Dark close-up of diamond in coal grit with coins and denim — carbon carried as something personal",
+      "description": "Diamond with glowing circuitry in coal grit, coins and worn fabric — carbon carried as something personal",
       "image": "assets/images/scene-04-pocket.webp",
       "narration": {
         "lines": [
@@ -536,15 +562,24 @@
           "loop": false,
           "fadeIn": 0,
           "fadeOut": 0
+        },
+        {
+          "id": "ambient-04",
+          "type": "ambient",
+          "src": "assets/audio/ambient/scene-04-pocket.m4a",
+          "enter": 0,
+          "volume": 1,
+          "loop": true,
+          "fadeIn": 1500,
+          "fadeOut": null
         }
       ]
     },
     {
       "id": "scene-05-rinse",
       "frameType": "scene",
-
       "holdAfterNarration": 2500,
-      "description": "Hands holding diamond under water with circuitry visible — carbon entering the water cycle",
+      "description": "Hands holding diamond with circuitry under running water in a metal sink, coins in basin — carbon entering the water cycle",
       "image": "assets/images/scene-05-rinse.webp",
       "narration": {
         "lines": [
@@ -655,15 +690,24 @@
           "loop": false,
           "fadeIn": 0,
           "fadeOut": 0
+        },
+        {
+          "id": "ambient-05",
+          "type": "ambient",
+          "src": "assets/audio/ambient/scene-05-rinse.m4a",
+          "enter": 0,
+          "volume": 0.15,
+          "loop": true,
+          "fadeIn": 1500,
+          "fadeOut": null
         }
       ]
     },
     {
       "id": "scene-06-storage",
       "frameType": "scene",
-
       "holdAfterNarration": 2000,
-      "description": "Tin open with diamond glowing among coins — carbon quietly accumulated and set aside",
+      "description": "Hands opening round tin revealing diamond glowing on coins, old photograph inside — carbon quietly accumulated and set aside",
       "image": "assets/images/scene-06-storage.webp",
       "narration": {
         "lines": [
@@ -769,15 +813,24 @@
           "loop": false,
           "fadeIn": 0,
           "fadeOut": 0
+        },
+        {
+          "id": "ambient-06",
+          "type": "ambient",
+          "src": "assets/audio/ambient/scene-06-storage.m4a",
+          "enter": 0,
+          "volume": 0.35,
+          "loop": true,
+          "fadeIn": 1500,
+          "fadeOut": null
         }
       ]
     },
     {
       "id": "scene-07-missing",
       "frameType": "scene",
-
       "holdAfterNarration": 2000,
-      "description": "Bedroom with empty bed and woman silhouette — carbon suspended in silence, barely moving",
+      "description": "Woman silhouette gazing at framed painting of a girl in a field, flowers on table, warm amber light — carbon suspended in silence, barely moving",
       "image": "assets/images/scene-07-missing.webp",
       "narration": {
         "lines": [
@@ -863,15 +916,24 @@
           "loop": false,
           "fadeIn": 0,
           "fadeOut": 0
+        },
+        {
+          "id": "ambient-07",
+          "type": "ambient",
+          "src": "assets/audio/ambient/scene-07-missing.m4a",
+          "enter": 0,
+          "volume": 0.7,
+          "loop": true,
+          "fadeIn": 1500,
+          "fadeOut": null
         }
       ]
     },
     {
       "id": "scene-08-empty",
       "frameType": "scene",
-
       "holdAfterNarration": 8000,
-      "description": "Stripped bed, empty chair, tin glowing — a space where someone should be but isn't",
+      "description": "Sparse room with tin on wall shelf, circuitry glowing on walls, bright window — a space where someone should be but isn't",
       "image": "assets/images/scene-08-empty.webp",
       "narration": {
         "lines": [
@@ -911,14 +973,24 @@
       "traceOverlay": {
         "opacity": 0.3
       },
-      "audioCues": null
+      "audioCues": [
+        {
+          "id": "ambient-08",
+          "type": "ambient",
+          "src": "assets/audio/ambient/scene-08-empty.m4a",
+          "enter": 0,
+          "volume": 1,
+          "loop": true,
+          "fadeIn": 1500,
+          "fadeOut": null
+        }
+      ]
     },
     {
       "id": "scene-09-return",
       "frameType": "scene",
-
       "holdAfterNarration": 2000,
-      "description": "Woman silhouette in doorway with traces exploding outward — carbon cycling back",
+      "description": "Woman silhouette holding tin in glowing corridor, circuit traces on walls and floor — carbon cycling back",
       "image": "assets/images/scene-09-return.webp",
       "narration": {
         "lines": [
@@ -1014,15 +1086,24 @@
           "loop": false,
           "fadeIn": 0,
           "fadeOut": 0
+        },
+        {
+          "id": "ambient-09",
+          "type": "ambient",
+          "src": "assets/audio/ambient/scene-09-return.m4a",
+          "enter": 0,
+          "volume": 0.55,
+          "loop": true,
+          "fadeIn": 1500,
+          "fadeOut": null
         }
       ]
     },
     {
       "id": "scene-10-building",
       "frameType": "scene",
-
       "holdAfterNarration": 3000,
-      "description": "Woman on floor with tools and components, diamond glowing — carbon activated into something new",
+      "description": "Woman kneeling, soldering components on a wood frame, diamond glowing on floor, circuit traces on walls — carbon activated into something new",
       "image": "assets/images/scene-10-building.webp",
       "narration": {
         "lines": [
@@ -1118,15 +1199,24 @@
           "loop": false,
           "fadeIn": 0,
           "fadeOut": 0
+        },
+        {
+          "id": "ambient-10",
+          "type": "ambient",
+          "src": "assets/audio/ambient/scene-10-building.m4a",
+          "enter": 0,
+          "volume": 0.2,
+          "loop": true,
+          "fadeIn": 1500,
+          "fadeOut": null
         }
       ]
     },
     {
       "id": "scene-11-music",
       "frameType": "credits",
-
       "holdAfterNarration": null,
-      "description": "Record player with diamond blazing and circuitry — the finale, light filling the room",
+      "description": "Woman standing before record player on wooden table with diamond glowing, circuit traces and sparkles filling the bright room — the finale",
       "image": "assets/images/scene-11-music.webp",
       "narration": {
         "lines": [
@@ -1214,16 +1304,23 @@
           "fadeOut": 0
         },
         {
+          "id": "ambient-11",
+          "type": "ambient",
+          "src": "assets/audio/ambient/scene-11-music.m4a",
+          "enter": 0,
+          "volume": 0.2,
+          "loop": true,
+          "fadeIn": 1500,
+          "fadeOut": null
+        },
+        {
           "id": "end-song",
           "type": "ambient",
           "src": "assets/audio/sfx/BridgeCitySinners_BreakTheChain.mp3",
-          "enter": {
-            "ref": "narration",
-            "offset": -5000
-          },
-          "volume": 0.25,
+          "enter": { "ref": "narration", "offset": -5000 },
+          "volume": 0.75,
           "loop": true,
-          "fadeIn": 45000,
+          "fadeIn": 10000,
           "fadeOut": null
         }
       ]
