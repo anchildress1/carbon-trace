@@ -310,7 +310,7 @@ by the CREDITS state.
 ```
 1. Narration (loudest, volume: 1.0)
 2. Emotional silence (audioCues: null, no audio cues)
-3. Ambient texture (volume: 0.05–0.20, loop: true, 1.5s fade-in)
+3. Ambient texture (volume: 0.1–1.0, scene-dependent; loop: true, 1.5s fade-in)
 4. End song (type: "ambient", anchored entry 5s before narration ends, crescendo to 0.75 over 10s)
 ```
 

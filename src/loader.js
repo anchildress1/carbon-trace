@@ -15,7 +15,14 @@ export function preloadAudio(src) {
     const audio = new Audio();
     audio.preload = 'metadata';
 
+    function cleanup() {
+      audio.onloadedmetadata = null;
+      audio.onerror = null;
+      audio.src = '';
+    }
+
     const timeout = setTimeout(() => {
+      cleanup();
       console.warn(`Audio preload timed out: ${src}`);
       resolve({ src: null, duration: 0 });
     }, 5000);
@@ -23,17 +30,13 @@ export function preloadAudio(src) {
     audio.onloadedmetadata = () => {
       clearTimeout(timeout);
       const duration = audio.duration || 0;
-      audio.onloadedmetadata = null;
-      audio.onerror = null;
-      audio.src = '';
+      cleanup();
       resolve({ src, duration });
     };
     audio.onerror = () => {
       clearTimeout(timeout);
       console.warn(`Failed to preload audio: ${src}`);
-      audio.onloadedmetadata = null;
-      audio.onerror = null;
-      audio.src = '';
+      cleanup();
       resolve({ src: null, duration: 0 });
     };
     audio.src = src;
