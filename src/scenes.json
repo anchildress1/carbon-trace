@@ -41,7 +41,7 @@
         "captions": [
           {
             "text": "[Appalachian English dialect]",
-            "start": 0,
+            "start": 10,
             "end": 1000
           },
           {
@@ -193,7 +193,7 @@
           "type": "ambient",
           "src": "assets/audio/ambient/scene-01-seam.m4a",
           "enter": 0,
-          "volume": 1,
+          "volume": 0.1,
           "loop": true,
           "fadeIn": 500,
           "fadeOut": null
@@ -440,7 +440,7 @@
           "type": "ambient",
           "src": "assets/audio/ambient/scene-03-reach.m4a",
           "enter": 0,
-          "volume": 0.4,
+          "volume": 0.75,
           "loop": true,
           "fadeIn": 1500,
           "fadeOut": null
@@ -819,7 +819,7 @@
           "type": "ambient",
           "src": "assets/audio/ambient/scene-06-storage.m4a",
           "enter": 0,
-          "volume": 1,
+          "volume": 0.35,
           "loop": true,
           "fadeIn": 1500,
           "fadeOut": null
@@ -922,7 +922,7 @@
           "type": "ambient",
           "src": "assets/audio/ambient/scene-07-missing.m4a",
           "enter": 0,
-          "volume": 1,
+          "volume": 0.7,
           "loop": true,
           "fadeIn": 1500,
           "fadeOut": null
@@ -1092,7 +1092,7 @@
           "type": "ambient",
           "src": "assets/audio/ambient/scene-09-return.m4a",
           "enter": 0,
-          "volume": 0.85,
+          "volume": 0.55,
           "loop": true,
           "fadeIn": 1500,
           "fadeOut": null
