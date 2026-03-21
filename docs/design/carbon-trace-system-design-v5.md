@@ -311,7 +311,7 @@ by the CREDITS state.
 1. Narration (loudest, volume: 1.0)
 2. Emotional silence (audioCues: null, no audio cues)
 3. Ambient texture (volume: 0.05–0.20, loop: true, 1.5s fade-in)
-4. End song (type: "ambient", 5s delay, crescendo to 0.75 over 30s)
+4. End song (type: "ambient", anchored entry 5s before narration ends, crescendo to 0.75 over 10s)
 ```
 
 ---
@@ -771,8 +771,8 @@ Audio load failure                  │ onloaderror/onplayerror call onend.
                                     │ Auto-advance chain continues.
 Narration buffer stall              │ .buffering CSS spinner. Text timeline pauses.
                                     │ Recovery: nudge-seek → reload → give up.
-Scene 11 music + narration          │ End song (type: ambient) enters after 5s fixed
-                                    │ delay. Crescendo from 0 to 0.75 over 30s. Both
+Scene 11 music + narration          │ End song (type: ambient) anchored to narration
+                                    │ end (offset: -5s). Crescendo 0→0.75 over 10s. Both
                                     │ play simultaneously. Terminal — no advance.
 Scene 11 skip (nav away)            │ cleanupCurrentScene stops music. Normal.
                                     │ Return = restart from top.
@@ -829,7 +829,7 @@ Progressive loading: first frame blocks, background assets load sequentially by 
 - Accessibility: aria-live, reduced-motion, keyboard, WCAG 2.2.2, captions
 - Cloud Run deploy with CI/CD
 - Effects registry wired but no-op until implementations added
-- End song on Scene 11 using type: ambient with 5s delay and 30s crescendo to 0.75
+- End song on Scene 11 using type: ambient with anchor-based entry and 10s crescendo to 0.75
 
 ---
 
