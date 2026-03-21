@@ -222,7 +222,7 @@ Every frame has identical shape via `meta.frameDefaults` merge. `null` = skip fe
       "id": "scene-01-seam",
       "frameType": "scene",
       "holdAfterNarration": 2000,
-      "description": "Coal seam wall, lamp upper left — carbon buried under pressure",
+      "description": "Underground mine tunnel with timber supports, lantern on left wall, diamond barely visible in coal seam — carbon buried under immense pressure",
       "image": "assets/images/scene-01-seam.webp",
       "narration": {
         "lines": [
