@@ -22,11 +22,18 @@ export function preloadAudio(src) {
 
     audio.onloadedmetadata = () => {
       clearTimeout(timeout);
-      resolve({ src, duration: audio.duration || 0 });
+      const duration = audio.duration || 0;
+      audio.onloadedmetadata = null;
+      audio.onerror = null;
+      audio.src = '';
+      resolve({ src, duration });
     };
     audio.onerror = () => {
       clearTimeout(timeout);
       console.warn(`Failed to preload audio: ${src}`);
+      audio.onloadedmetadata = null;
+      audio.onerror = null;
+      audio.src = '';
       resolve({ src: null, duration: 0 });
     };
     audio.src = src;
