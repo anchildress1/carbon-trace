@@ -47,6 +47,11 @@ function loadTexture(url) {
  * Load a grayscale mask PNG and convert its luminance to alpha.
  * Masks are authored as white-on-black: white = effect visible, black = hidden.
  * PixiJS alpha masking reads the alpha channel, so we map luminance → alpha.
+ *
+ * The modified pixels are round-tripped through a data-URL back into an Image
+ * so that Texture.from() creates an ImageSource. PixiJS v8's AlphaMaskPipe
+ * fails with CanvasSource textures (BindGroup.getResource returns null),
+ * but ImageSource textures upload to the GPU correctly.
  */
 function loadLuminanceMask(url) {
   return new Promise((resolve, reject) => {
@@ -68,7 +73,13 @@ function loadLuminanceMask(url) {
         data[i + 3] = luminance;
       }
       ctx.putImageData(imageData, 0, 0);
-      resolve(Texture.from(canvas));
+
+      // Round-trip through data-URL → Image so PixiJS creates an ImageSource
+      // instead of a CanvasSource. Required for AlphaMaskPipe compatibility.
+      const result = new Image();
+      result.onload = () => resolve(Texture.from(result));
+      result.onerror = () => reject(new Error(`Failed to process mask: ${url}`));
+      result.src = canvas.toDataURL();
     };
     img.onerror = () => reject(new Error(`Failed to load mask: ${url}`));
     img.src = url;
