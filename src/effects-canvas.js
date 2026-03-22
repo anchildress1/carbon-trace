@@ -14,7 +14,7 @@
  */
 
 import { Application, Container, Sprite, Texture } from 'pixi.js';
-import { createEffect, noiseFreeTypes } from './effects.js';
+import { createEffect, noiseFreeTypes, overlayTypes } from './effects.js';
 
 let pixiApp = null;
 let canvasEl = null;
@@ -94,9 +94,15 @@ function tickerUpdate() {
 
 /**
  * Set up a single region's effect: load noise sprite (if needed), create
- * the effect filter, and wire it into the stage as a masked Container.
- * Every region must have a mask (ADR-007 addendum: transparent overlay
- * architecture — no unmasked full-screen geometry on stage).
+ * the effect filter, and wire it into the stage.
+ *
+ * Two rendering modes:
+ * - Displacement (water/heat/dust/shockwave): scene texture clipped by mask.
+ * - Overlay (glow): mask texture IS the content sprite. GlowFilter needs
+ *   alpha edges to radiate outward — a full-screen opaque sprite has none.
+ *   The mask shape's own transparency provides those edges.
+ *
+ * Every region must have a mask (ADR-007 addendum).
  * Returns the effect object, or null if the factory declined.
  */
 async function applyRegionEffect(region, sceneTexture) {
@@ -118,6 +124,37 @@ async function applyRegionEffect(region, sceneTexture) {
 
   const maskTexture = await loadLuminanceMask(region.mask);
   disposableTextures.push(maskTexture);
+
+  if (overlayTypes.has(region.type)) {
+    return applyOverlayEffect(effect, maskTexture, region);
+  }
+  return applyMaskedEffect(effect, maskTexture, sceneTexture);
+}
+
+/**
+ * Overlay rendering: mask texture becomes the visible sprite content.
+ * The shape's alpha edges let GlowFilter radiate outward. Tinted with
+ * the effect color and set to low alpha so the scene shows through.
+ */
+function applyOverlayEffect(effect, maskTexture, region) {
+  const effectSprite = new Sprite(maskTexture);
+  effectSprite.width = pixiApp.screen.width;
+  effectSprite.height = pixiApp.screen.height;
+  effectSprite.tint = region.color ?? 0xffcc66;
+  effectSprite.alpha = region.glowAlpha ?? 0.15;
+  effectSprite.filters = [effect.filter];
+
+  screenSizedSprites.push(effectSprite);
+  pixiApp.stage.addChild(effectSprite);
+
+  return effect;
+}
+
+/**
+ * Masked rendering: scene texture clipped by mask shape. Used for
+ * displacement effects (water, heat, dust) and shockwave.
+ */
+function applyMaskedEffect(effect, maskTexture, sceneTexture) {
   const maskSprite = new Sprite(maskTexture);
   maskSprite.width = pixiApp.screen.width;
   maskSprite.height = pixiApp.screen.height;

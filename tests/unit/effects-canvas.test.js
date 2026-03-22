@@ -83,6 +83,7 @@ vi.mock('../../src/effects.js', () => ({
     update: vi.fn(),
   })),
   noiseFreeTypes: new Set(['glow', 'shockwave']),
+  overlayTypes: new Set(['glow']),
 }));
 
 import {
@@ -323,6 +324,29 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
         expect.stringContaining('mask is required'),
       );
       warnSpy.mockRestore();
+    });
+
+    it('glow regions use overlay rendering (mask as content, tinted)', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      const { Sprite } = await import('pixi.js');
+      Sprite.mockClear();
+
+      await loadScene(
+        { regions: [{ type: 'glow', mask: 'diamond.png', color: 0xffee33 }] },
+        'scene.png',
+      );
+
+      // Overlay mode: only one sprite (effectSprite from mask texture),
+      // no separate maskSprite or Container masking.
+      // Sprite calls: no noise sprite (glow is noise-free), one effectSprite.
+      const spriteInstances = Sprite.mock.instances;
+      expect(spriteInstances.length).toBe(1);
+      const effectSprite = spriteInstances[0];
+      expect(effectSprite.tint).toBe(0xffee33);
+      expect(effectSprite.alpha).toBe(0.15);
+      expect(effectSprite.filters).toEqual([{ enabled: true }]);
     });
   });
 

@@ -31,6 +31,8 @@ import {
   registerEffect,
   createEffect,
   hasEffectType,
+  noiseFreeTypes,
+  overlayTypes,
 } from '../../src/effects.js';
 
 function mockSprite() {
@@ -88,6 +90,20 @@ describe('effects.js — factory registry', () => {
     it('registers a custom effect type', () => {
       registerEffect('custom', vi.fn(() => ({ filter: {}, update: vi.fn() })));
       expect(hasEffectType('custom')).toBe(true);
+    });
+  });
+
+  describe('type sets', () => {
+    it('noiseFreeTypes contains glow and shockwave', () => {
+      expect(noiseFreeTypes.has('glow')).toBe(true);
+      expect(noiseFreeTypes.has('shockwave')).toBe(true);
+      expect(noiseFreeTypes.has('water')).toBe(false);
+    });
+
+    it('overlayTypes contains glow', () => {
+      expect(overlayTypes.has('glow')).toBe(true);
+      expect(overlayTypes.has('shockwave')).toBe(false);
+      expect(overlayTypes.has('water')).toBe(false);
     });
   });
 

@@ -39,6 +39,16 @@ export function hasEffectType(type) {
 /** Effect types that don't need a displacement noise sprite. */
 export const noiseFreeTypes = new Set(['glow', 'shockwave']);
 
+/**
+ * Overlay effect types render the mask as content (not a clipping mask).
+ * GlowFilter needs alpha edges to produce visible halos — a full-screen
+ * opaque scene sprite has no alpha edges, so the glow would be invisible
+ * behind a clipping mask. Instead, the mask texture (shape with transparent
+ * background) becomes the sprite content, giving GlowFilter the alpha
+ * transitions it needs to radiate outward.
+ */
+export const overlayTypes = new Set(['glow']);
+
 // --- Displacement-based effect factories ---
 // Each receives a PixiJS Sprite (noise texture) and region params.
 // Returns { filter, update(): void }.
