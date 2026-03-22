@@ -98,25 +98,6 @@ registerEffect('dust', (sprite, params = {}) => {
   };
 });
 
-registerEffect('fog', (sprite, params = {}) => {
-  const { speed = 0.3, intensity = 18, scale = 0.2 } = params;
-
-  sprite.texture.source.style.addressMode = 'repeat';
-  sprite.scale.set(scale);
-
-  const filter = new DisplacementFilter({ sprite, scale: intensity });
-
-  let t = 0;
-  return {
-    filter,
-    update() {
-      t += 0.005;
-      sprite.x += Math.sin(t) * speed;
-      sprite.y += Math.cos(t * 0.6) * speed * 0.3;
-    },
-  };
-});
-
 // --- Extension filter factories (pixi-filters) ---
 // These do NOT use a displacement noise sprite.
 

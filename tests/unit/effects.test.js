@@ -53,7 +53,6 @@ describe('effects.js — factory registry', () => {
       expect(hasEffectType('heat')).toBe(true);
       expect(hasEffectType('dust')).toBe(true);
       expect(hasEffectType('glow')).toBe(true);
-      expect(hasEffectType('fog')).toBe(true);
       expect(hasEffectType('shockwave')).toBe(true);
     });
 
@@ -210,15 +209,6 @@ describe('effects.js — factory registry', () => {
 
       expect(result).not.toBeNull();
       expect(result.filter).toBeDefined();
-    });
-
-    it('creates a fog effect with displacement', () => {
-      const sprite = mockSprite();
-      const result = createEffect('fog', sprite, { speed: 0.15, intensity: 5 });
-
-      expect(result).not.toBeNull();
-      expect(result.filter).toBeDefined();
-      expect(typeof result.update).toBe('function');
     });
 
     it('creates a shockwave effect with filter and update function', () => {
