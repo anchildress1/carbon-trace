@@ -17,6 +17,15 @@ vi.mock('pixi-filters', () => ({
     this.innerStrength = innerStrength;
     this.quality = quality;
   }),
+  GodrayFilter: vi.fn(function ({ angle, gain, lacunarity, parallel, center, alpha }) {
+    this.angle = angle;
+    this.gain = gain;
+    this.lacunarity = lacunarity;
+    this.parallel = parallel;
+    this.center = center;
+    this.alpha = alpha;
+    this.time = 0;
+  }),
   ShockwaveFilter: vi.fn(function ({ center, amplitude, wavelength, speed, radius }) {
     this.center = center;
     this.amplitude = amplitude;
@@ -55,6 +64,7 @@ describe('effects.js — factory registry', () => {
       expect(hasEffectType('heat')).toBe(true);
       expect(hasEffectType('dust')).toBe(true);
       expect(hasEffectType('glow')).toBe(true);
+      expect(hasEffectType('godray')).toBe(true);
       expect(hasEffectType('shockwave')).toBe(true);
     });
 
@@ -94,16 +104,17 @@ describe('effects.js — factory registry', () => {
   });
 
   describe('type sets', () => {
-    it('noiseFreeTypes contains glow and shockwave', () => {
+    it('noiseFreeTypes contains glow, godray, and shockwave', () => {
       expect(noiseFreeTypes.has('glow')).toBe(true);
+      expect(noiseFreeTypes.has('godray')).toBe(true);
       expect(noiseFreeTypes.has('shockwave')).toBe(true);
       expect(noiseFreeTypes.has('water')).toBe(false);
     });
 
-    it('overlayTypes contains glow', () => {
+    it('overlayTypes contains glow but not godray', () => {
       expect(overlayTypes.has('glow')).toBe(true);
+      expect(overlayTypes.has('godray')).toBe(false);
       expect(overlayTypes.has('shockwave')).toBe(false);
-      expect(overlayTypes.has('water')).toBe(false);
     });
   });
 
@@ -222,6 +233,32 @@ describe('effects.js — factory registry', () => {
 
     it('glow effect uses default params when none provided', () => {
       const result = createEffect('glow', null);
+
+      expect(result).not.toBeNull();
+      expect(result.filter).toBeDefined();
+    });
+
+    it('creates a godray effect with filter and update function', () => {
+      const result = createEffect('godray', null, {
+        angle: 45,
+        gain: 0.6,
+      });
+
+      expect(result).not.toBeNull();
+      expect(result.filter).toBeDefined();
+      expect(typeof result.update).toBe('function');
+    });
+
+    it('godray advances time on update', () => {
+      const result = createEffect('godray', null, { speed: 0.01 });
+
+      expect(result.filter.time).toBe(0);
+      result.update();
+      expect(result.filter.time).toBeGreaterThan(0);
+    });
+
+    it('godray uses default params when none provided', () => {
+      const result = createEffect('godray', null);
 
       expect(result).not.toBeNull();
       expect(result.filter).toBeDefined();

@@ -974,17 +974,8 @@
       "effects": {
         "regions": [
           {
-            "type": "glow",
-            "mask": "assets/masks/mask-07-missing-glow.png"
-          },
-          {
-            "type": "glow",
-            "mask": "assets/masks/mask-07-missing-diamond.png",
-            "color": 16772659,
-            "distance": 20,
-            "outerStrength": 4,
-            "pulseSpeed": 0.02,
-            "pulseDepth": 0.4
+            "type": "godray",
+            "mask": "assets/masks/mask-07-missing-godray.png"
           }
         ]
       },
@@ -1156,17 +1147,8 @@
       "effects": {
         "regions": [
           {
-            "type": "glow",
-            "mask": "assets/masks/mask-09-return-glow.png"
-          },
-          {
-            "type": "glow",
-            "mask": "assets/masks/mask-09-return-diamond.png",
-            "color": 16772659,
-            "distance": 20,
-            "outerStrength": 4,
-            "pulseSpeed": 0.02,
-            "pulseDepth": 0.4
+            "type": "godray",
+            "mask": "assets/masks/mask-09-return-godray.png"
           }
         ]
       },
