@@ -96,13 +96,29 @@ EACH rAF FRAME (managed by PixiJS ticker):
 - Same DisplacementFilter as water/heat, with multi-directional slow drift
 - Very low intensity — subtle movement suggesting floating particles without actual particle sprites
 - Mask constrains displacement to the dust region (e.g., around a diamond, in a shaft of light)
-- No particle emitter dependency — all three effect types (water, heat, dust) use DisplacementFilter exclusively
+- No particle emitter dependency — displacement effect types (water, heat, dust, shockwave) use DisplacementFilter exclusively
 - Parameters: `speed`, `intensity`, `scale`
+
+**fog** — Atmospheric haze (PixiJS BlurFilter)
+- Soft static blur with gentle pulse for subtle atmospheric drift
+- Normal blend mode (not additive) — dims rather than brightens
+- No displacement sprite needed (`needsNoise: false`)
+- Parameters: `strength`, `quality`, `pulseSpeed`, `pulseRange`
+
+**glow** — Soft bloom (PixiJS BlurFilter)
+- Animated blur with additive blend mode — adds warm light to masked region
+- Pulses blur strength for organic breathing effect
+- No displacement sprite needed (`needsNoise: false`)
+- Parameters: `strength`, `quality`, `pulseSpeed`, `pulseRange`
+
+**shockwave** — Radial displacement burst (PixiJS DisplacementFilter)
+- Noise sprite scales outward rapidly from center, displacement fades as it expands
+- Cycles between burst phase and rest phase for repeating pulse
+- Parameters: `speed`, `intensity`, `restScale`, `burstScale`, `cyclePause`
 
 **Future effects** — PixiJS supports:
 - Custom GLSL fragment shaders (caustics, refraction, chromatic aberration)
 - ColorMatrixFilter (tint shifts, desaturation)
-- BlurFilter (depth-of-field, fog)
 - Any combination of the above, masked to arbitrary regions
 - New effects are added by registering a filter factory function — no architecture changes needed
 
@@ -153,7 +169,7 @@ registerEffect(type, factoryFn)  — register a named effect type
 createEffect(type, app, params)  — create PixiJS filter for this type
 ```
 
-Built-in registrations: `water`, `heat`, `dust`. Each factory returns a PixiJS DisplacementFilter configured from params.
+Built-in registrations: `water`, `heat`, `dust`, `fog`, `glow`, `shockwave`. Displacement types return a DisplacementFilter; blur types (fog, glow) return a BlurFilter.
 
 **effects-canvas.js** — gains PixiJS lifecycle:
 ```
@@ -167,7 +183,7 @@ pause() / resume()                     — stop/start PixiJS ticker (WCAG 2.2.2)
 ```
 
 **New dependencies:**
-- `pixi.js` v8 — added to package.json (pinned to exact minor version), bundled by Vite (no CDN). ~150KB gzipped. Tree-shake via `import { Application, Sprite, DisplacementFilter, Texture } from 'pixi.js'`.
+- `pixi.js` v8 — added to package.json (pinned to exact minor version), bundled by Vite (no CDN). ~150KB gzipped. Tree-shake via `import { Application, Sprite, DisplacementFilter, BlurFilter, Texture } from 'pixi.js'`. Also imports `pixi.js/unsafe-eval` for CSP-safe shader compilation.
 - No particle emitter package needed — all three effect types use DisplacementFilter exclusively.
 
 **app.js** — showFrame() call site:
@@ -246,6 +262,9 @@ When `prefers-reduced-motion: reduce` is active:
 - Water: static (no displacement)
 - Heat: static (no displacement)
 - Dust: static (no displacement)
+- Fog: static (no blur pulse)
+- Glow: static (no bloom pulse)
+- Shockwave: static (no burst cycle)
 
 All displacement stops. The masked regions display the static scene image with no movement.
 
@@ -291,9 +310,10 @@ Same as normal scene-to-scene. Only the destination frame matters.
 ```
 CONCERN                  │ MITIGATION
 ─────────────────────────┼──────────────────────────────────────
-PixiJS bundle size       │ ~150KB gzipped. Tree-shake unused modules
-                         │ via Vite. Only import Application,
-                         │ Sprite, DisplacementFilter, Texture.
+PixiJS bundle size       │ ~133KB gzipped. Tree-shake unused modules
+                         │ via Vite. Only import Application, Sprite,
+                         │ DisplacementFilter, BlurFilter, Texture.
+                         │ Also imports pixi.js/unsafe-eval for CSP.
 ─────────────────────────┼──────────────────────────────────────
 GPU memory               │ Scene texture + displacement texture +
                          │ mask texture per region. ~10-20MB GPU
@@ -394,6 +414,9 @@ loadScene         │ valid config, empty regions [], mask load failure, missing
 water effect      │ flow direction, speed 0 (static), varying intensity
 heat effect       │ upward distortion, edge falloff
 dust effect       │ gentle drift displacement, varying intensity from gray values
+fog effect        │ blur without additive blend, gentle pulse
+glow effect       │ additive blur bloom, pulse animation
+shockwave effect  │ radial burst cycle, rest phase, displacement fade
 pause/resume      │ effects freeze on pause, resume without drift
 reduced motion    │ all effects static, no displacement
 resize            │ PixiJS renderer resizes via existing ResizeObserver callback
@@ -425,16 +448,16 @@ These are scoped implementation choices, not architectural decisions. The ADR's 
 ## Action Items
 
 1. [ ] Design and author mask images for all scenes (Ashley)
-2. [ ] Add pixi.js v8 (pinned to exact minor version) to package.json — no particle emitter package needed
-3. [ ] Implement effect factory registry in effects.js (water, heat, dust)
-4. [ ] Refactor effects-canvas.js with PixiJS lifecycle (init, loadScene, clearAll, pause/resume)
-5. [ ] Implement water displacement (DisplacementFilter + scrolling noise sprite + mask)
-6. [ ] Implement heat displacement (DisplacementFilter, upward, large scale)
-7. [ ] Implement dust displacement (DisplacementFilter, multi-directional slow drift)
-8. [ ] Update app.js showFrame() to use new effects API
+2. [x] Add pixi.js v8.17.1 (pinned) to package.json — no particle emitter package needed
+3. [x] Implement effect factory registry in effects.js (water, heat, dust, fog, glow, shockwave)
+4. [x] Refactor effects-canvas.js with PixiJS lifecycle (init, loadScene, clearAll, pause/resume)
+5. [x] Implement water displacement (DisplacementFilter + scrolling noise sprite + mask)
+6. [x] Implement heat displacement (DisplacementFilter, upward, large scale)
+7. [x] Implement dust displacement (DisplacementFilter, multi-directional slow drift)
+8. [x] Update app.js showFrame() to use new effects API
 9. [ ] ~~Add mask preloading to loader.js pipeline~~ Masks loaded lazily via `new Image()` + `Texture.from()` inside loadScene(). No loader.js changes needed.
-10. [ ] Update scenes.json schema for all 12 frames
-11. [ ] WebGL fallback: detect unavailability, degrade to static + context loss recovery (re-init on next loadScene)
-12. [ ] Error boundary: try/catch around init(), webglAvailable flag, loadScene() no-op on failure
+10. [x] Update scenes.json schema for all 12 frames
+11. [x] WebGL fallback: detect unavailability, degrade to static + context loss recovery (re-init on next loadScene)
+12. [x] Error boundary: try/catch around init(), webglAvailable flag, loadScene() no-op on failure
 13. [ ] Performance profiling — verify <2ms per frame on baseline hardware (see profiling gates)
 14. [ ] Update v5 spec §3, §4, §17
