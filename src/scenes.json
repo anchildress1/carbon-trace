@@ -159,7 +159,17 @@
           }
         ]
       },
-      "effects": { "regions": [] },
+      "effects": {
+        "regions": [
+          {
+            "type": "dust",
+            "mask": "assets/masks/placeholder-dust.png",
+            "speed": 0.2,
+            "intensity": 2,
+            "scale": 0.06
+          }
+        ]
+      },
       "transition": {
         "type": "zoom-in",
         "duration": 1200,
@@ -197,7 +207,6 @@
     {
       "id": "scene-02-travel",
       "frameType": "scene",
-
       "holdAfterNarration": 2000,
       "description": "Mine tunnel with coal cart and miner walking with headlamp, diamond glowing in the coal — carbon in transit through the earth",
       "image": "assets/images/scene-02-travel.webp",
@@ -289,7 +298,16 @@
           }
         ]
       },
-      "effects": { "regions": [] },
+      "effects": {
+        "regions": [
+          {
+            "type": "fog",
+            "mask": "assets/masks/placeholder-dust.png",
+            "strength": 3,
+            "pulseRange": 1
+          }
+        ]
+      },
       "transition": {
         "type": "fade",
         "duration": 1200
@@ -404,7 +422,17 @@
           }
         ]
       },
-      "effects": { "regions": [] },
+      "effects": {
+        "regions": [
+          {
+            "type": "heat",
+            "mask": "assets/masks/placeholder-heat.png",
+            "speed": 0.6,
+            "intensity": 5,
+            "scale": 0.12
+          }
+        ]
+      },
       "transition": {
         "type": "fade",
         "duration": 1200
@@ -529,7 +557,16 @@
           }
         ]
       },
-      "effects": { "regions": [] },
+      "effects": {
+        "regions": [
+          {
+            "type": "glow",
+            "mask": "assets/masks/placeholder-dust.png",
+            "strength": 6,
+            "pulseRange": 2
+          }
+        ]
+      },
       "transition": {
         "type": "fade",
         "duration": 1200
@@ -654,7 +691,18 @@
           }
         ]
       },
-      "effects": { "regions": [] },
+      "effects": {
+        "regions": [
+          {
+            "type": "water",
+            "mask": "assets/masks/placeholder-water.png",
+            "direction": 180,
+            "speed": 0.5,
+            "intensity": 6,
+            "scale": 0.03
+          }
+        ]
+      },
       "transition": {
         "type": "fade",
         "duration": 1200
@@ -774,7 +822,16 @@
           }
         ]
       },
-      "effects": { "regions": [] },
+      "effects": {
+        "regions": [
+          {
+            "type": "glow",
+            "mask": "assets/masks/placeholder-dust.png",
+            "strength": 5,
+            "pulseRange": 1.5
+          }
+        ]
+      },
       "transition": {
         "type": "fade",
         "duration": 1200
@@ -874,7 +931,16 @@
           }
         ]
       },
-      "effects": { "regions": [] },
+      "effects": {
+        "regions": [
+          {
+            "type": "glow",
+            "mask": "assets/masks/placeholder-dust.png",
+            "strength": 6,
+            "pulseRange": 2
+          }
+        ]
+      },
       "transition": {
         "type": "fade",
         "duration": 1200
@@ -938,7 +1004,16 @@
           }
         ]
       },
-      "effects": { "regions": [] },
+      "effects": {
+        "regions": [
+          {
+            "type": "glow",
+            "mask": "assets/masks/placeholder-dust.png",
+            "strength": 7,
+            "pulseRange": 2
+          }
+        ]
+      },
       "transition": {
         "type": "fade",
         "duration": 1200
@@ -1038,7 +1113,16 @@
           }
         ]
       },
-      "effects": { "regions": [] },
+      "effects": {
+        "regions": [
+          {
+            "type": "glow",
+            "mask": "assets/masks/placeholder-dust.png",
+            "strength": 8,
+            "pulseRange": 2.5
+          }
+        ]
+      },
       "transition": {
         "type": "fade",
         "duration": 1200
@@ -1148,7 +1232,16 @@
           }
         ]
       },
-      "effects": { "regions": [] },
+      "effects": {
+        "regions": [
+          {
+            "type": "glow",
+            "mask": "assets/masks/placeholder-dust.png",
+            "strength": 8,
+            "pulseRange": 2
+          }
+        ]
+      },
       "transition": {
         "type": "fade",
         "duration": 1200
@@ -1248,7 +1341,18 @@
           }
         ]
       },
-      "effects": { "regions": [] },
+      "effects": {
+        "regions": [
+          {
+            "type": "shockwave",
+            "mask": "assets/masks/placeholder-dust.png",
+            "speed": 0.012,
+            "intensity": 15,
+            "burstScale": 0.3,
+            "cyclePause": 4
+          }
+        ]
+      },
       "transition": {
         "type": "fade",
         "duration": 1500
@@ -1281,7 +1385,10 @@
           "id": "end-song",
           "type": "ambient",
           "src": "assets/audio/sfx/BridgeCitySinners_BreakTheChain.mp3",
-          "enter": { "ref": "narration", "offset": -5000 },
+          "enter": {
+            "ref": "narration",
+            "offset": -5000
+          },
           "volume": 0.75,
           "loop": true,
           "fadeIn": 10000,

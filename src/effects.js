@@ -92,6 +92,26 @@ registerEffect('dust', (sprite, params = {}) => {
 });
 
 /**
+ * Fog: soft static haze via blur. No displacement sprite needed.
+ * Gentle pulse gives subtle atmospheric drift.
+ */
+registerEffect('fog', (_sprite, params = {}) => {
+  const { strength = 4, quality = 4, pulseSpeed = 0.008, pulseRange = 1 } = params;
+
+  const filter = new BlurFilter({ strength, quality });
+
+  let t = 0;
+  return {
+    filter,
+    needsNoise: false,
+    update() {
+      t += pulseSpeed;
+      filter.strength = strength + Math.sin(t) * pulseRange;
+    },
+  };
+});
+
+/**
  * Glow: soft bloom effect via animated blur. No displacement sprite needed.
  * Pulses blur strength gently for an organic warm haze.
  */
@@ -108,6 +128,44 @@ registerEffect('glow', (_sprite, params = {}) => {
     update() {
       t += pulseSpeed;
       filter.strength = strength + Math.sin(t) * pulseRange;
+    },
+  };
+});
+
+/**
+ * Shockwave: radial displacement burst that expands outward and resets.
+ * Noise sprite scales up rapidly from center, displacement fades as it expands.
+ */
+registerEffect('shockwave', (sprite, params = {}) => {
+  const {
+    speed = 0.015,
+    intensity = 12,
+    restScale = 0.01,
+    burstScale = 0.25,
+    cyclePause = 3,
+  } = params;
+
+  sprite.texture.source.style.addressMode = 'repeat';
+  sprite.scale.set(restScale);
+
+  const filter = new DisplacementFilter({ sprite, scale: 0 });
+
+  let t = 0;
+  return {
+    filter,
+    update() {
+      t += speed;
+      const cycle = t % (1 + cyclePause);
+
+      if (cycle < 1) {
+        const progress = cycle;
+        const ease = 1 - (1 - progress) * (1 - progress);
+        sprite.scale.set(restScale + (burstScale - restScale) * ease);
+        filter.scale = intensity * (1 - ease);
+      } else {
+        sprite.scale.set(restScale);
+        filter.scale = 0;
+      }
     },
   };
 });

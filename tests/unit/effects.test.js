@@ -40,6 +40,8 @@ describe('effects.js — factory registry', () => {
       expect(hasEffectType('heat')).toBe(true);
       expect(hasEffectType('dust')).toBe(true);
       expect(hasEffectType('glow')).toBe(true);
+      expect(hasEffectType('fog')).toBe(true);
+      expect(hasEffectType('shockwave')).toBe(true);
     });
 
     it('returns false for unregistered types', () => {
@@ -201,6 +203,44 @@ describe('effects.js — factory registry', () => {
       expect(result).not.toBeNull();
       expect(result.filter).toBeDefined();
       expect(result.needsNoise).toBe(false);
+    });
+
+    it('creates a fog effect with blur filter (non-additive)', () => {
+      const result = createEffect('fog', null, { strength: 4 });
+
+      expect(result).not.toBeNull();
+      expect(result.filter).toBeDefined();
+      expect(result.needsNoise).toBe(false);
+      expect(result.filter.blendMode).not.toBe('add');
+    });
+
+    it('creates a shockwave effect with displacement', () => {
+      const sprite = mockSprite();
+      const result = createEffect('shockwave', sprite, {
+        speed: 0.015,
+        intensity: 12,
+      });
+
+      expect(result).not.toBeNull();
+      expect(result.filter).toBeDefined();
+      expect(typeof result.update).toBe('function');
+    });
+
+    it('shockwave cycles between burst and rest', () => {
+      const sprite = mockSprite();
+      const result = createEffect('shockwave', sprite, {
+        speed: 0.5,
+        intensity: 12,
+        cyclePause: 1,
+      });
+
+      // During burst phase
+      result.update();
+      const burstScale = result.filter.scale;
+
+      // Advance past burst into rest phase
+      for (let i = 0; i < 10; i++) result.update();
+      expect(result.filter.scale).toBe(0);
     });
   });
 });
