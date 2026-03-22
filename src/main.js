@@ -1,3 +1,6 @@
+// Must run before any pixi.js import — patches shader compilation to
+// use CSP-safe alternatives, required by script-src 'self' policy.
+import 'pixi.js/unsafe-eval';
 import { createApp } from './app.js';
 
 // Activate preloaded Google Fonts stylesheet without blocking render.

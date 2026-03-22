@@ -12,8 +12,7 @@
  */
 
 import { Application, Sprite, Texture } from 'pixi.js';
-import 'pixi.js/unsafe-eval';
-import { createEffect } from './effects.js';
+import { createEffect, noiseFreeTypes } from './effects.js';
 
 let pixiApp = null;
 let canvasEl = null;
@@ -132,19 +131,15 @@ export async function loadScene(effectsConfig, sceneImageUrl) {
 
     for (const region of effectsConfig.regions) {
       try {
-        // Probe the factory — glow and other non-displacement effects
-        // set needsNoise: false and don't require a noise sprite.
-        const probe = createEffect(region.type, null, region);
-        if (!probe) continue;
-
-        let effect = probe;
-        if (probe.needsNoise !== false) {
+        let noiseSprite = null;
+        if (!noiseFreeTypes.has(region.type)) {
           const noiseTexture = await loadTexture(region.noise || 'assets/masks/noise-256.png');
-          const noiseSprite = new Sprite(noiseTexture);
+          noiseSprite = new Sprite(noiseTexture);
           pixiApp.stage.addChild(noiseSprite);
-          effect = createEffect(region.type, noiseSprite, region);
-          if (!effect) continue;
         }
+
+        const effect = createEffect(region.type, noiseSprite, region);
+        if (!effect) continue;
 
         if (region.mask) {
           const maskTexture = await loadTexture(region.mask);

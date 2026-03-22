@@ -32,6 +32,9 @@ export function hasEffectType(type) {
   return typeof type === 'string' && Object.hasOwn(factories, type);
 }
 
+/** Effect types that don't need a displacement noise sprite. */
+export const noiseFreeTypes = new Set(['fog', 'glow']);
+
 // --- Built-in effect factories ---
 // Each receives a PixiJS Sprite (noise texture, may be null for non-displacement
 // effects) and region params. Returns { filter, update(), needsNoise? }.
