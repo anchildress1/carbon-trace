@@ -213,7 +213,7 @@ function buildDOM() {
 
   for (const id of ids) {
     let el;
-    if (id === 'scene-canvas' || id === 'effects-canvas') {
+    if (id === 'scene-canvas' || id === 'effects-canvas' || id === 'trace-overlay') {
       el = document.createElement('canvas');
       el.getContext = vi.fn(() => ({
         clearRect: vi.fn(),
