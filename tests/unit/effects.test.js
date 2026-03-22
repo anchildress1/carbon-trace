@@ -7,11 +7,6 @@ vi.mock('pixi.js', () => ({
     this.scale = scale;
     this.enabled = true;
   }),
-  BlurFilter: vi.fn(function ({ strength, quality } = {}) {
-    this.strength = strength ?? 8;
-    this.quality = quality ?? 4;
-    this.blendMode = 'normal';
-  }),
 }));
 
 import {
@@ -173,45 +168,42 @@ describe('effects.js — factory registry', () => {
       expect(sprite.x).toBeGreaterThan(startX);
     });
 
-    it('creates a glow effect with blur filter', () => {
-      const result = createEffect('glow', null, {
-        strength: 10,
-        quality: 4,
-      });
+    it('creates a glow effect with pulsing displacement', () => {
+      const sprite = mockSprite();
+      const result = createEffect('glow', sprite, { intensity: 3 });
 
       expect(result).not.toBeNull();
       expect(result.filter).toBeDefined();
-      expect(result.needsNoise).toBe(false);
       expect(typeof result.update).toBe('function');
     });
 
-    it('glow effect pulses blur strength', () => {
-      const result = createEffect('glow', null, {
-        strength: 8,
+    it('glow effect pulses displacement scale', () => {
+      const sprite = mockSprite();
+      const result = createEffect('glow', sprite, {
+        intensity: 5,
         pulseSpeed: 0.5,
-        pulseRange: 2,
       });
 
-      const initial = result.filter.strength;
+      const initial = result.filter.scale;
       result.update();
-      expect(result.filter.strength).not.toBe(initial);
+      expect(result.filter.scale).not.toBe(initial);
     });
 
     it('glow effect uses default params when none provided', () => {
-      const result = createEffect('glow', null);
+      const sprite = mockSprite();
+      const result = createEffect('glow', sprite);
 
       expect(result).not.toBeNull();
       expect(result.filter).toBeDefined();
-      expect(result.needsNoise).toBe(false);
     });
 
-    it('creates a fog effect with blur filter (non-additive)', () => {
-      const result = createEffect('fog', null, { strength: 4 });
+    it('creates a fog effect with displacement', () => {
+      const sprite = mockSprite();
+      const result = createEffect('fog', sprite, { speed: 0.15, intensity: 5 });
 
       expect(result).not.toBeNull();
       expect(result.filter).toBeDefined();
-      expect(result.needsNoise).toBe(false);
-      expect(result.filter.blendMode).not.toBe('add');
+      expect(typeof result.update).toBe('function');
     });
 
     it('creates a shockwave effect with displacement', () => {

@@ -5,7 +5,7 @@
  * per region.
  */
 
-import { BlurFilter, DisplacementFilter } from 'pixi.js';
+import { DisplacementFilter } from 'pixi.js';
 
 const factories = Object.create(null);
 
@@ -33,7 +33,7 @@ export function hasEffectType(type) {
 }
 
 /** Effect types that don't need a displacement noise sprite. */
-export const noiseFreeTypes = new Set(['fog', 'glow']);
+export const noiseFreeTypes = new Set();
 
 // --- Built-in effect factories ---
 // Each receives a PixiJS Sprite (noise texture, may be null for non-displacement
@@ -95,42 +95,48 @@ registerEffect('dust', (sprite, params = {}) => {
 });
 
 /**
- * Fog: soft static haze via blur. No displacement sprite needed.
- * Gentle pulse gives subtle atmospheric drift.
+ * Fog: slow, large-scale displacement drift — scene appears to shift
+ * through moving atmospheric haze. Multi-directional for rolling feel.
  */
-registerEffect('fog', (_sprite, params = {}) => {
-  const { strength = 4, quality = 4, pulseSpeed = 0.008, pulseRange = 1 } = params;
+registerEffect('fog', (sprite, params = {}) => {
+  const { speed = 0.15, intensity = 5, scale = 0.2 } = params;
 
-  const filter = new BlurFilter({ strength, quality });
+  sprite.texture.source.style.addressMode = 'repeat';
+  sprite.scale.set(scale);
+
+  const filter = new DisplacementFilter({ sprite, scale: intensity });
 
   let t = 0;
   return {
     filter,
-    needsNoise: false,
     update() {
-      t += pulseSpeed;
-      filter.strength = strength + Math.sin(t) * pulseRange;
+      t += 0.005;
+      sprite.x += Math.sin(t) * speed;
+      sprite.y += Math.cos(t * 0.6) * speed * 0.3;
     },
   };
 });
 
 /**
- * Glow: soft bloom effect via animated blur. No displacement sprite needed.
- * Pulses blur strength gently for an organic warm haze.
+ * Glow: subtle pulsing displacement that creates an organic shimmer —
+ * the scene appears to breathe with warm light. Intensity oscillates.
  */
-registerEffect('glow', (_sprite, params = {}) => {
-  const { strength = 8, quality = 4, pulseSpeed = 0.02, pulseRange = 2 } = params;
+registerEffect('glow', (sprite, params = {}) => {
+  const { speed = 0.1, intensity = 3, scale = 0.15, pulseSpeed = 0.02 } = params;
 
-  const filter = new BlurFilter({ strength, quality });
-  filter.blendMode = 'add';
+  sprite.texture.source.style.addressMode = 'repeat';
+  sprite.scale.set(scale);
+
+  const filter = new DisplacementFilter({ sprite, scale: intensity });
 
   let t = 0;
   return {
     filter,
-    needsNoise: false,
     update() {
       t += pulseSpeed;
-      filter.strength = strength + Math.sin(t) * pulseRange;
+      filter.scale = intensity + Math.sin(t) * (intensity * 0.4);
+      sprite.x += Math.sin(t * 1.3) * speed * 0.3;
+      sprite.y += Math.cos(t * 0.9) * speed * 0.2;
     },
   };
 });
