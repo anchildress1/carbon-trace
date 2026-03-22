@@ -310,11 +310,11 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
       const canvas = createMockCanvas();
       await init(canvas);
 
-      const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       canvas.dispatchEvent(new Event('webglcontextrestored'));
 
-      expect(infoSpy).toHaveBeenCalledWith('WebGL context restored');
-      infoSpy.mockRestore();
+      expect(warnSpy).toHaveBeenCalledWith('WebGL context restored');
+      warnSpy.mockRestore();
     });
   });
 

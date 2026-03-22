@@ -47,7 +47,7 @@ function handleContextLost(e) {
 }
 
 function handleContextRestored() {
-  console.info('WebGL context restored');
+  console.warn('WebGL context restored');
 }
 
 function tickerUpdate() {
