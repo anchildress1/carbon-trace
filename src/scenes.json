@@ -41,7 +41,7 @@
         "captions": [
           {
             "text": "[Appalachian English dialect]",
-            "start": 10,
+            "start": 100,
             "end": 1000
           },
           {
@@ -164,6 +164,15 @@
           {
             "type": "dust",
             "mask": "assets/masks/mask-01-seam-dust.png"
+          },
+          {
+            "type": "glow",
+            "mask": "assets/masks/mask-01-seam-diamond-glow.png",
+            "color": 16772659,
+            "distance": 20,
+            "outerStrength": 4,
+            "pulseSpeed": 0.02,
+            "pulseDepth": 0.4
           }
         ]
       },
@@ -298,8 +307,19 @@
       "effects": {
         "regions": [
           {
-            "type": "fog",
-            "mask": "assets/masks/mask-02-travel-fog.png"
+            "type": "dust",
+            "mask": "assets/masks/mask-02-travel-fog.png",
+            "intensity": 18,
+            "scale": 0.2
+          },
+          {
+            "type": "glow",
+            "mask": "assets/masks/mask-02-travel-diamond-glow.png",
+            "color": 16772659,
+            "distance": 20,
+            "outerStrength": 4,
+            "pulseSpeed": 0.02,
+            "pulseDepth": 0.4
           }
         ]
       },
@@ -1317,6 +1337,15 @@
           {
             "type": "shockwave",
             "mask": "assets/masks/mask-11-music-shockwave.png"
+          },
+          {
+            "type": "glow",
+            "mask": "assets/masks/mask-11-music-diamond-glow.png",
+            "color": 16772659,
+            "distance": 20,
+            "outerStrength": 4,
+            "pulseSpeed": 0.02,
+            "pulseDepth": 0.4
           }
         ]
       },
