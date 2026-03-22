@@ -23,6 +23,7 @@
   "dependencies": {
     "gsap": "^3.12.7",
     "howler": "^2.2.4",
+    "pixi-filters": "6.1.5",
     "pixi.js": "8.17.1"
   },
   "devDependencies": {

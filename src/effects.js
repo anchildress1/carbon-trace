@@ -1,10 +1,16 @@
 /**
  * Effect factory registry. Each effect type is registered with a factory
- * function that creates a DisplacementFilter from a noise sprite and region
- * parameters. effects-canvas.js calls createEffect() to instantiate filters.
+ * function that creates a filter and an update callback. effects-canvas.js
+ * calls createEffect() to instantiate filters.
+ *
+ * Displacement-based effects (water, heat, dust, fog) use the built-in
+ * DisplacementFilter with a noise sprite. Extension effects (glow, shockwave)
+ * use filters from pixi-filters and do not require a noise sprite.
  */
 
 import { DisplacementFilter } from 'pixi.js';
+import { GlowFilter } from 'pixi-filters';
+import { ShockwaveFilter } from 'pixi-filters';
 
 const factories = Object.create(null);
 
@@ -32,14 +38,14 @@ export function hasEffectType(type) {
 }
 
 /** Effect types that don't need a displacement noise sprite. */
-export const noiseFreeTypes = new Set();
+export const noiseFreeTypes = new Set(['glow', 'shockwave']);
 
-// --- Built-in effect factories ---
+// --- Displacement-based effect factories ---
 // Each receives a PixiJS Sprite (noise texture) and region params.
-// Returns { filter: DisplacementFilter, update(): void }.
+// Returns { filter, update(): void }.
 
 registerEffect('water', (sprite, params = {}) => {
-  const { direction = 180, speed = 0.6, intensity = 8, scale = 0.02 } = params;
+  const { direction = 180, speed = 0.6, intensity = 20, scale = 0.15 } = params;
   const rad = (direction * Math.PI) / 180;
   const dx = Math.cos(rad) * speed;
   const dy = Math.sin(rad) * speed;
@@ -59,7 +65,7 @@ registerEffect('water', (sprite, params = {}) => {
 });
 
 registerEffect('heat', (sprite, params = {}) => {
-  const { speed = 0.8, intensity = 4, scale = 0.15 } = params;
+  const { speed = 0.8, intensity = 15, scale = 0.15 } = params;
 
   sprite.texture.source.style.addressMode = 'repeat';
   sprite.scale.set(scale);
@@ -75,7 +81,7 @@ registerEffect('heat', (sprite, params = {}) => {
 });
 
 registerEffect('dust', (sprite, params = {}) => {
-  const { speed = 0.3, intensity = 3, scale = 0.08 } = params;
+  const { speed = 0.3, intensity = 12, scale = 0.15 } = params;
 
   sprite.texture.source.style.addressMode = 'repeat';
   sprite.scale.set(scale);
@@ -93,12 +99,8 @@ registerEffect('dust', (sprite, params = {}) => {
   };
 });
 
-/**
- * Fog: slow, large-scale displacement drift — scene appears to shift
- * through moving atmospheric haze. Multi-directional for rolling feel.
- */
 registerEffect('fog', (sprite, params = {}) => {
-  const { speed = 0.15, intensity = 5, scale = 0.2 } = params;
+  const { speed = 0.3, intensity = 18, scale = 0.2 } = params;
 
   sprite.texture.source.style.addressMode = 'repeat';
   sprite.scale.set(scale);
@@ -116,64 +118,80 @@ registerEffect('fog', (sprite, params = {}) => {
   };
 });
 
+// --- Extension filter factories (pixi-filters) ---
+// These do NOT use a displacement noise sprite.
+
 /**
- * Glow: subtle pulsing displacement that creates an organic shimmer —
- * the scene appears to breathe with warm light. Intensity oscillates.
+ * Glow: luminous outer glow that pulses in intensity. Creates a warm,
+ * breathing light effect around bright regions of the scene.
  */
-registerEffect('glow', (sprite, params = {}) => {
-  const { speed = 0.1, intensity = 3, scale = 0.15, pulseSpeed = 0.02 } = params;
+registerEffect('glow', (_sprite, params = {}) => {
+  const {
+    color = 0xffcc66,
+    distance = 15,
+    outerStrength = 3,
+    innerStrength = 1,
+    pulseSpeed = 0.03,
+    pulseDepth = 0.4,
+  } = params;
 
-  sprite.texture.source.style.addressMode = 'repeat';
-  sprite.scale.set(scale);
-
-  const filter = new DisplacementFilter({ sprite, scale: intensity });
+  const filter = new GlowFilter({
+    color,
+    distance,
+    outerStrength,
+    innerStrength,
+    quality: 0.3,
+  });
 
   let t = 0;
   return {
     filter,
     update() {
       t += pulseSpeed;
-      const s = intensity + Math.sin(t) * (intensity * 0.4);
-      filter.scale.set(s);
-      sprite.x += Math.sin(t * 1.3) * speed * 0.3;
-      sprite.y += Math.cos(t * 0.9) * speed * 0.2;
+      const pulse = 1 + Math.sin(t) * pulseDepth;
+      filter.outerStrength = outerStrength * pulse;
     },
   };
 });
 
 /**
- * Shockwave: radial displacement burst that expands outward and resets.
- * Noise sprite scales up rapidly from center, displacement fades as it expands.
+ * Shockwave: radial ripple that expands outward from center and resets.
+ * Uses the ShockwaveFilter for a real distortion wave effect.
  */
-registerEffect('shockwave', (sprite, params = {}) => {
+registerEffect('shockwave', (_sprite, params = {}) => {
   const {
-    speed = 0.015,
-    intensity = 12,
-    restScale = 0.01,
-    burstScale = 0.25,
-    cyclePause = 3,
+    centerX = 0.5,
+    centerY = 0.5,
+    amplitude = 15,
+    wavelength = 80,
+    speed = 300,
+    radius = -1,
+    cyclePause = 2,
+    cycleDuration = 1.5,
   } = params;
 
-  sprite.texture.source.style.addressMode = 'repeat';
-  sprite.scale.set(restScale);
+  const filter = new ShockwaveFilter({
+    center: { x: centerX, y: centerY },
+    amplitude,
+    wavelength,
+    speed,
+    radius,
+  });
+  filter.time = cycleDuration;
 
-  const filter = new DisplacementFilter({ sprite, scale: 0 });
+  const totalCycle = cycleDuration + cyclePause;
+  let elapsed = 0;
 
-  let t = 0;
   return {
     filter,
     update() {
-      t += speed;
-      const cycle = t % (1 + cyclePause);
+      elapsed += 1 / 60;
+      const cycle = elapsed % totalCycle;
 
-      if (cycle < 1) {
-        const progress = cycle;
-        const ease = 1 - (1 - progress) * (1 - progress);
-        sprite.scale.set(restScale + (burstScale - restScale) * ease);
-        filter.scale.set(intensity * (1 - ease));
+      if (cycle < cycleDuration) {
+        filter.time = cycle;
       } else {
-        sprite.scale.set(restScale);
-        filter.scale.set(0);
+        filter.time = cycleDuration;
       }
     },
   };

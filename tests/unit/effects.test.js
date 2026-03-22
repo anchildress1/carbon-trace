@@ -9,6 +9,24 @@ vi.mock('pixi.js', () => ({
   }),
 }));
 
+vi.mock('pixi-filters', () => ({
+  GlowFilter: vi.fn(function ({ color, distance, outerStrength, innerStrength, quality }) {
+    this.color = color;
+    this.distance = distance;
+    this.outerStrength = outerStrength;
+    this.innerStrength = innerStrength;
+    this.quality = quality;
+  }),
+  ShockwaveFilter: vi.fn(function ({ center, amplitude, wavelength, speed, radius }) {
+    this.center = center;
+    this.amplitude = amplitude;
+    this.wavelength = wavelength;
+    this.speed = speed;
+    this.radius = radius;
+    this.time = 0;
+  }),
+}));
+
 import {
   registerEffect,
   createEffect,
@@ -168,30 +186,27 @@ describe('effects.js — factory registry', () => {
       expect(sprite.x).toBeGreaterThan(startX);
     });
 
-    it('creates a glow effect with pulsing displacement', () => {
-      const sprite = mockSprite();
-      const result = createEffect('glow', sprite, { intensity: 3 });
+    it('creates a glow effect with filter and update function', () => {
+      const result = createEffect('glow', null, { outerStrength: 3 });
 
       expect(result).not.toBeNull();
       expect(result.filter).toBeDefined();
       expect(typeof result.update).toBe('function');
     });
 
-    it('glow effect pulses displacement scale', () => {
-      const sprite = mockSprite();
-      const result = createEffect('glow', sprite, {
-        intensity: 5,
+    it('glow effect pulses outerStrength', () => {
+      const result = createEffect('glow', null, {
+        outerStrength: 3,
         pulseSpeed: 0.5,
       });
 
-      const initial = result.filter.scale.x;
+      const initial = result.filter.outerStrength;
       result.update();
-      expect(result.filter.scale.x).not.toBe(initial);
+      expect(result.filter.outerStrength).not.toBe(initial);
     });
 
     it('glow effect uses default params when none provided', () => {
-      const sprite = mockSprite();
-      const result = createEffect('glow', sprite);
+      const result = createEffect('glow', null);
 
       expect(result).not.toBeNull();
       expect(result.filter).toBeDefined();
@@ -206,11 +221,10 @@ describe('effects.js — factory registry', () => {
       expect(typeof result.update).toBe('function');
     });
 
-    it('creates a shockwave effect with displacement', () => {
-      const sprite = mockSprite();
-      const result = createEffect('shockwave', sprite, {
-        speed: 0.015,
-        intensity: 12,
+    it('creates a shockwave effect with filter and update function', () => {
+      const result = createEffect('shockwave', null, {
+        speed: 300,
+        amplitude: 15,
       });
 
       expect(result).not.toBeNull();
@@ -219,20 +233,19 @@ describe('effects.js — factory registry', () => {
     });
 
     it('shockwave cycles between burst and rest', () => {
-      const sprite = mockSprite();
-      const result = createEffect('shockwave', sprite, {
-        speed: 0.5,
-        intensity: 12,
+      const result = createEffect('shockwave', null, {
+        cycleDuration: 0.1,
         cyclePause: 1,
       });
 
-      // During burst phase
+      // During burst phase — time advances
       result.update();
-      const burstScale = result.filter.scale;
+      expect(result.filter.time).toBeGreaterThan(0);
+      expect(result.filter.time).toBeLessThan(0.1);
 
-      // Advance past burst into rest phase
+      // Advance past burst into rest phase (need elapsed > 0.1s = 6+ ticks)
       for (let i = 0; i < 10; i++) result.update();
-      expect(result.filter.scale.x).toBe(0);
+      expect(result.filter.time).toBe(0.1);
     });
   });
 });

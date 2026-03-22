@@ -11,7 +11,7 @@
  * calls become no-ops and the app continues without effects.
  */
 
-import { Application, Sprite, Texture } from 'pixi.js';
+import { Application, Container, Sprite, Texture } from 'pixi.js';
 import { createEffect, noiseFreeTypes } from './effects.js';
 
 let pixiApp = null;
@@ -35,6 +35,38 @@ function loadTexture(url) {
     img.crossOrigin = 'anonymous';
     img.onload = () => resolve(Texture.from(img));
     img.onerror = () => reject(new Error(`Failed to load texture: ${url}`));
+    img.src = url;
+  });
+}
+
+/**
+ * Load a grayscale mask PNG and convert its luminance to alpha.
+ * Masks are authored as white-on-black: white = effect visible, black = hidden.
+ * PixiJS alpha masking reads the alpha channel, so we map luminance → alpha.
+ */
+function loadLuminanceMask(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const luminance = data[i];
+        data[i] = 255;
+        data[i + 1] = 255;
+        data[i + 2] = 255;
+        data[i + 3] = luminance;
+      }
+      ctx.putImageData(imageData, 0, 0);
+      resolve(Texture.from(canvas));
+    };
+    img.onerror = () => reject(new Error(`Failed to load mask: ${url}`));
     img.src = url;
   });
 }
@@ -101,8 +133,14 @@ export async function init(el) {
 }
 
 /**
- * Load a scene's effects: create scene sprite, load masks and noise textures,
- * configure displacement filters per region.
+ * Load a scene's effects: create scene sprite, load noise textures with
+ * optional masks, configure displacement filters per region.
+ *
+ * The scene sprite stays fully opaque so it covers the scene-canvas below.
+ * Masks are applied to the noise sprite (not the scene sprite) — this
+ * constrains displacement to the masked region while the full scene remains
+ * visible. Where the noise sprite is transparent (masked out), no
+ * displacement occurs and the image appears static.
  */
 export async function loadScene(effectsConfig, sceneImageUrl) {
   if (!webglAvailable) return;
@@ -141,15 +179,41 @@ export async function loadScene(effectsConfig, sceneImageUrl) {
         const effect = createEffect(region.type, noiseSprite, region);
         if (!effect) continue;
 
-        if (region.mask) {
-          const maskTexture = await loadTexture(region.mask);
-          const maskSprite = new Sprite(maskTexture);
-          maskSprite.width = pixiApp.screen.width;
-          maskSprite.height = pixiApp.screen.height;
-          sceneSprite.setMask({ mask: maskSprite });
+        if (noiseFreeTypes.has(region.type)) {
+          // Extension filters (glow, shockwave) have no noise sprite.
+          // When a mask is provided, apply the filter to a masked overlay
+          // sprite so the effect is constrained to the authored region.
+          if (region.mask) {
+            const maskTexture = await loadLuminanceMask(region.mask);
+            const maskSprite = new Sprite(maskTexture);
+            maskSprite.width = pixiApp.screen.width;
+            maskSprite.height = pixiApp.screen.height;
+
+            const effectSprite = new Sprite(sceneTexture);
+            effectSprite.width = pixiApp.screen.width;
+            effectSprite.height = pixiApp.screen.height;
+            effectSprite.filters = [effect.filter];
+
+            const container = new Container();
+            container.addChild(effectSprite);
+            container.setMask({ mask: maskSprite });
+            pixiApp.stage.addChild(container);
+          } else {
+            filters.push(effect.filter);
+          }
+        } else {
+          // Displacement effect: mask the noise sprite to constrain
+          // where displacement occurs.
+          if (region.mask && noiseSprite) {
+            const maskTexture = await loadLuminanceMask(region.mask);
+            const maskSprite = new Sprite(maskTexture);
+            maskSprite.width = pixiApp.screen.width;
+            maskSprite.height = pixiApp.screen.height;
+            noiseSprite.setMask({ mask: maskSprite });
+          }
+          filters.push(effect.filter);
         }
 
-        filters.push(effect.filter);
         activeEffects.push(effect);
       } catch (err) {
         console.warn(`Skipping effect region "${region.type}":`, err.message);
@@ -193,12 +257,14 @@ export function clearAll() {
   try {
     if (sceneSprite) {
       sceneSprite.filters = [];
-      sceneSprite.setMask({ mask: null });
     }
     while (pixiApp.stage.children.length > 0) {
       const child = pixiApp.stage.children[0];
       pixiApp.stage.removeChild(child);
       try {
+        if (child.mask) {
+          child.setMask({ mask: null });
+        }
         child.destroy({ children: true, texture: false });
       } catch {
         // Context lost — destroy may throw, continue cleanup

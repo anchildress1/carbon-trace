@@ -712,7 +712,7 @@
           "type": "ambient",
           "src": "assets/audio/ambient/scene-05-rinse.m4a",
           "enter": 0,
-          "volume": 0.15,
+          "volume": 0.1,
           "loop": true,
           "fadeIn": 1500,
           "fadeOut": null

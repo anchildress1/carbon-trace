@@ -44,6 +44,13 @@ vi.mock('pixi.js', () => ({
     this.renderer = { ...mockRenderer };
     this.screen = { width: 1920, height: 1080 };
   }),
+  Container: vi.fn(function () {
+    this.children = [];
+    this.addChild = vi.fn(function (child) { this.children.push(child); });
+    this.setMask = vi.fn();
+    this.destroy = vi.fn();
+    this.mask = null;
+  }),
   Sprite: vi.fn(function (texture) {
     this.texture = texture;
     this.width = 0;
@@ -51,6 +58,7 @@ vi.mock('pixi.js', () => ({
     this.filters = [];
     this.mask = null;
     this.destroy = vi.fn();
+    this.setMask = vi.fn();
     this.x = 0;
     this.y = 0;
     this.scale = { set: vi.fn() };
@@ -65,6 +73,7 @@ vi.mock('../../src/effects.js', () => ({
     filter: { enabled: true },
     update: vi.fn(),
   })),
+  noiseFreeTypes: new Set(['glow', 'shockwave']),
 }));
 
 import {
