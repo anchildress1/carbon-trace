@@ -124,6 +124,10 @@ async function applyRegionEffect(region, sceneTexture, filters) {
 
     const container = new Container();
     container.addChild(effectSprite);
+    // PixiJS v8 requires masks to be in the display list for world
+    // transform computation. The mask sprite is not rendered visually
+    // — PixiJS automatically excludes objects used as masks.
+    pixiApp.stage.addChild(maskSprite);
     container.setMask({ mask: maskSprite });
     pixiApp.stage.addChild(container);
   } else {
