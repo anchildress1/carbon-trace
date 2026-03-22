@@ -12,6 +12,7 @@
  */
 
 import { Application, Sprite, Texture } from 'pixi.js';
+import 'pixi.js/unsafe-eval';
 import { createEffect } from './effects.js';
 
 let pixiApp = null;
@@ -70,16 +71,19 @@ export async function init(el) {
   canvasEl = el;
 
   try {
-    pixiApp = new Application();
-    await pixiApp.init({
+    const app = new Application();
+    await app.init({
       canvas: canvasEl,
       backgroundAlpha: 0,
-      resizeTo: canvasEl.parentElement,
       autoStart: false,
     });
 
-    pixiApp.ticker.add(tickerUpdate);
-    pixiApp.ticker.stop();
+    app.ticker.add(tickerUpdate);
+    app.ticker.stop();
+
+    // Only assign after successful init — prevents race conditions
+    // where pause()/clearAll() access a half-initialized Application.
+    pixiApp = app;
 
     canvasEl.addEventListener('webglcontextlost', handleContextLost);
     canvasEl.addEventListener('webglcontextrestored', handleContextRestored);

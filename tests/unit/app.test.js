@@ -53,8 +53,8 @@ vi.mock('../../src/text.js', () => ({
 }));
 
 vi.mock('../../src/effects-canvas.js', () => ({
-  init: vi.fn(),
-  loadScene: vi.fn(),
+  init: vi.fn().mockResolvedValue(undefined),
+  loadScene: vi.fn().mockResolvedValue(undefined),
   clearAll: vi.fn(),
   pause: vi.fn(),
   resume: vi.fn(),
