@@ -1,7 +1,9 @@
 /**
- * PixiJS WebGL lifecycle for the effects overlay canvas. Manages a PixiJS
- * Application, loads scene images as sprites, applies masked displacement
- * filters per region, and runs the PixiJS ticker for 60fps GPU animation.
+ * PixiJS WebGL lifecycle for the transparent effects overlay canvas.
+ * The stage contains ONLY masked Containers — no full-screen geometry.
+ * Canvas 2D renders the static scene image underneath; this layer
+ * overlays animated effect regions via per-region sprite clones inside
+ * masked Containers with displacement/glow/shockwave filters.
  *
  * Textures are loaded via new Image() + Texture.from() to preserve
  * connect-src 'none' CSP (PixiJS Assets.load() may use fetch internally).
@@ -20,7 +22,9 @@ let observer = null;
 let webglAvailable = true;
 let needsReinit = false;
 let activeEffects = [];
-let sceneSprite = null;
+let screenSizedSprites = [];
+let disposableTextures = [];
+let loadGeneration = 0;
 
 function reducedMotion() {
   return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -90,14 +94,21 @@ function tickerUpdate() {
 
 /**
  * Set up a single region's effect: load noise sprite (if needed), create
- * the effect filter, and wire it into the stage — either as a masked
- * Container overlay or as a global filter on the scene sprite.
+ * the effect filter, and wire it into the stage as a masked Container.
+ * Every region must have a mask (ADR-007 addendum: transparent overlay
+ * architecture — no unmasked full-screen geometry on stage).
  * Returns the effect object, or null if the factory declined.
  */
-async function applyRegionEffect(region, sceneTexture, filters) {
+async function applyRegionEffect(region, sceneTexture) {
+  if (!region.mask) {
+    console.warn(`Skipping region "${region.type}": mask is required`);
+    return null;
+  }
+
   let noiseSprite = null;
   if (!noiseFreeTypes.has(region.type)) {
     const noiseTexture = await loadTexture(region.noise || 'assets/masks/noise-256.png');
+    disposableTextures.push(noiseTexture);
     noiseSprite = new Sprite(noiseTexture);
     pixiApp.stage.addChild(noiseSprite);
   }
@@ -105,34 +116,27 @@ async function applyRegionEffect(region, sceneTexture, filters) {
   const effect = createEffect(region.type, noiseSprite, region);
   if (!effect) return null;
 
-  if (region.mask) {
-    // All masked effects use the same approach: apply the filter
-    // to a cloned scene sprite inside a masked Container. This
-    // constrains the visual output to the mask region regardless
-    // of whether the effect is displacement-based or noise-free.
-    // (Masking the noise sprite alone does NOT constrain
-    // DisplacementFilter — it reads the texture directly.)
-    const maskTexture = await loadLuminanceMask(region.mask);
-    const maskSprite = new Sprite(maskTexture);
-    maskSprite.width = pixiApp.screen.width;
-    maskSprite.height = pixiApp.screen.height;
+  const maskTexture = await loadLuminanceMask(region.mask);
+  disposableTextures.push(maskTexture);
+  const maskSprite = new Sprite(maskTexture);
+  maskSprite.width = pixiApp.screen.width;
+  maskSprite.height = pixiApp.screen.height;
 
-    const effectSprite = new Sprite(sceneTexture);
-    effectSprite.width = pixiApp.screen.width;
-    effectSprite.height = pixiApp.screen.height;
-    effectSprite.filters = [effect.filter];
+  const effectSprite = new Sprite(sceneTexture);
+  effectSprite.width = pixiApp.screen.width;
+  effectSprite.height = pixiApp.screen.height;
+  effectSprite.filters = [effect.filter];
 
-    const container = new Container();
-    container.addChild(effectSprite);
-    // PixiJS v8 requires masks to be in the display list for world
-    // transform computation. The mask sprite is not rendered visually
-    // — PixiJS automatically excludes objects used as masks.
-    pixiApp.stage.addChild(maskSprite);
-    container.setMask({ mask: maskSprite });
-    pixiApp.stage.addChild(container);
-  } else {
-    filters.push(effect.filter);
-  }
+  screenSizedSprites.push(maskSprite, effectSprite);
+
+  const container = new Container();
+  container.addChild(effectSprite);
+  // PixiJS v8 requires masks to be in the display list for world
+  // transform computation. The mask sprite is not rendered visually
+  // — PixiJS automatically excludes objects used as masks.
+  pixiApp.stage.addChild(maskSprite);
+  container.setMask({ mask: maskSprite });
+  pixiApp.stage.addChild(container);
 
   return effect;
 }
@@ -149,6 +153,7 @@ export async function init(el) {
   if (canvasEl && pixiApp) destroy();
 
   canvasEl = el;
+  webglAvailable = true;
 
   try {
     const app = new Application();
@@ -171,6 +176,12 @@ export async function init(el) {
     observer = new ResizeObserver(() => {
       if (pixiApp?.renderer) {
         pixiApp.renderer.resize(canvasEl.clientWidth, canvasEl.clientHeight);
+        const w = pixiApp.screen.width;
+        const h = pixiApp.screen.height;
+        for (const sprite of screenSizedSprites) {
+          sprite.width = w;
+          sprite.height = h;
+        }
       }
     });
     observer.observe(canvasEl);
@@ -182,17 +193,36 @@ export async function init(el) {
 }
 
 /**
- * Load a scene's effects: create scene sprite, load noise textures with
- * optional masks, configure displacement filters per region.
+ * Iterate regions, create effects, and bail early if a newer loadScene()
+ * call has superseded this one (stale generation).
+ * Returns true if all regions were processed, false if superseded.
+ */
+async function loadRegionEffects(regions, sceneTexture, gen) {
+  for (const region of regions) {
+    try {
+      const effect = await applyRegionEffect(region, sceneTexture);
+      if (gen !== loadGeneration) return false;
+      if (effect) activeEffects.push(effect);
+    } catch (err) {
+      console.warn(`Skipping effect region "${region.type}":`, err.message);
+    }
+  }
+  return true;
+}
+
+/**
+ * Load a scene's effects: load the scene image as a shared texture (not
+ * added to stage), then create per-region masked Containers with filters.
+ * The stage is transparent except where masked regions render — Canvas 2D
+ * scene image shows through everywhere else (ADR-007 addendum).
  *
- * The scene sprite stays fully opaque so it covers the scene-canvas below.
- * Masked effects use a Container-based overlay: a clone of the scene sprite
- * receives the filter and is placed inside a masked Container. This
- * constrains the visible effect to the mask region while the base scene
- * remains unaffected underneath.
+ * Uses a generation counter to discard stale results when the user
+ * navigates to a new scene while textures are still loading.
  */
 export async function loadScene(effectsConfig, sceneImageUrl) {
   if (!webglAvailable) return;
+
+  const gen = ++loadGeneration;
 
   if (needsReinit) {
     try {
@@ -203,38 +233,23 @@ export async function loadScene(effectsConfig, sceneImageUrl) {
     }
   }
 
-  if (!pixiApp) return;
+  if (!pixiApp || gen !== loadGeneration) return;
 
   clearAll();
 
   try {
     const sceneTexture = await loadTexture(sceneImageUrl);
-    sceneSprite = new Sprite(sceneTexture);
-    sceneSprite.width = pixiApp.screen.width;
-    sceneSprite.height = pixiApp.screen.height;
-    pixiApp.stage.addChild(sceneSprite);
+    if (gen !== loadGeneration) return;
 
-    const filters = [];
-
-    for (const region of effectsConfig.regions) {
-      try {
-        const effect = await applyRegionEffect(region, sceneTexture, filters);
-        if (effect) activeEffects.push(effect);
-      } catch (err) {
-        console.warn(`Skipping effect region "${region.type}":`, err.message);
-      }
-    }
-
-    if (filters.length > 0) {
-      sceneSprite.filters = filters;
-    }
+    const completed = await loadRegionEffects(effectsConfig.regions, sceneTexture, gen);
+    if (!completed) return;
 
     if (!reducedMotion()) {
       pixiApp.ticker.start();
     }
   } catch (err) {
     console.warn('Failed to load scene effects:', err.message);
-    clearAll();
+    if (gen === loadGeneration) clearAll();
   }
 }
 
@@ -253,6 +268,7 @@ export function clearAll() {
   if (!webglAvailable || !pixiApp) return;
 
   activeEffects = [];
+  screenSizedSprites = [];
 
   if (pixiApp.ticker) {
     pixiApp.ticker.stop();
@@ -260,9 +276,6 @@ export function clearAll() {
 
   // Wrap destroy calls in try/catch — a lost WebGL context can cause throws.
   try {
-    if (sceneSprite) {
-      sceneSprite.filters = [];
-    }
     const children = pixiApp.stage.removeChildren();
     for (const child of children) {
       try {
@@ -278,7 +291,14 @@ export function clearAll() {
     // Stage access failed — context lost
   }
 
-  sceneSprite = null;
+  for (const tex of disposableTextures) {
+    try {
+      tex.destroy(true);
+    } catch {
+      // Context lost
+    }
+  }
+  disposableTextures = [];
 }
 
 export function pause() {
@@ -317,7 +337,9 @@ export function destroy() {
   pixiApp = null;
   canvasEl = null;
   activeEffects = [];
-  sceneSprite = null;
+  screenSizedSprites = [];
+  disposableTextures = [];
+  loadGeneration = 0;
   needsReinit = false;
 }
 

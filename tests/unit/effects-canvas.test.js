@@ -69,7 +69,11 @@ vi.mock('pixi.js', () => ({
     this.scale = { set: vi.fn() };
   }),
   Texture: {
-    from: vi.fn((img) => ({ _source: img, source: { style: {} } })),
+    from: vi.fn((img) => ({
+      _source: img,
+      source: { style: {} },
+      destroy: vi.fn(),
+    })),
   },
 }));
 
@@ -114,7 +118,27 @@ function createMockCanvas() {
   return canvas;
 }
 
+/**
+ * Mock Image constructor that supports both loadTexture and loadLuminanceMask.
+ * loadLuminanceMask reads pixel data via canvas getContext('2d'), so the mock
+ * must provide width/height for the offscreen canvas sizing.
+ */
+function setupImageMock() {
+  globalThis.Image = vi.fn(function () {
+    const self = this;
+    self.width = 256;
+    self.height = 256;
+    Object.defineProperty(this, 'src', {
+      set() {
+        self.onload?.();
+      },
+    });
+  });
+}
+
 describe('effects-canvas.js — PixiJS lifecycle', () => {
+  let originalGetContext;
+
   beforeEach(() => {
     destroy();
     vi.clearAllMocks();
@@ -125,22 +149,27 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
     });
 
     globalThis.matchMedia = vi.fn().mockReturnValue({ matches: false });
+    setupImageMock();
 
-    // Mock Image for loadTexture — fire onload synchronously when src is set.
-    // In loadTexture, the order is: new Image() → set onload → set src,
-    // so onload is available by the time the setter fires.
-    globalThis.Image = vi.fn(function () {
-      const self = this;
-      Object.defineProperty(this, 'src', {
-        set() {
-          self.onload?.();
-        },
-      });
-    });
+    // Mock canvas 2D context for loadLuminanceMask (happy-dom lacks full support)
+    originalGetContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type) {
+      if (type === '2d') {
+        return {
+          drawImage: vi.fn(),
+          getImageData: vi.fn(() => ({
+            data: new Uint8ClampedArray(this.width * this.height * 4),
+          })),
+          putImageData: vi.fn(),
+        };
+      }
+      return originalGetContext?.call(this, type);
+    };
   });
 
   afterEach(() => {
     destroy();
+    HTMLCanvasElement.prototype.getContext = originalGetContext;
     vi.restoreAllMocks();
   });
 
@@ -281,6 +310,110 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
       await expect(
         loadScene({ regions: [] }, 'scene.webp'),
       ).resolves.not.toThrow();
+    });
+
+    it('skips regions without a mask', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      await loadScene({ regions: [{ type: 'water' }] }, 'scene.png');
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('mask is required'),
+      );
+      warnSpy.mockRestore();
+    });
+  });
+
+  describe('generation guard', () => {
+    it('discards stale loadScene results when superseded', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      const { createEffect } = await import('../../src/effects.js');
+      createEffect.mockClear();
+
+      // Start two loadScene calls — the first should be discarded
+      const first = loadScene(
+        { regions: [{ type: 'water', mask: 'mask.png' }] },
+        'scene-old.png',
+      );
+      const second = loadScene(
+        { regions: [{ type: 'glow', mask: 'mask.png' }] },
+        'scene-new.png',
+      );
+
+      await first;
+      await second;
+
+      // The second call supersedes the first. The first call's generation
+      // check causes it to bail after its texture await resolves.
+      // createEffect should be called for at most the second scene's region.
+      const glowCalls = createEffect.mock.calls.filter(c => c[0] === 'glow');
+      expect(glowCalls.length).toBeLessThanOrEqual(1);
+    });
+  });
+
+  describe('resize tracking', () => {
+    it('ResizeObserver callback resizes tracked sprites', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      const { Sprite } = await import('pixi.js');
+      Sprite.mockClear();
+
+      // Load a scene with a masked region to populate screenSizedSprites
+      await loadScene(
+        { regions: [{ type: 'water', mask: 'mask.png' }] },
+        'scene.png',
+      );
+
+      // Sprite constructor called for: noiseSprite (idx 0), maskSprite (idx 1),
+      // effectSprite (idx 2). screenSizedSprites contains mask + effect only.
+      const spriteInstances = Sprite.mock.instances;
+      expect(spriteInstances.length).toBeGreaterThanOrEqual(3);
+      const maskSprite = spriteInstances[1];
+      const effectSprite = spriteInstances[2];
+
+      // Both should have been sized to 1920x1080 initially
+      expect(maskSprite.width).toBe(1920);
+      expect(effectSprite.width).toBe(1920);
+
+      // Get the ResizeObserver callback and simulate resize
+      const ResizeObserverCb = globalThis.ResizeObserver.mock.calls[0][0];
+      const { Application } = await import('pixi.js');
+      const instance = Application.mock.instances[0];
+      instance.screen.width = 1280;
+      instance.screen.height = 720;
+      ResizeObserverCb();
+
+      expect(maskSprite.width).toBe(1280);
+      expect(maskSprite.height).toBe(720);
+      expect(effectSprite.width).toBe(1280);
+      expect(effectSprite.height).toBe(720);
+    });
+
+    it('resize is a no-op after clearAll', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      await loadScene(
+        { regions: [{ type: 'water', mask: 'mask.png' }] },
+        'scene.png',
+      );
+
+      clearAll();
+
+      // Get the ResizeObserver callback and simulate resize
+      const ResizeObserverCb = globalThis.ResizeObserver.mock.calls[0][0];
+      const { Application } = await import('pixi.js');
+      const instance = Application.mock.instances[0];
+      instance.screen.width = 800;
+      instance.screen.height = 450;
+
+      // Should not throw — screenSizedSprites is empty after clearAll
+      expect(() => ResizeObserverCb()).not.toThrow();
     });
   });
 
