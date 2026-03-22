@@ -122,6 +122,97 @@ EACH rAF FRAME (managed by PixiJS ticker):
 - Any combination of the above, masked to arbitrary regions
 - New effects are added by registering a filter factory function — no architecture changes needed
 
+### Audio-Reactive Modulation
+
+Any effect region can optionally react to audio in real time by adding an `audioReactive` key. This modulates an existing effect parameter based on frequency data from the Web Audio API. No new filters, no new render passes — just parameter changes on existing GPU work.
+
+**How it works:**
+```
+1. audio.js exposes getAnalyserNode() — lazy-creates a Web Audio AnalyserNode
+   connected to Howler's master gain node. One shared analyser for the app.
+2. app.js wires the bridge: effectsCanvas.setAnalyser(audio.getAnalyserNode())
+   Called once when a scene with audioReactive regions loads.
+3. effects-canvas.js ticker reads getByteFrequencyData() each frame (~0.1ms).
+   For each region with audioReactive config:
+     a. Extract the target frequency band (bass/mid/high) from the FFT array
+     b. Normalize to 0–1
+     c. Smooth via exponential moving average (smoothing factor)
+     d. Lerp the target parameter between range[0] and range[1]
+```
+
+**Schema:**
+```jsonc
+{
+  "type": "glow",
+  "mask": "assets/masks/11-diamond.png",
+  "strength": 4,
+  "quality": 4,
+  "pulseSpeed": 0,
+  "pulseRange": [4, 4],
+  "audioReactive": {
+    "band": "bass",
+    "target": "strength",
+    "range": [2, 12],
+    "smoothing": 0.8
+  }
+}
+```
+
+**`audioReactive` fields:**
+```
+FIELD     │ TYPE          │ DESCRIPTION
+──────────┼───────────────┼────────────────────────────────────────────
+band      │ string        │ "bass" (20-250Hz), "mid" (250-2000Hz), "high" (2000-16000Hz)
+target    │ string        │ Effect parameter to modulate (e.g. "strength", "intensity", "speed")
+range     │ [min, max]    │ Output range for the modulated parameter
+smoothing │ float 0–1     │ Exponential moving average factor. 0 = instant (jittery),
+          │               │ 0.8 = smooth (recommended), 0.95 = very slow response.
+```
+
+**Frequency band mapping (FFT bin indices for 2048-sample AnalyserNode at 44100Hz):**
+```
+bass:  bins 1–12   (~20–250 Hz)  — kick drums, bass lines, low rumble
+mid:   bins 12–93  (~250–2000 Hz) — vocals, instruments, body
+high:  bins 93–744 (~2000–16000 Hz) — cymbals, sibilance, air
+```
+Each band is the average of its bin range, normalized to 0–1.
+
+**Module changes:**
+
+audio.js — one new export:
+```
+getAnalyserNode()  — lazy-create AnalyserNode on Howler's AudioContext,
+                     connect to masterGain. Returns AnalyserNode.
+                     Subsequent calls return the same instance.
+                     fftSize: 2048, smoothingTimeConstant: 0.8
+```
+
+effects-canvas.js — one new method:
+```
+setAnalyser(analyserNode)  — store reference. Ticker reads frequency data
+                             each frame if analyser is set and regions have
+                             audioReactive config. Cleared on clearAll().
+```
+
+app.js — wiring in showFrame():
+```js
+if (frame.effects?.regions?.some(r => r.audioReactive)) {
+  effectsCanvas.setAnalyser(audio.getAnalyserNode());
+}
+```
+
+**No cross-imports between leaf modules.** audio.js doesn't know about effects. effects-canvas.js doesn't know about Howler. app.js bridges them.
+
+**Performance:** `getByteFrequencyData()` copies FFT data into a pre-allocated Uint8Array — ~0.1ms. Band averaging is a few additions. Parameter lerp is one multiply. Total audio-reactive overhead per frame: < 0.2ms. Well within the <2ms budget.
+
+**Reduced motion:** `audioReactive` is ignored. The base parameter value is used (e.g., `strength: 4` without modulation). The effect is present but static.
+
+**Pause:** When paused, the ticker is stopped, so no frequency reads happen. On resume, the smoothing catches up naturally — no jump.
+
+**No audio playing:** If `getByteFrequencyData()` returns all zeros (silence, audio not started, muted), the modulated value stays at `range[0]`. The effect is visible at minimum intensity, not invisible.
+
+**Multiple audioReactive regions:** Each reads from the same shared AnalyserNode and FFT data array. One `getByteFrequencyData()` call per frame, not per region.
+
 ### Schema
 
 ```jsonc
@@ -330,6 +421,10 @@ Mask image memory        │ Grayscale PNGs at 768×432 ≈ 330KB per mask.
 WebGL unavailability     │ Graceful degradation: effects disabled,
                          │ static scene image shown. No crash.
 ─────────────────────────┼──────────────────────────────────────
+Audio-reactive overhead  │ getByteFrequencyData() ~0.1ms + band
+                         │ averaging + lerp. < 0.2ms total. One FFT
+                         │ read shared across all reactive regions.
+─────────────────────────┼──────────────────────────────────────
 Multiple render loops    │ PixiJS ticker for effects. Shimmer has
                          │ its own rAF. Scene canvas has none.
                          │ If baseline profiling shows >4ms combined
@@ -427,6 +522,11 @@ scene transition  │ old effects cleared before new scene loads
 WebGL init fail   │ webglAvailable = false, all loadScene() no-op, app continues
 context loss      │ clearAll() on loss, re-init on next loadScene, permanent
                   │ static fallback if re-init also fails
+audioReactive     │ modulates target param from FFT band, smoothing works,
+                  │ no audio (zeros) → stays at range[0], muted → range[0],
+                  │ reduced motion → audioReactive ignored (base param used),
+                  │ multiple reactive regions share one FFT read,
+                  │ pause → no reads, resume → smooth catchup
 ```
 
 ---
@@ -461,3 +561,8 @@ These are scoped implementation choices, not architectural decisions. The ADR's 
 12. [x] Error boundary: try/catch around init(), webglAvailable flag, loadScene() no-op on failure
 13. [ ] Performance profiling — verify <2ms per frame on baseline hardware (see profiling gates)
 14. [ ] Update v5 spec §3, §4, §17
+15. [ ] Add getAnalyserNode() to audio.js — lazy AnalyserNode on Howler's AudioContext
+16. [ ] Add setAnalyser() to effects-canvas.js — store analyser, read FFT in ticker
+17. [ ] Wire audio-reactive bridge in app.js showFrame()
+18. [ ] Author Scene 11 audioReactive regions (glow + displacement reacting to music)
+19. [ ] Test audioReactive: silence, muted, pause/resume, reduced motion, multiple bands

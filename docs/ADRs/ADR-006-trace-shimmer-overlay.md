@@ -3,7 +3,7 @@
 **Supersedes:** §4.5 (Circuit Trace Overlay Progression), §13 v2 bullet "Circuit traces baked in images + canvas shimmer" of `carbon-trace-system-design-v3-final.md`, v5 §5.4 line 594 (`<div id="trace-overlay">`), v5 §4.1 line 239 (opacity-only traceOverlay schema)
 **Date:** March 19, 2026
 **Author:** Ashley Childress (@anchildress1)
-**Status:** Deferred — path authoring for scenes 02–11 pending recording work
+**Status:** Accepted — architecture and engine spec are normative. Path authoring for scenes 02–11 is pending recording work (implementation gated, not the decision).
 **Decision:** Promote canvas shimmer overlay from v2 to v1; define shimmer engine architecture
 
 ---
@@ -70,13 +70,17 @@ OPTION                              │ VERDICT   │ REASON
 
 ### 06.2.1 Layer Stack — Current vs. Changed
 
-The existing DOM structure in `index.html` already places `#trace-overlay` between the scene canvas and effects canvas. The only HTML change is converting the `<div>` to a `<canvas>`:
+Two HTML changes to `#trace-overlay`: (1) convert `<div>` to `<canvas>`, (2) move above `#effects-canvas` in DOM order so shimmer renders on top of pixel effects (ADR-007 swapped the z-order).
 
 ```html
-<!-- BEFORE (current index.html line 54) -->
+<!-- BEFORE (current index.html) -->
+<canvas id="scene-canvas" aria-hidden="true"></canvas>
 <div class="trace-overlay" id="trace-overlay"></div>
+<canvas id="effects-canvas" aria-hidden="true"></canvas>
 
-<!-- AFTER -->
+<!-- AFTER (ADR-006 + ADR-007) -->
+<canvas id="scene-canvas" aria-hidden="true"></canvas>
+<canvas id="effects-canvas" aria-hidden="true"></canvas>
 <canvas class="trace-overlay" id="trace-overlay" aria-hidden="true"></canvas>
 ```
 
@@ -91,12 +95,12 @@ Full layer stack inside `#scene-stage`:
 │  │  #narration-layer (DOM)                  │ ◄── text, captions, a11y
 │  │  GSAP animates text here                 │    │
 │  ├──────────────────────────────────────────┤    │
-│  │  #effects-canvas  (Canvas 2D)            │ ◄── v2 pixel effects
-│  │  aria-hidden="true"                      │    │
-│  ├──────────────────────────────────────────┤    │
 │  │  #trace-overlay   (Canvas 2D) ← CHANGED │ ◄── glowing trace paths
 │  │  aria-hidden="true"                      │    independent rAF loop
 │  │  mix-blend-mode: screen                  │    │
+│  ├──────────────────────────────────────────┤    │
+│  │  #effects-canvas  (PixiJS/WebGL)         │ ◄── pixel effects (ADR-007)
+│  │  aria-hidden="true"                      │    │
 │  ├──────────────────────────────────────────┤    │
 │  │  #scene-canvas    (Canvas 2D)            │ ◄── images, cover-fit
 │  │  aria-hidden="true"                      │    │
@@ -210,7 +214,8 @@ All coordinates normalized (0–1). No absolute pixel values.
 
 ```
 DO:
-  ✓ every frame has traceOverlay with both opacity AND paths
+  ✓ traceOverlay: null = no shimmer on this frame (consistent with all other optional keys)
+  ✓ when present, traceOverlay must have both opacity AND paths
   ✓ paths is always an array (empty [] for scenes not yet authored)
   ✓ opacity is a float 0.0 – 1.0
   ✓ all coordinates normalized 0.0 – 1.0
@@ -219,11 +224,10 @@ DON'T:
   ✗ pixel-based coordinates
   ✗ external JSON files (CSP is connect-src 'none'; all data inline)
   ✗ opacity-only frames without paths key (no backward compat per AGENTS.md)
-  ✗ traceOverlay: null (use { "opacity": 0, "paths": [] } instead)
   ✗ opacity values outside 0.0 – 1.0
 ```
 
-**No backward compatibility.** Per AGENTS.md: "Do not maintain backwards compatibility in this codebase for any reason." Every frame must have the full schema. Existing scenes.json frames will be updated to include `"paths": []` when this ADR is implemented.
+**No backward compatibility.** Per AGENTS.md: "Do not maintain backwards compatibility in this codebase for any reason." When traceOverlay is present (not null), it must have the full schema. Existing scenes.json frames will be updated when this ADR is implemented.
 
 ---
 
@@ -432,10 +436,13 @@ Glow cache rebuild  │ Happens on loadScene() and resize only —
                     │ shadowBlur on offscreen canvas. ~5–15ms
                     │ one-time cost, hidden behind GSAP fade.
 ────────────────────┼─────────────────────────────────────────────
-Multiple rAF loops  │ scene-canvas has no rAF (static drawImage).
-                    │ effects-canvas has its own rAF (idle in v1).
+Multiple render loops│ scene-canvas has no rAF (static drawImage).
+                    │ effects-canvas has PixiJS ticker (active — ADR-007).
                     │ Shimmer rAF runs continuously but is light.
-                    │ Consolidate if profiling shows contention.
+                    │ FAIL gate: if combined p95 frame time > 16.6ms
+                    │ on baseline hardware, consolidate per ADR-007
+                    │ profiling method (move shimmer into PixiJS
+                    │ ticker or reduce to 30fps frame-skip).
 ────────────────────┼─────────────────────────────────────────────
 Canvas memory       │ Two canvases: visible + offscreen glow cache.
                     │ At 1920×1080 × 4 bytes = ~16MB total.
@@ -458,10 +465,10 @@ Early exit          │ If opacity === 0 or paths.length === 0,
 - Global intensity curve
 - shimmer.js module
 
-**Remains v2:**
+**Remains v2 (UPDATED by ADR-007 — effects.js promoted to v1 via PixiJS):**
 
-- Runtime procedural effects via Canvas pixel ops (effects.js)
-- Per-scene canvas pixel effects (ripple, dust, bloom)
+- ~~Runtime procedural effects via Canvas pixel ops (effects.js)~~ → Superseded by ADR-007: effects.js is now a PixiJS factory registry, active in v1
+- ~~Per-scene canvas pixel effects (ripple, dust, bloom)~~ → Superseded by ADR-007: water, heat, dust-glow effects via PixiJS DisplacementFilter in v1
 - Hover-responsive parallax
 - Extended credits animation
 - Per-scene ambient audio loops
@@ -477,8 +484,8 @@ shimmer.js is a leaf module with zero coupling to existing code. It adds one can
 ```
 UNCHANGED:
   ✓ canvas.js — untouched
-  ✓ effects.js — untouched (no-op registry)
-  ✓ effects-canvas.js — untouched (pause/resume unaffected)
+  ✓ effects.js — untouched by ADR-006 (superseded by ADR-007: now PixiJS factory registry)
+  ✓ effects-canvas.js — untouched by ADR-006 (superseded by ADR-007: now PixiJS/WebGL lifecycle)
   ✓ text.js — untouched
   ✓ audio.js — untouched
   ✓ overlay.js — untouched
@@ -489,8 +496,8 @@ UNCHANGED:
   ✓ Keyboard/accessibility — shimmer is decorative, aria-hidden
   ✓ Deployment — no new dependencies
 
-CHANGED:
-  ✓ index.html — #trace-overlay: <div> → <canvas>
+CHANGED (not yet applied to code — implementation pending path authoring):
+  ✓ index.html — #trace-overlay: <div> → <canvas>, move above #effects-canvas (ADR-007 z-swap)
   ✓ app.js showFrame() — one line: style.opacity → shimmer.loadScene()
   ✓ app.js createApp() — add shimmer.init(app.els.traceOverlay) call
   ✓ app.js doPause()/doResume() — add shimmer.pause() and shimmer.resume()
@@ -529,7 +536,7 @@ Extends §16 of v3-final:
 
 ```
 RENDERING (updated):
-  ✓ image canvas = visual plane (images, crossfade, v2 pixel effects)
+  ✓ image canvas = visual plane (static scene images, cover-fit)
   ✓ trace-overlay canvas = additive light plane (glowing trace paths + shimmer)
   ✓ DOM overlay = semantic plane (text, buttons, a11y)
   ✓ all three layers are independent rendering contexts
@@ -546,8 +553,8 @@ SHIMMER:
   ✓ shimmer.js is a leaf module with no cross-imports
   ✓ shimmer transitions ride the parent container GSAP fade — no shimmer-specific transition code
 
-NEVER:
-  ✗ particles (dots that spawn, move, or die)
+NEVER (shimmer-specific — does not constrain effects-canvas / ADR-007):
+  ✗ particles on the shimmer canvas (dots that spawn, move, or die)
   ✗ CSS glow filters (box-shadow, filter: blur — fights paint texture)
   ✗ white shimmer (always warm amber)
   ✗ shimmer that responds to mouse/touch (v2 parallax territory)
