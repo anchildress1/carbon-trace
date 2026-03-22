@@ -1,25 +1,84 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// Mock PixiJS
+const mockTicker = {
+  add: vi.fn(),
+  stop: vi.fn(),
+  start: vi.fn(),
+  started: false,
+};
+
+const mockRenderer = {
+  resize: vi.fn(),
+};
+
+const mockStage = {
+  children: [],
+  addChild: vi.fn(function (child) {
+    this.children.push(child);
+  }),
+  removeChild: vi.fn(function (child) {
+    const idx = this.children.indexOf(child);
+    if (idx >= 0) this.children.splice(idx, 1);
+  }),
+};
+
+const mockPixiApp = {
+  ticker: mockTicker,
+  renderer: mockRenderer,
+  stage: mockStage,
+  screen: { width: 1920, height: 1080 },
+  init: vi.fn(),
+  destroy: vi.fn(),
+};
+
+vi.mock('pixi.js', () => ({
+  Application: vi.fn(function () {
+    Object.assign(this, {
+      ...mockPixiApp,
+      stage: { ...mockStage, children: [] },
+    });
+    this.init = vi.fn();
+    this.destroy = vi.fn();
+    this.ticker = { ...mockTicker };
+    this.renderer = { ...mockRenderer };
+    this.screen = { width: 1920, height: 1080 };
+  }),
+  Sprite: vi.fn(function (texture) {
+    this.texture = texture;
+    this.width = 0;
+    this.height = 0;
+    this.filters = [];
+    this.mask = null;
+    this.destroy = vi.fn();
+    this.x = 0;
+    this.y = 0;
+    this.scale = { set: vi.fn() };
+  }),
+  Texture: {
+    from: vi.fn((img) => ({ _source: img, source: { style: {} } })),
+  },
+}));
+
+vi.mock('../../src/effects.js', () => ({
+  createEffect: vi.fn(() => ({
+    filter: { enabled: true },
+    update: vi.fn(),
+  })),
+}));
+
 import {
-  initCanvas,
+  init,
+  loadScene,
+  clearAll,
   pause,
   resume,
-  clearAll,
   destroy,
-  getContext,
   isRunning,
 } from '../../src/effects-canvas.js';
 
 function createMockCanvas() {
-  const mockCtx = {
-    clearRect: vi.fn(),
-    resetTransform: vi.fn(),
-    scale: vi.fn(),
-  };
-
   const canvas = document.createElement('canvas');
-  vi.spyOn(canvas, 'getContext').mockReturnValue(mockCtx);
-
-  // Mock getBoundingClientRect
   vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
     width: 1920,
     height: 1080,
@@ -31,35 +90,39 @@ function createMockCanvas() {
     y: 0,
     toJSON: () => {},
   });
+  Object.defineProperty(canvas, 'clientWidth', { value: 1920 });
+  Object.defineProperty(canvas, 'clientHeight', { value: 1080 });
 
-  return { canvas, mockCtx };
+  // parentElement is read-only in happy-dom; attach canvas to a container
+  const container = document.createElement('div');
+  container.appendChild(canvas);
+
+  return canvas;
 }
 
-describe('effects-canvas.js', () => {
-  let rafCallbacks;
-  let rafId;
-
+describe('effects-canvas.js — PixiJS lifecycle', () => {
   beforeEach(() => {
-    // Reset module state
     destroy();
+    vi.clearAllMocks();
 
-    rafCallbacks = [];
-    rafId = 0;
-
-    vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb) => {
-      rafCallbacks.push(cb);
-      return ++rafId;
-    });
-    vi.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(() => {});
-
-    // Mock ResizeObserver
     globalThis.ResizeObserver = vi.fn(function () {
       this.observe = vi.fn();
       this.disconnect = vi.fn();
     });
 
-    // Default: no reduced motion preference
     globalThis.matchMedia = vi.fn().mockReturnValue({ matches: false });
+
+    // Mock Image for loadTexture — fire onload synchronously when src is set.
+    // In loadTexture, the order is: new Image() → set onload → set src,
+    // so onload is available by the time the setter fires.
+    globalThis.Image = vi.fn(function () {
+      const self = this;
+      Object.defineProperty(this, 'src', {
+        set() {
+          self.onload?.();
+        },
+      });
+    });
   });
 
   afterEach(() => {
@@ -67,209 +130,105 @@ describe('effects-canvas.js', () => {
     vi.restoreAllMocks();
   });
 
-  describe('initCanvas', () => {
-    it('returns a 2d context', () => {
-      const { canvas, mockCtx } = createMockCanvas();
-      const ctx = initCanvas(canvas);
-
-      expect(ctx).toBe(mockCtx);
-      expect(canvas.getContext).toHaveBeenCalledWith('2d');
+  describe('init', () => {
+    it('throws when given a non-canvas element', async () => {
+      const div = document.createElement('div');
+      await expect(init(div)).rejects.toThrow('init requires a <canvas> element');
     });
 
-    it('sets canvas dimensions based on bounding rect and DPR', () => {
-      const { canvas } = createMockCanvas();
-      const dpr = globalThis.devicePixelRatio || 1;
-
-      initCanvas(canvas);
-
-      expect(canvas.width).toBe(1920 * dpr);
-      expect(canvas.height).toBe(1080 * dpr);
+    it('throws when given null', async () => {
+      await expect(init(null)).rejects.toThrow('init requires a <canvas> element');
     });
 
-    it('creates a ResizeObserver on the canvas', () => {
-      const { canvas } = createMockCanvas();
-      initCanvas(canvas);
+    it('creates a PixiJS Application on the canvas', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      const { Application } = await import('pixi.js');
+      expect(Application).toHaveBeenCalled();
+    });
+
+    it('creates a ResizeObserver on the canvas', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
 
       expect(globalThis.ResizeObserver).toHaveBeenCalled();
       const observerInstance = globalThis.ResizeObserver.mock.results[0].value;
       expect(observerInstance.observe).toHaveBeenCalledWith(canvas);
     });
 
-    it('resets transform before scaling on resize', () => {
-      const { canvas, mockCtx } = createMockCanvas();
-      initCanvas(canvas);
+    it('sets webglAvailable to false if Application.init throws', async () => {
+      const { Application } = await import('pixi.js');
+      Application.mockImplementationOnce(function () {
+        this.init = vi.fn().mockRejectedValue(new Error('WebGL not supported'));
+        this.ticker = mockTicker;
+        this.destroy = vi.fn();
+      });
 
-      const observerCb = globalThis.ResizeObserver.mock.calls[0][0];
-      mockCtx.resetTransform.mockClear();
-      mockCtx.scale.mockClear();
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const canvas = createMockCanvas();
+      await init(canvas);
 
-      observerCb();
-
-      expect(mockCtx.resetTransform).toHaveBeenCalledTimes(1);
-      expect(mockCtx.scale).toHaveBeenCalledTimes(1);
-    });
-
-    it('throws when given a non-canvas element', () => {
-      const div = document.createElement('div');
-      expect(() => initCanvas(div)).toThrow('initCanvas requires a <canvas> element');
-    });
-
-    it('throws when given null', () => {
-      expect(() => initCanvas(null)).toThrow('initCanvas requires a <canvas> element');
-    });
-
-    it('throws when given undefined', () => {
-      expect(() => initCanvas(undefined)).toThrow('initCanvas requires a <canvas> element');
-    });
-
-    it('throws when getContext returns null', () => {
-      const canvas = document.createElement('canvas');
-      vi.spyOn(canvas, 'getContext').mockReturnValue(null);
-
-      expect(() => initCanvas(canvas)).toThrow(
-        'Failed to acquire 2D effects canvas context',
+      expect(warnSpy).toHaveBeenCalledWith(
+        'WebGL unavailable — effects disabled:',
+        expect.any(String),
       );
-    });
-
-    it('destroys previous canvas before initializing new one', () => {
-      const { canvas: first } = createMockCanvas();
-      initCanvas(first);
-      const firstObserver = globalThis.ResizeObserver.mock.results[0].value;
-
-      const { canvas: second } = createMockCanvas();
-      initCanvas(second);
-
-      expect(firstObserver.disconnect).toHaveBeenCalled();
+      warnSpy.mockRestore();
     });
   });
 
   describe('pause / resume', () => {
-    it('starts not running', () => {
+    it('isRunning returns false before init', () => {
       expect(isRunning()).toBe(false);
     });
 
-    it('resume sets running to true and requests animation frame', () => {
-      const { canvas } = createMockCanvas();
-      initCanvas(canvas);
-
-      resume();
-
-      expect(isRunning()).toBe(true);
-      expect(globalThis.requestAnimationFrame).toHaveBeenCalled();
+    it('pause does not throw before init', () => {
+      expect(() => pause()).not.toThrow();
     });
 
-    it('pause sets running to false and cancels animation frame', () => {
-      const { canvas } = createMockCanvas();
-      initCanvas(canvas);
-      resume();
-      pause();
-
-      expect(isRunning()).toBe(false);
-      expect(globalThis.cancelAnimationFrame).toHaveBeenCalled();
+    it('resume does not throw before init', () => {
+      expect(() => resume()).not.toThrow();
     });
 
-    it('resume without initCanvas does nothing', () => {
-      resume();
-      expect(isRunning()).toBe(false);
-    });
-
-    it('resume when already running does not double-request frames', () => {
-      const { canvas } = createMockCanvas();
-      initCanvas(canvas);
-      resume();
-
-      const callCount = globalThis.requestAnimationFrame.mock.calls.length;
-      resume();
-
-      expect(globalThis.requestAnimationFrame.mock.calls.length).toBe(callCount);
-    });
-
-    it('resume does not start when prefers-reduced-motion is active', () => {
-      const { canvas } = createMockCanvas();
-      initCanvas(canvas);
+    it('resume does not start when prefers-reduced-motion is active', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
 
       globalThis.matchMedia = vi.fn().mockReturnValue({ matches: true });
       resume();
 
-      expect(isRunning()).toBe(false);
-      expect(globalThis.requestAnimationFrame).not.toHaveBeenCalled();
-    });
-
-    it('render loop self-stops when reduced motion activates mid-run', () => {
-      const { canvas } = createMockCanvas();
-      initCanvas(canvas);
-
-      globalThis.matchMedia = vi.fn().mockReturnValue({ matches: false });
-      resume();
-      expect(isRunning()).toBe(true);
-
-      // Simulate reduced motion toggled on between frames
-      globalThis.matchMedia = vi.fn().mockReturnValue({ matches: true });
-      rafCallbacks[0]();
-
-      expect(isRunning()).toBe(false);
-    });
-  });
-
-  describe('render loop', () => {
-    it('clears the canvas each frame', () => {
-      const { canvas, mockCtx } = createMockCanvas();
-      initCanvas(canvas);
-      resume();
-
-      // Execute the rAF callback
-      expect(rafCallbacks.length).toBe(1);
-      rafCallbacks[0]();
-
-      expect(mockCtx.clearRect).toHaveBeenCalledWith(0, 0, 1920, 1080);
-    });
-
-    it('requests next frame after rendering', () => {
-      const { canvas } = createMockCanvas();
-      initCanvas(canvas);
-      resume();
-
-      rafCallbacks[0]();
-
-      // Original call + re-request inside render
-      expect(globalThis.requestAnimationFrame).toHaveBeenCalledTimes(2);
-    });
-
-    it('stops requesting frames after pause', () => {
-      const { canvas } = createMockCanvas();
-      initCanvas(canvas);
-      resume();
-      pause();
-
-      // Clear callbacks
-      rafCallbacks.length = 0;
-      // No more callbacks should be queued
-      expect(rafCallbacks.length).toBe(0);
+      // Should not have called ticker.start
+      const { Application } = await import('pixi.js');
+      const instance = Application.mock.instances[0];
+      expect(instance.ticker.start).not.toHaveBeenCalled();
     });
   });
 
   describe('clearAll', () => {
-    it('does nothing when no canvas is initialized', () => {
-      destroy();
+    it('does not throw before init', () => {
       expect(() => clearAll()).not.toThrow();
     });
 
-    it('pauses and clears the canvas', () => {
-      const { canvas, mockCtx } = createMockCanvas();
-      initCanvas(canvas);
-      resume();
+    it('stops the ticker', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
 
       clearAll();
 
-      expect(isRunning()).toBe(false);
-      expect(mockCtx.clearRect).toHaveBeenCalledWith(0, 0, 1920, 1080);
+      const { Application } = await import('pixi.js');
+      const instance = Application.mock.instances[0];
+      expect(instance.ticker.stop).toHaveBeenCalled();
     });
   });
 
   describe('destroy', () => {
-    it('disconnects the ResizeObserver', () => {
-      const { canvas } = createMockCanvas();
-      initCanvas(canvas);
+    it('is safe to call before init', () => {
+      expect(() => destroy()).not.toThrow();
+    });
+
+    it('disconnects the ResizeObserver', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
 
       const observerInstance = globalThis.ResizeObserver.mock.results[0].value;
       destroy();
@@ -277,31 +236,108 @@ describe('effects-canvas.js', () => {
       expect(observerInstance.disconnect).toHaveBeenCalled();
     });
 
-    it('nulls the context', () => {
-      const { canvas } = createMockCanvas();
-      initCanvas(canvas);
-      destroy();
-
-      expect(getContext()).toBeNull();
-    });
-
-    it('is safe to call twice', () => {
-      const { canvas } = createMockCanvas();
-      initCanvas(canvas);
+    it('is safe to call twice', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
       destroy();
       expect(() => destroy()).not.toThrow();
     });
   });
 
-  describe('getContext', () => {
-    it('returns null before init', () => {
-      expect(getContext()).toBeNull();
+  describe('loadScene', () => {
+    it('does not throw when webgl is unavailable', async () => {
+      const { Application } = await import('pixi.js');
+      Application.mockImplementationOnce(function () {
+        this.init = vi.fn().mockRejectedValue(new Error('fail'));
+        this.ticker = mockTicker;
+        this.destroy = vi.fn();
+      });
+
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      await expect(
+        loadScene({ regions: [{ type: 'water', mask: 'test.png' }] }, 'scene.png'),
+      ).resolves.not.toThrow();
     });
 
-    it('returns ctx after init', () => {
-      const { canvas, mockCtx } = createMockCanvas();
-      initCanvas(canvas);
-      expect(getContext()).toBe(mockCtx);
+    it('returns immediately when not initialized', async () => {
+      // loadScene on a destroyed/uninitialized module should be a no-op
+      await expect(
+        loadScene({ regions: [] }, 'scene.webp'),
+      ).resolves.not.toThrow();
+    });
+  });
+
+  describe('pause / resume with active effects', () => {
+    it('pause stops the ticker after init', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+      pause();
+
+      const { Application } = await import('pixi.js');
+      const instance = Application.mock.instances[0];
+      expect(instance.ticker.stop).toHaveBeenCalled();
+    });
+
+    it('resume does not start ticker when no active effects', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+      resume();
+
+      const { Application } = await import('pixi.js');
+      const instance = Application.mock.instances[0];
+      expect(instance.ticker.start).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('context loss', () => {
+    it('handles webglcontextlost event', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const event = new Event('webglcontextlost');
+      event.preventDefault = vi.fn();
+      canvas.dispatchEvent(event);
+
+      expect(warnSpy).toHaveBeenCalledWith('WebGL context lost — effects paused');
+      warnSpy.mockRestore();
+    });
+
+    it('handles webglcontextrestored event', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+      canvas.dispatchEvent(new Event('webglcontextrestored'));
+
+      expect(infoSpy).toHaveBeenCalledWith('WebGL context restored');
+      infoSpy.mockRestore();
+    });
+  });
+
+  describe('destroy with app', () => {
+    it('calls app.destroy', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      const { Application } = await import('pixi.js');
+      const instance = Application.mock.instances[0];
+      destroy();
+
+      expect(instance.destroy).toHaveBeenCalled();
+    });
+
+    it('removes context loss listeners', async () => {
+      const canvas = createMockCanvas();
+      const removeSpy = vi.spyOn(canvas, 'removeEventListener');
+      await init(canvas);
+      destroy();
+
+      expect(removeSpy).toHaveBeenCalledWith('webglcontextlost', expect.any(Function));
+      expect(removeSpy).toHaveBeenCalledWith('webglcontextrestored', expect.any(Function));
     });
   });
 });

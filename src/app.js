@@ -15,12 +15,12 @@ import {
 } from './audio.js';
 import { PausableTimer } from './pausable-timer.js';
 import { buildNarrationTimeline, clearNarrationLayer } from './text.js';
-import { runEffect, clearEffects, effectExists } from './effects.js';
 import {
-  initCanvas,
-  pause as pauseCanvas,
-  resume as resumeCanvas,
-  clearAll as clearCanvasEffects,
+  init as initEffectsCanvas,
+  loadScene as loadEffectsScene,
+  clearAll as clearEffects,
+  pause as pauseEffects,
+  resume as resumeEffects,
 } from './effects-canvas.js';
 import { initOverlay, updateProgress, showControls } from './overlay.js';
 import {
@@ -341,20 +341,12 @@ function showFrame(app, index) {
   renderSceneImage(app, frame);
   app.els.traceOverlay.style.opacity = frame.traceOverlay?.opacity ?? 0;
 
-  clearCanvasEffects();
-  clearEffects();
   clearNarrationLayer(app.els.narrationLayer);
 
-  if (frame.effects?.idle) {
-    runEffect(frame.effects.idle, app.els.effectsCanvas, app.els.sceneCanvas);
-  }
-
-  // Start the effects render loop early so it is already running when the
-  // fade-in begins. Without this, effects would appear to 'pop in' after
-  // the transition completes. Skip the loop entirely when no registered
-  // effect will draw into the canvas — avoids spinning rAF for zero output.
-  if (effectExists(frame.effects?.idle)) {
-    resumeCanvas();
+  if (frame.effects?.regions?.length) {
+    loadEffectsScene(frame.effects, frame.image);
+  } else {
+    clearEffects();
   }
 
   const sceneIdx = app.sceneMap.byFrame.get(index);
@@ -639,9 +631,7 @@ function doResume(app) {
     }
   }
 
-  if (effectExists(app.frames[app.currentIndex].effects?.idle)) {
-    resumeCanvas();
-  }
+  resumeEffects();
 
   app.autoAdvanceTimer?.resume();
 
@@ -668,7 +658,7 @@ function doPause(app) {
     app.textTimeline.pause();
   }
 
-  pauseCanvas();
+  pauseEffects();
 
   app.autoAdvanceTimer?.pause();
 
@@ -790,7 +780,7 @@ function toggleCaptions(app) {
 
 function initApp(app) {
   initSceneCanvas(app.els.sceneCanvas);
-  initCanvas(app.els.effectsCanvas);
+  initEffectsCanvas(app.els.effectsCanvas);
 
   preloadFirstFrameAudio(app.frames, (result) => registerAudio(app, result));
   onNarrationBufferChange((isBuffering) => handleBufferChange(app, isBuffering));

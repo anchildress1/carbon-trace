@@ -1,117 +1,251 @@
 /**
- * Canvas 2D lifecycle — manages the effects overlay canvas context,
- * DPR-aware sizing, and the requestAnimationFrame render loop. The
- * render loop currently clears the canvas each frame; effect
- * implementations will draw into this canvas via the effects.js
- * registry. The render loop is controlled by the orchestrator via
- * pause()/resume().
+ * PixiJS WebGL lifecycle for the effects overlay canvas. Manages a PixiJS
+ * Application, loads scene images as sprites, applies masked displacement
+ * filters per region, and runs the PixiJS ticker for 60fps GPU animation.
  *
- * Respects prefers-reduced-motion: the render loop will not start (and
- * will self-stop) when the user prefers reduced motion.
+ * Textures are loaded via new Image() + Texture.from() to preserve
+ * connect-src 'none' CSP (PixiJS Assets.load() may use fetch internally).
+ *
+ * Respects prefers-reduced-motion: ticker is paused, effects are static.
+ * Graceful WebGL fallback: if init fails or context is lost, all subsequent
+ * calls become no-ops and the app continues without effects.
  */
 
-let ctx = null;
+import { Application, Sprite, Texture } from 'pixi.js';
+import { createEffect } from './effects.js';
+
+let pixiApp = null;
 let canvasEl = null;
 let observer = null;
-let running = false;
-let rafId = null;
-let cssWidth = 0;
-let cssHeight = 0;
+let webglAvailable = true;
+let needsReinit = false;
+let activeEffects = [];
+let sceneSprite = null;
 
 function reducedMotion() {
   return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-function sizeCanvas() {
-  if (!canvasEl) return;
+/**
+ * Load an image URL as a PixiJS Texture via new Image() (img-src, not fetch).
+ */
+function loadTexture(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(Texture.from(img));
+    img.onerror = () => reject(new Error(`Failed to load texture: ${url}`));
+    img.src = url;
+  });
+}
 
-  const dpr = globalThis.devicePixelRatio || 1;
-  const rect = canvasEl.getBoundingClientRect();
+function handleContextLost(e) {
+  e.preventDefault();
+  console.warn('WebGL context lost — effects paused');
+  clearAll();
+  needsReinit = true;
+}
 
-  cssWidth = rect.width;
-  cssHeight = rect.height;
+function handleContextRestored() {
+  console.info('WebGL context restored');
+}
 
-  canvasEl.width = cssWidth * dpr;
-  canvasEl.height = cssHeight * dpr;
-
-  if (ctx) {
-    ctx.resetTransform();
-    ctx.scale(dpr, dpr);
+function tickerUpdate() {
+  for (const effect of activeEffects) {
+    effect.update();
   }
 }
 
-function render() {
-  if (!running || !ctx || !canvasEl) return;
-
-  if (reducedMotion()) {
-    pause();
-    return;
-  }
-
-  ctx.clearRect(0, 0, cssWidth, cssHeight);
-
-  // Currently no-op: effect draw calls will be added here when effect implementations are wired in.
-
-  rafId = requestAnimationFrame(render);
-}
-
-export function initCanvas(el) {
+/**
+ * Create the PixiJS Application on the effects canvas. Called lazily during
+ * first loadScene(). If WebGL is unavailable, sets webglAvailable = false.
+ */
+export async function init(el) {
   if (!el || !(el instanceof HTMLCanvasElement)) {
-    throw new Error('initCanvas requires a <canvas> element');
+    throw new Error('init requires a <canvas> element');
   }
 
-  if (canvasEl) destroy();
+  if (canvasEl && pixiApp) destroy();
 
   canvasEl = el;
-  ctx = canvasEl.getContext('2d');
-  if (!ctx) {
-    canvasEl = null;
-    throw new Error('Failed to acquire 2D effects canvas context');
+
+  try {
+    pixiApp = new Application();
+    await pixiApp.init({
+      canvas: canvasEl,
+      backgroundAlpha: 0,
+      resizeTo: canvasEl.parentElement,
+      autoStart: false,
+    });
+
+    pixiApp.ticker.add(tickerUpdate);
+    pixiApp.ticker.stop();
+
+    canvasEl.addEventListener('webglcontextlost', handleContextLost);
+    canvasEl.addEventListener('webglcontextrestored', handleContextRestored);
+
+    observer = new ResizeObserver(() => {
+      if (pixiApp?.renderer) {
+        pixiApp.renderer.resize(canvasEl.clientWidth, canvasEl.clientHeight);
+      }
+    });
+    observer.observe(canvasEl);
+  } catch (err) {
+    console.warn('WebGL unavailable — effects disabled:', err.message);
+    webglAvailable = false;
+    pixiApp = null;
+  }
+}
+
+/**
+ * Load a scene's effects: create scene sprite, load masks and noise textures,
+ * configure displacement filters per region.
+ */
+export async function loadScene(effectsConfig, sceneImageUrl) {
+  if (!webglAvailable) return;
+
+  if (needsReinit) {
+    try {
+      await reinit();
+    } catch {
+      webglAvailable = false;
+      return;
+    }
   }
 
-  sizeCanvas();
+  if (!pixiApp) return;
 
-  observer = new ResizeObserver(sizeCanvas);
-  observer.observe(canvasEl);
+  clearAll();
 
-  return ctx;
+  try {
+    const sceneTexture = await loadTexture(sceneImageUrl);
+    sceneSprite = new Sprite(sceneTexture);
+    sceneSprite.width = pixiApp.screen.width;
+    sceneSprite.height = pixiApp.screen.height;
+    pixiApp.stage.addChild(sceneSprite);
+
+    const filters = [];
+
+    for (const region of effectsConfig.regions) {
+      try {
+        const noiseTexture = await loadTexture(region.noise || 'assets/masks/noise-256.png');
+        const noiseSprite = new Sprite(noiseTexture);
+        pixiApp.stage.addChild(noiseSprite);
+
+        const effect = createEffect(region.type, noiseSprite, region);
+        if (!effect) continue;
+
+        if (region.mask) {
+          const maskTexture = await loadTexture(region.mask);
+          const maskSprite = new Sprite(maskTexture);
+          maskSprite.width = pixiApp.screen.width;
+          maskSprite.height = pixiApp.screen.height;
+          pixiApp.stage.addChild(maskSprite);
+          sceneSprite.mask = maskSprite;
+        }
+
+        filters.push(effect.filter);
+        activeEffects.push(effect);
+      } catch (err) {
+        console.warn(`Skipping effect region "${region.type}":`, err.message);
+      }
+    }
+
+    if (filters.length > 0) {
+      sceneSprite.filters = filters;
+    }
+
+    if (!reducedMotion()) {
+      pixiApp.ticker.start();
+    }
+  } catch (err) {
+    console.warn('Failed to load scene effects:', err.message);
+    clearAll();
+  }
+}
+
+async function reinit() {
+  const el = canvasEl;
+  destroy();
+  needsReinit = false;
+  await init(el);
+}
+
+/**
+ * Destroy all scene content (sprites, filters, textures). Frees GPU memory.
+ * The ticker stops but the Application stays alive for reuse.
+ */
+export function clearAll() {
+  if (!webglAvailable || !pixiApp) return;
+
+  activeEffects = [];
+
+  if (pixiApp.ticker) {
+    pixiApp.ticker.stop();
+  }
+
+  // Wrap destroy calls in try/catch — a lost WebGL context can cause throws.
+  try {
+    if (sceneSprite) {
+      sceneSprite.filters = [];
+      sceneSprite.mask = null;
+    }
+    while (pixiApp.stage.children.length > 0) {
+      const child = pixiApp.stage.children[0];
+      pixiApp.stage.removeChild(child);
+      try {
+        child.destroy({ children: true, texture: true, textureSource: true });
+      } catch {
+        // Context lost — destroy may throw, continue cleanup
+      }
+    }
+  } catch {
+    // Stage access failed — context lost
+  }
+
+  sceneSprite = null;
 }
 
 export function pause() {
-  running = false;
-  if (rafId !== null) {
-    cancelAnimationFrame(rafId);
-    rafId = null;
-  }
+  if (!webglAvailable || !pixiApp) return;
+  pixiApp.ticker.stop();
 }
 
 export function resume() {
-  if (!ctx || running || reducedMotion()) return;
-  running = true;
-  rafId = requestAnimationFrame(render);
-}
-
-export function clearAll() {
-  pause();
-  if (ctx && canvasEl) {
-    ctx.clearRect(0, 0, cssWidth, cssHeight);
+  if (!webglAvailable || !pixiApp || reducedMotion()) return;
+  if (activeEffects.length > 0) {
+    pixiApp.ticker.start();
   }
 }
 
 export function destroy() {
   pause();
+
+  if (canvasEl) {
+    canvasEl.removeEventListener('webglcontextlost', handleContextLost);
+    canvasEl.removeEventListener('webglcontextrestored', handleContextRestored);
+  }
+
   if (observer) {
     observer.disconnect();
     observer = null;
   }
-  ctx = null;
-  canvasEl = null;
-}
 
-export function getContext() {
-  return ctx;
+  try {
+    if (pixiApp) {
+      pixiApp.destroy(false, { children: true, texture: true, textureSource: true });
+    }
+  } catch {
+    // Context already lost
+  }
+
+  pixiApp = null;
+  canvasEl = null;
+  activeEffects = [];
+  sceneSprite = null;
+  needsReinit = false;
 }
 
 export function isRunning() {
-  return running;
+  return pixiApp?.ticker?.started ?? false;
 }

@@ -61,10 +61,7 @@
           }
         ]
       },
-      "effects": {
-        "idle": null,
-        "entry": null
-      },
+      "effects": null,
       "transition": {
         "type": "fade",
         "duration": 1500
@@ -162,10 +159,7 @@
           }
         ]
       },
-      "effects": {
-        "idle": "dust-drift",
-        "entry": "fade-in"
-      },
+      "effects": { "regions": [] },
       "transition": {
         "type": "zoom-in",
         "duration": 1200,
@@ -295,10 +289,7 @@
           }
         ]
       },
-      "effects": {
-        "idle": "motion-drag",
-        "entry": "fade-in"
-      },
+      "effects": { "regions": [] },
       "transition": {
         "type": "fade",
         "duration": 1200
@@ -413,10 +404,7 @@
           }
         ]
       },
-      "effects": {
-        "idle": "heat-pulse",
-        "entry": "fade-in"
-      },
+      "effects": { "regions": [] },
       "transition": {
         "type": "fade",
         "duration": 1200
@@ -541,10 +529,7 @@
           }
         ]
       },
-      "effects": {
-        "idle": "near-still-pulse",
-        "entry": "fade-in"
-      },
+      "effects": { "regions": [] },
       "transition": {
         "type": "fade",
         "duration": 1200
@@ -669,10 +654,7 @@
           }
         ]
       },
-      "effects": {
-        "idle": "water-run",
-        "entry": "fade-in"
-      },
+      "effects": { "regions": [] },
       "transition": {
         "type": "fade",
         "duration": 1200
@@ -792,10 +774,7 @@
           }
         ]
       },
-      "effects": {
-        "idle": "dust-settle",
-        "entry": "fade-in"
-      },
+      "effects": { "regions": [] },
       "transition": {
         "type": "fade",
         "duration": 1200
@@ -895,10 +874,7 @@
           }
         ]
       },
-      "effects": {
-        "idle": "near-still-pulse",
-        "entry": "fade-in"
-      },
+      "effects": { "regions": [] },
       "transition": {
         "type": "fade",
         "duration": 1200
@@ -962,10 +938,7 @@
           }
         ]
       },
-      "effects": {
-        "idle": "assembly-micro",
-        "entry": "fade-in"
-      },
+      "effects": { "regions": [] },
       "transition": {
         "type": "fade",
         "duration": 1200
@@ -1065,10 +1038,7 @@
           }
         ]
       },
-      "effects": {
-        "idle": "light-crack",
-        "entry": "fade-in"
-      },
+      "effects": { "regions": [] },
       "transition": {
         "type": "fade",
         "duration": 1200
@@ -1178,10 +1148,7 @@
           }
         ]
       },
-      "effects": {
-        "idle": "illumination-spread",
-        "entry": "fade-in"
-      },
+      "effects": { "regions": [] },
       "transition": {
         "type": "fade",
         "duration": 1200
@@ -1281,10 +1248,7 @@
           }
         ]
       },
-      "effects": {
-        "idle": "machine-steady",
-        "entry": null
-      },
+      "effects": { "regions": [] },
       "transition": {
         "type": "fade",
         "duration": 1500
