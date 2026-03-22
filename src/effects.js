@@ -1,11 +1,11 @@
 /**
- * Effect factory registry. Each effect type (water, heat, dust) is registered
- * with a factory function that configures a DisplacementFilter from a noise
- * sprite and region parameters. effects-canvas.js calls createEffect() to
- * instantiate filters per region.
+ * Effect factory registry. Each effect type (water, heat, dust, glow) is
+ * registered with a factory function that creates PixiJS filters from region
+ * parameters. effects-canvas.js calls createEffect() to instantiate filters
+ * per region.
  */
 
-import { DisplacementFilter } from 'pixi.js';
+import { BlurFilter, DisplacementFilter } from 'pixi.js';
 
 const factories = Object.create(null);
 
@@ -33,8 +33,8 @@ export function hasEffectType(type) {
 }
 
 // --- Built-in effect factories ---
-// Each receives a PixiJS Sprite (noise texture) and region params.
-// Returns { filter: DisplacementFilter, update(): void }.
+// Each receives a PixiJS Sprite (noise texture, may be null for non-displacement
+// effects) and region params. Returns { filter, update(), needsNoise? }.
 
 registerEffect('water', (sprite, params = {}) => {
   const { direction = 180, speed = 0.6, intensity = 8, scale = 0.02 } = params;
@@ -87,6 +87,27 @@ registerEffect('dust', (sprite, params = {}) => {
       t += 0.01;
       sprite.x += Math.sin(t) * speed;
       sprite.y += Math.cos(t * 0.7) * speed * 0.5;
+    },
+  };
+});
+
+/**
+ * Glow: soft bloom effect via animated blur. No displacement sprite needed.
+ * Pulses blur strength gently for an organic warm haze.
+ */
+registerEffect('glow', (_sprite, params = {}) => {
+  const { strength = 8, quality = 4, pulseSpeed = 0.02, pulseRange = 2 } = params;
+
+  const filter = new BlurFilter({ strength, quality });
+  filter.blendMode = 'add';
+
+  let t = 0;
+  return {
+    filter,
+    needsNoise: false,
+    update() {
+      t += pulseSpeed;
+      filter.strength = strength + Math.sin(t) * pulseRange;
     },
   };
 });

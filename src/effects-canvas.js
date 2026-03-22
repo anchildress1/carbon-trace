@@ -132,12 +132,19 @@ export async function loadScene(effectsConfig, sceneImageUrl) {
 
     for (const region of effectsConfig.regions) {
       try {
-        const noiseTexture = await loadTexture(region.noise || 'assets/masks/noise-256.png');
-        const noiseSprite = new Sprite(noiseTexture);
-        pixiApp.stage.addChild(noiseSprite);
+        // Probe the factory — glow and other non-displacement effects
+        // set needsNoise: false and don't require a noise sprite.
+        const probe = createEffect(region.type, null, region);
+        if (!probe) continue;
 
-        const effect = createEffect(region.type, noiseSprite, region);
-        if (!effect) continue;
+        let effect = probe;
+        if (probe.needsNoise !== false) {
+          const noiseTexture = await loadTexture(region.noise || 'assets/masks/noise-256.png');
+          const noiseSprite = new Sprite(noiseTexture);
+          pixiApp.stage.addChild(noiseSprite);
+          effect = createEffect(region.type, noiseSprite, region);
+          if (!effect) continue;
+        }
 
         if (region.mask) {
           const maskTexture = await loadTexture(region.mask);

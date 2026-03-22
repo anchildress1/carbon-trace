@@ -7,6 +7,11 @@ vi.mock('pixi.js', () => ({
     this.scale = scale;
     this.enabled = true;
   }),
+  BlurFilter: vi.fn(function ({ strength, quality } = {}) {
+    this.strength = strength ?? 8;
+    this.quality = quality ?? 4;
+    this.blendMode = 'normal';
+  }),
 }));
 
 import {
@@ -34,6 +39,7 @@ describe('effects.js — factory registry', () => {
       expect(hasEffectType('water')).toBe(true);
       expect(hasEffectType('heat')).toBe(true);
       expect(hasEffectType('dust')).toBe(true);
+      expect(hasEffectType('glow')).toBe(true);
     });
 
     it('returns false for unregistered types', () => {
@@ -163,6 +169,38 @@ describe('effects.js — factory registry', () => {
       const startX = sprite.x;
       result.update();
       expect(sprite.x).toBeGreaterThan(startX);
+    });
+
+    it('creates a glow effect with blur filter', () => {
+      const result = createEffect('glow', null, {
+        strength: 10,
+        quality: 4,
+      });
+
+      expect(result).not.toBeNull();
+      expect(result.filter).toBeDefined();
+      expect(result.needsNoise).toBe(false);
+      expect(typeof result.update).toBe('function');
+    });
+
+    it('glow effect pulses blur strength', () => {
+      const result = createEffect('glow', null, {
+        strength: 8,
+        pulseSpeed: 0.5,
+        pulseRange: 2,
+      });
+
+      const initial = result.filter.strength;
+      result.update();
+      expect(result.filter.strength).not.toBe(initial);
+    });
+
+    it('glow effect uses default params when none provided', () => {
+      const result = createEffect('glow', null);
+
+      expect(result).not.toBeNull();
+      expect(result.filter).toBeDefined();
+      expect(result.needsNoise).toBe(false);
     });
   });
 });
