@@ -1,11 +1,12 @@
 # ADR-007: Pixel-Level Scene Animations
 
 **Status:** Accepted
-**Date:** March 21, 2026
+**Date:** March 21, 2026 (addendum: March 22, 2026 — sceneSprite elimination, transparent overlay architecture)
 **Deciders:** Ashley Childress (@anchildress1)
 **Coexists with:** ADR-006 (trace shimmer overlay — separate system, separate canvas)
 **Supersedes:** ADR-006 §06.9 (v1/v2 boundary — effects.js no longer deferred to v2), ADR-006 §06.10 (effects.js listed as "untouched"), v5 §5.4 layer stack order (effects-canvas and trace-overlay swap)
 **Affects:** v5 §17 Rules (getImageData restriction), effects.js (no longer no-op), effects-canvas.js (context changes from Canvas 2D to WebGL via PixiJS)
+**Extended by:** ADR-008 (audio-reactive effect modulation)
 
 ## Context
 
@@ -34,9 +35,9 @@ ADR-001 rejected WebGL because "GPU shader pipeline is overkill for 2D image ren
 
 ## Decision
 
-**Mask-based GPU-accelerated effects via PixiJS on the effects canvas.**
+**Mask-based GPU-accelerated effects via PixiJS on a transparent overlay canvas.**
 
-Each scene declares one or more effect regions. Each region is defined by a grayscale mask image (white = animate, black = don't) and an effect type (water, heat, dust, or any future type). PixiJS renders the scene image as a sprite, applies displacement maps (scrolling noise textures) masked to the defined regions, and composites the result to the effects canvas at 60fps with GPU acceleration.
+Each scene declares one or more effect regions. Each region is defined by a grayscale mask image (white = animate, black = don't) and an effect type (water, heat, dust, or any future type). PixiJS loads the scene image as a shared texture, creates per-region sprite clones inside masked Containers, applies displacement/blur filters to each, and composites the result as a transparent overlay at 60fps with GPU acceleration. The Canvas 2D layer underneath renders the static scene image — visible everywhere the PixiJS layer is transparent (i.e., outside effect regions).
 
 **Rendering library:** PixiJS v8 (MIT license, ~150KB gzipped). Bundled via Vite — no CDN in production. CSP is `connect-src 'none'` (ADR-006 §06.3.3); external scripts would violate `script-src`. POC may use CDN for rapid iteration.
 
@@ -49,13 +50,14 @@ Each scene declares one or more effect regions. Each region is defined by a gray
 ```
 ON SCENE LOAD:
   1. Create PixiJS Application on the effects canvas (or reuse existing)
-  2. Load scene image via new Image() → Texture.from() → Sprite
+  2. Load scene image via new Image() → Texture.from() (store as shared texture, NO full-screen sprite)
   3. For each effect region:
      a. Load mask image via new Image() → Texture.from() → Sprite (masking)
-     b. Load pre-authored displacement noise texture via new Image() → Texture.from()
-     c. Create a DisplacementFilter with the noise sprite
-     d. Apply mask to constrain effect to region
-     e. Add filter to the scene sprite's filter chain
+     b. Clone scene texture into a new Sprite inside a masked Container
+     c. Load pre-authored displacement noise texture via new Image() → Texture.from()
+     d. Create a DisplacementFilter with the noise sprite
+     e. Apply filter to the cloned sprite inside the masked Container
+     f. Add the masked Container to the stage
 
 EACH rAF FRAME (managed by PixiJS ticker):
   1. For each active displacement sprite:
@@ -66,6 +68,47 @@ EACH rAF FRAME (managed by PixiJS ticker):
 ```
 
 **Key:** No getImageData at all. PixiJS handles all pixel work on the GPU via displacement maps. Textures are loaded via `new Image()` + `Texture.from()` (not `Assets.load()`) to preserve `connect-src 'none'` CSP. If WebGL is unavailable, effects degrade to static — no Canvas 2D fallback is attempted.
+
+### Transparent overlay architecture (addendum, March 22 2026)
+
+**The PixiJS layer has no full-screen sceneSprite.** The effects canvas is transparent except where masked effect regions render displaced pixels.
+
+**Why:** PixiJS DisplacementFilter works by reading pixels from a sprite's texture and shifting them — it can't reach into the Canvas 2D layer below. Each effect region therefore needs its own sprite (cloned from the shared scene texture) inside a masked Container. This is the Container-based overlay pattern confirmed by PixiJS documentation and GitHub issues (#5159, #1644): `setMask` on a noise sprite does NOT constrain DisplacementFilter output — the filter reads the displacement texture directly, ignoring visual masks. The fix is to apply the filter to a cloned sprite inside a masked Container, which constrains the *filtered output* to the mask region.
+
+Given that every effect region already has its own cloned sprite, a full-screen sceneSprite would be redundant — it would sit fully opaque on the stage, completely covering the Canvas 2D scene image underneath, serving no purpose. Eliminating it means:
+
+```
+BENEFIT                          │ DETAIL
+─────────────────────────────────┼──────────────────────────────────────────
+Layer stack is honest            │ Canvas 2D renders the scene image. PixiJS
+                                 │ overlays only the animated regions. Each
+                                 │ layer does one job.
+─────────────────────────────────┼──────────────────────────────────────────
+No redundant resize tracking     │ No full-screen sprite to keep sized to
+                                 │ the canvas. Region containers manage their
+                                 │ own geometry.
+─────────────────────────────────┼──────────────────────────────────────────
+WebGL fallback is clean          │ When effects are disabled, the PixiJS
+                                 │ canvas is empty and transparent. Canvas 2D
+                                 │ scene image shows through with no visual
+                                 │ change.
+─────────────────────────────────┼──────────────────────────────────────────
+GPU memory saved                 │ One fewer full-screen sprite on stage.
+                                 │ The texture is still loaded (needed for
+                                 │ per-region clones) but not rendered twice.
+─────────────────────────────────┼──────────────────────────────────────────
+Canvas 2D remains useful         │ drawFallback() before images load, future
+                                 │ getImageData work (v2 plans), and the
+                                 │ visible base layer when no effects are
+                                 │ active — all legitimate Canvas 2D uses.
+```
+
+**What loadScene() does now:**
+1. Load scene image as a PixiJS Texture (shared, not added to stage)
+2. For each region: create a Sprite from the shared texture, place it inside a masked Container, apply the filter to the sprite, add the Container to the stage
+3. The stage contains ONLY masked Containers — no unmasked full-screen geometry
+
+**Full-scene effects:** If a future effect needs to cover the entire scene without a mask, use a full-white mask in a Container. The architecture handles it identically — no special case needed.
 
 **PixiJS init timing:** `effectsCanvas.init()` is called during `showFrame()` on first use (lazy), aligned to image display. The PixiJS Application is created once and reused across scenes. `loadScene()` swaps sprites/filters per scene; `init()` is not called again. If `frame.effects` is null, `init()` is skipped — no WebGL context created until a scene actually needs effects.
 
@@ -99,22 +142,18 @@ EACH rAF FRAME (managed by PixiJS ticker):
 - No particle emitter dependency — displacement effect types (water, heat, dust, shockwave) use DisplacementFilter exclusively
 - Parameters: `speed`, `intensity`, `scale`
 
-**fog** — Atmospheric haze (PixiJS BlurFilter)
-- Soft static blur with gentle pulse for subtle atmospheric drift
-- Normal blend mode (not additive) — dims rather than brightens
+**glow** — Soft bloom (GlowFilter from `pixi-filters`)
+- Dedicated glow filter with `innerStrength`, `outerStrength`, `color`, and `quality` parameters
+- Pulses glow intensity for organic breathing effect
 - No displacement sprite needed (`needsNoise: false`)
-- Parameters: `strength`, `quality`, `pulseSpeed`, `pulseRange`
+- No manual additive blend mode — GlowFilter handles the bloom natively
+- Parameters: `outerStrength`, `innerStrength`, `color`, `quality`, `pulseSpeed`, `pulseRange`
 
-**glow** — Soft bloom (PixiJS BlurFilter)
-- Animated blur with additive blend mode — adds warm light to masked region
-- Pulses blur strength for organic breathing effect
-- No displacement sprite needed (`needsNoise: false`)
-- Parameters: `strength`, `quality`, `pulseSpeed`, `pulseRange`
-
-**shockwave** — Radial displacement burst (PixiJS DisplacementFilter)
-- Noise sprite scales outward rapidly from center, displacement fades as it expands
+**shockwave** — Radial displacement burst (ShockwaveFilter from `pixi-filters`)
+- Dedicated shockwave filter with configurable center, speed, radius, wavelength, and amplitude
 - Cycles between burst phase and rest phase for repeating pulse
-- Parameters: `speed`, `intensity`, `restScale`, `burstScale`, `cyclePause`
+- No manual noise sprite scaling — ShockwaveFilter handles the radial displacement natively
+- Parameters: `speed`, `amplitude`, `wavelength`, `radius`, `cyclePause`
 
 **Future effects** — PixiJS supports:
 - Custom GLSL fragment shaders (caustics, refraction, chromatic aberration)
@@ -122,96 +161,9 @@ EACH rAF FRAME (managed by PixiJS ticker):
 - Any combination of the above, masked to arbitrary regions
 - New effects are added by registering a filter factory function — no architecture changes needed
 
-### Audio-Reactive Modulation
+### Audio-Reactive Modulation → ADR-008
 
-Any effect region can optionally react to audio in real time by adding an `audioReactive` key. This modulates an existing effect parameter based on frequency data from the Web Audio API. No new filters, no new render passes — just parameter changes on existing GPU work.
-
-**How it works:**
-```
-1. audio.js exposes getAnalyserNode() — lazy-creates a Web Audio AnalyserNode
-   connected to Howler's master gain node. One shared analyser for the app.
-2. app.js wires the bridge: effectsCanvas.setAnalyser(audio.getAnalyserNode())
-   Called once when a scene with audioReactive regions loads.
-3. effects-canvas.js ticker reads getByteFrequencyData() each frame (~0.1ms).
-   For each region with audioReactive config:
-     a. Extract the target frequency band (bass/mid/high) from the FFT array
-     b. Normalize to 0–1
-     c. Smooth via exponential moving average (smoothing factor)
-     d. Lerp the target parameter between range[0] and range[1]
-```
-
-**Schema:**
-```jsonc
-{
-  "type": "glow",
-  "mask": "assets/masks/11-diamond.png",
-  "strength": 4,
-  "quality": 4,
-  "pulseSpeed": 0,
-  "pulseRange": [4, 4],
-  "audioReactive": {
-    "band": "bass",
-    "target": "strength",
-    "range": [2, 12],
-    "smoothing": 0.8
-  }
-}
-```
-
-**`audioReactive` fields:**
-```
-FIELD     │ TYPE          │ DESCRIPTION
-──────────┼───────────────┼────────────────────────────────────────────
-band      │ string        │ "bass" (20-250Hz), "mid" (250-2000Hz), "high" (2000-16000Hz)
-target    │ string        │ Effect parameter to modulate (e.g. "strength", "intensity", "speed")
-range     │ [min, max]    │ Output range for the modulated parameter
-smoothing │ float 0–1     │ Exponential moving average factor. 0 = instant (jittery),
-          │               │ 0.8 = smooth (recommended), 0.95 = very slow response.
-```
-
-**Frequency band mapping (FFT bin indices for 2048-sample AnalyserNode at 44100Hz):**
-```
-bass:  bins 1–12   (~20–250 Hz)  — kick drums, bass lines, low rumble
-mid:   bins 12–93  (~250–2000 Hz) — vocals, instruments, body
-high:  bins 93–744 (~2000–16000 Hz) — cymbals, sibilance, air
-```
-Each band is the average of its bin range, normalized to 0–1.
-
-**Module changes:**
-
-audio.js — one new export:
-```
-getAnalyserNode()  — lazy-create AnalyserNode on Howler's AudioContext,
-                     connect to masterGain. Returns AnalyserNode.
-                     Subsequent calls return the same instance.
-                     fftSize: 2048, smoothingTimeConstant: 0.8
-```
-
-effects-canvas.js — one new method:
-```
-setAnalyser(analyserNode)  — store reference. Ticker reads frequency data
-                             each frame if analyser is set and regions have
-                             audioReactive config. Cleared on clearAll().
-```
-
-app.js — wiring in showFrame():
-```js
-if (frame.effects?.regions?.some(r => r.audioReactive)) {
-  effectsCanvas.setAnalyser(audio.getAnalyserNode());
-}
-```
-
-**No cross-imports between leaf modules.** audio.js doesn't know about effects. effects-canvas.js doesn't know about Howler. app.js bridges them.
-
-**Performance:** `getByteFrequencyData()` copies FFT data into a pre-allocated Uint8Array — ~0.1ms. Band averaging is a few additions. Parameter lerp is one multiply. Total audio-reactive overhead per frame: < 0.2ms. Well within the <2ms budget.
-
-**Reduced motion:** `audioReactive` is ignored. The base parameter value is used (e.g., `strength: 4` without modulation). The effect is present but static.
-
-**Pause:** When paused, the ticker is stopped, so no frequency reads happen. On resume, the smoothing catches up naturally — no jump.
-
-**No audio playing:** If `getByteFrequencyData()` returns all zeros (silence, audio not started, muted), the modulated value stays at `range[0]`. The effect is visible at minimum intensity, not invisible.
-
-**Multiple audioReactive regions:** Each reads from the same shared AnalyserNode and FFT data array. One `getByteFrequencyData()` call per frame, not per region.
+Audio-reactive effect modulation is specified in **ADR-008**. Any effect region can declare an optional `audioReactive` key that maps a frequency band to an effect parameter, driven by Web Audio AnalyserNode FFT data. See ADR-008 for the full specification including schema, module wiring, edge cases, precedence rules, and performance analysis.
 
 ### Schema
 
@@ -260,7 +212,7 @@ registerEffect(type, factoryFn)  — register a named effect type
 createEffect(type, app, params)  — create PixiJS filter for this type
 ```
 
-Built-in registrations: `water`, `heat`, `dust`, `fog`, `glow`, `shockwave`. Displacement types return a DisplacementFilter; blur types (fog, glow) return a BlurFilter.
+Built-in registrations: `water`, `heat`, `dust`, `glow`, `shockwave`. Displacement types (water, heat, dust) return a DisplacementFilter. Glow returns a GlowFilter (`pixi-filters`). Shockwave returns a ShockwaveFilter (`pixi-filters`).
 
 **effects-canvas.js** — gains PixiJS lifecycle:
 ```
@@ -275,7 +227,8 @@ pause() / resume()                     — stop/start PixiJS ticker (WCAG 2.2.2)
 
 **New dependencies:**
 - `pixi.js` v8 — added to package.json (pinned to exact minor version), bundled by Vite (no CDN). ~150KB gzipped. Tree-shake via `import { Application, Sprite, DisplacementFilter, BlurFilter, Texture } from 'pixi.js'`. Also imports `pixi.js/unsafe-eval` for CSP-safe shader compilation.
-- No particle emitter package needed — all three effect types use DisplacementFilter exclusively.
+- `pixi-filters` v6 — community filter collection, compatible with PixiJS v8. Provides `GlowFilter` and `ShockwaveFilter` as dedicated, GPU-optimized implementations. Tree-shake via individual imports: `import { GlowFilter } from 'pixi-filters'`, `import { ShockwaveFilter } from 'pixi-filters'`. Pinned to exact minor version. **Bundle impact:** only the imported filters are included (Vite tree-shakes the rest). Verify final bundle size during profiling — the full `pixi-filters` package is large (~2.7MB unshaken) but individual filter imports should add minimal overhead.
+- No particle emitter package needed — displacement effect types (water, heat, dust) use DisplacementFilter exclusively.
 
 **app.js** — showFrame() call site:
 ```js
@@ -421,9 +374,7 @@ Mask image memory        │ Grayscale PNGs at 768×432 ≈ 330KB per mask.
 WebGL unavailability     │ Graceful degradation: effects disabled,
                          │ static scene image shown. No crash.
 ─────────────────────────┼──────────────────────────────────────
-Audio-reactive overhead  │ getByteFrequencyData() ~0.1ms + band
-                         │ averaging + lerp. < 0.2ms total. One FFT
-                         │ read shared across all reactive regions.
+Audio-reactive overhead  │ < 0.2ms total (see ADR-008 for detail).
 ─────────────────────────┼──────────────────────────────────────
 Multiple render loops    │ PixiJS ticker for effects. Shimmer has
                          │ its own rAF. Scene canvas has none.
@@ -522,11 +473,7 @@ scene transition  │ old effects cleared before new scene loads
 WebGL init fail   │ webglAvailable = false, all loadScene() no-op, app continues
 context loss      │ clearAll() on loss, re-init on next loadScene, permanent
                   │ static fallback if re-init also fails
-audioReactive     │ modulates target param from FFT band, smoothing works,
-                  │ no audio (zeros) → stays at range[0], muted → range[0],
-                  │ reduced motion → audioReactive ignored (base param used),
-                  │ multiple reactive regions share one FFT read,
-                  │ pause → no reads, resume → smooth catchup
+audioReactive     │ see ADR-008 test matrix
 ```
 
 ---
@@ -549,7 +496,7 @@ These are scoped implementation choices, not architectural decisions. The ADR's 
 
 1. [ ] Design and author mask images for all scenes (Ashley)
 2. [x] Add pixi.js v8.17.1 (pinned) to package.json — no particle emitter package needed
-3. [x] Implement effect factory registry in effects.js (water, heat, dust, fog, glow, shockwave)
+3. [x] Implement effect factory registry in effects.js (water, heat, dust, glow, shockwave)
 4. [x] Refactor effects-canvas.js with PixiJS lifecycle (init, loadScene, clearAll, pause/resume)
 5. [x] Implement water displacement (DisplacementFilter + scrolling noise sprite + mask)
 6. [x] Implement heat displacement (DisplacementFilter, upward, large scale)
@@ -561,8 +508,7 @@ These are scoped implementation choices, not architectural decisions. The ADR's 
 12. [x] Error boundary: try/catch around init(), webglAvailable flag, loadScene() no-op on failure
 13. [ ] Performance profiling — verify <2ms per frame on baseline hardware (see profiling gates)
 14. [ ] Update v5 spec §3, §4, §17
-15. [ ] Add getAnalyserNode() to audio.js — lazy AnalyserNode on Howler's AudioContext
-16. [ ] Add setAnalyser() to effects-canvas.js — store analyser, read FFT in ticker
-17. [ ] Wire audio-reactive bridge in app.js showFrame()
-18. [ ] Author Scene 11 audioReactive regions (glow + displacement reacting to music)
-19. [ ] Test audioReactive: silence, muted, pause/resume, reduced motion, multiple bands
+15. [ ] Audio-reactive implementation — see ADR-008 action items
+16. [x] Add request-generation guard in loadScene() — increment a generation counter on each call, check on async image/mask load resolve, discard stale results if counter has changed (prevents race when user navigates mid-load)
+17. [x] Resize active effect/mask bounds — ResizeObserver tracks screen-sized sprites (maskSprite, effectSprite) and updates their dimensions on resize. Noise sprites use scale.set() with repeat addressing (viewport-independent).
+18. [x] Texture lifecycle cleanup in clearAll() — disposableTextures array tracks per-scene mask and noise textures. Destroyed with .destroy(true) in clearAll(). Shared scene texture preserved via child.destroy({ texture: false }).

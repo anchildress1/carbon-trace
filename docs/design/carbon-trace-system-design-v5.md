@@ -37,7 +37,7 @@ carbon-trace/
 │   ├── audio.js                # Howler — narration, ambient, buffer recovery
 │   ├── text.js                 # Ghost-drift text + caption entries — GSAP timelines
 │   ├── captions.js             # Timed captions, localStorage persistence
-│   ├── effects.js              # Effect factory registry — water, heat, dust-glow (ADR-007)
+│   ├── effects.js              # Effect factory registry — water, heat, dust, glow, shockwave (ADR-007)
 │   ├── shimmer.js              # Trace shimmer engine — glowing circuit paths, rAF loop (ADR-006)
 │   ├── overlay.js              # DOM controls — progress dots, buttons
 │   ├── loader.js               # Audio metadata preloading (sequential by scene)
@@ -91,17 +91,19 @@ Image cache is a `Map<string, Promise<Image>>`. Concurrent calls for the same sr
 init(canvasEl)                         → create PixiJS Application (WebGL context).
                                          Wrapped in try/catch — on failure, sets
                                          webglAvailable = false, all loadScene() no-op.
-loadScene(effectsConfig, sceneImageUrl) → clearAll() + load scene sprite + create filters per region.
-                                         Masks loaded via new Image() + Texture.from() (lazy, not preloaded).
+loadScene(effectsConfig, sceneImageUrl) → clearAll() + load scene texture (shared, no full-screen sprite)
+                                         + create per-region masked Containers with cloned sprites and
+                                         filters. Masks loaded via new Image() + Texture.from() (lazy).
+                                         PixiJS layer is transparent outside effect regions (ADR-007 addendum).
 setAnalyser(analyserNode)              → store Web Audio AnalyserNode reference. Ticker reads FFT
-                                         data each frame for regions with audioReactive config (ADR-007).
+                                         data each frame for regions with audioReactive config (ADR-008).
 clearAll()                             → destroy sprites/filters/textures via .destroy(true)
                                          (frees GPU backing store). Ticker stays running.
 pause() / resume()                     → stop/start PixiJS ticker (WCAG 2.2.2).
                                          Only pause()/resume() control ticker lifecycle.
 ```
 
-Uses PixiJS v8 (WebGL) instead of Canvas 2D (ADR-007). DPR-aware. Reduced motion: effects render static (no displacement animation, dust-glow visible but still). Handles WebGL context loss (re-init on next loadScene, permanent static fallback if re-init fails).
+Uses PixiJS v8 (WebGL) instead of Canvas 2D (ADR-007). Transparent overlay — no full-screen sceneSprite, only masked effect containers (ADR-007 addendum). DPR-aware. Reduced motion: effects render static (no displacement animation, audioReactive ignored — ADR-008). Handles WebGL context loss (re-init on next loadScene, permanent static fallback if re-init fails).
 
 ### audio.js
 
@@ -132,10 +134,11 @@ isNarrationBuffering()           → returns current buffer stall state
 preloadNarrationAhead(src)        → pre-create Howl for next scene
 clearNarrationCache()             → unload ahead-of-time cache
 
-// Audio analysis (ADR-007 audio-reactive)
+// Audio analysis (ADR-008 audio-reactive)
 getAnalyserNode()                → lazy-create AnalyserNode on Howler's AudioContext,
-                                   connect to masterGain. Returns same instance on
-                                   subsequent calls. fftSize: 2048.
+                                   connect to Howler.masterGain(). Returns same instance on
+                                   subsequent calls. fftSize: 2048. See ADR-008 for
+                                   CORS/html5-mode verification requirements.
 ```
 
 Internal state uses `activeCues = new Map<cueId, { howl, timer, type, state }>`. No hardcoded timer variables — each cue gets its own `PausableTimer` entry. All Howl instances use `html5: true` for streaming.
@@ -188,7 +191,7 @@ registerEffect(type, factoryFn)  → register a named effect type
 createEffect(type, app, params)  → create PixiJS filter/emitter for this type
 ```
 
-Built-in registrations: `water`, `heat`, `dust-glow`. Each factory returns a PixiJS filter (or particle emitter) configured from params. See ADR-007 for full specification.
+Built-in registrations: `water`, `heat`, `dust`, `glow`, `shockwave`. Displacement types (water, heat, dust) return DisplacementFilter. Glow returns GlowFilter (`pixi-filters`). Shockwave returns ShockwaveFilter (`pixi-filters`). No particle emitter dependency. See ADR-007 for full specification.
 
 ### shimmer.js (ADR-006)
 
@@ -615,7 +618,7 @@ Tab to controls    │ Tab                  │ —                  │ focus m
 Auto-advance       │ (internal)           │ (internal)         │ advance(cur+1)
 ```
 
-- **Stage click/tap does NOT navigate** — reserved for v2 interactive triggers (hover parallax, particle triggers). Ambient effects (water, heat, dust-glow) and shimmer run automatically without interaction (ADR-006, ADR-007). Navigation is exclusively via buttons, dots, and keyboard.
+- **Stage click/tap does NOT navigate** — reserved for v2 interactive triggers (hover parallax, particle triggers). Ambient effects (water, heat, dust, glow) and shimmer run automatically without interaction (ADR-006, ADR-007). Navigation is exclusively via buttons, dots, and keyboard.
 - TRANSITIONING: navigation queued as pendingNavIndex, pause queued as pendingPause
 - PAUSED: hardJump — no lock, rapid dot-clicking works
 - CREDITS: advance disabled (last frame + CREDITS state)
@@ -777,7 +780,7 @@ connect-src 'none'; object-src 'none'; base-uri 'self'
 - DOM: `aria-live="polite"` narration region populated from caption text
 - Keyboard: Arrow ←/→ navigate, Space toggle pause, Enter advance, Tab to controls
 - Play/pause button satisfies WCAG 2.2.2 (Pause, Stop, Hide)
-- `prefers-reduced-motion`: ghost-drift → opacity fade, transitions → instant, effects static (no displacement/animation, dust-glow visible but still — see ADR-007), shimmer static glow (no highlights/pulse — see ADR-006), loading animation disabled
+- `prefers-reduced-motion`: ghost-drift → opacity fade, transitions → instant, effects static (no displacement/animation, audioReactive ignored — see ADR-007, ADR-008), shimmer static glow (no highlights/pulse — see ADR-006), loading animation disabled
 - All buttons: `aria-label`, `aria-pressed` where stateful, `aria-disabled` when inactive
 - Focus-visible outlines on all interactive elements
 - Captions available as alternative to audio narration
@@ -849,7 +852,8 @@ Background preload  │ Deferred 4s after first frame
 Total images        │ ~2-5MB (12 WebP at 1536×824)
 Total masks         │ ~4MB worst case (12 grayscale PNG at 768×432) (ADR-007)
 Total audio         │ TBD (narration .m4a + end song .mp3)
-JS bundle (vendor)  │ ~150KB gzipped PixiJS v8 + particle emitter (ADR-007)
+JS bundle (vendor)  │ ~150KB gzipped PixiJS v8 + tree-shaken pixi-filters (GlowFilter,
+                    │ ShockwaveFilter) (ADR-007). Verify final size during profiling.
 Canvas render       │ 60fps during effects, <2ms/frame on baseline hardware
 Transition          │ ~0.6-0.75s (half of transition duration, each direction)
 ```
@@ -873,7 +877,7 @@ Progressive loading: first frame blocks, background assets load sequentially by 
 - Narration buffer stall detection and recovery
 - Accessibility: aria-live, reduced-motion, keyboard, WCAG 2.2.2, captions
 - Cloud Run deploy with CI/CD
-- Effects registry active: water, heat, dust-glow via PixiJS DisplacementFilter + particle emitter (ADR-007)
+- Effects registry active: water, heat, dust, glow, shockwave via PixiJS DisplacementFilter (ADR-007). Audio-reactive modulation on Scene 11 (ADR-008).
 - End song on Scene 11 using type: ambient with anchor-based entry and 45s crescendo
 
 ---

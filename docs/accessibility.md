@@ -67,7 +67,7 @@ flowchart TD
 
     B --> D["Text: 0.3s opacity fade"]
     B --> E["Transitions: instant (no GSAP fade)"]
-    B --> F["Effects: static (no displacement/animation, dust-glow particles visible but still)"]
+    B --> F["Effects: static (no displacement/animation, audioReactive ignored)"]
     B --> G["Trace shimmer: static glow, no highlights, no pulse"]
 
     C --> H["Text: 1.2s blur + y + opacity"]
@@ -80,7 +80,8 @@ flowchart TD
 |---------|--------|----------------|
 | Ghost-drift text | Blur + y offset + opacity (1.2s in, 0.9s out) | Opacity only (0.3s) |
 | Scene transitions | Two-phase GSAP fade | Instant swap |
-| Visual effects | Full displacement + particle effects | Static: no displacement, dust-glow particles visible but still (ADR-007) |
+| Visual effects | Full displacement + particle effects | Static: no displacement, no animation (ADR-007) |
+| Audio-reactive modulation | Effect parameters driven by music FFT data | Ignored — base parameter values used, no modulation (ADR-008) |
 | Trace shimmer | Layered glow + traveling highlights + ambient pulse | Static glow at 0.5 brightness, no animation |
 
 The `prefersReducedMotion()` check is evaluated at the point of use (not
