@@ -163,10 +163,7 @@
         "regions": [
           {
             "type": "dust",
-            "mask": "assets/masks/mask-01-seam-dust.png",
-            "speed": 0.2,
-            "intensity": 2,
-            "scale": 0.06
+            "mask": "assets/masks/mask-01-seam-dust.png"
           }
         ]
       },
@@ -302,9 +299,7 @@
         "regions": [
           {
             "type": "fog",
-            "mask": "assets/masks/mask-02-travel-fog.png",
-            "strength": 3,
-            "pulseRange": 1
+            "mask": "assets/masks/mask-02-travel-fog.png"
           }
         ]
       },
@@ -426,10 +421,7 @@
         "regions": [
           {
             "type": "heat",
-            "mask": "assets/masks/mask-03-reach-heat.png",
-            "speed": 0.6,
-            "intensity": 5,
-            "scale": 0.12
+            "mask": "assets/masks/mask-03-reach-heat.png"
           }
         ]
       },
@@ -561,9 +553,7 @@
         "regions": [
           {
             "type": "glow",
-            "mask": "assets/masks/mask-04-pocket-glow.png",
-            "strength": 6,
-            "pulseRange": 2
+            "mask": "assets/masks/mask-04-pocket-glow.png"
           }
         ]
       },
@@ -695,11 +685,7 @@
         "regions": [
           {
             "type": "water",
-            "mask": "assets/masks/mask-05-rinse-water.png",
-            "direction": 180,
-            "speed": 0.5,
-            "intensity": 6,
-            "scale": 0.03
+            "mask": "assets/masks/mask-05-rinse-water.png"
           }
         ]
       },
@@ -826,9 +812,7 @@
         "regions": [
           {
             "type": "glow",
-            "mask": "assets/masks/mask-06-storage-glow.png",
-            "strength": 5,
-            "pulseRange": 1.5
+            "mask": "assets/masks/mask-06-storage-glow.png"
           }
         ]
       },
@@ -935,9 +919,7 @@
         "regions": [
           {
             "type": "glow",
-            "mask": "assets/masks/mask-07-missing-glow.png",
-            "strength": 6,
-            "pulseRange": 2
+            "mask": "assets/masks/mask-07-missing-glow.png"
           }
         ]
       },
@@ -1110,9 +1092,7 @@
         "regions": [
           {
             "type": "glow",
-            "mask": "assets/masks/mask-09-return-glow.png",
-            "strength": 8,
-            "pulseRange": 2.5
+            "mask": "assets/masks/mask-09-return-glow.png"
           }
         ]
       },
@@ -1229,9 +1209,7 @@
         "regions": [
           {
             "type": "glow",
-            "mask": "assets/masks/mask-10-building-glow.png",
-            "strength": 8,
-            "pulseRange": 2
+            "mask": "assets/masks/mask-10-building-glow.png"
           }
         ]
       },
@@ -1338,11 +1316,7 @@
         "regions": [
           {
             "type": "shockwave",
-            "mask": "assets/masks/mask-11-music-shockwave.png",
-            "speed": 0.012,
-            "intensity": 15,
-            "burstScale": 0.3,
-            "cyclePause": 4
+            "mask": "assets/masks/mask-11-music-shockwave.png"
           }
         ]
       },

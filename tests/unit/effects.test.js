@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('pixi.js', () => ({
   DisplacementFilter: vi.fn(function ({ sprite, scale }) {
     this.sprite = sprite;
-    this.scale = scale;
+    this.scale = { x: scale, y: scale, set: vi.fn((v) => { this.scale.x = v; this.scale.y = v; }) };
     this.enabled = true;
   }),
 }));
@@ -184,9 +184,9 @@ describe('effects.js — factory registry', () => {
         pulseSpeed: 0.5,
       });
 
-      const initial = result.filter.scale;
+      const initial = result.filter.scale.x;
       result.update();
-      expect(result.filter.scale).not.toBe(initial);
+      expect(result.filter.scale.x).not.toBe(initial);
     });
 
     it('glow effect uses default params when none provided', () => {
@@ -232,7 +232,7 @@ describe('effects.js — factory registry', () => {
 
       // Advance past burst into rest phase
       for (let i = 0; i < 10; i++) result.update();
-      expect(result.filter.scale).toBe(0);
+      expect(result.filter.scale.x).toBe(0);
     });
   });
 });

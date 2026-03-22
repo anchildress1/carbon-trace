@@ -141,6 +141,16 @@ export async function loadScene(effectsConfig, sceneImageUrl) {
         const effect = createEffect(region.type, noiseSprite, region);
         if (!effect) continue;
 
+        if (region.mask) {
+          const maskTexture = await loadTexture(region.mask);
+          const maskSprite = new Sprite(maskTexture);
+          maskSprite.width = pixiApp.screen.width;
+          maskSprite.height = pixiApp.screen.height;
+          pixiApp.stage.addChild(maskSprite);
+          // PixiJS v8: mask must be a stage child before assignment
+          sceneSprite.mask = maskSprite;
+        }
+
         filters.push(effect.filter);
         activeEffects.push(effect);
       } catch (err) {
@@ -191,7 +201,7 @@ export function clearAll() {
       const child = pixiApp.stage.children[0];
       pixiApp.stage.removeChild(child);
       try {
-        child.destroy({ children: true, texture: true, textureSource: true });
+        child.destroy({ children: true, texture: false });
       } catch {
         // Context lost — destroy may throw, continue cleanup
       }

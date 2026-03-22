@@ -1,8 +1,7 @@
 /**
- * Effect factory registry. Each effect type (water, heat, dust, glow) is
- * registered with a factory function that creates PixiJS filters from region
- * parameters. effects-canvas.js calls createEffect() to instantiate filters
- * per region.
+ * Effect factory registry. Each effect type is registered with a factory
+ * function that creates a DisplacementFilter from a noise sprite and region
+ * parameters. effects-canvas.js calls createEffect() to instantiate filters.
  */
 
 import { DisplacementFilter } from 'pixi.js';
@@ -36,8 +35,8 @@ export function hasEffectType(type) {
 export const noiseFreeTypes = new Set();
 
 // --- Built-in effect factories ---
-// Each receives a PixiJS Sprite (noise texture, may be null for non-displacement
-// effects) and region params. Returns { filter, update(), needsNoise? }.
+// Each receives a PixiJS Sprite (noise texture) and region params.
+// Returns { filter: DisplacementFilter, update(): void }.
 
 registerEffect('water', (sprite, params = {}) => {
   const { direction = 180, speed = 0.6, intensity = 8, scale = 0.02 } = params;
@@ -134,7 +133,8 @@ registerEffect('glow', (sprite, params = {}) => {
     filter,
     update() {
       t += pulseSpeed;
-      filter.scale = intensity + Math.sin(t) * (intensity * 0.4);
+      const s = intensity + Math.sin(t) * (intensity * 0.4);
+      filter.scale.set(s);
       sprite.x += Math.sin(t * 1.3) * speed * 0.3;
       sprite.y += Math.cos(t * 0.9) * speed * 0.2;
     },
@@ -170,10 +170,10 @@ registerEffect('shockwave', (sprite, params = {}) => {
         const progress = cycle;
         const ease = 1 - (1 - progress) * (1 - progress);
         sprite.scale.set(restScale + (burstScale - restScale) * ease);
-        filter.scale = intensity * (1 - ease);
+        filter.scale.set(intensity * (1 - ease));
       } else {
         sprite.scale.set(restScale);
-        filter.scale = 0;
+        filter.scale.set(0);
       }
     },
   };
