@@ -9,8 +9,7 @@
  */
 
 import { DisplacementFilter } from 'pixi.js';
-import { GlowFilter } from 'pixi-filters';
-import { ShockwaveFilter } from 'pixi-filters';
+import { GlowFilter, ShockwaveFilter } from 'pixi-filters';
 
 const factories = Object.create(null);
 
@@ -19,7 +18,7 @@ export function registerEffect(type, factoryFn) {
     throw new Error('registerEffect requires a non-empty string type');
   }
   if (typeof factoryFn !== 'function') {
-    throw new Error('registerEffect requires a factory function');
+    throw new TypeError('registerEffect requires a factory function');
   }
   factories[type] = factoryFn;
 }
@@ -45,7 +44,7 @@ export const noiseFreeTypes = new Set(['glow', 'shockwave']);
 // Returns { filter, update(): void }.
 
 registerEffect('water', (sprite, params = {}) => {
-  const { direction = 180, speed = 0.6, intensity = 20, scale = 0.15 } = params;
+  const { direction = 90, speed = 0.6, intensity = 20, scale = 0.15 } = params;
   const rad = (direction * Math.PI) / 180;
   const dx = Math.cos(rad) * speed;
   const dy = Math.sin(rad) * speed;
@@ -81,7 +80,7 @@ registerEffect('heat', (sprite, params = {}) => {
 });
 
 registerEffect('dust', (sprite, params = {}) => {
-  const { speed = 0.3, intensity = 12, scale = 0.15 } = params;
+  const { speed = 0.3, intensity = 4, scale = 0.15 } = params;
 
   sprite.texture.source.style.addressMode = 'repeat';
   sprite.scale.set(scale);
@@ -128,11 +127,11 @@ registerEffect('fog', (sprite, params = {}) => {
 registerEffect('glow', (_sprite, params = {}) => {
   const {
     color = 0xffcc66,
-    distance = 15,
-    outerStrength = 3,
+    distance = 25,
+    outerStrength = 6,
     innerStrength = 1,
     pulseSpeed = 0.03,
-    pulseDepth = 0.4,
+    pulseDepth = 0.5,
   } = params;
 
   const filter = new GlowFilter({
@@ -140,7 +139,7 @@ registerEffect('glow', (_sprite, params = {}) => {
     distance,
     outerStrength,
     innerStrength,
-    quality: 0.3,
+    quality: 0.5,
   });
 
   let t = 0;

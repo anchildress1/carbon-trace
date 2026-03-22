@@ -21,6 +21,11 @@ const mockStage = {
     const idx = this.children.indexOf(child);
     if (idx >= 0) this.children.splice(idx, 1);
   }),
+  removeChildren: vi.fn(function () {
+    const removed = this.children.slice();
+    this.children.length = 0;
+    return removed;
+  }),
 };
 
 const mockPixiApp = {

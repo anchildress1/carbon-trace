@@ -89,6 +89,51 @@ function tickerUpdate() {
 }
 
 /**
+ * Set up a single region's effect: load noise sprite (if needed), create
+ * the effect filter, and wire it into the stage — either as a masked
+ * Container overlay or as a global filter on the scene sprite.
+ * Returns the effect object, or null if the factory declined.
+ */
+async function applyRegionEffect(region, sceneTexture, filters) {
+  let noiseSprite = null;
+  if (!noiseFreeTypes.has(region.type)) {
+    const noiseTexture = await loadTexture(region.noise || 'assets/masks/noise-256.png');
+    noiseSprite = new Sprite(noiseTexture);
+    pixiApp.stage.addChild(noiseSprite);
+  }
+
+  const effect = createEffect(region.type, noiseSprite, region);
+  if (!effect) return null;
+
+  if (region.mask) {
+    // All masked effects use the same approach: apply the filter
+    // to a cloned scene sprite inside a masked Container. This
+    // constrains the visual output to the mask region regardless
+    // of whether the effect is displacement-based or noise-free.
+    // (Masking the noise sprite alone does NOT constrain
+    // DisplacementFilter — it reads the texture directly.)
+    const maskTexture = await loadLuminanceMask(region.mask);
+    const maskSprite = new Sprite(maskTexture);
+    maskSprite.width = pixiApp.screen.width;
+    maskSprite.height = pixiApp.screen.height;
+
+    const effectSprite = new Sprite(sceneTexture);
+    effectSprite.width = pixiApp.screen.width;
+    effectSprite.height = pixiApp.screen.height;
+    effectSprite.filters = [effect.filter];
+
+    const container = new Container();
+    container.addChild(effectSprite);
+    container.setMask({ mask: maskSprite });
+    pixiApp.stage.addChild(container);
+  } else {
+    filters.push(effect.filter);
+  }
+
+  return effect;
+}
+
+/**
  * Create the PixiJS Application on the effects canvas. Called lazily during
  * first loadScene(). If WebGL is unavailable, sets webglAvailable = false.
  */
@@ -137,10 +182,10 @@ export async function init(el) {
  * optional masks, configure displacement filters per region.
  *
  * The scene sprite stays fully opaque so it covers the scene-canvas below.
- * Masks are applied to the noise sprite (not the scene sprite) — this
- * constrains displacement to the masked region while the full scene remains
- * visible. Where the noise sprite is transparent (masked out), no
- * displacement occurs and the image appears static.
+ * Masked effects use a Container-based overlay: a clone of the scene sprite
+ * receives the filter and is placed inside a masked Container. This
+ * constrains the visible effect to the mask region while the base scene
+ * remains unaffected underneath.
  */
 export async function loadScene(effectsConfig, sceneImageUrl) {
   if (!webglAvailable) return;
@@ -169,52 +214,8 @@ export async function loadScene(effectsConfig, sceneImageUrl) {
 
     for (const region of effectsConfig.regions) {
       try {
-        let noiseSprite = null;
-        if (!noiseFreeTypes.has(region.type)) {
-          const noiseTexture = await loadTexture(region.noise || 'assets/masks/noise-256.png');
-          noiseSprite = new Sprite(noiseTexture);
-          pixiApp.stage.addChild(noiseSprite);
-        }
-
-        const effect = createEffect(region.type, noiseSprite, region);
-        if (!effect) continue;
-
-        if (noiseFreeTypes.has(region.type)) {
-          // Extension filters (glow, shockwave) have no noise sprite.
-          // When a mask is provided, apply the filter to a masked overlay
-          // sprite so the effect is constrained to the authored region.
-          if (region.mask) {
-            const maskTexture = await loadLuminanceMask(region.mask);
-            const maskSprite = new Sprite(maskTexture);
-            maskSprite.width = pixiApp.screen.width;
-            maskSprite.height = pixiApp.screen.height;
-
-            const effectSprite = new Sprite(sceneTexture);
-            effectSprite.width = pixiApp.screen.width;
-            effectSprite.height = pixiApp.screen.height;
-            effectSprite.filters = [effect.filter];
-
-            const container = new Container();
-            container.addChild(effectSprite);
-            container.setMask({ mask: maskSprite });
-            pixiApp.stage.addChild(container);
-          } else {
-            filters.push(effect.filter);
-          }
-        } else {
-          // Displacement effect: mask the noise sprite to constrain
-          // where displacement occurs.
-          if (region.mask && noiseSprite) {
-            const maskTexture = await loadLuminanceMask(region.mask);
-            const maskSprite = new Sprite(maskTexture);
-            maskSprite.width = pixiApp.screen.width;
-            maskSprite.height = pixiApp.screen.height;
-            noiseSprite.setMask({ mask: maskSprite });
-          }
-          filters.push(effect.filter);
-        }
-
-        activeEffects.push(effect);
+        const effect = await applyRegionEffect(region, sceneTexture, filters);
+        if (effect) activeEffects.push(effect);
       } catch (err) {
         console.warn(`Skipping effect region "${region.type}":`, err.message);
       }
@@ -258,9 +259,8 @@ export function clearAll() {
     if (sceneSprite) {
       sceneSprite.filters = [];
     }
-    while (pixiApp.stage.children.length > 0) {
-      const child = pixiApp.stage.children[0];
-      pixiApp.stage.removeChild(child);
+    const children = pixiApp.stage.removeChildren();
+    for (const child of children) {
       try {
         if (child.mask) {
           child.setMask({ mask: null });
