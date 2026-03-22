@@ -741,7 +741,7 @@ On each `showFrame()` call, `prebufferNextScene()`:
 
 ## 11. Responsive
 
-- Full-bleed: scene-stage fills viewport (no letterboxing — images cover-fit)
+- **16:9 letterbox:** `#app` enforces 16:9 aspect ratio via `width: min(100%, calc(100vh * 16 / 9)); aspect-ratio: 16/9`. Centered within the viewport using flexbox on `body`. Black bars fill remaining viewport area (letterbox on tall screens, pillarbox on wide screens). All content — canvases, narration, controls — is positioned within the 16:9 box. This ensures masks, effects, and text positioning align with the 16:9 source images across all viewport dimensions.
 - ResizeObserver on all three canvases (scene, effects, trace-overlay). DPR-aware sizing. Redraw on resize. **Resize coordination (ADR-007):** scene-canvas and trace-overlay resize via their own ResizeObserver callbacks (Canvas 2D). effects-canvas resize calls `app.renderer.resize()` on the PixiJS Application — do NOT create a second ResizeObserver for PixiJS. One observer, one resize call, avoids double-resize flicker.
 - `clamp()` font sizes: narration text, captions, loading title, play-gate label
 - 320px minimum functional width
