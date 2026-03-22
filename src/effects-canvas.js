@@ -141,15 +141,6 @@ export async function loadScene(effectsConfig, sceneImageUrl) {
         const effect = createEffect(region.type, noiseSprite, region);
         if (!effect) continue;
 
-        if (region.mask) {
-          const maskTexture = await loadTexture(region.mask);
-          const maskSprite = new Sprite(maskTexture);
-          maskSprite.width = pixiApp.screen.width;
-          maskSprite.height = pixiApp.screen.height;
-          pixiApp.stage.addChild(maskSprite);
-          sceneSprite.mask = maskSprite;
-        }
-
         filters.push(effect.filter);
         activeEffects.push(effect);
       } catch (err) {
