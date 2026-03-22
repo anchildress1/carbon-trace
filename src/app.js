@@ -624,6 +624,12 @@ function doResume(app) {
       app.textTimeline.play(0);
     }
     setupAutoAdvance(app);
+  } else if (firstPlay) {
+    app.els.playGate.hidden = true;
+    // Clear stranded 'cued' entries from showFrame's cueAudioCues call —
+    // handleFirstPlay will schedule audio fresh via scheduleFrameAudio.
+    cancelAudioCues();
+    handleFirstPlay(app);
   } else {
     if (!resumeDeferredFrameAudio(app)) {
       resumeAudioCues();
@@ -636,14 +642,6 @@ function doResume(app) {
   resumeEffects();
 
   app.autoAdvanceTimer?.resume();
-
-  if (firstPlay) {
-    app.els.playGate.hidden = true;
-    // Clear stranded 'cued' entries from showFrame's cueAudioCues call —
-    // handleFirstPlay will schedule audio fresh via scheduleFrameAudio.
-    cancelAudioCues();
-    handleFirstPlay(app);
-  }
 
   app.els.btnPause.setAttribute('aria-pressed', 'false');
   app.els.btnPause.classList.remove('paused');
