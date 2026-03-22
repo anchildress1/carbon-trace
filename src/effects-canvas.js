@@ -146,9 +146,7 @@ export async function loadScene(effectsConfig, sceneImageUrl) {
           const maskSprite = new Sprite(maskTexture);
           maskSprite.width = pixiApp.screen.width;
           maskSprite.height = pixiApp.screen.height;
-          pixiApp.stage.addChild(maskSprite);
-          // PixiJS v8: mask must be a stage child before assignment
-          sceneSprite.mask = maskSprite;
+          sceneSprite.setMask({ mask: maskSprite });
         }
 
         filters.push(effect.filter);
@@ -195,7 +193,7 @@ export function clearAll() {
   try {
     if (sceneSprite) {
       sceneSprite.filters = [];
-      sceneSprite.mask = null;
+      sceneSprite.setMask({ mask: null });
     }
     while (pixiApp.stage.children.length > 0) {
       const child = pixiApp.stage.children[0];
