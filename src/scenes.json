@@ -167,7 +167,7 @@
           },
           {
             "type": "glow",
-            "mask": "assets/masks/mask-01-seam-diamond-glow.png",
+            "mask": "assets/masks/mask-01-seam-diamond.png",
             "color": 16772659,
             "distance": 20,
             "outerStrength": 4,
@@ -314,7 +314,7 @@
           },
           {
             "type": "glow",
-            "mask": "assets/masks/mask-02-travel-diamond-glow.png",
+            "mask": "assets/masks/mask-02-travel-diamond.png",
             "color": 16772659,
             "distance": 20,
             "outerStrength": 4,
@@ -442,6 +442,15 @@
           {
             "type": "heat",
             "mask": "assets/masks/mask-03-reach-heat.png"
+          },
+          {
+            "type": "glow",
+            "mask": "assets/masks/mask-03-reach-diamond.png",
+            "color": 16772659,
+            "distance": 20,
+            "outerStrength": 4,
+            "pulseSpeed": 0.02,
+            "pulseDepth": 0.4
           }
         ]
       },
@@ -574,6 +583,15 @@
           {
             "type": "glow",
             "mask": "assets/masks/mask-04-pocket-glow.png"
+          },
+          {
+            "type": "glow",
+            "mask": "assets/masks/mask-04-pocket-diamond.png",
+            "color": 16772659,
+            "distance": 20,
+            "outerStrength": 4,
+            "pulseSpeed": 0.02,
+            "pulseDepth": 0.4
           }
         ]
       },
@@ -706,6 +724,15 @@
           {
             "type": "water",
             "mask": "assets/masks/mask-05-rinse-water.png"
+          },
+          {
+            "type": "glow",
+            "mask": "assets/masks/mask-05-rinse-diamond.png",
+            "color": 16772659,
+            "distance": 20,
+            "outerStrength": 4,
+            "pulseSpeed": 0.02,
+            "pulseDepth": 0.4
           }
         ]
       },
@@ -833,6 +860,15 @@
           {
             "type": "glow",
             "mask": "assets/masks/mask-06-storage-glow.png"
+          },
+          {
+            "type": "glow",
+            "mask": "assets/masks/mask-06-storage-diamond.png",
+            "color": 16772659,
+            "distance": 20,
+            "outerStrength": 4,
+            "pulseSpeed": 0.02,
+            "pulseDepth": 0.4
           }
         ]
       },
@@ -940,6 +976,15 @@
           {
             "type": "glow",
             "mask": "assets/masks/mask-07-missing-glow.png"
+          },
+          {
+            "type": "glow",
+            "mask": "assets/masks/mask-07-missing-diamond.png",
+            "color": 16772659,
+            "distance": 20,
+            "outerStrength": 4,
+            "pulseSpeed": 0.02,
+            "pulseDepth": 0.4
           }
         ]
       },
@@ -1113,6 +1158,15 @@
           {
             "type": "glow",
             "mask": "assets/masks/mask-09-return-glow.png"
+          },
+          {
+            "type": "glow",
+            "mask": "assets/masks/mask-09-return-diamond.png",
+            "color": 16772659,
+            "distance": 20,
+            "outerStrength": 4,
+            "pulseSpeed": 0.02,
+            "pulseDepth": 0.4
           }
         ]
       },
@@ -1230,6 +1284,15 @@
           {
             "type": "glow",
             "mask": "assets/masks/mask-10-building-glow.png"
+          },
+          {
+            "type": "glow",
+            "mask": "assets/masks/mask-10-building-diamond.png",
+            "color": 16772659,
+            "distance": 20,
+            "outerStrength": 4,
+            "pulseSpeed": 0.02,
+            "pulseDepth": 0.4
           }
         ]
       },
@@ -1340,7 +1403,7 @@
           },
           {
             "type": "glow",
-            "mask": "assets/masks/mask-11-music-diamond-glow.png",
+            "mask": "assets/masks/mask-11-music-diamond.png",
             "color": 16772659,
             "distance": 20,
             "outerStrength": 4,
