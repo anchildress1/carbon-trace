@@ -162,15 +162,12 @@
       "effects": {
         "regions": [
           {
-            "type": "dust",
-            "mask": "assets/masks/mask-01-seam-dust.png"
-          },
-          {
             "type": "glow",
             "mask": "assets/masks/mask-01-seam-diamond.png",
-            "color": 16772659,
-            "distance": 20,
-            "outerStrength": 4,
+            "color": 16775408,
+            "glowAlpha": 0.15,
+            "distance": 15,
+            "outerStrength": 3,
             "pulseSpeed": 0.02,
             "pulseDepth": 0.4
           }
@@ -307,17 +304,12 @@
       "effects": {
         "regions": [
           {
-            "type": "dust",
-            "mask": "assets/masks/mask-02-travel-fog.png",
-            "intensity": 18,
-            "scale": 0.2
-          },
-          {
             "type": "glow",
             "mask": "assets/masks/mask-02-travel-diamond.png",
-            "color": 16772659,
-            "distance": 20,
-            "outerStrength": 4,
+            "color": 16775408,
+            "glowAlpha": 0.15,
+            "distance": 15,
+            "outerStrength": 3,
             "pulseSpeed": 0.02,
             "pulseDepth": 0.4
           }
@@ -446,9 +438,10 @@
           {
             "type": "glow",
             "mask": "assets/masks/mask-03-reach-diamond.png",
-            "color": 16772659,
-            "distance": 20,
-            "outerStrength": 4,
+            "color": 16775408,
+            "glowAlpha": 0.15,
+            "distance": 15,
+            "outerStrength": 3,
             "pulseSpeed": 0.02,
             "pulseDepth": 0.4
           }
@@ -582,14 +575,11 @@
         "regions": [
           {
             "type": "glow",
-            "mask": "assets/masks/mask-04-pocket-glow.png"
-          },
-          {
-            "type": "glow",
             "mask": "assets/masks/mask-04-pocket-diamond.png",
-            "color": 16772659,
-            "distance": 20,
-            "outerStrength": 4,
+            "color": 16775408,
+            "glowAlpha": 0.15,
+            "distance": 15,
+            "outerStrength": 3,
             "pulseSpeed": 0.02,
             "pulseDepth": 0.4
           }
@@ -728,9 +718,10 @@
           {
             "type": "glow",
             "mask": "assets/masks/mask-05-rinse-diamond.png",
-            "color": 16772659,
-            "distance": 20,
-            "outerStrength": 4,
+            "color": 16775408,
+            "glowAlpha": 0.15,
+            "distance": 15,
+            "outerStrength": 3,
             "pulseSpeed": 0.02,
             "pulseDepth": 0.4
           }
@@ -859,14 +850,11 @@
         "regions": [
           {
             "type": "glow",
-            "mask": "assets/masks/mask-06-storage-glow.png"
-          },
-          {
-            "type": "glow",
             "mask": "assets/masks/mask-06-storage-diamond.png",
-            "color": 16772659,
-            "distance": 20,
-            "outerStrength": 4,
+            "color": 16775408,
+            "glowAlpha": 0.15,
+            "distance": 15,
+            "outerStrength": 3,
             "pulseSpeed": 0.02,
             "pulseDepth": 0.4
           }
@@ -1156,8 +1144,14 @@
       "effects": {
         "regions": [
           {
-            "type": "godray",
-            "mask": "assets/masks/mask-09-return-godray.png"
+            "type": "glow",
+            "mask": "assets/masks/mask-09-return-diamond.png",
+            "color": 16775408,
+            "glowAlpha": 0.15,
+            "distance": 15,
+            "outerStrength": 3,
+            "pulseSpeed": 0.02,
+            "pulseDepth": 0.4
           }
         ]
       },
@@ -1275,9 +1269,10 @@
           {
             "type": "glow",
             "mask": "assets/masks/mask-10-building-diamond.png",
-            "color": 16772659,
-            "distance": 20,
-            "outerStrength": 4,
+            "color": 16775408,
+            "glowAlpha": 0.15,
+            "distance": 15,
+            "outerStrength": 3,
             "pulseSpeed": 0.02,
             "pulseDepth": 0.4
           }
@@ -1391,9 +1386,10 @@
           {
             "type": "glow",
             "mask": "assets/masks/mask-11-music-diamond.png",
-            "color": 16772659,
-            "distance": 20,
-            "outerStrength": 4,
+            "color": 16775408,
+            "glowAlpha": 0.15,
+            "distance": 15,
+            "outerStrength": 3,
             "pulseSpeed": 0.02,
             "pulseDepth": 0.4
           }
