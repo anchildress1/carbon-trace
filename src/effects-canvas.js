@@ -149,7 +149,7 @@ function applyOverlayEffect(effect, maskTexture, region) {
   effectSprite.width = pixiApp.screen.width;
   effectSprite.height = pixiApp.screen.height;
   effectSprite.tint = region.color ?? 0xffcc66;
-  effectSprite.alpha = region.glowAlpha ?? 0.15;
+  effectSprite.alpha = 1;
   effectSprite.filters = [effect.filter];
 
   screenSizedSprites.push(effectSprite);

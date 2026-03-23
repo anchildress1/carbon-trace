@@ -351,7 +351,7 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
       expect(spriteInstances.length).toBe(1);
       const effectSprite = spriteInstances[0];
       expect(effectSprite.tint).toBe(0xffee33);
-      expect(effectSprite.alpha).toBe(0.15);
+      expect(effectSprite.alpha).toBe(1);
       expect(effectSprite.filters).toEqual([{ enabled: true }]);
     });
   });

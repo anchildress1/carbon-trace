@@ -123,6 +123,7 @@ registerEffect('glow', (_sprite, params = {}) => {
     innerStrength = 1,
     pulseSpeed = 0.03,
     pulseDepth = 0.5,
+    glowAlpha = 1,
   } = params;
 
   const filter = new GlowFilter({
@@ -132,6 +133,7 @@ registerEffect('glow', (_sprite, params = {}) => {
     innerStrength,
     quality: 0.5,
     knockout: true,
+    alpha: glowAlpha,
   });
 
   let t = 0;
