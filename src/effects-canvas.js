@@ -355,6 +355,15 @@ export function clearAll() {
     }
   }
   disposableTextures = [];
+
+  // Render the now-empty stage to flush stale glow pixels from the canvas.
+  // Without this, the WebGL canvas retains its last-drawn frame because the
+  // ticker is stopped and no re-render occurs before the next scene fades in.
+  try {
+    pixiApp.render();
+  } catch {
+    // Context lost
+  }
 }
 
 export function pause() {
