@@ -1,6 +1,6 @@
 # ADR-002: Narration-Driven Auto-Advance with Hard Cut on Pause
 
-**Status:** Accepted
+**Status:** Accepted (timing mechanism superseded by ADR-009)
 **Date:** March 17, 2026
 **Deciders:** Ashley Childress (@anchildress1)
 **Supersedes:** Click-to-advance interaction model (v3 §5.3, §5.8)
