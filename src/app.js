@@ -121,20 +121,26 @@ function shouldAutoAdvance(app) {
 }
 
 function setupAutoAdvance(app) {
-  clearAutoAdvance(app);
   const frame = app.frames[app.currentIndex];
-  if (!shouldAutoAdvance(app)) return;
+  if (!shouldAutoAdvance(app)) {
+    clearAutoAdvance(app);
+    return;
+  }
 
   const holdAfterNarration =
     frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
 
-  // For scenes without narration audio, schedule immediately on landing
   const hasNarrationAudio = frame.audioCues?.some((c) => c.type === 'narration');
-  if (!hasNarrationAudio) {
+  if (hasNarrationAudio) {
+    // Full scene timer: narration enter delay + max duration + hold.
+    // onNarrationEnd shortens this when narration ends normally (ADR-009).
+    const maxMs = getMaxNarrationDuration(frame, app.audioDurations, app.projectMaxCaptionMs);
+    const narrationCue = getNarrationCueFromFrame(frame);
+    const enterDelay = typeof narrationCue?.enter === 'number' ? narrationCue.enter : 0;
+    scheduleAutoAdvance(app, enterDelay + maxMs + holdAfterNarration);
+  } else {
     scheduleAutoAdvance(app, holdAfterNarration);
   }
-  // For scenes with narration audio, the onNarrationEnd callback in
-  // scheduleAudioCues triggers scheduleAutoAdvance
 }
 
 function getNarrationCueFromFrame(frame) {
@@ -641,7 +647,11 @@ function doResume(app) {
 
   resumeEffects();
 
-  app.autoAdvanceTimer?.resume();
+  if (app.autoAdvanceTimer) {
+    app.autoAdvanceTimer.resume();
+  } else {
+    setupAutoAdvance(app);
+  }
 
   app.els.btnPause.setAttribute('aria-pressed', 'false');
   app.els.btnPause.classList.remove('paused');
