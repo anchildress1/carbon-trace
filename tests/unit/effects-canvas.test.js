@@ -129,12 +129,18 @@ function setupImageMock() {
     const self = this;
     self.width = 256;
     self.height = 256;
+    self.naturalWidth = 256;
+    self.naturalHeight = 256;
     Object.defineProperty(this, 'src', {
       set() {
         self.onload?.();
       },
     });
   });
+
+  // createImageBitmap is not available in jsdom/happy-dom.
+  // Return a plain object — Texture.from() is mocked anyway.
+  globalThis.createImageBitmap = vi.fn().mockResolvedValue({ width: 256, height: 256 });
 }
 
 describe('effects-canvas.js — PixiJS lifecycle', () => {
