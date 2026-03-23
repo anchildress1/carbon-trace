@@ -48,42 +48,39 @@ function loadTexture(url) {
  * Masks are authored as white-on-black: white = effect visible, black = hidden.
  * PixiJS alpha masking reads the alpha channel, so we map luminance → alpha.
  *
- * The modified pixels are round-tripped through a data-URL back into an Image
- * so that Texture.from() creates an ImageSource. PixiJS v8's AlphaMaskPipe
- * fails with CanvasSource textures (BindGroup.getResource returns null),
- * but ImageSource textures upload to the GPU correctly.
+ * Uses createImageBitmap to produce an ImageBitmap that PixiJS v8 wraps in
+ * an ImageSource. CanvasSource textures and data-URL round-trips both cause
+ * BindGroup.getResource to return null inside AlphaMaskPipe on subsequent
+ * scene loads. ImageBitmap provides a GPU-ready resource that uploads
+ * reliably across scene transitions.
  */
-function loadLuminanceMask(url) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imageData.data;
-      for (let i = 0; i < data.length; i += 4) {
-        const luminance = data[i];
-        data[i] = 255;
-        data[i + 1] = 255;
-        data[i + 2] = 255;
-        data[i + 3] = luminance;
-      }
-      ctx.putImageData(imageData, 0, 0);
-
-      // Round-trip through data-URL → Image so PixiJS creates an ImageSource
-      // instead of a CanvasSource. Required for AlphaMaskPipe compatibility.
-      const result = new Image();
-      result.onload = () => resolve(Texture.from(result));
-      result.onerror = () => reject(new Error(`Failed to process mask: ${url}`));
-      result.src = canvas.toDataURL();
-    };
+async function loadLuminanceMask(url) {
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  await new Promise((resolve, reject) => {
+    img.onload = resolve;
     img.onerror = () => reject(new Error(`Failed to load mask: ${url}`));
     img.src = url;
   });
+
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    const luminance = data[i];
+    data[i] = 255;
+    data[i + 1] = 255;
+    data[i + 2] = 255;
+    data[i + 3] = luminance;
+  }
+  ctx.putImageData(imageData, 0, 0);
+
+  const bitmap = await createImageBitmap(canvas, { premultiplyAlpha: 'none' });
+  return Texture.from(bitmap);
 }
 
 function handleContextLost(e) {
@@ -327,8 +324,12 @@ export function clearAll() {
     const children = pixiApp.stage.removeChildren();
     for (const child of children) {
       try {
+        // Use the mask property setter (not setMask) to properly unregister
+        // the mask effect. setMask({ mask: null }) is a no-op in PixiJS v8
+        // because the guard `if (options.mask)` is falsy for null, so the
+        // mask effect is never removed from the container's effects list.
         if (child.mask) {
-          child.setMask({ mask: null });
+          child.mask = null;
         }
         child.destroy({ children: true, texture: false });
       } catch {
@@ -339,9 +340,16 @@ export function clearAll() {
     // Stage access failed — context lost
   }
 
+  // Destroy textures WITHOUT destroying the underlying TextureSource.
+  // tex.destroy(true) triggers TextureSource.destroy() → unload() →
+  // emits "change" → BindGroup.onResourceChange sees destroyed=true →
+  // BindGroup.destroy() sets resources=null. This corrupts pooled
+  // AlphaMaskEffect objects whose MaskFilter BindGroup then crashes on
+  // getResource(0) during the next scene's render. PixiJS's TextureGCSystem
+  // handles GPU memory reclamation for unreferenced texture sources.
   for (const tex of disposableTextures) {
     try {
-      tex.destroy(true);
+      tex.destroy(false);
     } catch {
       // Context lost
     }

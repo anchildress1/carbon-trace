@@ -131,6 +131,7 @@ registerEffect('glow', (_sprite, params = {}) => {
     outerStrength,
     innerStrength,
     quality: 0.5,
+    knockout: true,
   });
 
   let t = 0;
