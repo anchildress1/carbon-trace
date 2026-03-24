@@ -82,9 +82,18 @@ export function buildNarrationTimeline(lines, container, opts = {}) {
       const entry = { text: caption.text, startSec, endSec, el: null };
       captionEntries.push(entry);
 
+      // Guard: if this entry already has a DOM element, remove it before
+      // creating a new one. This prevents duplicate captions when the
+      // timeline callback fires more than once (e.g., play(0) after a
+      // buffering resume, or rapid replay). Do not remove this guard —
+      // the duplicate-caption bug has been reintroduced multiple times.
       tl.call(
         () => {
           if (isCaptionEnabled && !isCaptionEnabled()) return;
+          if (entry.el) {
+            entry.el.remove();
+            entry.el = null;
+          }
           const el = document.createElement('p');
           el.className = 'caption-text';
           el.textContent = caption.text;
