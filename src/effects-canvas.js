@@ -93,7 +93,7 @@ async function loadLuminanceMask(url) {
 
 function handleContextLost(e) {
   e.preventDefault();
-  console.warn('WebGL context lost — effects paused');
+  console.error('WebGL context lost — effects paused');
   clearAll();
   needsReinit = true;
 }
@@ -257,7 +257,7 @@ async function doInit(el) {
     });
     observer.observe(el);
   } catch (err) {
-    console.warn('WebGL unavailable — effects disabled:', err.message);
+    console.error('WebGL unavailable — effects disabled:', err.message);
     webglAvailable = false;
     pixiApp = null;
   } finally {
@@ -330,7 +330,7 @@ export async function loadScene(effectsConfig, sceneImageUrl) {
       pixiApp.ticker.start();
     }
   } catch (err) {
-    console.warn('Failed to load scene effects:', err.message);
+    console.error('Failed to load scene effects:', err.message);
     if (gen === loadGeneration) clearAll();
   }
 }

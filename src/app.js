@@ -351,7 +351,7 @@ function showFrame(app, index) {
 
   if (frame.effects?.regions?.length) {
     loadEffectsScene(frame.effects, frame.image).catch((err) =>
-      console.warn('Effects load failed:', err.message),
+      console.error('Effects load failed:', err.message),
     );
   } else {
     clearEffects();
@@ -791,7 +791,7 @@ function toggleCaptions(app) {
 function initApp(app) {
   initSceneCanvas(app.els.sceneCanvas);
   initEffectsCanvas(app.els.effectsCanvas).catch((err) =>
-    console.warn('Effects canvas init failed:', err.message),
+    console.error('Effects canvas init failed:', err.message),
   );
 
   preloadFirstFrameAudio(app.frames, (result) => registerAudio(app, result));

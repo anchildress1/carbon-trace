@@ -215,15 +215,15 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
         this.destroy = vi.fn();
       });
 
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const canvas = createMockCanvas();
       await init(canvas);
 
-      expect(warnSpy).toHaveBeenCalledWith(
+      expect(errorSpy).toHaveBeenCalledWith(
         'WebGL unavailable — effects disabled:',
         expect.any(String),
       );
-      warnSpy.mockRestore();
+      errorSpy.mockRestore();
     });
   });
 
@@ -303,7 +303,7 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
         this.destroy = vi.fn();
       });
 
-      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
       const canvas = createMockCanvas();
       await init(canvas);
 
@@ -474,13 +474,13 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
       const canvas = createMockCanvas();
       await init(canvas);
 
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const event = new Event('webglcontextlost');
       event.preventDefault = vi.fn();
       canvas.dispatchEvent(event);
 
-      expect(warnSpy).toHaveBeenCalledWith('WebGL context lost — effects paused');
-      warnSpy.mockRestore();
+      expect(errorSpy).toHaveBeenCalledWith('WebGL context lost — effects paused');
+      errorSpy.mockRestore();
     });
 
     it('handles webglcontextrestored event', async () => {
