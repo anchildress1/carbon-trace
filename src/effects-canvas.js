@@ -25,6 +25,7 @@ let activeEffects = [];
 let screenSizedSprites = [];
 let disposableTextures = [];
 let loadGeneration = 0;
+let isPaused = false;
 let initPromise = null;
 
 function reducedMotion() {
@@ -326,7 +327,7 @@ export async function loadScene(effectsConfig, sceneImageUrl) {
     const completed = await loadRegionEffects(effectsConfig.regions, sceneTexture, gen);
     if (!completed) return;
 
-    if (!reducedMotion()) {
+    if (!reducedMotion() && !isPaused) {
       pixiApp.ticker.start();
     }
   } catch (err) {
@@ -415,11 +416,13 @@ export function cancelPendingLoad() {
 }
 
 export function pause() {
+  isPaused = true;
   if (!webglAvailable || !pixiApp) return;
   pixiApp.ticker.stop();
 }
 
 export function resume() {
+  isPaused = false;
   if (!webglAvailable || !pixiApp || reducedMotion()) return;
   if (activeEffects.length > 0) {
     pixiApp.ticker.start();
@@ -453,6 +456,7 @@ export function destroy() {
   screenSizedSprites = [];
   disposableTextures = [];
   needsReinit = false;
+  isPaused = false;
   initPromise = null;
 }
 

@@ -495,6 +495,66 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
       const instance = Application.mock.instances[0];
       expect(instance.ticker.start).not.toHaveBeenCalled();
     });
+
+    it('loadScene does not start ticker when paused', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      pause();
+
+      const { Application } = await import('pixi.js');
+      const instance = Application.mock.instances[0];
+      instance.ticker.start.mockClear();
+
+      await loadScene(
+        { regions: [{ type: 'water', mask: 'mask.png' }] },
+        'scene.png',
+      );
+
+      expect(instance.ticker.start).not.toHaveBeenCalled();
+    });
+
+    it('resume after paused loadScene starts ticker', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      pause();
+
+      await loadScene(
+        { regions: [{ type: 'water', mask: 'mask.png' }] },
+        'scene.png',
+      );
+
+      const { Application } = await import('pixi.js');
+      const instance = Application.mock.instances[0];
+      instance.ticker.start.mockClear();
+
+      resume();
+
+      expect(instance.ticker.start).toHaveBeenCalled();
+    });
+
+    it('destroy resets isPaused so next init starts clean', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+      pause();
+      destroy();
+
+      // Re-init and load a scene — ticker should start (isPaused was reset)
+      const canvas2 = createMockCanvas();
+      await init(canvas2);
+
+      const { Application } = await import('pixi.js');
+      const instance = Application.mock.instances[Application.mock.instances.length - 1];
+      instance.ticker.start.mockClear();
+
+      await loadScene(
+        { regions: [{ type: 'water', mask: 'mask.png' }] },
+        'scene.png',
+      );
+
+      expect(instance.ticker.start).toHaveBeenCalled();
+    });
   });
 
   describe('context loss', () => {
