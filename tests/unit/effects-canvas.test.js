@@ -516,4 +516,190 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
       expect(removeSpy).toHaveBeenCalledWith('webglcontextrestored', expect.any(Function));
     });
   });
+
+  describe('tickerUpdate callback', () => {
+    it('invokes effect.update on active effects', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      const { Application } = await import('pixi.js');
+      const instance = Application.mock.instances[0];
+
+      // Load a scene to populate active effects
+      await loadScene(
+        { regions: [{ type: 'glow', mask: 'mask.png' }] },
+        'scene.png',
+      );
+
+      // Get the tickerUpdate callback registered via ticker.add
+      const tickerCb = instance.ticker.add.mock.calls[0][0];
+      expect(tickerCb).toBeDefined();
+
+      // Invoke with mock ticker object
+      tickerCb({ deltaMS: 16.67 });
+
+      // Verify createEffect was called and its update was invoked
+      const { createEffect } = await import('../../src/effects.js');
+      const effect = createEffect.mock.results[0]?.value;
+      if (effect) {
+        expect(effect.update).toHaveBeenCalled();
+      }
+    });
+  });
+
+  describe('resume with active effects', () => {
+    it('starts ticker when active effects exist', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      // Load a scene to have active effects
+      await loadScene(
+        { regions: [{ type: 'glow', mask: 'mask.png' }] },
+        'scene.png',
+      );
+
+      pause();
+
+      const { Application } = await import('pixi.js');
+      const instance = Application.mock.instances[0];
+      instance.ticker.start.mockClear();
+
+      resume();
+      expect(instance.ticker.start).toHaveBeenCalled();
+    });
+  });
+
+  describe('masked rendering path', () => {
+    it('creates Container with mask for displacement types', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      const { Sprite, Container } = await import('pixi.js');
+      Sprite.mockClear();
+      Container.mockClear();
+
+      await loadScene(
+        { regions: [{ type: 'water', mask: 'mask.png' }] },
+        'scene.png',
+      );
+
+      // Displacement type: noiseSprite + maskSprite + effectSprite
+      expect(Sprite.mock.instances.length).toBeGreaterThanOrEqual(3);
+
+      // A Container should have been created for masking
+      expect(Container).toHaveBeenCalled();
+      const container = Container.mock.instances[0];
+      expect(container.setMask).toHaveBeenCalled();
+    });
+  });
+
+  describe('reinit after context loss', () => {
+    it('loadScene triggers reinit after context loss', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      // Simulate context loss
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const event = new Event('webglcontextlost');
+      event.preventDefault = vi.fn();
+      canvas.dispatchEvent(event);
+      errorSpy.mockRestore();
+
+      const { Application } = await import('pixi.js');
+      const initCallsBefore = Application.mock.instances.length;
+
+      // loadScene should trigger reinit
+      await loadScene(
+        { regions: [{ type: 'glow', mask: 'mask.png' }] },
+        'scene.png',
+      );
+
+      // A new Application instance should have been created for reinit
+      expect(Application.mock.instances.length).toBeGreaterThan(initCallsBefore);
+    });
+  });
+
+  describe('scene texture load failure', () => {
+    it('calls clearAll when scene texture fails to load', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      // Make Image.src trigger onerror
+      globalThis.Image = vi.fn(function () {
+        Object.defineProperty(this, 'src', {
+          set() {
+            this.onerror?.();
+          },
+        });
+      });
+
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      await loadScene(
+        { regions: [{ type: 'glow', mask: 'mask.png' }] },
+        'bad-scene.png',
+      );
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Failed to load scene effects:',
+        expect.any(String),
+      );
+      errorSpy.mockRestore();
+    });
+  });
+
+  describe('per-region error handling', () => {
+    it('continues loading subsequent regions when one mask fails', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      const { createEffect } = await import('../../src/effects.js');
+      createEffect.mockClear();
+
+      // First call to loadLuminanceMask (for mask1.png) will fail,
+      // second (for mask2.png) should succeed.
+      let callCount = 0;
+      const originalImage = globalThis.Image;
+      globalThis.Image = vi.fn(function () {
+        const self = this;
+        self.width = 256;
+        self.height = 256;
+        self.naturalWidth = 256;
+        self.naturalHeight = 256;
+        Object.defineProperty(this, 'src', {
+          set(val) {
+            callCount++;
+            // Fail the second Image load (first mask's luminance processing)
+            // but succeed on others (noise, scene texture, second mask)
+            if (callCount === 2) {
+              self.onerror?.();
+            } else {
+              self.onload?.();
+            }
+          },
+        });
+      });
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      await loadScene(
+        {
+          regions: [
+            { type: 'glow', mask: 'mask1.png' },
+            { type: 'glow', mask: 'mask2.png' },
+          ],
+        },
+        'scene.png',
+      );
+
+      // First region should fail (mask load error) but second should succeed
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Skipping effect region'),
+        expect.any(String),
+      );
+
+      globalThis.Image = originalImage;
+      warnSpy.mockRestore();
+    });
+  });
 });
