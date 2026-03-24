@@ -105,7 +105,11 @@ function handleContextRestored() {
 function tickerUpdate(ticker) {
   const dt = ticker.deltaMS / 1000;
   for (const effect of activeEffects) {
-    effect.update(dt);
+    try {
+      effect.update(dt);
+    } catch (err) {
+      console.error('Effect update failed:', err);
+    }
   }
 }
 
