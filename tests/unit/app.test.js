@@ -52,17 +52,13 @@ vi.mock('../../src/text.js', () => ({
   clearNarrationLayer: vi.fn(),
 }));
 
-vi.mock('../../src/effects.js', () => ({
-  runEffect: vi.fn(),
-  clearEffects: vi.fn(),
-  effectExists: vi.fn().mockReturnValue(false),
-}));
-
 vi.mock('../../src/effects-canvas.js', () => ({
-  initCanvas: vi.fn(),
+  init: vi.fn().mockResolvedValue(undefined),
+  loadScene: vi.fn().mockResolvedValue(undefined),
+  clearAll: vi.fn(),
+  cancelPendingLoad: vi.fn(),
   pause: vi.fn(),
   resume: vi.fn(),
-  clearAll: vi.fn(),
 }));
 
 vi.mock('../../src/overlay.js', () => ({
@@ -110,7 +106,7 @@ vi.mock('../../src/scenes.json', () => ({
         id: 'title',
         frameType: 'title',
 
-        holdAfterNarration: null,
+        holdAfterNarration: 2000,
         narration: {
           lines: [{ text: 'Opening line', enter: 0, exit: 3000 }],
           captions: [{ text: 'Opening line', start: 0, end: 3000 }],
@@ -118,7 +114,7 @@ vi.mock('../../src/scenes.json', () => ({
         audioCues: [
           { id: 'narration', type: 'narration', src: 'title-narration.m4a', enter: 0, volume: 1, loop: false, fadeIn: 0, fadeOut: 0 },
         ],
-        effects: { idle: null, entry: null },
+        effects: null,
         transition: { type: 'fade', duration: 400 },
         traceOverlay: null,
       },
@@ -137,7 +133,7 @@ vi.mock('../../src/scenes.json', () => ({
           { id: 'ambient-01', type: 'ambient', src: 'ambient.mp3', enter: 0, volume: 0.5, loop: true, fadeIn: 1000, fadeOut: null },
           { id: 'end-song', type: 'ambient', src: 'credits-music.mp3', enter: 100, volume: 0.5, loop: true, fadeIn: 2000, fadeOut: null },
         ],
-        effects: { idle: null, entry: 'fade-in' },
+        effects: { regions: [{ type: 'glow', mask: 'diamond.png' }] },
         transition: { type: 'fade', duration: 400 },
         traceOverlay: null,
       },
@@ -152,7 +148,7 @@ vi.mock('../../src/scenes.json', () => ({
           captions: null,
         },
         audioCues: null,
-        effects: { idle: 'dust-drift', entry: 'fade-in' },
+        effects: null,
         transition: { type: 'fade', duration: 400 },
         traceOverlay: null,
       },
@@ -160,17 +156,25 @@ vi.mock('../../src/scenes.json', () => ({
         id: 'credits',
         frameType: 'credits',
 
-        holdAfterNarration: null,
+        holdAfterNarration: 2000,
         image: 'credits.webp',
         narration: null,
         audioCues: null,
-        effects: { idle: null, entry: null },
+        effects: null,
         transition: { type: 'fade', duration: 400 },
         traceOverlay: null,
       },
     ],
   },
 }));
+
+/**
+ * Flush the microtask / promise queue without advancing the fake-timer clock.
+ * Replaces vi.runAllTimersAsync() which fires auto-advance PausableTimers.
+ */
+async function flush() {
+  await vi.advanceTimersByTimeAsync(0);
+}
 
 import { createApp } from '../../src/app.js';
 import {
@@ -185,11 +189,12 @@ import {
   onNarrationBufferChange,
 } from '../../src/audio.js';
 import { buildNarrationTimeline } from '../../src/text.js';
-import { runEffect, clearEffects, effectExists } from '../../src/effects.js';
 import {
-  clearAll as clearCanvasEffects,
-  pause as pauseCanvas,
-  resume as resumeCanvas,
+  clearAll as clearEffects,
+  cancelPendingLoad,
+  loadScene as loadEffectsScene,
+  pause as pauseEffects,
+  resume as resumeEffects,
 } from '../../src/effects-canvas.js';
 import { clearScene, drawFallback, loadImage } from '../../src/canvas.js';
 import { setCaptionsEnabled, areCaptionsEnabled, syncCaptionsToTime, clearCaptionElements } from '../../src/captions.js';
@@ -213,7 +218,7 @@ function buildDOM() {
 
   for (const id of ids) {
     let el;
-    if (id === 'scene-canvas' || id === 'effects-canvas') {
+    if (id === 'scene-canvas' || id === 'effects-canvas' || id === 'trace-overlay') {
       el = document.createElement('canvas');
       el.getContext = vi.fn(() => ({
         clearRect: vi.fn(),
@@ -280,7 +285,7 @@ describe('app.js', () => {
 
     it('transitions to PAUSED after image preload completes', async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       expect(app.getState()).toBe('PAUSED');
     });
   });
@@ -290,22 +295,22 @@ describe('app.js', () => {
   describe('advance', () => {
     beforeEach(async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
     });
 
     it('does not advance from credits frame', async () => {
       app.togglePause();
       app.advance(); // title → scene-01
-      await vi.runAllTimersAsync();
+      await flush();
       app.advance(); // scene-01 → scene-02
-      await vi.runAllTimersAsync();
+      await flush();
       app.advance(); // scene-02 → credits
-      await vi.runAllTimersAsync();
+      await flush();
 
       expect(app.getState()).toBe('CREDITS');
 
       app.advance();
-      await vi.runAllTimersAsync();
+      await flush();
       expect(app.getState()).toBe('CREDITS');
     });
   });
@@ -315,7 +320,7 @@ describe('app.js', () => {
   describe('togglePause', () => {
     beforeEach(async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
     });
 
     it('starts paused (play gate)', () => {
@@ -338,7 +343,7 @@ describe('app.js', () => {
       vi.clearAllMocks();
       app.togglePause();
       expect(pauseAudioCues).toHaveBeenCalled();
-      expect(pauseCanvas).toHaveBeenCalled();
+      expect(pauseEffects).toHaveBeenCalled();
     });
 
     it('calls resumeAudioCues when resuming', () => {
@@ -349,23 +354,12 @@ describe('app.js', () => {
       expect(resumeAudioCues).toHaveBeenCalled();
     });
 
-    it('calls resumeCanvas when resuming on a frame with a registered effect', () => {
-      app.togglePause();
-      app.advance(); // to scene-01
-      app.advance(); // to scene-02 (effects.idle='dust-drift')
-      effectExists.mockReturnValueOnce(true);
-      app.togglePause(); // pause
-      vi.clearAllMocks();
-      app.togglePause(); // resume
-      expect(resumeCanvas).toHaveBeenCalled();
-    });
-
-    it('skips resumeCanvas when no registered effect exists', () => {
+    it('calls resumeEffects when resuming', () => {
       app.togglePause();
       app.togglePause();
       vi.clearAllMocks();
       app.togglePause();
-      expect(resumeCanvas).not.toHaveBeenCalled();
+      expect(resumeEffects).toHaveBeenCalled();
     });
 
     it('updates aria-pressed on pause button', () => {
@@ -385,7 +379,7 @@ describe('app.js', () => {
   describe('navigation while paused (hard cut)', () => {
     beforeEach(async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
       app.togglePause();
       expect(app.getState()).toBe('PAUSED');
@@ -393,37 +387,36 @@ describe('app.js', () => {
 
     it('remains paused after advancing', async () => {
       app.advance();
-      await vi.runAllTimersAsync();
+      await flush();
       expect(app.getState()).toBe('PAUSED');
     });
 
     it('calls cancelAudioCues for cleanup', async () => {
       vi.clearAllMocks();
       app.advance();
-      await vi.runAllTimersAsync();
+      await flush();
       expect(cancelAudioCues).toHaveBeenCalled();
     });
 
     it('defers frame audio during hard cut', async () => {
       vi.clearAllMocks();
       app.advance();
-      await vi.runAllTimersAsync();
+      await flush();
       expect(cueAudioCues).not.toHaveBeenCalled();
       expect(scheduleAudioCues).not.toHaveBeenCalled();
     });
 
-    it('calls clearEffects during hard cut', async () => {
+    it('calls loadEffectsScene during hard cut to scene with effects', async () => {
       vi.clearAllMocks();
-      app.advance();
-      await vi.runAllTimersAsync();
-      expect(clearEffects).toHaveBeenCalled();
-      expect(clearCanvasEffects).toHaveBeenCalled();
+      app.advance(); // to scene-01 which has effects regions
+      await flush();
+      expect(loadEffectsScene).toHaveBeenCalled();
     });
 
     it('does not start ambient during hard cut', async () => {
       vi.clearAllMocks();
       app.advance();
-      await vi.runAllTimersAsync();
+      await flush();
       expect(cueAudioCues).not.toHaveBeenCalled();
       expect(scheduleAudioCues).not.toHaveBeenCalled();
     });
@@ -431,7 +424,7 @@ describe('app.js', () => {
     it('schedules fresh frame audio on resume after hard cut', async () => {
       vi.clearAllMocks();
       app.advance();
-      await vi.runAllTimersAsync();
+      await flush();
       vi.clearAllMocks();
       app.togglePause();
       expect(scheduleAudioCues).toHaveBeenCalledWith(
@@ -451,12 +444,14 @@ describe('app.js', () => {
   describe('shouldAutoAdvance', () => {
     beforeEach(async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
     });
 
-    it('does not auto-advance on title before narration ends', () => {
+    it('does not auto-advance on title before full scene timer elapses', () => {
       app.togglePause();
-      vi.advanceTimersByTime(10000);
+      // Title timer: enter(0) + maxNarration(3000 from caption end) + hold(2000) = 5000ms.
+      // Advance less than that — scene should not advance yet (ADR-009).
+      vi.advanceTimersByTime(4000);
       expect(app.getState()).toBe('SCENE_ACTIVE');
     });
   });
@@ -466,7 +461,7 @@ describe('app.js', () => {
   describe('toggleMute', () => {
     beforeEach(async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
     });
 
     it('toggles mute state on the button', () => {
@@ -484,7 +479,7 @@ describe('app.js', () => {
   describe('pendingPause (pause during transition)', () => {
     beforeEach(async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
     });
 
@@ -512,7 +507,7 @@ describe('app.js', () => {
   describe('keyboard handling', () => {
     beforeEach(async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
     });
 
     it('Space toggles pause', () => {
@@ -527,19 +522,19 @@ describe('app.js', () => {
       vi.clearAllMocks();
       const stage = document.getElementById('scene-stage');
       stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
-      await vi.runAllTimersAsync();
+      await flush();
       expect(cancelAudioCues).toHaveBeenCalled();
     });
 
     it('ArrowLeft retreats when on scene-01', async () => {
       app.togglePause();
       app.advance();
-      await vi.runAllTimersAsync();
+      await flush();
 
       vi.clearAllMocks();
       const stage = document.getElementById('scene-stage');
       stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
-      await vi.runAllTimersAsync();
+      await flush();
       expect(cancelAudioCues).toHaveBeenCalled();
     });
   });
@@ -549,7 +544,7 @@ describe('app.js', () => {
   describe('first-play via keyboard', () => {
     beforeEach(async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
     });
 
     it('Space key triggers handleFirstPlay on first play', () => {
@@ -589,7 +584,7 @@ describe('app.js', () => {
     it('draws fallback when image fails to load for a scene with image', async () => {
       loadImage.mockResolvedValue(null);
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       expect(app.getState()).toBe('PAUSED');
       // Title frame has no image key, so clearScene is called for it
       expect(clearScene).toHaveBeenCalled();
@@ -599,12 +594,12 @@ describe('app.js', () => {
       // All image loads fail
       loadImage.mockResolvedValue(null);
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
 
       vi.clearAllMocks();
       app.advance();
-      await vi.runAllTimersAsync();
+      await flush();
       // scene-01 has an image key but load failed (null in cache)
       // waitForImage stores null, showFrame draws fallback
       expect(drawFallback).toHaveBeenCalled();
@@ -616,7 +611,7 @@ describe('app.js', () => {
   describe('play gate', () => {
     beforeEach(async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
     });
 
     it('is visible after init', () => {
@@ -647,14 +642,14 @@ describe('app.js', () => {
   describe('cleanup', () => {
     beforeEach(async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
     });
 
     it('calls cancelAudioCues on scene change', async () => {
       vi.clearAllMocks();
       app.advance();
-      await vi.runAllTimersAsync();
+      await flush();
       expect(cancelAudioCues).toHaveBeenCalled();
     });
   });
@@ -664,11 +659,11 @@ describe('app.js', () => {
   describe('ambient audio', () => {
     it('schedules ambient crossfade when advancing to a scene with ambient', async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
       vi.clearAllMocks();
       app.advance();
-      await vi.runAllTimersAsync();
+      await flush();
       // Ambient crossfade is now handled by scheduleAudioCues with crossfadeDurationMs opt
       expect(scheduleAudioCues).toHaveBeenCalled();
     });
@@ -679,14 +674,14 @@ describe('app.js', () => {
   describe('music scheduling', () => {
     beforeEach(async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
     });
 
     it('schedules audio cues including music when advancing', async () => {
       vi.clearAllMocks();
       app.advance();
-      await vi.runAllTimersAsync();
+      await flush();
       // Music is now part of the unified audioCues array handled by scheduleAudioCues
       expect(scheduleAudioCues).toHaveBeenCalled();
     });
@@ -697,11 +692,11 @@ describe('app.js', () => {
   describe('narration scheduling', () => {
     it('schedules audio cues with onNarrationEnd when advancing to narration scene', async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
       vi.clearAllMocks();
       app.advance();
-      await vi.runAllTimersAsync();
+      await flush();
       // Narration is now scheduled via unified scheduleAudioCues
       expect(scheduleAudioCues).toHaveBeenCalledWith(
         expect.any(Array),
@@ -714,10 +709,10 @@ describe('app.js', () => {
 
     it('onNarrationEnd callback triggers auto-advance', async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
       app.advance(); // to scene-01
-      await vi.runAllTimersAsync();
+      await flush();
 
       // Call [0] is handleFirstPlay (title frame, audioCues=null).
       // Call [1] is showFrame for scene-01 with the real cues.
@@ -735,25 +730,26 @@ describe('app.js', () => {
 
     it('stale onend callback is ignored after scene change', async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
       app.advance(); // to scene-01
-      await vi.runAllTimersAsync();
+      await flush();
 
       // Call [1] is the scene-01 scheduleAudioCues (call [0] is title from handleFirstPlay)
       const staleOnend = scheduleAudioCues.mock.calls[1][1].onNarrationEnd;
 
       // Navigate away before narration ends — cancelAudioCues called
       app.advance(); // to scene-02
-      await vi.runAllTimersAsync();
+      await flush();
 
       // Fire the stale onend — should be ignored (generation changed)
       staleOnend();
 
       // The stale onend should NOT have triggered auto-advance.
-      // If it did, advancing past the hold timer would call cancelAudioCues again.
+      // Advance less than scene-02's holdAfterNarration (3000ms) so only
+      // the stale callback's effect is tested, not scene-02's own timer.
       vi.clearAllMocks();
-      vi.advanceTimersByTime(5000);
+      vi.advanceTimersByTime(2000);
       expect(cancelAudioCues).not.toHaveBeenCalled();
     });
   });
@@ -763,7 +759,7 @@ describe('app.js', () => {
   describe('accessible narration region', () => {
     it('populates aria-live region with caption text when captions exist', async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
       app.advance(); // to scene-01 which has captions
 
@@ -773,11 +769,11 @@ describe('app.js', () => {
 
     it('clears aria-live region on frame with no narration', async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
       app.advance(); // to scene-01
       app.advance(); // to scene-02 (narration: { lines: null, captions: null })
-      await vi.runAllTimersAsync();
+      await flush();
 
       const region = document.getElementById('accessible-narration');
       expect(region.textContent).toBe('');
@@ -789,10 +785,10 @@ describe('app.js', () => {
   describe('replay narration', () => {
     beforeEach(async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
       app.advance();
-      await vi.runAllTimersAsync();
+      await flush();
       // On scene-01.
     });
 
@@ -876,7 +872,7 @@ describe('app.js', () => {
       vi.clearAllMocks();
       // Navigate to next scene instead of resuming
       app.advance();
-      await vi.runAllTimersAsync();
+      await flush();
       // Resume on the new scene — hard cut should schedule fresh frame audio.
       app.togglePause(); // resume
       expect(scheduleAudioCues).toHaveBeenCalled();
@@ -889,7 +885,7 @@ describe('app.js', () => {
   describe('captions toggle', () => {
     beforeEach(async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
     });
 
     it('enables captions on btn-captions click', () => {
@@ -919,7 +915,7 @@ describe('app.js', () => {
       });
 
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
 
       const stage = document.getElementById('scene-stage');
@@ -935,16 +931,16 @@ describe('app.js', () => {
   describe('button event listeners', () => {
     beforeEach(async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
       app.advance();
-      await vi.runAllTimersAsync();
+      await flush();
     });
 
     it('btn-prev retreats to previous frame', async () => {
       vi.clearAllMocks();
       document.getElementById('btn-prev').click();
-      await vi.runAllTimersAsync();
+      await flush();
       expect(cancelAudioCues).toHaveBeenCalled();
     });
 
@@ -965,11 +961,11 @@ describe('app.js', () => {
   describe('stage click', () => {
     it('does not advance on click outside controls', async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
       vi.clearAllMocks();
       document.getElementById('scene-stage').click();
-      await vi.runAllTimersAsync();
+      await flush();
       expect(cancelAudioCues).not.toHaveBeenCalled();
     });
   });
@@ -979,10 +975,10 @@ describe('app.js', () => {
   describe('auto-advance timer', () => {
     it('saves and restores auto-advance timer via PausableTimer', async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
       app.advance();
-      await vi.runAllTimersAsync();
+      await flush();
 
       // Extract the onNarrationEnd callback and fire it to trigger auto-advance timer
       // Call [0] is handleFirstPlay (title), call [1] is showFrame for scene-01
@@ -1008,10 +1004,10 @@ describe('app.js', () => {
     it('transitions without gsap fade in reduced motion', async () => {
       globalThis.matchMedia.mockReturnValue({ matches: true });
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
       app.advance();
-      await vi.runAllTimersAsync();
+      await flush();
       expect(app.getState()).toBe('SCENE_ACTIVE');
       // Ambient crossfade is now handled by scheduleAudioCues
       expect(scheduleAudioCues).toHaveBeenCalled();
@@ -1043,7 +1039,7 @@ describe('app.js', () => {
       // Prevent images from caching during init
       loadImage.mockResolvedValue(null);
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
 
       // Override loadImage to take 500ms for the transition
       loadImage.mockImplementation(
@@ -1057,7 +1053,7 @@ describe('app.js', () => {
       expect(document.getElementById('transition-loader').hidden).toBe(false);
 
       vi.advanceTimersByTime(200); // total 500ms, image loads
-      await vi.runAllTimersAsync();
+      await flush();
       expect(document.getElementById('transition-loader').hidden).toBe(true);
     });
   });
@@ -1072,12 +1068,12 @@ describe('app.js', () => {
       });
 
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
 
       vi.clearAllMocks();
       dotClickCb(2); // scene index 2 → frame index 1 (scene-01)
-      await vi.runAllTimersAsync();
+      await flush();
       expect(cancelAudioCues).toHaveBeenCalled();
     });
   });
@@ -1087,13 +1083,13 @@ describe('app.js', () => {
   describe('no-audio auto-advance (scene-02)', () => {
     it('auto-advances after holdAfterNarration when narration.audio is null', async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
       app.advance(); // title → scene-01 (transition completes synchronously via mock gsap)
 
-      // Now advance to scene-02 — don't runAllTimersAsync (it would chain through)
+      // Now advance to scene-02 — flush to complete async transition.
       app.advance(); // scene-01 → scene-02
-      // Transition completes synchronously. scene-02 auto-advance timer (3000ms) is now pending.
+      await flush();
 
       vi.clearAllMocks();
       vi.advanceTimersByTime(3000);
@@ -1101,60 +1097,101 @@ describe('app.js', () => {
       expect(cancelAudioCues).toHaveBeenCalled();
     });
 
-    it('runs idle effect on showFrame when effects.idle is set', async () => {
+    it('calls clearEffects on showFrame when frame has no effects', async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
-      app.advance(); // to scene-01
+      app.advance(); // title → scene-01
+      await flush();
       vi.clearAllMocks();
-      app.advance(); // to scene-02 which has effects.idle='dust-drift'
-      await vi.runAllTimersAsync();
+      app.advance(); // scene-01 → scene-02 (effects: null)
+      await flush();
+      expect(clearEffects).toHaveBeenCalled();
+    });
 
-      expect(runEffect).toHaveBeenCalledWith(
-        'dust-drift',
-        expect.any(HTMLCanvasElement),
-        expect.any(HTMLCanvasElement),
+    it('calls cancelPendingLoad before clearEffects on no-effects frames', async () => {
+      app = createApp();
+      await flush();
+      app.togglePause();
+      app.advance(); // title → scene-01
+      await flush();
+      vi.clearAllMocks();
+
+      const callOrder = [];
+      cancelPendingLoad.mockImplementation(() => callOrder.push('cancelPendingLoad'));
+      clearEffects.mockImplementation(() => callOrder.push('clearEffects'));
+
+      app.advance(); // scene-01 → scene-02 (effects: null)
+      await flush();
+
+      expect(cancelPendingLoad).toHaveBeenCalled();
+      // cancelPendingLoad is called twice: once during cleanupCurrentScene
+      // (invalidates stale in-flight loads from the outgoing frame) and once
+      // in showFrame's no-effects branch (explicit cancel before clearEffects).
+      expect(callOrder).toEqual(['cancelPendingLoad', 'cancelPendingLoad', 'clearEffects']);
+    });
+
+    it('calls cancelPendingLoad during cleanup to invalidate stale in-flight loads', async () => {
+      app = createApp();
+      await flush();
+      app.togglePause();
+      app.advance(); // title → scene-01 (has effects)
+      await flush();
+      vi.clearAllMocks();
+
+      // Advancing again triggers cleanupCurrentScene for scene-01.
+      // cancelPendingLoad must be called to prevent stale texture loads
+      // from resolving and adding sprites during the fade-out window.
+      app.advance(); // scene-01 → scene-02
+      await flush();
+
+      expect(cancelPendingLoad).toHaveBeenCalled();
+    });
+
+    it('calls loadEffectsScene on showFrame when frame has effect regions', async () => {
+      app = createApp();
+      await flush();
+      app.togglePause();
+      vi.clearAllMocks();
+      app.advance(); // title → scene-01 (has glow region)
+      await flush();
+      expect(loadEffectsScene).toHaveBeenCalled();
+    });
+
+    it('animated transition awaits effectsReady before fade-in', async () => {
+      const { gsap } = await import('gsap');
+      const onCompletes = [];
+      gsap.to.mockImplementation((_target, opts) => {
+        onCompletes.push(opts.onComplete);
+        return { kill: vi.fn() };
+      });
+
+      let resolveEffects;
+      loadEffectsScene.mockReturnValue(
+        new Promise((resolve) => {
+          resolveEffects = resolve;
+        }),
       );
-    });
 
-    it('does not call resumeCanvas during showFrame when no registered effects', async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
-      app.togglePause();
-      vi.clearAllMocks();
-      app.advance(); // to scene-01 (effects.idle=null, not registered)
-      await vi.runAllTimersAsync();
-      expect(resumeCanvas).not.toHaveBeenCalled();
-    });
+      await flush();
+      app.togglePause(); // resume
 
-    it('calls resumeCanvas during showFrame when effect is registered', async () => {
-      effectExists.mockReturnValue(true);
-      app = createApp();
-      await vi.runAllTimersAsync();
-      app.togglePause();
-      app.advance(); // to scene-01
-      vi.clearAllMocks();
-      app.advance(); // to scene-02 (effects.idle='dust-drift')
-      await vi.runAllTimersAsync();
-      expect(resumeCanvas).toHaveBeenCalled();
-      effectExists.mockReturnValue(false);
-    });
+      app.advance(); // title → scene-01 (has effects)
 
-    it('does not re-run entry effect on replay', async () => {
-      app = createApp();
-      await vi.runAllTimersAsync();
-      app.togglePause();
-      app.advance(); // to scene-01 (has effects.entry='fade-in' and narration)
+      // Fire fade-out onComplete → starts async fadeIn
+      if (onCompletes[0]) onCompletes[0]();
+      await flush();
 
-      vi.clearAllMocks();
-      document.getElementById('btn-replay').click();
+      // Effects haven't resolved yet — fade-in tween should not exist
+      expect(onCompletes.length).toBe(1);
 
-      // Entry effects belong to scene transitions, not narration replays
-      expect(runEffect).not.toHaveBeenCalledWith(
-        'fade-in',
-        expect.any(HTMLCanvasElement),
-        expect.any(HTMLCanvasElement),
-      );
+      // Resolve effects — fadeIn can proceed
+      resolveEffects();
+      await flush();
+
+      // Now the fade-in tween should have been created
+      expect(onCompletes.length).toBe(2);
     });
   });
 
@@ -1170,7 +1207,7 @@ describe('app.js', () => {
       });
 
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
 
       app.advance(); // starts transition (deferred onComplete)
@@ -1180,7 +1217,7 @@ describe('app.js', () => {
 
       // Complete first transition
       if (storedOnComplete) storedOnComplete();
-      await vi.runAllTimersAsync();
+      await flush();
 
       // Pending nav should have fired
       expect(cancelAudioCues).toHaveBeenCalled();
@@ -1199,17 +1236,20 @@ describe('app.js', () => {
       });
 
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause(); // resume → SCENE_ACTIVE
 
       app.advance(); // starts fade-out transition
       app.togglePause(); // queue pendingPause
 
-      // Complete fade-out → triggers showFrame + fade-in
+      // Complete fade-out → triggers async fadeIn (which awaits effects)
       if (onCompletes[0]) onCompletes[0]();
+      // Flush microtasks so the async fadeIn completes past its await
+      // and queues the fade-in GSAP tween (onCompletes[1]).
+      await flush();
       // Complete fade-in → landOnFrame checks pendingPause
       if (onCompletes[1]) onCompletes[1]();
-      await vi.runAllTimersAsync();
+      await flush();
 
       expect(app.getState()).toBe('PAUSED');
     });
@@ -1231,10 +1271,10 @@ describe('app.js', () => {
       });
 
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
       app.advance(); // to scene-01 (has captions)
-      await vi.runAllTimersAsync();
+      await flush();
 
       areCaptionsEnabled.mockReturnValue(false);
       vi.clearAllMocks();
@@ -1253,10 +1293,10 @@ describe('app.js', () => {
   describe('rapid replay while playing', () => {
     beforeEach(async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
       app.advance(); // to scene-01
-      await vi.runAllTimersAsync();
+      await flush();
     });
 
     it('three rapid replays reuse existing Howl each time', () => {
@@ -1283,9 +1323,11 @@ describe('app.js', () => {
       document.getElementById('btn-replay').click();
       vi.clearAllMocks();
 
-      // Fire stale onend — should be ignored (generation changed)
+      // Fire stale onend — should be ignored (generation changed).
+      // Advance less than scene-01's full auto-advance timer so only
+      // the stale callback's effect is tested, not the scene's own timer.
       if (firstOnend) firstOnend();
-      vi.advanceTimersByTime(5000);
+      vi.advanceTimersByTime(2000);
 
       // Should still be on scene-01, no spurious advance
       expect(app.getState()).toBe('SCENE_ACTIVE');
@@ -1298,17 +1340,17 @@ describe('app.js', () => {
   describe('retreat to title then advance', () => {
     beforeEach(async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
       app.advance(); // to scene-01
-      await vi.runAllTimersAsync();
+      await flush();
     });
 
     it('retreats to title and re-advances to scene-01 with narration', async () => {
       vi.clearAllMocks();
       // Retreat to title (index 0)
       document.getElementById('btn-prev').click();
-      await vi.runAllTimersAsync();
+      await flush();
 
       // Title: no narration audio scheduled yet (handleFirstPlay not called)
       expect(app.getState()).toBe('SCENE_ACTIVE');
@@ -1316,7 +1358,7 @@ describe('app.js', () => {
       // Advance back to scene-01
       vi.clearAllMocks();
       app.advance();
-      await vi.runAllTimersAsync();
+      await flush();
 
       // Should schedule all audio cues fresh (narration + ambient via scheduleAudioCues)
       expect(scheduleAudioCues).toHaveBeenCalledWith(
@@ -1339,10 +1381,10 @@ describe('app.js', () => {
       });
 
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
       app.advance(); // to scene-01
-      await vi.runAllTimersAsync();
+      await flush();
 
       // Simulate buffer stall
       bufferCb(true);
@@ -1367,10 +1409,10 @@ describe('app.js', () => {
       });
 
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
       app.advance(); // to scene-01 (frame index 1, scene index 1)
-      await vi.runAllTimersAsync();
+      await flush();
 
       vi.clearAllMocks();
       // Click the dot for the current scene (scene index 2 → frame index 1)
@@ -1386,7 +1428,7 @@ describe('app.js', () => {
   describe('keyboard events inside overlay-controls', () => {
     beforeEach(async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause(); // resume → SCENE_ACTIVE
     });
 
@@ -1422,7 +1464,7 @@ describe('app.js', () => {
 
     it('ArrowLeft still retreats from inside overlay-controls', async () => {
       app.advance(); // to scene-01
-      await vi.runAllTimersAsync();
+      await flush();
 
       vi.clearAllMocks();
       const controls = document.getElementById('overlay-controls');
@@ -1455,7 +1497,7 @@ describe('app.js', () => {
   describe('rapid play/pause toggle', () => {
     it('survives 5 rapid toggles and lands in consistent state', async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause(); // resume (firstPlay)
       vi.clearAllMocks();
 
@@ -1475,14 +1517,14 @@ describe('app.js', () => {
   describe('cancelAudioCues on scene with multiple cue types', () => {
     it('calls cancelAudioCues which clears all cue types on transition', async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause(); // resume
       app.advance(); // to scene-01 (has narration + ambient + music cues)
-      await vi.runAllTimersAsync();
+      await flush();
 
       vi.clearAllMocks();
       app.advance(); // to scene-02 (audioCues: null)
-      await vi.runAllTimersAsync();
+      await flush();
 
       // cancelAudioCues called during cleanupCurrentScene — stops all cue types
       expect(cancelAudioCues).toHaveBeenCalled();
@@ -1494,7 +1536,7 @@ describe('app.js', () => {
   describe('play-gate audio suppression', () => {
     it('does not call scheduleAudioCues before play-gate click', async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
 
       // App is paused with play-gate visible. No audio should be scheduled.
       expect(app.getState()).toBe('PAUSED');
@@ -1507,7 +1549,7 @@ describe('app.js', () => {
   describe('play gate audio scheduling', () => {
     beforeEach(async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
     });
 
     it('schedules audio cues for the title frame on play-gate click', () => {
@@ -1558,7 +1600,7 @@ describe('app.js', () => {
   describe('narration–caption alignment', () => {
     it('passes captionDelay=0 for title frame (narration enter=0)', async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
 
       // buildNarration runs during showFrame(0) in init — before play gate click.
       // Title narration cue has enter: 0 → captionDelay must be 0.
@@ -1571,11 +1613,11 @@ describe('app.js', () => {
 
     it('passes captionDelay=500 for scene-01 (narration enter=500)', async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
       vi.clearAllMocks();
       app.advance(); // title → scene-01
-      await vi.runAllTimersAsync();
+      await flush();
 
       // scene-01 narration cue has enter: 500 → captionDelay must be 500
       expect(buildNarrationTimeline).toHaveBeenCalledWith(
@@ -1587,11 +1629,11 @@ describe('app.js', () => {
 
     it('passes captions array to buildNarrationTimeline when frame has captions', async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
       vi.clearAllMocks();
       app.advance(); // to scene-01 which has captions
-      await vi.runAllTimersAsync();
+      await flush();
 
       expect(buildNarrationTimeline).toHaveBeenCalledWith(
         expect.any(Array),
@@ -1612,7 +1654,7 @@ describe('app.js', () => {
   describe('title auto-advance', () => {
     it('auto-advances title frame when onNarrationEnd fires', async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       vi.clearAllMocks();
 
       // Click play gate → handleFirstPlay → scheduleAudioCues for title
@@ -1630,7 +1672,7 @@ describe('app.js', () => {
       vi.clearAllMocks();
       onNarrationEnd(); // simulate narration ending
 
-      // holdAfterNarration is null → defaults to 2000ms
+      // holdAfterNarration is 2000ms
       vi.advanceTimersByTime(2000);
 
       // Should have triggered transition (cancelAudioCues called during cleanup)
@@ -1639,7 +1681,7 @@ describe('app.js', () => {
 
     it('does not auto-advance title if user navigates before narration ends', async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
 
       document.getElementById('play-gate').click();
 
@@ -1650,12 +1692,14 @@ describe('app.js', () => {
 
       // User manually advances before narration ends
       app.advance();
-      await vi.runAllTimersAsync();
+      await flush();
 
-      // Fire stale callback — generation check should reject it
+      // Fire stale callback — generation check should reject it.
+      // Advance less than scene-01's full auto-advance timer so only
+      // the stale callback's effect is tested, not the scene's own timer.
       vi.clearAllMocks();
       staleOnend();
-      vi.advanceTimersByTime(5000);
+      vi.advanceTimersByTime(2000);
       expect(cancelAudioCues).not.toHaveBeenCalled();
     });
   });
@@ -1665,10 +1709,10 @@ describe('app.js', () => {
   describe('replay auto-advance', () => {
     beforeEach(async () => {
       app = createApp();
-      await vi.runAllTimersAsync();
+      await flush();
       app.togglePause();
       app.advance(); // to scene-01
-      await vi.runAllTimersAsync();
+      await flush();
     });
 
     it('auto-advances after replay narration ends while playing', () => {

@@ -15,12 +15,13 @@ import {
 } from './audio.js';
 import { PausableTimer } from './pausable-timer.js';
 import { buildNarrationTimeline, clearNarrationLayer } from './text.js';
-import { runEffect, clearEffects, effectExists } from './effects.js';
 import {
-  initCanvas,
-  pause as pauseCanvas,
-  resume as resumeCanvas,
-  clearAll as clearCanvasEffects,
+  init as initEffectsCanvas,
+  loadScene as loadEffectsScene,
+  clearAll as clearEffects,
+  cancelPendingLoad,
+  pause as pauseEffects,
+  resume as resumeEffects,
 } from './effects-canvas.js';
 import { initOverlay, updateProgress, showControls } from './overlay.js';
 import {
@@ -102,6 +103,10 @@ async function preloadBackgroundImages(app) {
   }
 }
 
+function getHoldAfterNarration(frame) {
+  return frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
+}
+
 function clearAutoAdvance(app) {
   app.autoAdvanceTimer?.cancel();
   app.autoAdvanceTimer = null;
@@ -121,20 +126,25 @@ function shouldAutoAdvance(app) {
 }
 
 function setupAutoAdvance(app) {
-  clearAutoAdvance(app);
   const frame = app.frames[app.currentIndex];
-  if (!shouldAutoAdvance(app)) return;
+  if (!shouldAutoAdvance(app)) {
+    clearAutoAdvance(app);
+    return;
+  }
 
-  const holdAfterNarration =
-    frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
+  const holdAfterNarration = getHoldAfterNarration(frame);
 
-  // For scenes without narration audio, schedule immediately on landing
   const hasNarrationAudio = frame.audioCues?.some((c) => c.type === 'narration');
-  if (!hasNarrationAudio) {
+  if (hasNarrationAudio) {
+    // Full scene timer: narration enter delay + max duration + hold.
+    // onNarrationEnd shortens this when narration ends normally (ADR-009).
+    const maxMs = getMaxNarrationDuration(frame, app.audioDurations, app.projectMaxCaptionMs);
+    const narrationCue = getNarrationCueFromFrame(frame);
+    const enterDelay = typeof narrationCue?.enter === 'number' ? narrationCue.enter : 0;
+    scheduleAutoAdvance(app, enterDelay + maxMs + holdAfterNarration);
+  } else {
     scheduleAutoAdvance(app, holdAfterNarration);
   }
-  // For scenes with narration audio, the onNarrationEnd callback in
-  // scheduleAudioCues triggers scheduleAutoAdvance
 }
 
 function getNarrationCueFromFrame(frame) {
@@ -173,8 +183,7 @@ function makeNarrationEndCallback(app, frame, holdAfterNarration) {
 }
 
 function scheduleFrameAudio(app, frame) {
-  const holdAfterNarration =
-    frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
+  const holdAfterNarration = getHoldAfterNarration(frame);
   const onNarrationEnd = makeNarrationEndCallback(app, frame, holdAfterNarration);
   const maxNarrationDurationMs = getMaxNarrationDuration(
     frame,
@@ -193,8 +202,7 @@ function scheduleFrameAudio(app, frame) {
 function scheduleReplayNarration(app, frame, narrationCue) {
   if (!narrationCue) return;
 
-  const holdAfterNarration =
-    frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
+  const holdAfterNarration = getHoldAfterNarration(frame);
   const onNarrationEnd = makeNarrationEndCallback(app, frame, holdAfterNarration);
   const maxNarrationDurationMs = getMaxNarrationDuration(
     frame,
@@ -341,20 +349,16 @@ function showFrame(app, index) {
   renderSceneImage(app, frame);
   app.els.traceOverlay.style.opacity = frame.traceOverlay?.opacity ?? 0;
 
-  clearCanvasEffects();
-  clearEffects();
   clearNarrationLayer(app.els.narrationLayer);
 
-  if (frame.effects?.idle) {
-    runEffect(frame.effects.idle, app.els.effectsCanvas, app.els.sceneCanvas);
-  }
-
-  // Start the effects render loop early so it is already running when the
-  // fade-in begins. Without this, effects would appear to 'pop in' after
-  // the transition completes. Skip the loop entirely when no registered
-  // effect will draw into the canvas — avoids spinning rAF for zero output.
-  if (effectExists(frame.effects?.idle)) {
-    resumeCanvas();
+  if (frame.effects?.regions?.length) {
+    app.effectsReady = loadEffectsScene(frame.effects, frame.image).catch((err) =>
+      console.error('Effects load failed:', err.message),
+    );
+  } else {
+    cancelPendingLoad();
+    clearEffects();
+    app.effectsReady = null;
   }
 
   const sceneIdx = app.sceneMap.byFrame.get(index);
@@ -402,6 +406,17 @@ function handleBufferChange(app, isBuffering) {
   }
 }
 
+function waitForEffectsReady(app, timeoutMs = 800) {
+  if (!app.effectsReady) return Promise.resolve();
+
+  let timeoutId;
+  const timeout = new Promise((resolve) => {
+    timeoutId = setTimeout(resolve, timeoutMs);
+  });
+
+  return Promise.race([app.effectsReady.finally(() => clearTimeout(timeoutId)), timeout]);
+}
+
 function waitForImage(app, src) {
   return new Promise((resolve) => {
     const spinnerTimer = setTimeout(() => {
@@ -431,6 +446,7 @@ function completePendingNav(app) {
 function cleanupCurrentScene(app) {
   app.generation++;
   clearAutoAdvance(app);
+  cancelPendingLoad();
   cancelAudioCues();
 
   clearCaptionElements(app.captionEntries);
@@ -549,13 +565,18 @@ function transition(app, toIndex) {
     duration: halfDuration,
     ease: 'power2.inOut',
     onComplete: () => {
-      const fadeIn = () => {
+      const fadeIn = async () => {
         try {
           if (!proceedWithFrame()) {
             gsap.set(app.els.sceneStage, { opacity: 1 });
             completePendingNav(app);
             return;
           }
+
+          // Wait for effects textures to finish loading so they are
+          // visible when the stage fades back in. The timeout prevents
+          // the screen from staying at opacity 0 on very slow loads.
+          await waitForEffectsReady(app);
 
           gsap.to(app.els.sceneStage, {
             opacity: 1,
@@ -630,6 +651,12 @@ function doResume(app) {
       app.textTimeline.play(0);
     }
     setupAutoAdvance(app);
+  } else if (firstPlay) {
+    app.els.playGate.hidden = true;
+    // Clear stranded audio entries from showFrame's scheduleFrameAudio call —
+    // handleFirstPlay will schedule audio fresh via scheduleFrameAudio.
+    cancelAudioCues();
+    handleFirstPlay(app);
   } else {
     if (!resumeDeferredFrameAudio(app)) {
       resumeAudioCues();
@@ -639,18 +666,12 @@ function doResume(app) {
     }
   }
 
-  if (effectExists(app.frames[app.currentIndex].effects?.idle)) {
-    resumeCanvas();
-  }
+  resumeEffects();
 
-  app.autoAdvanceTimer?.resume();
-
-  if (firstPlay) {
-    app.els.playGate.hidden = true;
-    // Clear stranded 'cued' entries from showFrame's cueAudioCues call —
-    // handleFirstPlay will schedule audio fresh via scheduleFrameAudio.
-    cancelAudioCues();
-    handleFirstPlay(app);
+  if (app.autoAdvanceTimer) {
+    app.autoAdvanceTimer.resume();
+  } else {
+    setupAutoAdvance(app);
   }
 
   app.els.btnPause.setAttribute('aria-pressed', 'false');
@@ -668,7 +689,7 @@ function doPause(app) {
     app.textTimeline.pause();
   }
 
-  pauseCanvas();
+  pauseEffects();
 
   app.autoAdvanceTimer?.pause();
 
@@ -726,8 +747,7 @@ function replayNarration(app) {
   } else {
     buildNarration(app, frame);
     if (narrationCue) {
-      const holdAfterNarration =
-        frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
+      const holdAfterNarration = getHoldAfterNarration(frame);
       const narrationOpts = {
         onNarrationEnd: makeNarrationEndCallback(app, frame, holdAfterNarration),
         maxNarrationDurationMs: getMaxNarrationDuration(
@@ -790,7 +810,9 @@ function toggleCaptions(app) {
 
 function initApp(app) {
   initSceneCanvas(app.els.sceneCanvas);
-  initCanvas(app.els.effectsCanvas);
+  initEffectsCanvas(app.els.effectsCanvas).catch((err) =>
+    console.error('Effects canvas init failed:', err.message),
+  );
 
   preloadFirstFrameAudio(app.frames, (result) => registerAudio(app, result));
   onNarrationBufferChange((isBuffering) => handleBufferChange(app, isBuffering));
@@ -932,6 +954,7 @@ export function createApp() {
     replayPending: false,
     pendingPause: false,
     buffering: false,
+    effectsReady: null,
     availableAudio: new Set(),
     audioDurations: new Map(),
     projectMaxCaptionMs: computeProjectMaxCaptionMs(frames),

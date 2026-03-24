@@ -16,7 +16,7 @@
     {
       "id": "scene-00-title",
       "frameType": "title",
-      "holdAfterNarration": null,
+      "holdAfterNarration": 2000,
       "description": "Title card — opening narration on a dark field",
       "image": null,
       "narration": {
@@ -41,7 +41,7 @@
         "captions": [
           {
             "text": "[Appalachian English dialect]",
-            "start": 10,
+            "start": 100,
             "end": 1000
           },
           {
@@ -61,10 +61,7 @@
           }
         ]
       },
-      "effects": {
-        "idle": null,
-        "entry": null
-      },
+      "effects": null,
       "transition": {
         "type": "fade",
         "duration": 1500
@@ -163,8 +160,18 @@
         ]
       },
       "effects": {
-        "idle": "dust-drift",
-        "entry": "fade-in"
+        "regions": [
+          {
+            "type": "glow",
+            "mask": "assets/masks/mask-01-seam-diamond.png",
+            "color": 16775408,
+            "glowAlpha": 0.15,
+            "distance": 10,
+            "outerStrength": 2,
+            "pulseSpeed": 0.02,
+            "pulseDepth": 0.4
+          }
+        ]
       },
       "transition": {
         "type": "zoom-in",
@@ -203,7 +210,6 @@
     {
       "id": "scene-02-travel",
       "frameType": "scene",
-
       "holdAfterNarration": 2000,
       "description": "Mine tunnel with coal cart and miner walking with headlamp, diamond glowing in the coal — carbon in transit through the earth",
       "image": "assets/images/scene-02-travel.webp",
@@ -296,8 +302,18 @@
         ]
       },
       "effects": {
-        "idle": "motion-drag",
-        "entry": "fade-in"
+        "regions": [
+          {
+            "type": "glow",
+            "mask": "assets/masks/mask-02-travel-diamond.png",
+            "color": 16775408,
+            "glowAlpha": 0.15,
+            "distance": 5,
+            "outerStrength": 2,
+            "pulseSpeed": 0.02,
+            "pulseDepth": 0.4
+          }
+        ]
       },
       "transition": {
         "type": "fade",
@@ -414,8 +430,22 @@
         ]
       },
       "effects": {
-        "idle": "heat-pulse",
-        "entry": "fade-in"
+        "regions": [
+          {
+            "type": "heat",
+            "mask": "assets/masks/mask-03-reach-heat.png"
+          },
+          {
+            "type": "glow",
+            "mask": "assets/masks/mask-03-reach-diamond.png",
+            "color": 16775408,
+            "glowAlpha": 0.15,
+            "distance": 15,
+            "outerStrength": 3,
+            "pulseSpeed": 0.02,
+            "pulseDepth": 0.4
+          }
+        ]
       },
       "transition": {
         "type": "fade",
@@ -542,8 +572,18 @@
         ]
       },
       "effects": {
-        "idle": "near-still-pulse",
-        "entry": "fade-in"
+        "regions": [
+          {
+            "type": "glow",
+            "mask": "assets/masks/mask-04-pocket-diamond.png",
+            "color": 16775408,
+            "glowAlpha": 0.15,
+            "distance": 15,
+            "outerStrength": 3,
+            "pulseSpeed": 0.02,
+            "pulseDepth": 0.4
+          }
+        ]
       },
       "transition": {
         "type": "fade",
@@ -670,8 +710,22 @@
         ]
       },
       "effects": {
-        "idle": "water-run",
-        "entry": "fade-in"
+        "regions": [
+          {
+            "type": "water",
+            "mask": "assets/masks/mask-05-rinse-water.png"
+          },
+          {
+            "type": "glow",
+            "mask": "assets/masks/mask-05-rinse-diamond.png",
+            "color": 16775408,
+            "glowAlpha": 0.15,
+            "distance": 15,
+            "outerStrength": 3,
+            "pulseSpeed": 0.02,
+            "pulseDepth": 0.4
+          }
+        ]
       },
       "transition": {
         "type": "fade",
@@ -696,7 +750,7 @@
           "type": "ambient",
           "src": "assets/audio/ambient/scene-05-rinse.m4a",
           "enter": 0,
-          "volume": 0.15,
+          "volume": 0.1,
           "loop": true,
           "fadeIn": 1500,
           "fadeOut": null
@@ -793,8 +847,18 @@
         ]
       },
       "effects": {
-        "idle": "dust-settle",
-        "entry": "fade-in"
+        "regions": [
+          {
+            "type": "glow",
+            "mask": "assets/masks/mask-06-storage-diamond.png",
+            "color": 16775408,
+            "glowAlpha": 0.15,
+            "distance": 15,
+            "outerStrength": 3,
+            "pulseSpeed": 0.02,
+            "pulseDepth": 0.4
+          }
+        ]
       },
       "transition": {
         "type": "fade",
@@ -895,10 +959,7 @@
           }
         ]
       },
-      "effects": {
-        "idle": "near-still-pulse",
-        "entry": "fade-in"
-      },
+      "effects": null,
       "transition": {
         "type": "fade",
         "duration": 1200
@@ -962,10 +1023,7 @@
           }
         ]
       },
-      "effects": {
-        "idle": "assembly-micro",
-        "entry": "fade-in"
-      },
+      "effects": null,
       "transition": {
         "type": "fade",
         "duration": 1200
@@ -1066,8 +1124,18 @@
         ]
       },
       "effects": {
-        "idle": "light-crack",
-        "entry": "fade-in"
+        "regions": [
+          {
+            "type": "glow",
+            "mask": "assets/masks/mask-09-return-diamond.png",
+            "color": 16775408,
+            "glowAlpha": 0.15,
+            "distance": 15,
+            "outerStrength": 3,
+            "pulseSpeed": 0.02,
+            "pulseDepth": 0.4
+          }
+        ]
       },
       "transition": {
         "type": "fade",
@@ -1179,8 +1247,18 @@
         ]
       },
       "effects": {
-        "idle": "illumination-spread",
-        "entry": "fade-in"
+        "regions": [
+          {
+            "type": "glow",
+            "mask": "assets/masks/mask-10-building-diamond.png",
+            "color": 16775408,
+            "glowAlpha": 0.15,
+            "distance": 15,
+            "outerStrength": 3,
+            "pulseSpeed": 0.02,
+            "pulseDepth": 0.4
+          }
+        ]
       },
       "transition": {
         "type": "fade",
@@ -1215,7 +1293,7 @@
     {
       "id": "scene-11-music",
       "frameType": "credits",
-      "holdAfterNarration": null,
+      "holdAfterNarration": 2000,
       "description": "Woman standing before record player on wooden table with diamond glowing, circuit traces and sparkles filling the bright room — the finale",
       "image": "assets/images/scene-11-music.webp",
       "narration": {
@@ -1282,8 +1360,22 @@
         ]
       },
       "effects": {
-        "idle": "machine-steady",
-        "entry": null
+        "regions": [
+          {
+            "type": "shockwave",
+            "mask": "assets/masks/mask-11-music-shockwave.png"
+          },
+          {
+            "type": "glow",
+            "mask": "assets/masks/mask-11-music-diamond.png",
+            "color": 16775408,
+            "glowAlpha": 0.15,
+            "distance": 15,
+            "outerStrength": 3,
+            "pulseSpeed": 0.02,
+            "pulseDepth": 0.4
+          }
+        ]
       },
       "transition": {
         "type": "fade",
@@ -1317,7 +1409,10 @@
           "id": "end-song",
           "type": "ambient",
           "src": "assets/audio/sfx/BridgeCitySinners_BreakTheChain.mp3",
-          "enter": { "ref": "narration", "offset": -5000 },
+          "enter": {
+            "ref": "narration",
+            "offset": -5000
+          },
           "volume": 0.75,
           "loop": true,
           "fadeIn": 10000,

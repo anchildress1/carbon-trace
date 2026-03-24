@@ -186,7 +186,7 @@ export function clearNarrationCache() {
 
 // --- Anchor resolution ---
 
-function resolveAnchors(cues, opts) {
+function buildCueDurations(cues, opts) {
   const durations = new Map();
 
   if (opts?.audioDurations) {
@@ -201,19 +201,52 @@ function resolveAnchors(cues, opts) {
     durations.set(narrationCue.id, opts.maxNarrationDurationMs);
   }
 
-  return cues.map((cue) => {
+  return durations;
+}
+
+function tryResolveAnchor(cue, resolvedEnters, durations) {
+  if (resolvedEnters.has(cue.id)) return false;
+  const refEnter = resolvedEnters.get(cue.enter.ref);
+  if (refEnter === undefined) return false;
+  if (durations.has(cue.enter.ref)) {
+    resolvedEnters.set(cue.id, refEnter + durations.get(cue.enter.ref) + cue.enter.offset);
+  } else {
+    console.warn(`Anchor ref "${cue.enter.ref}" duration unknown — falling back to enter: 0`);
+    resolvedEnters.set(cue.id, 0);
+  }
+  return true;
+}
+
+function resolveAnchors(cues, opts) {
+  const durations = buildCueDurations(cues, opts);
+  const resolvedEnters = new Map();
+
+  for (const cue of cues) {
     if (typeof cue.enter === 'number') {
-      return { ...cue, resolvedEnter: cue.enter };
+      resolvedEnters.set(cue.id, cue.enter);
     }
-    const refDuration = durations.get(cue.enter.ref);
-    if (refDuration === null || refDuration === undefined) {
-      console.warn(`Anchor ref "${cue.enter.ref}" duration unknown — falling back to enter: 0`);
-      return { ...cue, resolvedEnter: 0 };
+  }
+
+  let progress = true;
+  while (progress) {
+    progress = false;
+    for (const cue of cues) {
+      if (tryResolveAnchor(cue, resolvedEnters, durations)) {
+        progress = true;
+      }
     }
-    const refCue = cues.find((c) => c.id === cue.enter.ref);
-    const refEnter = typeof refCue?.enter === 'number' ? refCue.enter : 0;
-    return { ...cue, resolvedEnter: refEnter + refDuration + cue.enter.offset };
-  });
+  }
+
+  for (const cue of cues) {
+    if (!resolvedEnters.has(cue.id)) {
+      console.warn(
+        `Anchor ref "${cue.enter.ref}" unresolvable (circular or missing) — falling back to enter: 0`,
+      );
+      resolvedEnters.set(cue.id, 0);
+    }
+  }
+
+  return cues.map((cue) => ({ ...cue, resolvedEnter: resolvedEnters.get(cue.id) }));
 }
 
 // --- Internal cue playback ---

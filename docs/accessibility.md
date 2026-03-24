@@ -52,6 +52,7 @@ button activation.
 | `#btn-captions` | `aria-pressed` | Toggle state for captions on/off |
 | `#btn-mute` | `aria-label` | Updates between "Mute audio" / "Unmute audio" |
 | `#btn-mute` | `aria-disabled` | Disabled until audio is available |
+| `#trace-overlay` | `aria-hidden="true"` | Hides decorative shimmer canvas |
 | `#scene-stage` | `aria-label` | Scene description from `frame.description` |
 | progress dots | `aria-current="step"` | Identifies the current scene dot |
 
@@ -66,21 +67,22 @@ flowchart TD
 
     B --> D["Text: 0.3s opacity fade"]
     B --> E["Transitions: instant (no GSAP fade)"]
-    B --> F["Effects: skipped"]
-    B --> G["Trace overlay: 0.3s transition"]
+    B --> F["Effects: static (no displacement/animation, audioReactive ignored)"]
+    B --> G["Trace shimmer: static glow, no highlights, no pulse"]
 
     C --> H["Text: 1.2s blur + y + opacity"]
     C --> I["Transitions: GSAP two-phase fade"]
     C --> J["Effects: particles, pulses, etc."]
-    C --> K["Trace overlay: 0.6s transition"]
+    C --> K["Trace shimmer: layered glow + traveling highlights + pulse"]
 ```
 
 | Feature | Normal | Reduced Motion |
 |---------|--------|----------------|
 | Ghost-drift text | Blur + y offset + opacity (1.2s in, 0.9s out) | Opacity only (0.3s) |
 | Scene transitions | Two-phase GSAP fade | Instant swap |
-| Visual effects | Full particle/filter effects | Skipped entirely |
-| Trace overlay | 0.6s opacity transition | 0.3s opacity transition |
+| Visual effects | Full displacement + particle effects | Static: no displacement, no animation (ADR-007) |
+| Audio-reactive modulation | Effect parameters driven by music FFT data | Ignored — base parameter values used, no modulation (ADR-008) |
+| Trace shimmer | Layered glow + traveling highlights + ambient pulse | Static glow at 0.5 brightness, no animation |
 
 The `prefersReducedMotion()` check is evaluated at the point of use (not
 cached), so it responds to runtime changes in the user's system preference.

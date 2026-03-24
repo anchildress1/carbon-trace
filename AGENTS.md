@@ -79,22 +79,24 @@ Full system design: `docs/design/carbon-trace-system-design-v5.md` and `docs/ADR
 
 ### Module responsibilities
 
-| Module              | Job                                                      | Does NOT know about   |
-| ------------------- | -------------------------------------------------------- | --------------------- |
-| `app.js`            | State machine, orchestrator                              | Pixel rendering       |
-| `canvas.js`         | Canvas 2D — image drawing, cover-fit, resize             | Frame ordering, audio |
-| `effects-canvas.js` | Canvas 2D effects overlay, render loop                   | Frame ordering, audio |
-| `effects.js`        | Effect registry, `runEffect`/`clearEffects` API          | Canvas internals      |
-| `audio.js`          | Howler — ambient crossfade, narration, buffer monitoring | DOM, canvas           |
-| `text.js`           | Ghost-drift GSAP timelines from config                   | Audio, canvas         |
-| `captions.js`       | Timed captions, localStorage persistence                 | Audio, canvas         |
-| `overlay.js`        | DOM controls — dot bar, buttons, progress                | Canvas, audio         |
-| `loader.js`         | Audio metadata preloading, frame-aware sequencing        | DOM, app state        |
-| `pausable-timer.js` | Pause-aware timer — used by audio.js and app.js          | Everything else       |
+| Module              | Job                                                            | Does NOT know about   |
+| ------------------- | -------------------------------------------------------------- | --------------------- |
+| `app.js`            | State machine, orchestrator                                    | Pixel rendering       |
+| `canvas.js`         | Canvas 2D — image drawing, cover-fit, resize                   | Frame ordering, audio |
+| `effects-canvas.js` | PixiJS WebGL effects overlay, render loop (imports effects.js) | Frame ordering, audio |
+| `effects.js`        | Effect factory registry, `registerEffect`/`createEffect` API   | Canvas internals      |
+| `audio.js`          | Howler — ambient crossfade, narration, buffer monitoring       | DOM, canvas           |
+| `text.js`           | Ghost-drift GSAP timelines from config                         | Audio, canvas         |
+| `captions.js`       | Timed captions, localStorage persistence                       | Audio, canvas         |
+| `overlay.js`        | DOM controls — dot bar, buttons, progress                      | Canvas, audio         |
+| `loader.js`         | Audio metadata preloading, frame-aware sequencing              | DOM, app state        |
+| `pausable-timer.js` | Pause-aware timer — used by audio.js and app.js                | Everything else       |
 
 ### Rules
 
-- Each module does ONE thing. No cross-imports between leaf modules.
+- Each module does ONE thing. No cross-imports between leaf modules
+  (exception: `effects-canvas.js` imports from `effects.js` — directed
+  dependency per ADR-007).
 - `app.js` is the only module that knows frame ordering.
 - Scene differences = config data in `scenes.json`, not if-blocks.
 - Effects receive canvas and scene canvas elements; cleanup is handled by `clearEffects()`.
@@ -140,3 +142,7 @@ Full system design: `docs/design/carbon-trace-system-design-v5.md` and `docs/ADR
 ## Security
 
 - Before committing any changes, follow all rules in `.github/instructions/sonarqube_mcp.instructions.md`.
+- After modifying source files, use the SonarQube MCP `analyze_code_snippet` tool to
+  scan each changed file for new issues before committing. Fix any issues found.
+  Use `search_sonar_issues_in_projects` with the PR ID to check for open issues
+  on the current branch.
