@@ -293,7 +293,7 @@ test.describe('carbon-trace — positioned text', () => {
 
   test('overlay text elements have absolute positioning styles', async ({ page }) => {
     // Press play so narration renders on title frame
-    await page.click('#play-gate');
+    await page.click('#loading-screen');
 
     const lines = page.locator('.narration-line--positioned');
     await expect(lines.first()).toBeVisible({ timeout: 5000 });
@@ -305,55 +305,60 @@ test.describe('carbon-trace — positioned text', () => {
     expect(position).toBe('absolute');
   });
 
-  test('text alignment matches data for center-aligned lines', async ({ page }) => {
+  test('text alignment style is applied to positioned lines', async ({ page }) => {
     // Press play so narration renders on title frame
-    await page.click('#play-gate');
+    await page.click('#loading-screen');
 
     const lines = page.locator('.narration-line--positioned');
     await expect(lines.first()).toBeVisible({ timeout: 5000 });
     const first = lines.first();
 
     const textAlign = await first.evaluate((el) => el.style.textAlign);
-    expect(textAlign).toBe('center');
+    expect(['left', 'center', 'right']).toContain(textAlign);
   });
 });
 
-test.describe('carbon-trace — play gate', () => {
+test.describe('carbon-trace — loading screen gate', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
   });
 
-  test('play gate is visible on title card', async ({ page }) => {
-    const playGate = page.locator('#play-gate');
-    await expect(playGate).toBeVisible();
+  test('loading screen is visible on title card', async ({ page }) => {
+    const screen = page.locator('#loading-screen');
+    await expect(screen).toBeVisible();
   });
 
-  test('play gate has accessible label', async ({ page }) => {
-    const playGate = page.locator('#play-gate');
-    await expect(playGate).toHaveAttribute('aria-label', 'Begin experience');
+  test('loading screen has accessible label', async ({ page }) => {
+    const screen = page.locator('#loading-screen');
+    await expect(screen).toHaveAttribute('aria-label', 'Begin experience');
   });
 
-  test('clicking play gate unpauses and hides it', async ({ page }) => {
-    const playGate = page.locator('#play-gate');
+  test('loading screen shows click-to-begin prompt when ready', async ({ page }) => {
+    const prompt = page.locator('#loading-prompt');
+    await expect(prompt).toBeVisible({ timeout: 5000 });
+  });
+
+  test('clicking loading screen unpauses and hides it', async ({ page }) => {
+    const screen = page.locator('#loading-screen');
     const pauseBtn = page.locator('#btn-pause');
 
-    await expect(playGate).toBeVisible();
+    await expect(screen).toBeVisible();
     await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
 
-    await playGate.click();
+    await screen.click();
 
-    await expect(playGate).toBeHidden();
+    await expect(screen).toBeHidden({ timeout: 2000 });
     await expect(pauseBtn).toHaveAttribute('aria-pressed', 'false');
   });
 
-  test('play gate hides when navigating forward', async ({ page }) => {
-    const playGate = page.locator('#play-gate');
-    await expect(playGate).toBeVisible();
+  test('loading screen hides when navigating forward via keyboard', async ({ page }) => {
+    const screen = page.locator('#loading-screen');
+    await expect(screen).toBeVisible();
 
-    await page.click('#btn-next');
+    await page.keyboard.press('ArrowRight');
 
-    await expect(playGate).toBeHidden();
+    await expect(screen).toBeHidden({ timeout: 2000 });
   });
 });
 

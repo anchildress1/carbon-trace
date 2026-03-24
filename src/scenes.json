@@ -25,16 +25,24 @@
             "text": "I'm gonna tell you a story.",
             "enter": 10,
             "exit": 1800,
-            "x": 25,
+            "x": 15,
             "y": 30,
-            "align": "center"
+            "align": "left"
           },
           {
-            "text": "Not because it's special. But because it's mine.",
+            "text": "Not because it's special.",
             "enter": 3000,
             "exit": 8000,
-            "x": 40,
-            "y": 45,
+            "x": 22,
+            "y": 30,
+            "align": "left"
+          },
+          {
+            "text": "Because it's mine.",
+            "enter": 7000,
+            "exit": 12000,
+            "x": 50,
+            "y": 50,
             "align": "center"
           }
         ],

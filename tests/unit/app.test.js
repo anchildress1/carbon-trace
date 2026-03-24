@@ -209,7 +209,7 @@ function buildDOM() {
     'effects-canvas', 'narration-layer', 'caption-layer', 'accessible-narration',
     'overlay-controls', 'progress-dots', 'btn-prev', 'btn-next',
     'btn-replay', 'btn-mute', 'btn-pause', 'btn-captions',
-    'play-gate', 'transition-loader',
+    'loading-prompt', 'transition-loader',
   ];
 
   const root = document.createElement('div');
@@ -226,14 +226,13 @@ function buildDOM() {
         scale: vi.fn(),
         resetTransform: vi.fn(),
       }));
-    } else if (id.startsWith('btn-')) {
+    } else if (id.startsWith('btn-') || id === 'loading-screen') {
       el = document.createElement('button');
     } else {
       el = document.createElement('div');
     }
     el.id = id;
     if (id === 'scene-stage') el.hidden = true;
-    if (id === 'play-gate') el.hidden = true;
     if (id === 'overlay-controls') el.hidden = true;
     if (id === 'transition-loader') el.hidden = true;
     root.appendChild(el);
@@ -323,7 +322,7 @@ describe('app.js', () => {
       await flush();
     });
 
-    it('starts paused (play gate)', () => {
+    it('starts paused (loading screen gate)', () => {
       expect(app.getState()).toBe('PAUSED');
     });
 
@@ -555,12 +554,13 @@ describe('app.js', () => {
       expect(scheduleAudioCues).toHaveBeenCalled();
     });
 
-    it('Space key hides play gate on first play', () => {
-      const gate = document.getElementById('play-gate');
-      expect(gate.hidden).toBe(false);
+    it('Space key hides loading screen on first play', () => {
+      const screen = document.getElementById('loading-screen');
+      expect(screen.hidden).toBe(false);
       const stage = document.getElementById('scene-stage');
       stage.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
-      expect(gate.hidden).toBe(true);
+      // Loading screen gets fade-out class; hidden is set after transition
+      expect(screen.classList.contains('fade-out')).toBe(true);
     });
 
     it('double Space does not call handleFirstPlay twice', () => {
@@ -606,33 +606,31 @@ describe('app.js', () => {
     });
   });
 
-  // ── play gate ──────────────────────────────────────────────────────
+  // ── loading screen gate ────────────────────────────────────────────
 
-  describe('play gate', () => {
+  describe('loading screen gate', () => {
     beforeEach(async () => {
       app = createApp();
       await flush();
     });
 
     it('is visible after init', () => {
-      const gate = document.getElementById('play-gate');
-      expect(gate.hidden).toBe(false);
+      const screen = document.getElementById('loading-screen');
+      expect(screen.hidden).toBe(false);
     });
 
-    it('hides on click and resumes', () => {
-      const gate = document.getElementById('play-gate');
-      gate.click();
+    it('fades out on click and resumes', () => {
+      const screen = document.getElementById('loading-screen');
+      screen.click();
       expect(app.getState()).toBe('SCENE_ACTIVE');
-      expect(gate.hidden).toBe(true);
+      expect(screen.classList.contains('fade-out')).toBe(true);
     });
 
     it('enables replay button on first play for non-credits frame', () => {
       const btn = document.getElementById('btn-replay');
-      // Before first play, replay is disabled (userHasInteracted was false)
       expect(btn.disabled).toBe(true);
 
-      // Click play gate — showFrame re-runs with userHasInteracted=true
-      document.getElementById('play-gate').click();
+      document.getElementById('loading-screen').click();
       expect(btn.disabled).toBe(false);
     });
   });
@@ -1531,30 +1529,30 @@ describe('app.js', () => {
     });
   });
 
-  // ── edge: no audio before play-gate ─────────────────────────────
+  // ── edge: no audio before start ─────────────────────────────────
 
-  describe('play-gate audio suppression', () => {
-    it('does not call scheduleAudioCues before play-gate click', async () => {
+  describe('loading screen audio suppression', () => {
+    it('does not call scheduleAudioCues before loading screen click', async () => {
       app = createApp();
       await flush();
 
-      // App is paused with play-gate visible. No audio should be scheduled.
+      // App is paused behind loading screen. No audio should be scheduled.
       expect(app.getState()).toBe('PAUSED');
       expect(scheduleAudioCues).not.toHaveBeenCalled();
     });
   });
 
-  // ── play gate → audio scheduling ──────────────────────────────────
+  // ── loading screen → audio scheduling ─────────────────────────────
 
-  describe('play gate audio scheduling', () => {
+  describe('loading screen audio scheduling', () => {
     beforeEach(async () => {
       app = createApp();
       await flush();
     });
 
-    it('schedules audio cues for the title frame on play-gate click', () => {
+    it('schedules audio cues for the title frame on loading screen click', () => {
       vi.clearAllMocks();
-      document.getElementById('play-gate').click();
+      document.getElementById('loading-screen').click();
 
       // handleFirstPlay must call scheduleAudioCues with the title frame's audioCues
       expect(scheduleAudioCues).toHaveBeenCalledWith(
@@ -1575,7 +1573,7 @@ describe('app.js', () => {
       cancelAudioCues.mockImplementation(() => callOrder.push('cancel'));
       scheduleAudioCues.mockImplementation(() => callOrder.push('schedule'));
 
-      document.getElementById('play-gate').click();
+      document.getElementById('loading-screen').click();
 
       // doResume calls cancelAudioCues, then handleFirstPlay → scheduleFrameAudio
       // The last cancel must precede the first schedule.
@@ -1586,7 +1584,7 @@ describe('app.js', () => {
     });
 
     it('plays narration timeline from position 0 on first play', () => {
-      document.getElementById('play-gate').click();
+      document.getElementById('loading-screen').click();
 
       // handleFirstPlay calls textTimeline.play(0) — not just resume
       expect(buildNarrationTimeline).toHaveBeenCalled();
@@ -1602,7 +1600,7 @@ describe('app.js', () => {
       app = createApp();
       await flush();
 
-      // buildNarration runs during showFrame(0) in init — before play gate click.
+      // buildNarration runs during showFrame(0) in init — before loading screen click.
       // Title narration cue has enter: 0 → captionDelay must be 0.
       expect(buildNarrationTimeline).toHaveBeenCalledWith(
         expect.any(Array),
@@ -1657,8 +1655,8 @@ describe('app.js', () => {
       await flush();
       vi.clearAllMocks();
 
-      // Click play gate → handleFirstPlay → scheduleAudioCues for title
-      document.getElementById('play-gate').click();
+      // Click loading screen → handleFirstPlay → scheduleAudioCues for title
+      document.getElementById('loading-screen').click();
 
       // Extract onNarrationEnd from the scheduleAudioCues call for the title frame
       const titleCall = scheduleAudioCues.mock.calls.find(
@@ -1683,7 +1681,7 @@ describe('app.js', () => {
       app = createApp();
       await flush();
 
-      document.getElementById('play-gate').click();
+      document.getElementById('loading-screen').click();
 
       const titleCall = scheduleAudioCues.mock.calls.find(
         (call) => call[0]?.some((c) => c.src === 'title-narration.m4a'),
