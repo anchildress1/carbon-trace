@@ -105,7 +105,7 @@ vi.mock('../../src/scenes.json', () => ({
         id: 'title',
         frameType: 'title',
 
-        holdAfterNarration: null,
+        holdAfterNarration: 2000,
         narration: {
           lines: [{ text: 'Opening line', enter: 0, exit: 3000 }],
           captions: [{ text: 'Opening line', start: 0, end: 3000 }],
@@ -155,7 +155,7 @@ vi.mock('../../src/scenes.json', () => ({
         id: 'credits',
         frameType: 'credits',
 
-        holdAfterNarration: null,
+        holdAfterNarration: 2000,
         image: 'credits.webp',
         narration: null,
         audioCues: null,
@@ -1592,7 +1592,7 @@ describe('app.js', () => {
       vi.clearAllMocks();
       onNarrationEnd(); // simulate narration ending
 
-      // holdAfterNarration is null → defaults to 2000ms
+      // holdAfterNarration is 2000ms
       vi.advanceTimersByTime(2000);
 
       // Should have triggered transition (cancelAudioCues called during cleanup)

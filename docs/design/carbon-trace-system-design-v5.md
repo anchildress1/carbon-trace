@@ -332,7 +332,7 @@ fadeOut  │ number | null       │ ms fade-out at end. null = no auto-fade.
 ```
 FRAME                │ holdAfterNarration
 ─────────────────────┼────────────────────
-00 Title             │ null (default 2000)
+00 Title             │ 2000
 01 Seam              │ 2000
 02 Travel            │ 2000
 03 Reach             │ 3000

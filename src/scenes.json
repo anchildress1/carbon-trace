@@ -16,7 +16,7 @@
     {
       "id": "scene-00-title",
       "frameType": "title",
-      "holdAfterNarration": null,
+      "holdAfterNarration": 2000,
       "description": "Title card — opening narration on a dark field",
       "image": null,
       "narration": {
@@ -1293,7 +1293,7 @@
     {
       "id": "scene-11-music",
       "frameType": "credits",
-      "holdAfterNarration": null,
+      "holdAfterNarration": 2000,
       "description": "Woman standing before record player on wooden table with diamond glowing, circuit traces and sparkles filling the bright room — the finale",
       "image": "assets/images/scene-11-music.webp",
       "narration": {
