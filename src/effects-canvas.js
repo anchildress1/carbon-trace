@@ -25,6 +25,7 @@ let activeEffects = [];
 let screenSizedSprites = [];
 let disposableTextures = [];
 let loadGeneration = 0;
+let initPromise = null;
 
 function reducedMotion() {
   return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -194,10 +195,11 @@ function applyMaskedEffect(effect, maskTexture, sceneTexture) {
 }
 
 /**
- * Create the PixiJS Application on the effects canvas. Called lazily during
- * first loadScene(). If WebGL is unavailable, sets webglAvailable = false.
+ * Create the PixiJS Application on the effects canvas. Called during app
+ * initialization. If WebGL is unavailable, sets webglAvailable = false.
+ * Stores a promise so loadScene() can wait for init to complete.
  */
-export async function init(el) {
+export function init(el) {
   if (!el || !(el instanceof HTMLCanvasElement)) {
     throw new Error('init requires a <canvas> element');
   }
@@ -207,10 +209,15 @@ export async function init(el) {
   canvasEl = el;
   webglAvailable = true;
 
+  initPromise = doInit(el);
+  return initPromise;
+}
+
+async function doInit(el) {
   try {
     const app = new Application();
     await app.init({
-      canvas: canvasEl,
+      canvas: el,
       backgroundAlpha: 0,
       autoStart: false,
     });
@@ -222,8 +229,8 @@ export async function init(el) {
     // where pause()/clearAll() access a half-initialized Application.
     pixiApp = app;
 
-    canvasEl.addEventListener('webglcontextlost', handleContextLost);
-    canvasEl.addEventListener('webglcontextrestored', handleContextRestored);
+    el.addEventListener('webglcontextlost', handleContextLost);
+    el.addEventListener('webglcontextrestored', handleContextRestored);
 
     observer = new ResizeObserver(() => {
       if (pixiApp?.renderer) {
@@ -236,11 +243,13 @@ export async function init(el) {
         }
       }
     });
-    observer.observe(canvasEl);
+    observer.observe(el);
   } catch (err) {
     console.warn('WebGL unavailable — effects disabled:', err.message);
     webglAvailable = false;
     pixiApp = null;
+  } finally {
+    initPromise = null;
   }
 }
 
@@ -273,6 +282,14 @@ async function loadRegionEffects(regions, sceneTexture, gen) {
  */
 export async function loadScene(effectsConfig, sceneImageUrl) {
   if (!webglAvailable) return;
+
+  // Wait for init() to complete if it is still in progress. This
+  // prevents the first loadScene call from racing ahead of PixiJS
+  // Application.init() and silently returning due to pixiApp === null.
+  if (initPromise) {
+    await initPromise;
+    if (!webglAvailable) return;
+  }
 
   const gen = ++loadGeneration;
 
@@ -413,6 +430,7 @@ export function destroy() {
   disposableTextures = [];
   loadGeneration = 0;
   needsReinit = false;
+  initPromise = null;
 }
 
 export function isRunning() {

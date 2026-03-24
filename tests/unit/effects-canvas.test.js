@@ -181,13 +181,13 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
   });
 
   describe('init', () => {
-    it('throws when given a non-canvas element', async () => {
+    it('throws when given a non-canvas element', () => {
       const div = document.createElement('div');
-      await expect(init(div)).rejects.toThrow('init requires a <canvas> element');
+      expect(() => init(div)).toThrow('init requires a <canvas> element');
     });
 
-    it('throws when given null', async () => {
-      await expect(init(null)).rejects.toThrow('init requires a <canvas> element');
+    it('throws when given null', () => {
+      expect(() => init(null)).toThrow('init requires a <canvas> element');
     });
 
     it('creates a PixiJS Application on the canvas', async () => {
