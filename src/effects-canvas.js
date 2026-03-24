@@ -309,6 +309,7 @@ export async function loadScene(effectsConfig, sceneImageUrl) {
   try {
     const sceneTexture = await loadTexture(sceneImageUrl);
     if (gen !== loadGeneration) return;
+    disposableTextures.push(sceneTexture);
 
     const completed = await loadRegionEffects(effectsConfig.regions, sceneTexture, gen);
     if (!completed) return;
