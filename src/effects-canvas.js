@@ -305,6 +305,20 @@ async function loadRegionEffects(regions, sceneTexture, gen) {
 }
 
 /**
+ * Start the animation loop or paint a single frame. When the ticker can
+ * run (not paused, no reduced-motion), start it for continuous updates.
+ * Otherwise render one frame so effects are visible immediately — e.g.
+ * hard-jump navigation pauses before the ticker ever ticks.
+ */
+function startOrRenderOnce() {
+  if (!reducedMotion() && !isPaused) {
+    pixiApp.ticker.start();
+  } else {
+    pixiApp.render();
+  }
+}
+
+/**
  * Load a scene's effects: load the scene image as a shared texture (not
  * added to stage), then create per-region masked Containers with filters.
  * The stage is transparent except where masked regions render — Canvas 2D
@@ -350,14 +364,7 @@ export async function loadScene(effectsConfig, sceneImageUrl) {
     const completed = await loadRegionEffects(effectsConfig.regions, sceneTexture, gen);
     if (!completed) return;
 
-    if (!reducedMotion() && !isPaused) {
-      pixiApp.ticker.start();
-    } else {
-      // Ticker won't run when paused or under reduced-motion — paint the
-      // initial frame so effects are visible immediately (e.g. hard-jump
-      // navigation pauses before the ticker ever ticks).
-      pixiApp.render();
-    }
+    startOrRenderOnce();
   } catch (err) {
     console.error('Failed to load scene effects:', err.message);
     if (gen === loadGeneration) clearAll();
