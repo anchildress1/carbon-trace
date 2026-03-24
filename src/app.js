@@ -478,7 +478,7 @@ function transition(app, toIndex) {
   app.state = State.TRANSITIONING;
   app.buffering = false;
   app.els.sceneStage.classList.remove('buffering');
-  app.els.playGate.hidden = true;
+  app.els.loadingScreen.hidden = true;
 
   cleanupCurrentScene(app);
 
@@ -652,7 +652,17 @@ function doResume(app) {
     }
     setupAutoAdvance(app);
   } else if (firstPlay) {
-    app.els.playGate.hidden = true;
+    // Fade out the loading screen to reveal the scene underneath.
+    const hideLoading = () => {
+      app.els.loadingScreen.hidden = true;
+    };
+    if (prefersReducedMotion()) {
+      hideLoading();
+    } else {
+      app.els.loadingScreen.classList.add('fade-out');
+      app.els.loadingScreen.addEventListener('transitionend', hideLoading, { once: true });
+      setTimeout(hideLoading, 900);
+    }
     // Clear stranded audio entries from showFrame's scheduleFrameAudio call —
     // handleFirstPlay will schedule audio fresh via scheduleFrameAudio.
     cancelAudioCues();
@@ -822,18 +832,6 @@ function initApp(app) {
       app.els.sceneStage.hidden = false;
       showControls();
 
-      // Fade out loading screen to reveal the scene stage underneath
-      const hideLoading = () => {
-        app.els.loadingScreen.hidden = true;
-      };
-      if (prefersReducedMotion()) {
-        hideLoading();
-      } else {
-        app.els.loadingScreen.classList.add('fade-out');
-        app.els.loadingScreen.addEventListener('transitionend', hideLoading, { once: true });
-        setTimeout(hideLoading, 900);
-      }
-
       if (app.availableAudio.size > 0) {
         app.els.btnMute.removeAttribute('aria-disabled');
       }
@@ -842,12 +840,14 @@ function initApp(app) {
       app.els.btnCaptions.setAttribute('aria-pressed', String(captionsEnabled));
 
       showFrame(app, 0);
-      app.els.playGate.hidden = false;
 
-      // Start paused — everything waits for the user to press play.
-      // Set SCENE_ACTIVE first so doPause stores the correct resume state.
-      // The play-gate label text serves as the LCP element for Lighthouse.
-      // On play, doResume → handleFirstPlay sets up narration and auto-advance.
+      // Loading screen stays visible as the interactive start gate.
+      // Show the "click to begin" prompt and mark it ready for interaction.
+      // The prompt text serves as the LCP element for Lighthouse.
+      app.els.loadingPrompt.hidden = false;
+      app.els.loadingPrompt.classList.add('visible');
+      app.els.loadingScreen.classList.add('ready');
+
       app.state = State.SCENE_ACTIVE;
       doPause(app);
 
@@ -894,7 +894,7 @@ function initApp(app) {
         e.stopPropagation();
         toggleCaptions(app);
       });
-      app.els.playGate.addEventListener('click', (e) => {
+      app.els.loadingScreen.addEventListener('click', (e) => {
         e.stopPropagation();
         togglePause(app);
       });
@@ -923,7 +923,7 @@ export function createApp() {
     'btn-mute',
     'btn-pause',
     'btn-captions',
-    'play-gate',
+    'loading-prompt',
     'transition-loader',
   ];
 
@@ -975,7 +975,7 @@ export function createApp() {
       btnMute: document.getElementById('btn-mute'),
       btnPause: document.getElementById('btn-pause'),
       btnCaptions: document.getElementById('btn-captions'),
-      playGate: document.getElementById('play-gate'),
+      loadingPrompt: document.getElementById('loading-prompt'),
       transitionLoader: document.getElementById('transition-loader'),
     },
   };
