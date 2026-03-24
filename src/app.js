@@ -408,7 +408,13 @@ function handleBufferChange(app, isBuffering) {
 
 function waitForEffectsReady(app, timeoutMs = 800) {
   if (!app.effectsReady) return Promise.resolve();
-  return Promise.race([app.effectsReady, new Promise((resolve) => setTimeout(resolve, timeoutMs))]);
+
+  let timeoutId;
+  const timeout = new Promise((resolve) => {
+    timeoutId = setTimeout(resolve, timeoutMs);
+  });
+
+  return Promise.race([app.effectsReady.finally(() => clearTimeout(timeoutId)), timeout]);
 }
 
 function waitForImage(app, src) {

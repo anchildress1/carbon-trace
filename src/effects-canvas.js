@@ -244,8 +244,9 @@ export function init(el) {
 }
 
 async function doInit(el) {
+  let app = null;
   try {
-    const app = new Application();
+    app = new Application();
     await app.init({
       canvas: el,
       backgroundAlpha: 0,
@@ -281,6 +282,13 @@ async function doInit(el) {
     console.error('WebGL unavailable — effects disabled:', err.message);
     webglAvailable = false;
     pixiApp = null;
+    if (app) {
+      try {
+        app.destroy(true, { children: true });
+      } catch {
+        /* destroy may fail if init was incomplete */
+      }
+    }
   } finally {
     initPromise = null;
   }
