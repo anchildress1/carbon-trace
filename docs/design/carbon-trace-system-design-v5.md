@@ -877,8 +877,9 @@ Progressive loading: first frame blocks, background assets load sequentially by 
 - Narration buffer stall detection and recovery
 - Accessibility: aria-live, reduced-motion, keyboard, WCAG 2.2.2, captions
 - Cloud Run deploy with CI/CD
-- Effects registry active: water, heat, dust, glow, shockwave via PixiJS DisplacementFilter (ADR-007). Audio-reactive modulation on Scene 11 (ADR-008).
+- Effects registry active: water, heat, dust, glow, shockwave via PixiJS DisplacementFilter (ADR-007)
 - End song on Scene 11 using type: ambient with anchor-based entry and 45s crescendo
+- **Deferred:** Audio-reactive effect modulation on Scene 11 (ADR-008 accepted, not yet implemented)
 
 ---
 
