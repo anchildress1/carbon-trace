@@ -352,6 +352,11 @@ export async function loadScene(effectsConfig, sceneImageUrl) {
 
     if (!reducedMotion() && !isPaused) {
       pixiApp.ticker.start();
+    } else {
+      // Ticker won't run when paused or under reduced-motion — paint the
+      // initial frame so effects are visible immediately (e.g. hard-jump
+      // navigation pauses before the ticker ever ticks).
+      pixiApp.render();
     }
   } catch (err) {
     console.error('Failed to load scene effects:', err.message);

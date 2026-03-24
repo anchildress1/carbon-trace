@@ -45,6 +45,7 @@ vi.mock('pixi.js', () => ({
     });
     this.init = vi.fn();
     this.destroy = vi.fn();
+    this.render = vi.fn();
     this.ticker = { ...mockTicker };
     this.renderer = { ...mockRenderer };
     this.screen = { width: 1920, height: 1080 };
@@ -518,6 +519,24 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
       );
 
       expect(instance.ticker.start).not.toHaveBeenCalled();
+    });
+
+    it('loadScene renders initial frame when paused so effects are visible', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      pause();
+
+      const { Application } = await import('pixi.js');
+      const instance = Application.mock.instances[0];
+      instance.render = vi.fn();
+
+      await loadScene(
+        { regions: [{ type: 'water', mask: 'mask.png' }] },
+        'scene.png',
+      );
+
+      expect(instance.render).toHaveBeenCalled();
     });
 
     it('resume after paused loadScene starts ticker', async () => {
