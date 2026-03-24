@@ -288,11 +288,12 @@ test.describe('carbon-trace — scene alignment', () => {
   });
 
   test('scene-02 description appears after advancing twice', async ({ page }) => {
-    await page.keyboard.press('ArrowRight');
-    await page.waitForTimeout(200);
-    await page.keyboard.press('ArrowRight');
+    // Advance to scene-01 then scene-02 from title card
+    await page.click('#btn-next');
     const stage = page.locator('#scene-stage');
-    await expect(stage).toHaveAttribute('aria-label', /Mine tunnel/, { timeout: 5000 });
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
+    await page.click('#btn-next');
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(2), { timeout: 5000 });
   });
 
   test('progress dots count matches scene count', async ({ page }) => {
