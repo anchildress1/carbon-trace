@@ -102,6 +102,10 @@ async function preloadBackgroundImages(app) {
   }
 }
 
+function getHoldAfterNarration(frame) {
+  return frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
+}
+
 function clearAutoAdvance(app) {
   app.autoAdvanceTimer?.cancel();
   app.autoAdvanceTimer = null;
@@ -127,8 +131,7 @@ function setupAutoAdvance(app) {
     return;
   }
 
-  const holdAfterNarration =
-    frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
+  const holdAfterNarration = getHoldAfterNarration(frame);
 
   const hasNarrationAudio = frame.audioCues?.some((c) => c.type === 'narration');
   if (hasNarrationAudio) {
@@ -179,8 +182,7 @@ function makeNarrationEndCallback(app, frame, holdAfterNarration) {
 }
 
 function scheduleFrameAudio(app, frame) {
-  const holdAfterNarration =
-    frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
+  const holdAfterNarration = getHoldAfterNarration(frame);
   const onNarrationEnd = makeNarrationEndCallback(app, frame, holdAfterNarration);
   const maxNarrationDurationMs = getMaxNarrationDuration(
     frame,
@@ -199,8 +201,7 @@ function scheduleFrameAudio(app, frame) {
 function scheduleReplayNarration(app, frame, narrationCue) {
   if (!narrationCue) return;
 
-  const holdAfterNarration =
-    frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
+  const holdAfterNarration = getHoldAfterNarration(frame);
   const onNarrationEnd = makeNarrationEndCallback(app, frame, holdAfterNarration);
   const maxNarrationDurationMs = getMaxNarrationDuration(
     frame,
@@ -726,8 +727,7 @@ function replayNarration(app) {
   } else {
     buildNarration(app, frame);
     if (narrationCue) {
-      const holdAfterNarration =
-        frame.holdAfterNarration ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
+      const holdAfterNarration = getHoldAfterNarration(frame);
       const narrationOpts = {
         onNarrationEnd: makeNarrationEndCallback(app, frame, holdAfterNarration),
         maxNarrationDurationMs: getMaxNarrationDuration(
