@@ -208,11 +208,11 @@ function tryResolveAnchor(cue, resolvedEnters, durations) {
   if (resolvedEnters.has(cue.id)) return false;
   const refEnter = resolvedEnters.get(cue.enter.ref);
   if (refEnter === undefined) return false;
-  if (!durations.has(cue.enter.ref)) {
+  if (durations.has(cue.enter.ref)) {
+    resolvedEnters.set(cue.id, refEnter + durations.get(cue.enter.ref) + cue.enter.offset);
+  } else {
     console.warn(`Anchor ref "${cue.enter.ref}" duration unknown — falling back to enter: 0`);
     resolvedEnters.set(cue.id, 0);
-  } else {
-    resolvedEnters.set(cue.id, refEnter + durations.get(cue.enter.ref) + cue.enter.offset);
   }
   return true;
 }
