@@ -95,9 +95,10 @@ function handleContextRestored() {
   console.warn('WebGL context restored');
 }
 
-function tickerUpdate() {
+function tickerUpdate(ticker) {
+  const dt = ticker.deltaMS / 1000;
   for (const effect of activeEffects) {
-    effect.update();
+    effect.update(dt);
   }
 }
 

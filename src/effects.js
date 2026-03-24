@@ -177,8 +177,8 @@ registerEffect('shockwave', (_sprite, params = {}) => {
 
   return {
     filter,
-    update() {
-      elapsed += 1 / 60;
+    update(dt) {
+      elapsed += dt;
       const cycle = elapsed % totalCycle;
 
       if (cycle < cycleDuration) {

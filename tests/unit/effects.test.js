@@ -252,13 +252,15 @@ describe('effects.js — factory registry', () => {
         cyclePause: 1,
       });
 
+      const dt = 1 / 60;
+
       // During burst phase — time advances
-      result.update();
+      result.update(dt);
       expect(result.filter.time).toBeGreaterThan(0);
       expect(result.filter.time).toBeLessThan(0.1);
 
       // Advance past burst into rest phase (need elapsed > 0.1s = 6+ ticks)
-      for (let i = 0; i < 10; i++) result.update();
+      for (let i = 0; i < 10; i++) result.update(dt);
       expect(result.filter.time).toBe(0.1);
     });
   });
