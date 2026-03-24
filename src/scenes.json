@@ -166,8 +166,8 @@
             "mask": "assets/masks/mask-01-seam-diamond.png",
             "color": 16775408,
             "glowAlpha": 0.15,
-            "distance": 15,
-            "outerStrength": 3,
+            "distance": 10,
+            "outerStrength": 2,
             "pulseSpeed": 0.02,
             "pulseDepth": 0.4
           }
@@ -308,8 +308,8 @@
             "mask": "assets/masks/mask-02-travel-diamond.png",
             "color": 16775408,
             "glowAlpha": 0.15,
-            "distance": 15,
-            "outerStrength": 3,
+            "distance": 5,
+            "outerStrength": 2,
             "pulseSpeed": 0.02,
             "pulseDepth": 0.4
           }
