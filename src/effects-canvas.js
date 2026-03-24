@@ -441,7 +441,6 @@ export function destroy() {
   activeEffects = [];
   screenSizedSprites = [];
   disposableTextures = [];
-  loadGeneration = 0;
   needsReinit = false;
   initPromise = null;
 }

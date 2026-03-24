@@ -617,6 +617,31 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
       // A new Application instance should have been created for reinit
       expect(Application.mock.instances.length).toBeGreaterThan(initCallsBefore);
     });
+
+    it('loadScene processes effects after reinit following context loss', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      // Simulate context loss
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const event = new Event('webglcontextlost');
+      event.preventDefault = vi.fn();
+      canvas.dispatchEvent(event);
+      errorSpy.mockRestore();
+
+      const { createEffect } = await import('../../src/effects.js');
+      createEffect.mockClear();
+
+      // loadScene after context loss should reinit and still process effects
+      await loadScene(
+        { regions: [{ type: 'glow', mask: 'mask.png' }] },
+        'scene.png',
+      );
+
+      // createEffect must be called — proves the generation guard did not bail
+      expect(createEffect).toHaveBeenCalled();
+      expect(createEffect.mock.calls[0][0]).toBe('glow');
+    });
   });
 
   describe('scene texture load failure', () => {
