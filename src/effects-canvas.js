@@ -113,7 +113,7 @@ function tickerUpdate() {
  * Every region must have a mask (ADR-007 addendum).
  * Returns the effect object, or null if the factory declined.
  */
-async function applyRegionEffect(region, sceneTexture) {
+async function applyRegionEffect(region, sceneTexture, gen) {
   if (!region.mask) {
     console.warn(`Skipping region "${region.type}": mask is required`);
     return null;
@@ -122,15 +122,22 @@ async function applyRegionEffect(region, sceneTexture) {
   let noiseSprite = null;
   if (!noiseFreeTypes.has(region.type)) {
     const noiseTexture = await loadTexture(region.noise || 'assets/masks/noise-256.png');
+    if (gen !== loadGeneration) return null;
     disposableTextures.push(noiseTexture);
     noiseSprite = new Sprite(noiseTexture);
     pixiApp.stage.addChild(noiseSprite);
   }
 
   const effect = createEffect(region.type, noiseSprite, region);
-  if (!effect) return null;
+  if (!effect) {
+    if (noiseSprite) {
+      pixiApp.stage.removeChild(noiseSprite);
+    }
+    return null;
+  }
 
   const maskTexture = await loadLuminanceMask(region.mask);
+  if (gen !== loadGeneration) return null;
   disposableTextures.push(maskTexture);
 
   if (overlayTypes.has(region.type)) {
@@ -245,7 +252,7 @@ export async function init(el) {
 async function loadRegionEffects(regions, sceneTexture, gen) {
   for (const region of regions) {
     try {
-      const effect = await applyRegionEffect(region, sceneTexture);
+      const effect = await applyRegionEffect(region, sceneTexture, gen);
       if (gen !== loadGeneration) return false;
       if (effect) activeEffects.push(effect);
     } catch (err) {
