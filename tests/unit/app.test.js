@@ -113,7 +113,7 @@ vi.mock('../../src/scenes.json', () => ({
         audioCues: [
           { id: 'narration', type: 'narration', src: 'title-narration.m4a', enter: 0, volume: 1, loop: false, fadeIn: 0, fadeOut: 0 },
         ],
-        effects: { idle: null, entry: null },
+        effects: null,
         transition: { type: 'fade', duration: 400 },
         traceOverlay: null,
       },
@@ -132,7 +132,7 @@ vi.mock('../../src/scenes.json', () => ({
           { id: 'ambient-01', type: 'ambient', src: 'ambient.mp3', enter: 0, volume: 0.5, loop: true, fadeIn: 1000, fadeOut: null },
           { id: 'end-song', type: 'ambient', src: 'credits-music.mp3', enter: 100, volume: 0.5, loop: true, fadeIn: 2000, fadeOut: null },
         ],
-        effects: { idle: null, entry: 'fade-in' },
+        effects: { regions: [{ type: 'glow', mask: 'diamond.png' }] },
         transition: { type: 'fade', duration: 400 },
         traceOverlay: null,
       },
@@ -147,7 +147,7 @@ vi.mock('../../src/scenes.json', () => ({
           captions: null,
         },
         audioCues: null,
-        effects: { idle: 'dust-drift', entry: 'fade-in' },
+        effects: null,
         transition: { type: 'fade', duration: 400 },
         traceOverlay: null,
       },
@@ -159,7 +159,7 @@ vi.mock('../../src/scenes.json', () => ({
         image: 'credits.webp',
         narration: null,
         audioCues: null,
-        effects: { idle: null, entry: null },
+        effects: null,
         transition: { type: 'fade', duration: 400 },
         traceOverlay: null,
       },
@@ -404,11 +404,11 @@ describe('app.js', () => {
       expect(scheduleAudioCues).not.toHaveBeenCalled();
     });
 
-    it('calls clearEffects during hard cut', async () => {
+    it('calls loadEffectsScene during hard cut to scene with effects', async () => {
       vi.clearAllMocks();
-      app.advance();
+      app.advance(); // to scene-01 which has effects regions
       await flush();
-      expect(clearEffects).toHaveBeenCalled();
+      expect(loadEffectsScene).toHaveBeenCalled();
     });
 
     it('does not start ambient during hard cut', async () => {
@@ -1095,24 +1095,26 @@ describe('app.js', () => {
       expect(cancelAudioCues).toHaveBeenCalled();
     });
 
-    it('calls clearEffects on showFrame when frame has no effects regions', async () => {
+    it('calls clearEffects on showFrame when frame has no effects', async () => {
       app = createApp();
       await flush();
       app.togglePause();
+      app.advance(); // title → scene-01
+      await flush();
       vi.clearAllMocks();
-      app.advance(); // title card has effects: null
+      app.advance(); // scene-01 → scene-02 (effects: null)
       await flush();
       expect(clearEffects).toHaveBeenCalled();
     });
 
-    it('calls clearEffects on showFrame when frame has empty regions', async () => {
+    it('calls loadEffectsScene on showFrame when frame has effect regions', async () => {
       app = createApp();
       await flush();
       app.togglePause();
       vi.clearAllMocks();
-      app.advance(); // scene-01 has effects: { regions: [] }
+      app.advance(); // title → scene-01 (has glow region)
       await flush();
-      expect(clearEffects).toHaveBeenCalled();
+      expect(loadEffectsScene).toHaveBeenCalled();
     });
   });
 

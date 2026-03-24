@@ -17,15 +17,6 @@ vi.mock('pixi-filters', () => ({
     this.innerStrength = innerStrength;
     this.quality = quality;
   }),
-  GodrayFilter: vi.fn(function ({ angle, gain, lacunarity, parallel, center, alpha }) {
-    this.angle = angle;
-    this.gain = gain;
-    this.lacunarity = lacunarity;
-    this.parallel = parallel;
-    this.center = center;
-    this.alpha = alpha;
-    this.time = 0;
-  }),
   ShockwaveFilter: vi.fn(function ({ center, amplitude, wavelength, speed, radius }) {
     this.center = center;
     this.amplitude = amplitude;
