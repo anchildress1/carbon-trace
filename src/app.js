@@ -663,6 +663,10 @@ function doResume(app) {
       app.els.loadingScreen.addEventListener('transitionend', hideLoading, { once: true });
       setTimeout(hideLoading, 900);
     }
+    // Move focus to the pause button so a pending Space keyup doesn't
+    // activate an unintended control (e.g., btn-next) after the loading
+    // screen loses focus.
+    app.els.btnPause.focus();
     // Clear stranded audio entries from showFrame's scheduleFrameAudio call —
     // handleFirstPlay will schedule audio fresh via scheduleFrameAudio.
     cancelAudioCues();

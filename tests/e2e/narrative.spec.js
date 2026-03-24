@@ -347,7 +347,7 @@ test.describe('carbon-trace — loading screen gate', () => {
 
   test('loading screen has accessible label', async ({ page }) => {
     const screen = page.locator('#loading-screen');
-    await expect(screen).toHaveAttribute('aria-label', 'Begin experience');
+    await expect(screen).toHaveAttribute('aria-label', 'click to begin');
   });
 
   test('loading screen shows click-to-begin prompt when ready', async ({ page }) => {

@@ -130,12 +130,12 @@ body {
 }
 
 .loading-prompt.visible {
-  color: rgba(232, 228, 223, 0.35);
+  color: rgba(232, 228, 223, 0.55);
 }
 
 .loading-screen.ready:hover .loading-prompt.visible,
 .loading-screen.ready:focus-visible .loading-prompt.visible {
-  color: rgba(232, 228, 223, 0.6);
+  color: rgba(232, 228, 223, 0.75);
 }
 
 @keyframes trace-draw {
@@ -164,7 +164,7 @@ body {
 
 @keyframes title-emerge {
   to {
-    color: rgba(232, 228, 223, 0.4);
+    color: rgba(232, 228, 223, 0.55);
   }
 }
 
@@ -468,7 +468,7 @@ body {
   }
 
   .loading-title {
-    color: rgba(232, 228, 223, 0.4);
+    color: rgba(232, 228, 223, 0.55);
     animation: none;
   }
 
