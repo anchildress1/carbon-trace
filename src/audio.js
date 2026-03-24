@@ -186,7 +186,7 @@ export function clearNarrationCache() {
 
 // --- Anchor resolution ---
 
-function resolveAnchors(cues, opts) {
+function buildCueDurations(cues, opts) {
   const durations = new Map();
 
   if (opts?.audioDurations) {
@@ -201,6 +201,24 @@ function resolveAnchors(cues, opts) {
     durations.set(narrationCue.id, opts.maxNarrationDurationMs);
   }
 
+  return durations;
+}
+
+function tryResolveAnchor(cue, resolvedEnters, durations) {
+  if (resolvedEnters.has(cue.id)) return false;
+  const refEnter = resolvedEnters.get(cue.enter.ref);
+  if (refEnter === undefined) return false;
+  if (!durations.has(cue.enter.ref)) {
+    console.warn(`Anchor ref "${cue.enter.ref}" duration unknown — falling back to enter: 0`);
+    resolvedEnters.set(cue.id, 0);
+  } else {
+    resolvedEnters.set(cue.id, refEnter + durations.get(cue.enter.ref) + cue.enter.offset);
+  }
+  return true;
+}
+
+function resolveAnchors(cues, opts) {
+  const durations = buildCueDurations(cues, opts);
   const resolvedEnters = new Map();
 
   for (const cue of cues) {
@@ -213,17 +231,9 @@ function resolveAnchors(cues, opts) {
   while (progress) {
     progress = false;
     for (const cue of cues) {
-      if (resolvedEnters.has(cue.id)) continue;
-      const refEnter = resolvedEnters.get(cue.enter.ref);
-      if (refEnter === undefined) continue;
-      const refDuration = durations.get(cue.enter.ref);
-      if (refDuration === null || refDuration === undefined) {
-        console.warn(`Anchor ref "${cue.enter.ref}" duration unknown — falling back to enter: 0`);
-        resolvedEnters.set(cue.id, 0);
-      } else {
-        resolvedEnters.set(cue.id, refEnter + refDuration + cue.enter.offset);
+      if (tryResolveAnchor(cue, resolvedEnters, durations)) {
+        progress = true;
       }
-      progress = true;
     }
   }
 
