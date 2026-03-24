@@ -175,23 +175,44 @@ function resolveAnchors(cues, opts) {
   }
 
   const narrationCue = cues.find(c => c.type === 'narration');
-  if (narrationCue && opts?.maxNarrationDurationMs) {
+  if (narrationCue && opts?.maxNarrationDurationMs && !durations.has(narrationCue.id)) {
     durations.set(narrationCue.id, opts.maxNarrationDurationMs);
   }
 
-  return cues.map(cue => {
-    if (typeof cue.enter === 'number') {
-      return { ...cue, resolvedEnter: cue.enter };
+  // Iterative resolution: seed numeric enters, then resolve anchors whose
+  // refs are already resolved. Repeat until no progress (handles chains).
+  const resolvedEnters = new Map();
+  for (const cue of cues) {
+    if (typeof cue.enter === 'number') resolvedEnters.set(cue.id, cue.enter);
+  }
+
+  let progress = true;
+  while (progress) {
+    progress = false;
+    for (const cue of cues) {
+      if (resolvedEnters.has(cue.id)) continue;
+      const refEnter = resolvedEnters.get(cue.enter.ref);
+      if (refEnter === undefined) continue;
+      const refDuration = durations.get(cue.enter.ref);
+      if (refDuration == null) {
+        console.warn(`Anchor ref "${cue.enter.ref}" duration unknown — falling back to enter: 0`);
+        resolvedEnters.set(cue.id, 0);
+      } else {
+        resolvedEnters.set(cue.id, refEnter + refDuration + cue.enter.offset);
+      }
+      progress = true;
     }
-    const refDuration = durations.get(cue.enter.ref);
-    if (refDuration == null) {
-      console.warn(`Anchor ref "${cue.enter.ref}" duration unknown — falling back to enter: 0`);
-      return { ...cue, resolvedEnter: 0 };
+  }
+
+  // Remaining unresolved = circular or missing refs
+  for (const cue of cues) {
+    if (!resolvedEnters.has(cue.id)) {
+      console.warn(`Anchor ref "${cue.enter.ref}" unresolvable — falling back to enter: 0`);
+      resolvedEnters.set(cue.id, 0);
     }
-    const refCue = cues.find(c => c.id === cue.enter.ref);
-    const refEnter = typeof refCue?.enter === 'number' ? refCue.enter : 0;
-    return { ...cue, resolvedEnter: refEnter + refDuration + cue.enter.offset };
-  });
+  }
+
+  return cues.map(cue => ({ ...cue, resolvedEnter: resolvedEnters.get(cue.id) }));
 }
 ```
 

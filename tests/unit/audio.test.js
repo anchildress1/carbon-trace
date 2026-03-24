@@ -208,7 +208,66 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       // resolvedEnter = 0, so Howl created immediately
       expect(Howl).toHaveBeenCalled();
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Anchor ref "nonexistent" duration unknown'),
+        expect.stringContaining('Anchor ref "nonexistent"'),
+      );
+      warnSpy.mockRestore();
+    });
+
+    it('resolves chained anchors across multiple iterations', () => {
+      const cueA = makeCue({ id: 'a', type: 'ambient', src: 'a.mp3', enter: 100 });
+      const cueB = makeCue({
+        id: 'b',
+        type: 'sfx',
+        src: 'b.mp3',
+        enter: { ref: 'a', offset: 200 },
+      });
+      const cueC = makeCue({
+        id: 'c',
+        type: 'sfx',
+        src: 'c.mp3',
+        enter: { ref: 'b', offset: 300 },
+      });
+
+      // a: 10s, b: 5s durations
+      const audioDurations = new Map([['a.mp3', 10], ['b.mp3', 5]]);
+      // resolvedEnter: a=100, b=100+10000+200=10300, c=10300+5000+300=15600
+      scheduleAudioCues([cueC, cueB, cueA], { audioDurations });
+
+      // cueA fires at 100ms
+      vi.advanceTimersByTime(100);
+      expect(Howl).toHaveBeenCalledTimes(1);
+
+      // cueB fires at 10300ms
+      vi.advanceTimersByTime(10200);
+      expect(Howl).toHaveBeenCalledTimes(2);
+
+      // cueC fires at 15600ms
+      vi.advanceTimersByTime(5300);
+      expect(Howl).toHaveBeenCalledTimes(3);
+    });
+
+    it('detects circular anchor references and falls back to enter: 0', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const cueX = makeCue({
+        id: 'x',
+        type: 'sfx',
+        src: 'x.mp3',
+        enter: { ref: 'y', offset: 0 },
+      });
+      const cueY = makeCue({
+        id: 'y',
+        type: 'sfx',
+        src: 'y.mp3',
+        enter: { ref: 'x', offset: 0 },
+      });
+
+      const audioDurations = new Map([['x.mp3', 5], ['y.mp3', 5]]);
+      scheduleAudioCues([cueX, cueY], { audioDurations });
+
+      // Both fire immediately (resolvedEnter = 0 due to circular fallback)
+      expect(Howl).toHaveBeenCalledTimes(2);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('unresolvable'),
       );
       warnSpy.mockRestore();
     });

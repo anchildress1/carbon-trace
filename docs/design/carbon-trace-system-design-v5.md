@@ -143,7 +143,7 @@ getAnalyserNode()                → lazy-create AnalyserNode on Howler's AudioC
 
 Internal state uses `activeCues = new Map<cueId, { howl, timer, type, state }>`. No hardcoded timer variables — each cue gets its own `PausableTimer` entry. All Howl instances use `html5: true` for streaming.
 
-**Anchor resolution:** `resolveAnchors(cues, opts)` computes `resolvedEnter` for each cue. Numeric enters pass through. Anchor objects (`{ ref, offset }`) resolve to `refEnter + refDuration + offset`. Duration lookup prefers `opts.audioDurations` metadata and falls back to `opts.maxNarrationDurationMs` for narration when metadata is missing. Unknown refs fall back to `enter: 0`.
+**Anchor resolution:** `resolveAnchors(cues, opts)` computes `resolvedEnter` for each cue. Numeric enters pass through. Anchor objects (`{ ref, offset }`) resolve to `refResolvedEnter + refDuration + offset`. Resolution is iterative: numeric enters are seeded first, then each pass resolves anchors whose refs are already resolved, repeating until no progress. This supports chained anchors (A → B → C) at arbitrary depth. Circular references and missing refs are detected (no progress after a full pass) and fall back to `enter: 0` with a console warning. Duration lookup prefers `opts.audioDurations` metadata and falls back to `opts.maxNarrationDurationMs` for narration when metadata is missing.
 
 **Narration safety timeout:** `wireNarrationEnd` sets a safety timer at `enterDelay + maxDurationMs + 5000ms`. If no `end`/`loaderror`/`playerror` fires, force-stops narration and calls `safeEnd`. Safety timer is a `PausableTimer` — pauses with the experience. Deduplicates — callback fires at most once. Duration authority: metadata → frame captions → project-wide max → 60s floor.
 
