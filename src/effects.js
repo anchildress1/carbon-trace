@@ -9,7 +9,7 @@
  */
 
 import { DisplacementFilter } from 'pixi.js';
-import { GlowFilter, GodrayFilter, ShockwaveFilter } from 'pixi-filters';
+import { GlowFilter, ShockwaveFilter } from 'pixi-filters';
 
 const factories = Object.create(null);
 
@@ -37,7 +37,7 @@ export function hasEffectType(type) {
 }
 
 /** Effect types that don't need a displacement noise sprite. */
-export const noiseFreeTypes = new Set(['glow', 'godray', 'shockwave']);
+export const noiseFreeTypes = new Set(['glow', 'shockwave']);
 
 /**
  * Overlay effect types render the mask as content (not a clipping mask).
@@ -143,40 +143,6 @@ registerEffect('glow', (_sprite, params = {}) => {
       t += pulseSpeed;
       const pulse = 1 + Math.sin(t) * pulseDepth;
       filter.outerStrength = outerStrength * pulse;
-    },
-  };
-});
-
-/**
- * Godray: volumetric light rays that shimmer over time. Creates ethereal
- * beams of light across the masked scene region.
- */
-registerEffect('godray', (_sprite, params = {}) => {
-  const {
-    angle = 30,
-    gain = 0.5,
-    lacunarity = 2.5,
-    parallel = true,
-    centerX = 0.5,
-    centerY = 0.3,
-    speed = 0.008,
-    alpha = 1,
-  } = params;
-
-  const filter = new GodrayFilter({
-    angle,
-    gain,
-    lacunarity,
-    parallel,
-    center: { x: centerX, y: centerY },
-    alpha,
-  });
-  filter.time = 0;
-
-  return {
-    filter,
-    update() {
-      filter.time += speed;
     },
   };
 });
