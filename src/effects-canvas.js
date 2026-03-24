@@ -338,12 +338,12 @@ async function reinit() {
 export function clearAll() {
   if (!webglAvailable || !pixiApp) return;
 
+  // Stop the ticker first to prevent update callbacks from running
+  // against partially-destroyed state during cleanup below.
+  pixiApp.ticker.stop();
+
   activeEffects = [];
   screenSizedSprites = [];
-
-  if (pixiApp.ticker) {
-    pixiApp.ticker.stop();
-  }
 
   // Wrap destroy calls in try/catch — a lost WebGL context can cause throws.
   try {
