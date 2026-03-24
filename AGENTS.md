@@ -142,3 +142,7 @@ Full system design: `docs/design/carbon-trace-system-design-v5.md` and `docs/ADR
 ## Security
 
 - Before committing any changes, follow all rules in `.github/instructions/sonarqube_mcp.instructions.md`.
+- After modifying source files, use the SonarQube MCP `analyze_code_snippet` tool to
+  scan each changed file for new issues before committing. Fix any issues found.
+  Use `search_sonar_issues_in_projects` with the PR ID to check for open issues
+  on the current branch.
