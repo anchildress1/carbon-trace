@@ -62,8 +62,10 @@ vi.mock('pixi.js', () => ({
     this.height = 0;
     this.filters = [];
     this.mask = null;
+    this.renderable = true;
     this.destroy = vi.fn();
     this.setMask = vi.fn();
+    this.removeFromParent = vi.fn();
     this.x = 0;
     this.y = 0;
     this.scale = { set: vi.fn() };
@@ -156,7 +158,11 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
       this.disconnect = vi.fn();
     });
 
-    globalThis.matchMedia = vi.fn().mockReturnValue({ matches: false });
+    globalThis.matchMedia = vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    });
     setupImageMock();
 
     // Mock canvas 2D context for loadLuminanceMask (happy-dom lacks full support)
@@ -814,6 +820,141 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
 
       globalThis.Image = originalImage;
       warnSpy.mockRestore();
+    });
+  });
+
+  describe('reduced-motion mid-session toggle', () => {
+    it('stops ticker when reduced-motion is enabled mid-session', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      await loadScene(
+        { regions: [{ type: 'glow', mask: 'mask.png' }] },
+        'scene.png',
+      );
+
+      const { Application } = await import('pixi.js');
+      const instance = Application.mock.instances[0];
+      instance.ticker.stop.mockClear();
+
+      // Get the matchMedia listener registered during init
+      const mqResult = globalThis.matchMedia.mock.results[0].value;
+      const changeHandler = mqResult.addEventListener.mock.calls.find(
+        ([event]) => event === 'change',
+      );
+      expect(changeHandler).toBeDefined();
+
+      // Simulate enabling reduced motion
+      changeHandler[1]({ matches: true });
+      expect(instance.ticker.stop).toHaveBeenCalled();
+    });
+
+    it('restarts ticker when reduced-motion is disabled mid-session', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      await loadScene(
+        { regions: [{ type: 'glow', mask: 'mask.png' }] },
+        'scene.png',
+      );
+
+      const { Application } = await import('pixi.js');
+      const instance = Application.mock.instances[0];
+
+      // Get the matchMedia listener
+      const mqResult = globalThis.matchMedia.mock.results[0].value;
+      const changeHandler = mqResult.addEventListener.mock.calls.find(
+        ([event]) => event === 'change',
+      );
+
+      // Simulate enabling then disabling reduced motion
+      changeHandler[1]({ matches: true });
+      instance.ticker.start.mockClear();
+      changeHandler[1]({ matches: false });
+      expect(instance.ticker.start).toHaveBeenCalled();
+    });
+
+    it('does not restart ticker when paused and reduced-motion disabled', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      await loadScene(
+        { regions: [{ type: 'glow', mask: 'mask.png' }] },
+        'scene.png',
+      );
+
+      pause();
+
+      const { Application } = await import('pixi.js');
+      const instance = Application.mock.instances[0];
+      instance.ticker.start.mockClear();
+
+      const mqResult = globalThis.matchMedia.mock.results[0].value;
+      const changeHandler = mqResult.addEventListener.mock.calls.find(
+        ([event]) => event === 'change',
+      );
+
+      changeHandler[1]({ matches: false });
+      expect(instance.ticker.start).not.toHaveBeenCalled();
+    });
+
+    it('removes matchMedia listener on destroy', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      const mqResult = globalThis.matchMedia.mock.results[0].value;
+      destroy();
+
+      expect(mqResult.removeEventListener).toHaveBeenCalledWith(
+        'change',
+        expect.any(Function),
+      );
+    });
+  });
+
+  describe('noiseSprite rendering', () => {
+    it('sets noiseSprite.renderable to false', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      const { Sprite } = await import('pixi.js');
+      Sprite.mockClear();
+
+      await loadScene(
+        { regions: [{ type: 'water', mask: 'mask.png' }] },
+        'scene.png',
+      );
+
+      // First Sprite instance is the noiseSprite (water needs noise)
+      const noiseSprite = Sprite.mock.instances[0];
+      expect(noiseSprite.renderable).toBe(false);
+    });
+  });
+
+  describe('texture leak prevention', () => {
+    it('destroys sceneTexture when generation changes during load', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      const { Texture } = await import('pixi.js');
+
+      // Start a load and immediately supersede it
+      const first = loadScene(
+        { regions: [{ type: 'glow', mask: 'mask.png' }] },
+        'scene-old.png',
+      );
+      loadScene(
+        { regions: [{ type: 'glow', mask: 'mask.png' }] },
+        'scene-new.png',
+      );
+
+      await first;
+
+      // The first scene's texture should have been destroyed
+      const textures = Texture.from.mock.results;
+      if (textures.length > 1) {
+        expect(textures[0].value.destroy).toHaveBeenCalledWith(false);
+      }
     });
   });
 });

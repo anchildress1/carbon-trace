@@ -19,6 +19,7 @@ import { createEffect, noiseFreeTypes, overlayTypes } from './effects.js';
 let pixiApp = null;
 let canvasEl = null;
 let observer = null;
+let motionQuery = null;
 let webglAvailable = true;
 let needsReinit = false;
 let activeEffects = [];
@@ -30,6 +31,15 @@ let initPromise = null;
 
 function reducedMotion() {
   return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function handleMotionChange(e) {
+  if (!pixiApp) return;
+  if (e.matches) {
+    pixiApp.ticker.stop();
+  } else if (!isPaused && activeEffects.length > 0) {
+    pixiApp.ticker.start();
+  }
 }
 
 /**
@@ -136,22 +146,29 @@ async function applyRegionEffect(region, sceneTexture, gen) {
   let noiseSprite = null;
   if (!noiseFreeTypes.has(region.type)) {
     const noiseTexture = await loadTexture(region.noise || 'assets/masks/noise-256.png');
-    if (gen !== loadGeneration) return null;
+    if (gen !== loadGeneration) {
+      noiseTexture.destroy(false);
+      return null;
+    }
     disposableTextures.push(noiseTexture);
     noiseSprite = new Sprite(noiseTexture);
+    noiseSprite.renderable = false;
     pixiApp.stage.addChild(noiseSprite);
   }
 
   const effect = createEffect(region.type, noiseSprite, region);
   if (!effect) {
     if (noiseSprite) {
-      pixiApp.stage.removeChild(noiseSprite);
+      noiseSprite.removeFromParent();
     }
     return null;
   }
 
   const maskTexture = await loadLuminanceMask(region.mask);
-  if (gen !== loadGeneration) return null;
+  if (gen !== loadGeneration) {
+    maskTexture.destroy(false);
+    return null;
+  }
   disposableTextures.push(maskTexture);
 
   if (overlayTypes.has(region.type)) {
@@ -245,6 +262,9 @@ async function doInit(el) {
     el.addEventListener('webglcontextlost', handleContextLost);
     el.addEventListener('webglcontextrestored', handleContextRestored);
 
+    motionQuery = globalThis.matchMedia('(prefers-reduced-motion: reduce)');
+    motionQuery.addEventListener('change', handleMotionChange);
+
     observer = new ResizeObserver(() => {
       if (pixiApp?.renderer) {
         pixiApp.renderer.resize(canvasEl.clientWidth, canvasEl.clientHeight);
@@ -321,7 +341,10 @@ export async function loadScene(effectsConfig, sceneImageUrl) {
 
   try {
     const sceneTexture = await loadTexture(sceneImageUrl);
-    if (gen !== loadGeneration) return;
+    if (gen !== loadGeneration) {
+      sceneTexture.destroy(false);
+      return;
+    }
     disposableTextures.push(sceneTexture);
 
     const completed = await loadRegionEffects(effectsConfig.regions, sceneTexture, gen);
@@ -435,6 +458,11 @@ export function destroy() {
   if (canvasEl) {
     canvasEl.removeEventListener('webglcontextlost', handleContextLost);
     canvasEl.removeEventListener('webglcontextrestored', handleContextRestored);
+  }
+
+  if (motionQuery) {
+    motionQuery.removeEventListener('change', handleMotionChange);
+    motionQuery = null;
   }
 
   if (observer) {
