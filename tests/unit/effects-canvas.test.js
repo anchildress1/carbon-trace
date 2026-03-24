@@ -90,6 +90,7 @@ import {
   init,
   loadScene,
   clearAll,
+  cancelPendingLoad,
   pause,
   resume,
   destroy,
@@ -381,6 +382,34 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
       // createEffect should be called for at most the second scene's region.
       const glowCalls = createEffect.mock.calls.filter(c => c[0] === 'glow');
       expect(glowCalls.length).toBeLessThanOrEqual(1);
+    });
+
+    it('cancelPendingLoad invalidates in-flight loadScene', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      const { createEffect } = await import('../../src/effects.js');
+      createEffect.mockClear();
+
+      // Start a loadScene that will be in-flight during cancel
+      const inflight = loadScene(
+        { regions: [{ type: 'water', mask: 'mask.png' }] },
+        'scene.png',
+      );
+
+      // Cancel before the in-flight call can finish
+      cancelPendingLoad();
+      clearAll();
+
+      await inflight;
+
+      // The in-flight load should have bailed at a generation check
+      expect(createEffect).not.toHaveBeenCalled();
+    });
+
+    it('cancelPendingLoad is safe to call before init', () => {
+      destroy();
+      expect(() => cancelPendingLoad()).not.toThrow();
     });
   });
 

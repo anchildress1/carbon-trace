@@ -403,6 +403,17 @@ export function clearAll() {
   }
 }
 
+/**
+ * Invalidate any in-flight loadScene() call so its async continuations
+ * bail out at the next generation check. Called by app.js when navigating
+ * to a frame with no effects — clearAll() alone is not sufficient because
+ * it does not advance loadGeneration (it is also called internally by
+ * loadScene, where advancing the counter would break the caller's own gen).
+ */
+export function cancelPendingLoad() {
+  loadGeneration++;
+}
+
 export function pause() {
   if (!webglAvailable || !pixiApp) return;
   pixiApp.ticker.stop();

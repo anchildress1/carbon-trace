@@ -19,6 +19,7 @@ import {
   init as initEffectsCanvas,
   loadScene as loadEffectsScene,
   clearAll as clearEffects,
+  cancelPendingLoad,
   pause as pauseEffects,
   resume as resumeEffects,
 } from './effects-canvas.js';
@@ -355,6 +356,7 @@ function showFrame(app, index) {
       console.error('Effects load failed:', err.message),
     );
   } else {
+    cancelPendingLoad();
     clearEffects();
   }
 

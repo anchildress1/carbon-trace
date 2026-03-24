@@ -56,6 +56,7 @@ vi.mock('../../src/effects-canvas.js', () => ({
   init: vi.fn().mockResolvedValue(undefined),
   loadScene: vi.fn().mockResolvedValue(undefined),
   clearAll: vi.fn(),
+  cancelPendingLoad: vi.fn(),
   pause: vi.fn(),
   resume: vi.fn(),
 }));
@@ -190,6 +191,7 @@ import {
 import { buildNarrationTimeline } from '../../src/text.js';
 import {
   clearAll as clearEffects,
+  cancelPendingLoad,
   loadScene as loadEffectsScene,
   pause as pauseEffects,
   resume as resumeEffects,
@@ -1105,6 +1107,25 @@ describe('app.js', () => {
       app.advance(); // scene-01 → scene-02 (effects: null)
       await flush();
       expect(clearEffects).toHaveBeenCalled();
+    });
+
+    it('calls cancelPendingLoad before clearEffects on no-effects frames', async () => {
+      app = createApp();
+      await flush();
+      app.togglePause();
+      app.advance(); // title → scene-01
+      await flush();
+      vi.clearAllMocks();
+
+      const callOrder = [];
+      cancelPendingLoad.mockImplementation(() => callOrder.push('cancelPendingLoad'));
+      clearEffects.mockImplementation(() => callOrder.push('clearEffects'));
+
+      app.advance(); // scene-01 → scene-02 (effects: null)
+      await flush();
+
+      expect(cancelPendingLoad).toHaveBeenCalled();
+      expect(callOrder).toEqual(['cancelPendingLoad', 'clearEffects']);
     });
 
     it('calls loadEffectsScene on showFrame when frame has effect regions', async () => {
