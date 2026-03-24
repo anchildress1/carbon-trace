@@ -162,14 +162,14 @@ async function applyRegionEffect(region, sceneTexture, gen) {
 /**
  * Overlay rendering: mask texture becomes the visible sprite content.
  * The shape's alpha edges let GlowFilter radiate outward. Tinted with
- * the effect color and set to low alpha so the scene shows through.
+ * the effect color; GlowFilter's knockout:true ensures only the glow
+ * halo renders, not the solid fill.
  */
 function applyOverlayEffect(effect, maskTexture, region) {
   const effectSprite = new Sprite(maskTexture);
   effectSprite.width = pixiApp.screen.width;
   effectSprite.height = pixiApp.screen.height;
   effectSprite.tint = region.color ?? 0xffcc66;
-  effectSprite.alpha = 1;
   effectSprite.filters = [effect.filter];
 
   screenSizedSprites.push(effectSprite);
@@ -343,8 +343,9 @@ async function reinit() {
 }
 
 /**
- * Destroy all scene content (sprites, filters, textures). Frees GPU memory.
- * The ticker stops but the Application stays alive for reuse.
+ * Destroy all scene content (sprites, filters, texture wrappers). Leaves
+ * TextureSources alive for deferred GC reclamation (see tex.destroy(false)
+ * rationale below). The ticker stops but the Application stays alive for reuse.
  */
 export function clearAll() {
   if (!webglAvailable || !pixiApp) return;
@@ -378,12 +379,11 @@ export function clearAll() {
   }
 
   // Destroy textures WITHOUT destroying the underlying TextureSource.
-  // tex.destroy(true) triggers TextureSource.destroy() → unload() →
-  // emits "change" → BindGroup.onResourceChange sees destroyed=true →
-  // BindGroup.destroy() sets resources=null. This corrupts pooled
-  // AlphaMaskEffect objects whose MaskFilter BindGroup then crashes on
-  // getResource(0) during the next scene's render. PixiJS's TextureGCSystem
-  // handles GPU memory reclamation for unreferenced texture sources.
+  // tex.destroy(true) destroys the TextureSource, which triggers
+  // unload → "change" event. This corrupts pooled AlphaMaskEffect
+  // objects from BigPool, causing crashes during the next scene's
+  // render. Passing false leaves the TextureSource alive for PixiJS's
+  // GCSystem to reclaim once the resource exceeds maxUnusedTime.
   for (const tex of disposableTextures) {
     try {
       tex.destroy(false);

@@ -632,7 +632,7 @@ function doResume(app) {
     setupAutoAdvance(app);
   } else if (firstPlay) {
     app.els.playGate.hidden = true;
-    // Clear stranded 'cued' entries from showFrame's cueAudioCues call —
+    // Clear stranded audio entries from showFrame's scheduleFrameAudio call —
     // handleFirstPlay will schedule audio fresh via scheduleFrameAudio.
     cancelAudioCues();
     handleFirstPlay(app);

@@ -209,7 +209,7 @@ Mask PNGs are local assets served from same origin. `img-src 'self'` already cov
 **effects.js** — no longer a no-op. Becomes the effect factory registry:
 ```
 registerEffect(type, factoryFn)  — register a named effect type
-createEffect(type, app, params)  — create PixiJS filter for this type
+createEffect(type, displacementSprite, params)  — create PixiJS filter for this type
 ```
 
 Built-in registrations: `water`, `heat`, `dust`, `glow`, `shockwave`. Displacement types (water, heat, dust) return a DisplacementFilter. Glow returns a GlowFilter (`pixi-filters`). Shockwave returns a ShockwaveFilter (`pixi-filters`).
@@ -218,15 +218,14 @@ Built-in registrations: `water`, `heat`, `dust`, `glow`, `shockwave`. Displaceme
 ```
 init(canvasEl)                         — create PixiJS Application on the canvas
 loadScene(effectsConfig, sceneImageUrl) — load scene sprite, create filters per region
-clearAll()                             — destroy sprites/filters/textures via .destroy(true)
-                                         (frees GPU backing store — prevents memory leak
-                                         across 12 scene transitions). Ticker stays running
-                                         (no-op frames, ~0ms). Ticker is only stopped by pause().
+clearAll()                             — destroy sprites/filters; texture wrappers via .destroy(false).
+                                         TextureSources left for GCSystem reclamation. Ticker stops.
+                                         Application stays alive for reuse.
 pause() / resume()                     — stop/start PixiJS ticker (WCAG 2.2.2)
 ```
 
 **New dependencies:**
-- `pixi.js` v8 — added to package.json (pinned to exact minor version), bundled by Vite (no CDN). ~150KB gzipped. Tree-shake via `import { Application, Sprite, DisplacementFilter, BlurFilter, Texture } from 'pixi.js'`. Also imports `pixi.js/unsafe-eval` for CSP-safe shader compilation.
+- `pixi.js` v8 — added to package.json (pinned to exact minor version), bundled by Vite (no CDN). ~150KB gzipped. Tree-shake via `import { Application, Container, Sprite, Texture } from 'pixi.js'` (effects-canvas.js) and `import { DisplacementFilter } from 'pixi.js'` (effects.js). Also imports `pixi.js/unsafe-eval` for CSP-safe shader compilation.
 - `pixi-filters` v6 — community filter collection, compatible with PixiJS v8. Provides `GlowFilter` and `ShockwaveFilter` as dedicated, GPU-optimized implementations. Tree-shake via individual imports: `import { GlowFilter } from 'pixi-filters'`, `import { ShockwaveFilter } from 'pixi-filters'`. Pinned to exact minor version. **Bundle impact:** only the imported filters are included (Vite tree-shakes the rest). Verify final bundle size during profiling — the full `pixi-filters` package is large (~2.7MB unshaken) but individual filter imports should add minimal overhead.
 - No particle emitter package needed — displacement effect types (water, heat, dust) use DisplacementFilter exclusively.
 
@@ -306,7 +305,6 @@ When `prefers-reduced-motion: reduce` is active:
 - Water: static (no displacement)
 - Heat: static (no displacement)
 - Dust: static (no displacement)
-- Fog: static (no blur pulse)
 - Glow: static (no bloom pulse)
 - Shockwave: static (no burst cycle)
 
@@ -460,7 +458,6 @@ loadScene         │ valid config, empty regions [], mask load failure, missing
 water effect      │ flow direction, speed 0 (static), varying intensity
 heat effect       │ upward distortion, edge falloff
 dust effect       │ gentle drift displacement, varying intensity from gray values
-fog effect        │ blur without additive blend, gentle pulse
 glow effect       │ additive blur bloom, pulse animation
 shockwave effect  │ radial burst cycle, rest phase, displacement fade
 pause/resume      │ effects freeze on pause, resume without drift
@@ -488,7 +485,7 @@ These are scoped implementation choices, not architectural decisions. The ADR's 
 
 ## Implementation Status
 
-**Code is not yet updated.** Current codebase still has: `<div id="trace-overlay">`, `effects.js` as no-op, `effects-canvas.js` with Canvas 2D `getContext('2d')`, old `effects: { idle, entry }` schema in scenes.json, CSS opacity transitions on `.trace-overlay`. All items below are pending implementation.
+**Implemented.** All architectural items below have been completed: trace-overlay converted to canvas, effects-canvas.js uses PixiJS WebGL, effects.js is a factory registry, scenes.json uses `{ regions: [...] }` schema.
 
 **Implementation note (adversarial review, March 21 2026):** ADR-007 owns the `<div>` → `<canvas>` conversion for `#trace-overlay` and the layer stack reorder. This is done as the opening commit of ADR-007 implementation, independent of ADR-006 shimmer logic.
 
@@ -511,4 +508,4 @@ These are scoped implementation choices, not architectural decisions. The ADR's 
 15. [ ] Audio-reactive implementation — see ADR-008 action items
 16. [x] Add request-generation guard in loadScene() — increment a generation counter on each call, check on async image/mask load resolve, discard stale results if counter has changed (prevents race when user navigates mid-load)
 17. [x] Resize active effect/mask bounds — ResizeObserver tracks screen-sized sprites (maskSprite, effectSprite) and updates their dimensions on resize. Noise sprites use scale.set() with repeat addressing (viewport-independent).
-18. [x] Texture lifecycle cleanup in clearAll() — disposableTextures array tracks per-scene mask and noise textures. Destroyed with .destroy(true) in clearAll(). Shared scene texture preserved via child.destroy({ texture: false }).
+18. [x] Texture lifecycle cleanup in clearAll() — disposableTextures array tracks per-scene mask, noise, and scene textures. Destroyed with .destroy(false) to avoid BindGroup corruption; TextureSources left for GCSystem reclamation. Sprites destroyed via child.destroy({ children: true, texture: false }).

@@ -3,7 +3,7 @@
  * function that creates a filter and an update callback. effects-canvas.js
  * calls createEffect() to instantiate filters.
  *
- * Displacement-based effects (water, heat, dust, fog) use the built-in
+ * Displacement-based effects (water, heat, dust) use the built-in
  * DisplacementFilter with a noise sprite. Extension effects (glow, shockwave)
  * use filters from pixi-filters and do not require a noise sprite.
  */
@@ -113,7 +113,7 @@ registerEffect('dust', (sprite, params = {}) => {
 
 /**
  * Glow: luminous outer glow that pulses in intensity. Creates a warm,
- * breathing light effect around bright regions of the scene.
+ * breathing light effect radiating from the mask shape's edges.
  */
 registerEffect('glow', (_sprite, params = {}) => {
   const {
