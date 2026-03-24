@@ -440,6 +440,7 @@ function completePendingNav(app) {
 function cleanupCurrentScene(app) {
   app.generation++;
   clearAutoAdvance(app);
+  cancelPendingLoad();
   cancelAudioCues();
 
   clearCaptionElements(app.captionEntries);

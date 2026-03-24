@@ -1125,7 +1125,27 @@ describe('app.js', () => {
       await flush();
 
       expect(cancelPendingLoad).toHaveBeenCalled();
-      expect(callOrder).toEqual(['cancelPendingLoad', 'clearEffects']);
+      // cancelPendingLoad is called twice: once during cleanupCurrentScene
+      // (invalidates stale in-flight loads from the outgoing frame) and once
+      // in showFrame's no-effects branch (explicit cancel before clearEffects).
+      expect(callOrder).toEqual(['cancelPendingLoad', 'cancelPendingLoad', 'clearEffects']);
+    });
+
+    it('calls cancelPendingLoad during cleanup to invalidate stale in-flight loads', async () => {
+      app = createApp();
+      await flush();
+      app.togglePause();
+      app.advance(); // title → scene-01 (has effects)
+      await flush();
+      vi.clearAllMocks();
+
+      // Advancing again triggers cleanupCurrentScene for scene-01.
+      // cancelPendingLoad must be called to prevent stale texture loads
+      // from resolving and adding sprites during the fade-out window.
+      app.advance(); // scene-01 → scene-02
+      await flush();
+
+      expect(cancelPendingLoad).toHaveBeenCalled();
     });
 
     it('calls loadEffectsScene on showFrame when frame has effect regions', async () => {
