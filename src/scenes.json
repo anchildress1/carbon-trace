@@ -24,17 +24,17 @@
           {
             "text": "I'm gonna tell you a story.",
             "enter": 10,
-            "exit": 3000,
-            "x": 50,
-            "y": 45,
+            "exit": 1800,
+            "x": 25,
+            "y": 30,
             "align": "center"
           },
           {
             "text": "Not because it's special. But because it's mine.",
             "enter": 3000,
             "exit": 8000,
-            "x": 50,
-            "y": 55,
+            "x": 40,
+            "y": 45,
             "align": "center"
           }
         ],
@@ -47,16 +47,16 @@
           {
             "text": "I'm gonna tell you a story.",
             "start": 1000,
-            "end": 2000
+            "end": 1800
           },
           {
             "text": "Not because it's special. But because it's mine.",
             "start": 3000,
-            "end": 6000
+            "end": 6500
           },
           {
             "text": "And my Daddy always told me to finish what I started.",
-            "start": 6000,
+            "start": 6500,
             "end": 10000
           }
         ]
@@ -125,37 +125,37 @@
           {
             "text": "I come from a place where the ground either feeds you or buries you.",
             "start": 0,
-            "end": 5000
+            "end": 4500
           },
           {
             "text": "Buchanan County is one of the poorest in the whole state of Virginia.",
-            "start": 5000,
-            "end": 10000
+            "start": 5700,
+            "end": 9700
           },
           {
-            "text": "And if you're aren't a miner, that meant you're a miner's wife and probably didn't have a pot to piss in.",
+            "text": "And if you're weren't a miner, then that meant you're a miner's wife and probably didn't have a pot to piss in.",
             "start": 10000,
-            "end": 16000
+            "end": 16500
           },
           {
             "text": "In these mountains, you ain't got many other options.",
-            "start": 16000,
-            "end": 20000
+            "start": 17000,
+            "end": 22000
           },
           {
             "text": "Every single day I watched my daddy go underground knowing most men came back home.",
-            "start": 20000,
-            "end": 27000
+            "start": 22000,
+            "end": 28200
           },
           {
             "text": "Not all of them, mind you, but most.",
-            "start": 27000,
+            "start": 28800,
             "end": 32000
           },
           {
             "text": "That's just what we called living.",
             "start": 32000,
-            "end": 34000
+            "end": 34500
           }
         ]
       },
@@ -164,12 +164,12 @@
           {
             "type": "glow",
             "mask": "assets/masks/mask-01-seam-diamond.png",
-            "color": 16775408,
-            "glowAlpha": 0.15,
-            "distance": 10,
-            "outerStrength": 2,
-            "pulseSpeed": 0.02,
-            "pulseDepth": 0.4
+            "color": 15189379,
+            "glowAlpha": 0.1,
+            "distance": 8,
+            "outerStrength": 3,
+            "pulseSpeed": 0.01,
+            "pulseDepth": 0.3
           }
         ]
       },
@@ -198,7 +198,7 @@
         {
           "id": "ambient-01",
           "type": "ambient",
-          "src": "assets/audio/ambient/scene-01-seam.m4a",
+          "src": "assets/audio/ambient/01-seam-mine.m4a",
           "enter": 0,
           "volume": 0.1,
           "loop": true,
@@ -252,32 +252,32 @@
           {
             "text": "I learned early the difference between work that got noticed and work that was just expected.",
             "start": 0,
-            "end": 6000
+            "end": 6100
           },
           {
             "text": "Daddy would come home covered in black coal and it was a badge of honor.",
-            "start": 6000,
-            "end": 11000
+            "start": 7000,
+            "end": 10800
           },
           {
             "text": "That meant he'd worked hard and he was respected for it.",
             "start": 11000,
-            "end": 15000
+            "end": 14800
           },
           {
             "text": "Mommy and Mawmaw kept the rest of the world from falling apart—",
             "start": 15000,
-            "end": 20000
+            "end": 18700
           },
           {
             "text": "the youngins to school, doing the running, supper on the table.",
-            "start": 20000,
-            "end": 23000
+            "start": 19000,
+            "end": 23400
           },
           {
             "text": "And it was always fixed and hot.",
             "start": 23000,
-            "end": 26000
+            "end": 26100
           },
           {
             "text": "Problem was, nobody called that much of nothing but being a good wife.",
@@ -285,19 +285,14 @@
             "end": 32000
           },
           {
-            "text": "So that's what I learned.",
+            "text": "That's the way I was raised.",
             "start": 32000,
             "end": 34000
           },
           {
-            "text": "Work like it mattered and keep on moving whether anybody sees it or not.",
+            "text": "To work like it mattered and keep on moving whether anybody sees it or not.",
             "start": 34000,
-            "end": 40000
-          },
-          {
-            "text": "That's how I was raised.",
-            "start": 40000,
-            "end": 42000
+            "end": 39000
           }
         ]
       },
@@ -306,12 +301,12 @@
           {
             "type": "glow",
             "mask": "assets/masks/mask-02-travel-diamond.png",
-            "color": 16775408,
-            "glowAlpha": 0.15,
-            "distance": 5,
-            "outerStrength": 2,
+            "color": 16769662,
+            "glowAlpha": 0.2,
+            "distance": 8,
+            "outerStrength": 1,
             "pulseSpeed": 0.02,
-            "pulseDepth": 0.4
+            "pulseDepth": 0.3
           }
         ]
       },
@@ -336,7 +331,7 @@
         {
           "id": "ambient-02",
           "type": "ambient",
-          "src": "assets/audio/ambient/scene-02-travel.m4a",
+          "src": "assets/audio/ambient/02-travel-fabric.m4a",
           "enter": 0,
           "volume": 0.4,
           "loop": true,
@@ -390,42 +385,42 @@
           {
             "text": "I'll tell you what—growing up was a hard thing to do.",
             "start": 0,
-            "end": 4000
+            "end": 3300
           },
           {
-            "text": "Seemed like every time I got my feet under me, something else would come along and knock them back out again.",
+            "text": "Seemed like every time I got my feet under me, something would come along and knock them back out again.",
             "start": 4000,
-            "end": 10000
+            "end": 8900
           },
           {
             "text": "More than once, life came at me hot enough to ruin a person.",
-            "start": 10000,
-            "end": 16000
+            "start": 9700,
+            "end": 13500
           },
           {
             "text": "Liked to have killed me, if I'm being honest.",
-            "start": 16000,
-            "end": 19000
+            "start": 14500,
+            "end": 16500
           },
           {
             "text": "But something in me just refused to burn.",
-            "start": 19000,
-            "end": 23000
+            "start": 17000,
+            "end": 19000
           },
           {
             "text": "And I don't know what you'd call it except stubborn.",
-            "start": 23000,
-            "end": 29000
+            "start": 20000,
+            "end": 23000
           },
           {
             "text": "I just figured as long as I had fight left in me, then fighting is just what I'd do.",
-            "start": 29000,
-            "end": 36000
+            "start": 24000,
+            "end": 30000
           },
           {
             "text": "Turns out that sort of thinking probably saved my life a time or two over the years.",
-            "start": 36000,
-            "end": 43000
+            "start": 30000,
+            "end": 35000
           }
         ]
       },
@@ -438,12 +433,12 @@
           {
             "type": "glow",
             "mask": "assets/masks/mask-03-reach-diamond.png",
-            "color": 16775408,
-            "glowAlpha": 0.15,
-            "distance": 15,
+            "color": 13524247,
+            "glowAlpha": 0.2,
+            "distance": 8,
             "outerStrength": 3,
-            "pulseSpeed": 0.02,
-            "pulseDepth": 0.4
+            "pulseSpeed": 0.03,
+            "pulseDepth": 0.5
           }
         ]
       },
@@ -468,7 +463,7 @@
         {
           "id": "ambient-03",
           "type": "ambient",
-          "src": "assets/audio/ambient/scene-03-reach.m4a",
+          "src": "assets/audio/ambient/03-reach-fireplace.m4a",
           "enter": 0,
           "volume": 0.75,
           "loop": true,
@@ -522,52 +517,52 @@
           {
             "text": "I left home toting more than I knew.",
             "start": 0,
-            "end": 3000
+            "end": 2400
           },
           {
             "text": "Not money—we didn't have none of that.",
             "start": 3000,
-            "end": 7000
+            "end": 6000
           },
           {
             "text": "Not a plan neither—I guess nobody thought to hand me one of those and I probably wouldn't have listened no how.",
-            "start": 7000,
-            "end": 15000
+            "start": 6600,
+            "end": 14000
           },
           {
             "text": "But somewhere between watching my Mawmaw stretch a meal to feed 16 of us for Sunday supper",
             "start": 15000,
-            "end": 22000
+            "end": 21000
           },
           {
             "text": "and watching my mommy hold that house together on nothing, something took root.",
-            "start": 22000,
-            "end": 27000
+            "start": 21500,
+            "end": 26000
           },
           {
             "text": "I didn't learn how to survive by reading about it—",
             "start": 27000,
-            "end": 31000
+            "end": 30000
           },
           {
             "text": "I learned because I watched them all do it every single day.",
-            "start": 31000,
-            "end": 36000
+            "start": 30500,
+            "end": 34000
           },
           {
             "text": "I didn't rightly know what it was back then.",
-            "start": 36000,
-            "end": 40000
+            "start": 34000,
+            "end": 38000
           },
           {
             "text": "It just felt like the way I was made.",
-            "start": 40000,
-            "end": 42000
+            "start": 38000,
+            "end": 40000
           },
           {
-            "text": "But I've kept it in my pocket my whole life.",
-            "start": 42000,
-            "end": 46000
+            "text": "But I had it in my pocket the whole time.",
+            "start": 41000,
+            "end": 44000
           }
         ]
       },
@@ -576,11 +571,11 @@
           {
             "type": "glow",
             "mask": "assets/masks/mask-04-pocket-diamond.png",
-            "color": 16775408,
+            "color": 15909236,
             "glowAlpha": 0.15,
-            "distance": 15,
-            "outerStrength": 3,
-            "pulseSpeed": 0.02,
+            "distance": 6,
+            "outerStrength": 2,
+            "pulseSpeed": 0.03,
             "pulseDepth": 0.4
           }
         ]
@@ -606,7 +601,7 @@
         {
           "id": "ambient-04",
           "type": "ambient",
-          "src": "assets/audio/ambient/scene-04-pocket.m4a",
+          "src": "assets/audio/ambient/04-pocket-clock.m4a",
           "enter": 0,
           "volume": 1,
           "loop": true,
@@ -660,7 +655,7 @@
           {
             "text": "By the time I found my way into tech, I'd already been trained in all the hard things.",
             "start": 0,
-            "end": 6000
+            "end": 4800
           },
           {
             "text": "Every time I thought about quitting school, I'd think of my Mommy telling me to put on my big girl panties.",
@@ -670,7 +665,7 @@
           {
             "text": "She still tells me that.",
             "start": 12000,
-            "end": 15000
+            "end": 14500
           },
           {
             "text": "And that was just our way of saying just because it's hard don't mean you ain't gonna do it.",
@@ -678,19 +673,19 @@
             "end": 20000
           },
           {
-            "text": "So I used all the stubbornness and grit I got from the mountains",
+            "text": "So I used all the stubbornness and grit from the mountains",
             "start": 20000,
-            "end": 26000
+            "end": 25500
           },
           {
-            "text": "and did a whole lot of just showing up until I finished school.",
+            "text": "and did a whole lot of just showing up to finish my schoolin'.",
             "start": 26000,
             "end": 29000
           },
           {
             "text": "Somewhere along the way, the dust started washing off.",
-            "start": 29000,
-            "end": 34000
+            "start": 30000,
+            "end": 33000
           },
           {
             "text": "Turns out what was under it was rightly what this kind of work needed.",
@@ -698,12 +693,12 @@
             "end": 39000
           },
           {
-            "text": "Now, I don't think nobody was quite expecting that to look like me by the time I got there.",
+            "text": "Now, I don't think nobody was quite expecting that to look like me by the time I showed up.",
             "start": 39000,
-            "end": 46000
+            "end": 45000
           },
           {
-            "text": "I didn't rightly care neither.",
+            "text": "But I didn't rightly care neither.",
             "start": 46000,
             "end": 48000
           }
@@ -718,10 +713,10 @@
           {
             "type": "glow",
             "mask": "assets/masks/mask-05-rinse-diamond.png",
-            "color": 16775408,
+            "color": 16642996,
             "glowAlpha": 0.15,
-            "distance": 15,
-            "outerStrength": 3,
+            "distance": 12,
+            "outerStrength": 2.5,
             "pulseSpeed": 0.02,
             "pulseDepth": 0.4
           }
@@ -748,7 +743,7 @@
         {
           "id": "ambient-05",
           "type": "ambient",
-          "src": "assets/audio/ambient/scene-05-rinse.m4a",
+          "src": "assets/audio/ambient/05-rinse-faucet.m4a",
           "enter": 0,
           "volume": 0.1,
           "loop": true,
@@ -800,49 +795,54 @@
         ],
         "captions": [
           {
-            "text": "For a long time I just did whatever work was thrown at me.",
+            "text": "I caught on fast enough to how this industry works.",
             "start": 0,
-            "end": 4000
+            "end": 2600
           },
           {
-            "text": "I kept my head down and built things that other people usually got the credit for.",
-            "start": 4000,
-            "end": 10000
+            "text": "I learned to keep my head down and do whatever work was thrown at me.",
+            "start": 3700,
+            "end": 7500
           },
           {
-            "text": "I solved problems quietly because that's the way I'd been taught to do it.",
-            "start": 10000,
-            "end": 15000
+            "text": "I built things that other people usually got the credit for.",
+            "start": 8000,
+            "end": 11000
           },
           {
-            "text": "There were special women along the way though.",
-            "start": 15000,
-            "end": 18000
+            "text": "And I solved problems quietly because that's how I stayed out of trouble.",
+            "start": 11000,
+            "end": 16000
+          },
+          {
+            "text": "There were special women along the way too.",
+            "start": 17000,
+            "end": 19500
           },
           {
             "text": "There always are, if you know where to look for them.",
-            "start": 18000,
+            "start": 20000,
             "end": 23000
           },
           {
-            "text": "They'd already walked through the fire and not one of them was gonna make you feel smaller if you was still in it.",
-            "start": 23000,
+            "text": "They'd already walked through the fire and wouldn't nobody gonna make you feel smaller if you was still in it.",
+            "start": 24000,
             "end": 30000
           },
           {
-            "text": "They didn't talk big because they didn't have to.",
+            "text": "They didn't talk big because they didn't need to.",
             "start": 30000,
-            "end": 34000
+            "end": 33000
           },
           {
             "text": "They just quietly shined the way.",
             "start": 34000,
-            "end": 37000
+            "end": 36000
           },
           {
             "text": "Walking in front of you—carrying the light as if they'd been the ones underground.",
-            "start": 37000,
-            "end": 44000
+            "start": 36000,
+            "end": 42000
           }
         ]
       },
@@ -852,10 +852,10 @@
             "type": "glow",
             "mask": "assets/masks/mask-06-storage-diamond.png",
             "color": 16775408,
-            "glowAlpha": 0.15,
+            "glowAlpha": 0.25,
             "distance": 15,
             "outerStrength": 3,
-            "pulseSpeed": 0.02,
+            "pulseSpeed": 0.03,
             "pulseDepth": 0.4
           }
         ]
@@ -881,7 +881,7 @@
         {
           "id": "ambient-06",
           "type": "ambient",
-          "src": "assets/audio/ambient/scene-06-storage.m4a",
+          "src": "assets/audio/ambient/06-storage-electromagnetic.m4a",
           "enter": 0,
           "volume": 0.35,
           "loop": true,
@@ -935,27 +935,37 @@
           {
             "text": "But not all of them made it...",
             "start": 0,
-            "end": 3000
+            "end": 1900
           },
           {
             "text": "That girl fresh out of school? She never even got a chance—she was good. Too good.",
-            "start": 3000,
-            "end": 12000
+            "start": 2800,
+            "end": 10500
+          },
+          {
+            "text": "She didn't leave loud neither—she was just gone",
+            "start": 11000,
+            "end": 15000
+          },
+          {
+            "text": "Everybody seemed to move on with life like that's normal. It ain't.",
+            "start": 16000,
+            "end": 22000
           },
           {
             "text": "There was lots of women working harder than anybody else in the room and getting paid less for their troubles.",
-            "start": 12000,
-            "end": 20000
+            "start": 23000,
+            "end": 28000
           },
           {
             "text": "Some of them left because folks kept asking them to hide,",
-            "start": 20000,
-            "end": 24000
+            "start": 29000,
+            "end": 32500
           },
           {
             "text": "and I reckon they'd just got done obliging.",
             "start": 24000,
-            "end": 27000
+            "end": 36000
           }
         ]
       },
@@ -981,7 +991,7 @@
         {
           "id": "ambient-07",
           "type": "ambient",
-          "src": "assets/audio/ambient/scene-07-missing.m4a",
+          "src": "assets/audio/ambient/07-missing-rain.m4a",
           "enter": 0,
           "volume": 0.7,
           "loop": true,
@@ -1035,7 +1045,7 @@
         {
           "id": "ambient-08",
           "type": "ambient",
-          "src": "assets/audio/ambient/scene-08-empty.m4a",
+          "src": "assets/audio/ambient/08-empty-snow.m4a",
           "enter": 0,
           "volume": 1,
           "loop": true,
@@ -1087,39 +1097,39 @@
         ],
         "captions": [
           {
-            "text": "My world had a plan for me before I ever got here.",
+            "text": "I refuse to let all that be forgot.",
             "start": 0,
             "end": 3000
           },
           {
-            "text": "I just didn't take what they was giving.",
+            "text": "Sitting on a shelf that ain't nobody gonna remember.",
             "start": 3000,
             "end": 6000
           },
           {
-            "text": "And I remember all those things handed to me over the years and I ain't done with it yet.",
+            "text": "So I pack it with me .",
             "start": 6000,
+            "end": 9000
+          },
+          {
+            "text": "And I finally decided it's way past time to do something with it.",
+            "start": 10000,
             "end": 14000
           },
           {
             "text": "Everything all the women before me hauled around—that matters.",
             "start": 14000,
-            "end": 22000
+            "end": 20000
           },
           {
             "text": "And all of you walking beside me while the industry aims to fix us—don't lose your fight.",
-            "start": 22000,
-            "end": 30000
+            "start": 20000,
+            "end": 26000
           },
           {
-            "text": "If nothing else, then we'll do it for all the youngins coming up next.",
-            "start": 30000,
-            "end": 35000
-          },
-          {
-            "text": "Cause they're gonna need things to look a little bit brighter before they get here.",
-            "start": 35000,
-            "end": 40000
+            "text": "If nothing else, then we'll do it for all the youngins coming up who need these things to be a little bright before they get here.",
+            "start": 26000,
+            "end": 34000
           }
         ]
       },
@@ -1158,7 +1168,7 @@
         {
           "id": "ambient-09",
           "type": "ambient",
-          "src": "assets/audio/ambient/scene-09-return.m4a",
+          "src": "assets/audio/ambient/09-return-forest.m4a",
           "enter": 0,
           "volume": 0.55,
           "loop": true,
@@ -1210,39 +1220,39 @@
         ],
         "captions": [
           {
-            "text": "For now, I'll build things. Smart things.",
+            "text": "Now, I build things. Smart things.",
             "start": 0,
-            "end": 6000
+            "end": 4900
           },
           {
             "text": "That's what a girl from a little old coal town can do when she gets her hands on the right parts.",
-            "start": 6000,
-            "end": 13000
+            "start": 4900,
+            "end": 11000
           },
           {
             "text": "Every hard thing I've done.",
-            "start": 13000,
-            "end": 15000
+            "start": 11000,
+            "end": 13000
           },
           {
             "text": "Every hot coal I walked straight across led me right here.",
-            "start": 15000,
-            "end": 20000
+            "start": 13000,
+            "end": 17500
           },
           {
-            "text": "Not cause of a path I found, but because I decided a long time ago to cut one of my own.",
-            "start": 20000,
-            "end": 27000
+            "text": "Not cause the path was easy. Because I got used to cutting one of my own.",
+            "start": 18000,
+            "end": 24000
           },
           {
-            "text": "And this work ain't always pretty. Sometimes it's hands and wires and not knowing if it'll hold.",
-            "start": 27000,
-            "end": 35000
+            "text": "And the work ain't always pretty. Sometimes it's hands and wires and not knowing if it'll hold.",
+            "start": 24000,
+            "end": 31000
           },
           {
-            "text": "But that's exactly how you build anything that's worth having.",
-            "start": 35000,
-            "end": 40000
+            "text": "But how you build anything that's worth having.",
+            "start": 31000,
+            "end": 34000
           }
         ]
       },
@@ -1251,11 +1261,11 @@
           {
             "type": "glow",
             "mask": "assets/masks/mask-10-building-diamond.png",
-            "color": 16775408,
+            "color": 16642996,
             "glowAlpha": 0.15,
-            "distance": 15,
+            "distance": 10,
             "outerStrength": 3,
-            "pulseSpeed": 0.02,
+            "pulseSpeed": 0.03,
             "pulseDepth": 0.4
           }
         ]
@@ -1281,7 +1291,7 @@
         {
           "id": "ambient-10",
           "type": "ambient",
-          "src": "assets/audio/ambient/scene-10-building.m4a",
+          "src": "assets/audio/ambient/10-building-welding.m4a",
           "enter": 0,
           "volume": 0.2,
           "loop": true,
@@ -1333,24 +1343,24 @@
         ],
         "captions": [
           {
-            "text": "So that's what all of this is for.",
+            "text": "So that's what I built all this is for.",
             "start": 0,
-            "end": 4000
+            "end": 2200
           },
           {
             "text": "I want to leave more than I got when I started out.",
-            "start": 4000,
-            "end": 8000
+            "start": 2200,
+            "end": 6000
           },
           {
             "text": "I want it easier for the next ones coming up to build smart things without having to fight for every inch of it first.",
             "start": 8000,
-            "end": 16000
+            "end": 14000
           },
           {
-            "text": "I really just wanted to put a little light—and some music—into this one little corner of the universe so it ain't dark no more.",
-            "start": 16000,
-            "end": 26000
+            "text": "So this is me putting the light—and some music—into this one little corner of the universe so it's not dark no more.",
+            "start": 14000,
+            "end": 23000
           },
           {
             "text": "And if we're lucky, it will spread like wildfire.",
@@ -1368,12 +1378,12 @@
           {
             "type": "glow",
             "mask": "assets/masks/mask-11-music-diamond.png",
-            "color": 16775408,
+            "color": 15526871,
             "glowAlpha": 0.15,
             "distance": 15,
             "outerStrength": 3,
-            "pulseSpeed": 0.02,
-            "pulseDepth": 0.4
+            "pulseSpeed": 0.05,
+            "pulseDepth": 0.5
           }
         ]
       },
@@ -1398,7 +1408,7 @@
         {
           "id": "ambient-11",
           "type": "ambient",
-          "src": "assets/audio/ambient/scene-11-music.m4a",
+          "src": "assets/audio/ambient/11-music-vinyl.m4a",
           "enter": 0,
           "volume": 0.2,
           "loop": true,
