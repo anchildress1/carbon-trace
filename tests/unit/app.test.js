@@ -1137,6 +1137,42 @@ describe('app.js', () => {
       await flush();
       expect(loadEffectsScene).toHaveBeenCalled();
     });
+
+    it('animated transition awaits effectsReady before fade-in', async () => {
+      const { gsap } = await import('gsap');
+      const onCompletes = [];
+      gsap.to.mockImplementation((_target, opts) => {
+        onCompletes.push(opts.onComplete);
+        return { kill: vi.fn() };
+      });
+
+      let resolveEffects;
+      loadEffectsScene.mockReturnValue(
+        new Promise((resolve) => {
+          resolveEffects = resolve;
+        }),
+      );
+
+      app = createApp();
+      await flush();
+      app.togglePause(); // resume
+
+      app.advance(); // title → scene-01 (has effects)
+
+      // Fire fade-out onComplete → starts async fadeIn
+      if (onCompletes[0]) onCompletes[0]();
+      await flush();
+
+      // Effects haven't resolved yet — fade-in tween should not exist
+      expect(onCompletes.length).toBe(1);
+
+      // Resolve effects — fadeIn can proceed
+      resolveEffects();
+      await flush();
+
+      // Now the fade-in tween should have been created
+      expect(onCompletes.length).toBe(2);
+    });
   });
 
   // ── coverage: pending navigation during transition ─────────────────
@@ -1186,8 +1222,11 @@ describe('app.js', () => {
       app.advance(); // starts fade-out transition
       app.togglePause(); // queue pendingPause
 
-      // Complete fade-out → triggers showFrame + fade-in
+      // Complete fade-out → triggers async fadeIn (which awaits effects)
       if (onCompletes[0]) onCompletes[0]();
+      // Flush microtasks so the async fadeIn completes past its await
+      // and queues the fade-in GSAP tween (onCompletes[1]).
+      await flush();
       // Complete fade-in → landOnFrame checks pendingPause
       if (onCompletes[1]) onCompletes[1]();
       await flush();

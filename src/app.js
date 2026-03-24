@@ -352,12 +352,13 @@ function showFrame(app, index) {
   clearNarrationLayer(app.els.narrationLayer);
 
   if (frame.effects?.regions?.length) {
-    loadEffectsScene(frame.effects, frame.image).catch((err) =>
+    app.effectsReady = loadEffectsScene(frame.effects, frame.image).catch((err) =>
       console.error('Effects load failed:', err.message),
     );
   } else {
     cancelPendingLoad();
     clearEffects();
+    app.effectsReady = null;
   }
 
   const sceneIdx = app.sceneMap.byFrame.get(index);
@@ -403,6 +404,11 @@ function handleBufferChange(app, isBuffering) {
     }
     app.els.sceneStage.classList.remove('buffering');
   }
+}
+
+function waitForEffectsReady(app, timeoutMs = 800) {
+  if (!app.effectsReady) return Promise.resolve();
+  return Promise.race([app.effectsReady, new Promise((resolve) => setTimeout(resolve, timeoutMs))]);
 }
 
 function waitForImage(app, src) {
@@ -552,13 +558,18 @@ function transition(app, toIndex) {
     duration: halfDuration,
     ease: 'power2.inOut',
     onComplete: () => {
-      const fadeIn = () => {
+      const fadeIn = async () => {
         try {
           if (!proceedWithFrame()) {
             gsap.set(app.els.sceneStage, { opacity: 1 });
             completePendingNav(app);
             return;
           }
+
+          // Wait for effects textures to finish loading so they are
+          // visible when the stage fades back in. The timeout prevents
+          // the screen from staying at opacity 0 on very slow loads.
+          await waitForEffectsReady(app);
 
           gsap.to(app.els.sceneStage, {
             opacity: 1,
@@ -936,6 +947,7 @@ export function createApp() {
     replayPending: false,
     pendingPause: false,
     buffering: false,
+    effectsReady: null,
     availableAudio: new Set(),
     audioDurations: new Map(),
     projectMaxCaptionMs: computeProjectMaxCaptionMs(frames),
