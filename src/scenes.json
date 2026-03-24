@@ -959,16 +959,7 @@
           }
         ]
       },
-      "effects": {
-        "regions": [
-          {
-            "type": "godray",
-            "mask": "assets/masks/mask-07-missing-godray.png",
-            "gain": 0.3,
-            "alpha": 0.6
-          }
-        ]
-      },
+      "effects": null,
       "transition": {
         "type": "fade",
         "duration": 1200
@@ -1032,16 +1023,7 @@
           }
         ]
       },
-      "effects": {
-        "regions": [
-          {
-            "type": "godray",
-            "mask": "assets/masks/mask-08-empty-godray.png",
-            "gain": 0.3,
-            "alpha": 0.6
-          }
-        ]
-      },
+      "effects": null,
       "transition": {
         "type": "fade",
         "duration": 1200
