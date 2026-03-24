@@ -64,10 +64,17 @@ async function loadLuminanceMask(url) {
     img.src = url;
   });
 
+  if (!img.naturalWidth || !img.naturalHeight) {
+    throw new Error(`Mask image has zero dimensions: ${url}`);
+  }
+
   const canvas = document.createElement('canvas');
   canvas.width = img.naturalWidth;
   canvas.height = img.naturalHeight;
   const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error(`Failed to create 2D context for mask processing: ${url}`);
+  }
   ctx.drawImage(img, 0, 0);
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const data = imageData.data;
