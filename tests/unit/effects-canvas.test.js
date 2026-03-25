@@ -1193,4 +1193,173 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
 
     destroy();
   });
+
+  describe('onset trigger mode', () => {
+    async function setupTriggerScene(audioReactiveConfig) {
+      const { createEffect } = await import('../../src/effects.js');
+      const triggerFn = vi.fn();
+      createEffect.mockReturnValue({
+        filter: { enabled: true, amplitude: 15 },
+        update: vi.fn(),
+        trigger: triggerFn,
+      });
+
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      const config = {
+        regions: [
+          {
+            type: 'shockwave',
+            mask: 'assets/masks/test.png',
+            audioReactive: audioReactiveConfig,
+          },
+        ],
+      };
+
+      await loadScene(config, 'assets/images/test.webp');
+
+      const analyser = createMockAnalyser(44100);
+      setAnalyser(analyser);
+
+      const { Application } = await import('pixi.js');
+      const instance = Application.mock.instances[Application.mock.instances.length - 1];
+      const tickerCallback = instance.ticker.add.mock.calls[0]?.[0];
+
+      return { analyser, tickerCallback, triggerFn };
+    }
+
+    it('onset detection fires trigger on energy spike', async () => {
+      const { analyser, tickerCallback, triggerFn } = await setupTriggerScene({
+        band: 'bass',
+        trigger: { threshold: 1.5, cooldown: 0 },
+      });
+
+      // First few frames: build up running average with low energy
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        for (let i = 1; i <= 12; i++) data[i] = 25; // low bass
+      });
+      for (let i = 0; i < 10; i++) tickerCallback({ deltaMS: 16.67 });
+      triggerFn.mockClear();
+
+      // Spike: high energy well above running average
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        for (let i = 1; i <= 12; i++) data[i] = 255; // max bass
+      });
+      tickerCallback({ deltaMS: 16.67 });
+
+      expect(triggerFn).toHaveBeenCalled();
+      destroy();
+    });
+
+    it('cooldown prevents rapid re-triggering', async () => {
+      const { analyser, tickerCallback, triggerFn } = await setupTriggerScene({
+        band: 'bass',
+        trigger: { threshold: 1.5, cooldown: 0.5 },
+      });
+
+      // Build baseline with low energy. runningAvg starts at 0, so any
+      // energy triggers on frame 1. Run 40 frames (667ms) to let the
+      // running average stabilize AND exceed the 0.5s cooldown from
+      // that initial trigger.
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        for (let i = 1; i <= 12; i++) data[i] = 25;
+      });
+      for (let i = 0; i < 40; i++) tickerCallback({ deltaMS: 16.67 });
+      triggerFn.mockClear();
+
+      // Spike — should trigger (energy well above runningAvg * 1.5)
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        for (let i = 1; i <= 12; i++) data[i] = 255;
+      });
+      tickerCallback({ deltaMS: 16.67 });
+      expect(triggerFn).toHaveBeenCalledTimes(1);
+
+      // Another spike immediately (within 0.5s cooldown) — should NOT trigger
+      tickerCallback({ deltaMS: 16.67 });
+      expect(triggerFn).toHaveBeenCalledTimes(1);
+
+      destroy();
+    });
+
+    it('combined trigger + modulation both run in same frame', async () => {
+      const { analyser, tickerCallback, triggerFn } = await setupTriggerScene({
+        band: 'bass',
+        target: 'amplitude',
+        range: [0, 10],
+        smoothing: 0,
+        trigger: { threshold: 1.5, cooldown: 0 },
+      });
+
+      // Build baseline
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        for (let i = 1; i <= 12; i++) data[i] = 25;
+      });
+      for (let i = 0; i < 10; i++) tickerCallback({ deltaMS: 16.67 });
+      triggerFn.mockClear();
+
+      // Spike — both modulation and trigger should fire
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        for (let i = 1; i <= 12; i++) data[i] = 255;
+      });
+      tickerCallback({ deltaMS: 16.67 });
+
+      // Trigger fired
+      expect(triggerFn).toHaveBeenCalled();
+
+      // Modulation also set the amplitude (smoothing=0, energy=1.0, range=[0,10] → ~10)
+      const { createEffect } = await import('../../src/effects.js');
+      const mockEffect = createEffect.mock.results[0]?.value;
+      expect(mockEffect.filter.amplitude).toBeGreaterThan(5);
+
+      destroy();
+    });
+
+    it('modulate-only mode still works without trigger', async () => {
+      const { createEffect } = await import('../../src/effects.js');
+      createEffect.mockReturnValue({
+        filter: { enabled: true, outerStrength: 0 },
+        update: vi.fn(),
+      });
+
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      const config = {
+        regions: [
+          {
+            type: 'glow',
+            mask: 'assets/masks/test.png',
+            audioReactive: { band: 'bass', target: 'outerStrength', range: [0, 10], smoothing: 0 },
+          },
+        ],
+      };
+
+      await loadScene(config, 'assets/images/test.webp');
+
+      const analyser = createMockAnalyser(44100);
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        for (let i = 1; i <= 12; i++) data[i] = 255;
+      });
+      setAnalyser(analyser);
+
+      const { Application } = await import('pixi.js');
+      const instance = Application.mock.instances[Application.mock.instances.length - 1];
+      const tickerCallback = instance.ticker.add.mock.calls[0]?.[0];
+      tickerCallback({ deltaMS: 16.67 });
+
+      // Modulation should have set the parameter
+      const mockEffect = createEffect.mock.results[createEffect.mock.results.length - 1]?.value;
+      expect(mockEffect.filter.outerStrength).toBeGreaterThan(5);
+
+      destroy();
+    });
+  });
 });

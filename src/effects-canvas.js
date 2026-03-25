@@ -151,15 +151,58 @@ function buildAudioReactiveState() {
   for (let i = 0; i < activeEffects.length; i++) {
     const ar = activeEffects[i].audioReactive;
     if (ar) {
-      audioReactiveState.push({
+      const state = {
         effectIndex: i,
         band: ar.band,
         target: ar.target,
         range: ar.range,
         smoothing: ar.smoothing ?? 0.8,
         smoothedValue: 0,
-      });
+      };
+      // Onset trigger fields (ADR-008 trigger mode)
+      if (ar.trigger) {
+        state.trigger = true;
+        state.threshold = ar.trigger.threshold ?? 1.5;
+        state.cooldown = ar.trigger.cooldown ?? 0.1;
+        state.runningAvg = 0;
+        state.timeSinceLastTrigger = Infinity;
+      }
+      audioReactiveState.push(state);
     }
+  }
+}
+
+function applyModulation(state, energy) {
+  state.smoothedValue = state.smoothedValue * state.smoothing + energy * (1 - state.smoothing);
+  const value = state.range[0] + state.smoothedValue * (state.range[1] - state.range[0]);
+  activeEffects[state.effectIndex].filter[state.target] = value;
+}
+
+function applyTrigger(state, energy, dt) {
+  state.runningAvg = state.runningAvg * 0.95 + energy * 0.05;
+  state.timeSinceLastTrigger += dt;
+  if (energy > state.runningAvg * state.threshold && state.timeSinceLastTrigger > state.cooldown) {
+    activeEffects[state.effectIndex].trigger?.();
+    state.timeSinceLastTrigger = 0;
+  }
+}
+
+/**
+ * Audio-reactive modulation (ADR-008) — runs AFTER effect updates
+ * so audioReactive overrides pulse on the same parameter.
+ */
+function processAudioReactive(dt) {
+  if (!arAnalyser || audioReactiveState.length === 0 || reducedMotion()) return;
+  try {
+    arAnalyser.getByteFrequencyData(fftData);
+    const bands = extractBands(fftData, arAnalyser.context.sampleRate);
+    for (const state of audioReactiveState) {
+      const energy = bands[state.band];
+      if (state.target && state.range) applyModulation(state, energy);
+      if (state.trigger) applyTrigger(state, energy, dt);
+    }
+  } catch (err) {
+    console.error('Audio-reactive modulation failed:', err);
   }
 }
 
@@ -172,24 +215,7 @@ function tickerUpdate(ticker) {
       console.error('Effect update failed:', err);
     }
   }
-
-  // Audio-reactive modulation (ADR-008) — runs AFTER effect updates
-  // so audioReactive overrides pulse on the same parameter.
-  if (arAnalyser && audioReactiveState.length > 0 && !reducedMotion()) {
-    try {
-      arAnalyser.getByteFrequencyData(fftData);
-      const bands = extractBands(fftData, arAnalyser.context.sampleRate);
-      for (const state of audioReactiveState) {
-        const energy = bands[state.band];
-        state.smoothedValue =
-          state.smoothedValue * state.smoothing + energy * (1 - state.smoothing);
-        const value = state.range[0] + state.smoothedValue * (state.range[1] - state.range[0]);
-        activeEffects[state.effectIndex].filter[state.target] = value;
-      }
-    } catch (err) {
-      console.error('Audio-reactive modulation failed:', err);
-    }
-  }
+  processAudioReactive(dt);
 }
 
 /**
