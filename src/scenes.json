@@ -1328,13 +1328,23 @@
           {
             "type": "shockwave",
             "mask": "assets/masks/mask-11-music-shockwave.png",
-            "centerX": 0.48,
-            "centerY": 0.43,
+            "centerX": 0.46,
+            "centerY": 0.47,
+            "autoRepeat": false,
+            "cycleDuration": 0.4,
+            "cyclePause": 0,
+            "speed": 400,
+            "amplitude": 20,
+            "wavelength": 120,
             "audioReactive": {
               "band": "bass",
               "target": "amplitude",
               "range": [10, 30],
-              "smoothing": 0.8
+              "smoothing": 0.3,
+              "trigger": {
+                "threshold": 1.5,
+                "cooldown": 0.08
+              }
             }
           },
           {
