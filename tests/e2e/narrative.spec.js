@@ -322,7 +322,7 @@ test.describe('carbon-trace — positioned text', () => {
     expect(position).toBe('absolute');
   });
 
-  test('text alignment style is applied to positioned lines', async ({ page }) => {
+  test('positioned lines use left alignment', async ({ page }) => {
     // Press play so narration renders on title frame
     await page.click('#loading-screen');
 
@@ -331,7 +331,7 @@ test.describe('carbon-trace — positioned text', () => {
     const first = lines.first();
 
     const textAlign = await first.evaluate((el) => el.style.textAlign);
-    expect(['left', 'center', 'right']).toContain(textAlign);
+    expect(textAlign).toBe('left');
   });
 });
 
@@ -348,7 +348,7 @@ test.describe('carbon-trace — loading screen gate', () => {
 
   test('loading screen has accessible label', async ({ page }) => {
     const screen = page.locator('#loading-screen');
-    await expect(screen).toHaveAttribute('aria-label', 'carbon-trace, click to begin');
+    await expect(screen).toHaveAttribute('aria-label', 'carbon-trace, begin experience');
   });
 
   test('loading screen shows click-to-begin prompt when ready', async ({ page }) => {

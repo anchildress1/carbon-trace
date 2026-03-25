@@ -119,6 +119,9 @@ body {
 }
 
 .loading-prompt {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
   font-family: 'Lora', serif;
   font-style: italic;
   font-weight: 400;
@@ -127,6 +130,13 @@ body {
   text-transform: lowercase;
   color: rgba(232, 228, 223, 0);
   transition: color 0.8s ease;
+}
+
+.loading-play-icon {
+  width: 1em;
+  height: 1em;
+  fill: currentColor;
+  stroke: none;
 }
 
 .loading-prompt.visible {

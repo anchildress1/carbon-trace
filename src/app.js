@@ -117,6 +117,7 @@ function scheduleAutoAdvance(app, delay) {
   app.autoAdvanceTimer = new PausableTimer(() => {
     app.autoAdvanceTimer = null;
     if (app.paused || app.state === State.TRANSITIONING) return;
+    app.autoAdvancing = true;
     advance(app);
   }, delay);
 }
@@ -539,6 +540,12 @@ function transition(app, toIndex) {
       if (app.textTimeline) app.textTimeline.play(0);
       setupAutoAdvance(app);
     }
+    if (app.autoAdvancing) {
+      app.autoAdvancing = false;
+      if (document.activeElement?.closest('.control-buttons')) {
+        document.activeElement.blur();
+      }
+    }
     completePendingNav(app);
   };
 
@@ -785,7 +792,6 @@ function replayNarration(app) {
 
 function handleKeydown(app, e) {
   if (e.key === ' ') {
-    if (e.target.closest('#overlay-controls')) return;
     e.preventDefault();
     app.userHasInteracted = true;
     togglePause(app);
@@ -794,7 +800,6 @@ function handleKeydown(app, e) {
     app.userHasInteracted = true;
     retreat(app);
   } else if (e.key === 'ArrowRight' || e.key === 'Enter') {
-    if (e.target.closest('#overlay-controls')) return;
     e.preventDefault();
     app.userHasInteracted = true;
     advance(app);
@@ -906,6 +911,8 @@ function initApp(app) {
     .catch((err) => {
       console.error('Failed to initialize:', err);
       app.els.loadingScreen.textContent = 'Something went wrong. Please refresh.';
+      app.els.loadingScreen.setAttribute('aria-label', 'Something went wrong. Please refresh.');
+      app.els.loadingScreen.disabled = true;
     });
 }
 
@@ -952,6 +959,7 @@ export function createApp() {
     textTimeline: null,
     captionEntries: [],
     autoAdvanceTimer: null,
+    autoAdvancing: false,
     pendingNavIndex: null,
     generation: 0,
     deferFrameAudioUntilResume: false,

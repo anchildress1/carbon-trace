@@ -1430,34 +1430,36 @@ describe('app.js', () => {
       app.togglePause(); // resume → SCENE_ACTIVE
     });
 
-    it('Space inside overlay-controls does not toggle pause', () => {
+    it('Space inside overlay-controls still toggles pause', () => {
       const controls = document.getElementById('overlay-controls');
       controls.dispatchEvent(
         new KeyboardEvent('keydown', { key: ' ', bubbles: true }),
       );
 
-      // Should still be SCENE_ACTIVE — Space suppressed inside controls
-      expect(app.getState()).toBe('SCENE_ACTIVE');
+      // Space always toggles pause regardless of focus target
+      expect(app.getState()).toBe('PAUSED');
     });
 
-    it('Enter inside overlay-controls does not advance', () => {
+    it('Enter inside overlay-controls still advances', () => {
       vi.clearAllMocks();
       const controls = document.getElementById('overlay-controls');
       controls.dispatchEvent(
         new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
       );
 
-      expect(cancelAudioCues).not.toHaveBeenCalled();
+      // All keyboard shortcuts work regardless of focus target
+      expect(cancelAudioCues).toHaveBeenCalled();
     });
 
-    it('ArrowRight inside overlay-controls does not advance', () => {
+    it('ArrowRight inside overlay-controls still advances', () => {
       vi.clearAllMocks();
       const controls = document.getElementById('overlay-controls');
       controls.dispatchEvent(
         new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }),
       );
 
-      expect(cancelAudioCues).not.toHaveBeenCalled();
+      // All keyboard shortcuts work regardless of focus target
+      expect(cancelAudioCues).toHaveBeenCalled();
     });
 
     it('ArrowLeft still retreats from inside overlay-controls', async () => {

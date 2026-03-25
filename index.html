@@ -27,8 +27,13 @@
   </head>
   <body>
     <div id="app" role="application" aria-label="carbon-trace visual narrative">
-      <button class="loading-screen" id="loading-screen" aria-label="carbon-trace, click to begin">
+      <button
+        class="loading-screen"
+        id="loading-screen"
+        aria-label="carbon-trace, begin experience"
+      >
         <div class="loading-trace">
+          <p class="loading-title">carbon-trace</p>
           <svg class="loading-svg" viewBox="0 0 200 40" aria-hidden="true">
             <path
               class="trace-glow"
@@ -40,8 +45,12 @@
             />
             <circle class="trace-node" cx="100" cy="20" r="2" />
           </svg>
-          <p class="loading-title">carbon-trace</p>
-          <span class="loading-prompt" id="loading-prompt" hidden>click to begin</span>
+          <span class="loading-prompt" id="loading-prompt" hidden>
+            <svg class="loading-play-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+            begin experience
+          </span>
         </div>
       </button>
 
