@@ -211,7 +211,7 @@
           "volume": 0.05,
           "loop": true,
           "fadeIn": 500,
-          "fadeOut": null
+          "fadeOut": 1000
         }
       ]
     },
@@ -337,10 +337,10 @@
           "type": "ambient",
           "src": "assets/audio/ambient/02-travel-fabric.m4a",
           "enter": 0,
-          "volume": 0.3,
+          "volume": 0.28,
           "loop": true,
-          "fadeIn": 1500,
-          "fadeOut": null
+          "fadeIn": 4500,
+          "fadeOut": 1500
         }
       ]
     },
@@ -608,8 +608,8 @@
           "enter": 0,
           "volume": 0.15,
           "loop": true,
-          "fadeIn": null,
-          "fadeOut": null
+          "fadeIn": 500,
+          "fadeOut": 500
         }
       ]
     },
@@ -747,7 +747,7 @@
           "volume": 0.1,
           "loop": true,
           "fadeIn": 1500,
-          "fadeOut": null
+          "fadeOut": 500
         }
       ]
     },
@@ -994,7 +994,7 @@
           "volume": 0.2,
           "loop": true,
           "fadeIn": 1500,
-          "fadeOut": null
+          "fadeOut": 1000
         }
       ]
     },
@@ -1165,7 +1165,7 @@
           "volume": 0.35,
           "loop": true,
           "fadeIn": 1500,
-          "fadeOut": null
+          "fadeOut": 1000
         }
       ]
     },
@@ -1284,7 +1284,7 @@
           "volume": 0.15,
           "loop": true,
           "fadeIn": 1500,
-          "fadeOut": null
+          "fadeOut": 1000
         }
       ]
     },
@@ -1347,7 +1347,7 @@
             "end": 23000
           },
           {
-            "text": "And if we're lucky, it will spread like wildfire.",
+            "text": "And if we're lucky, it will catch like wildfire.",
             "start": 26000,
             "end": 32000
           }
@@ -1397,7 +1397,7 @@
           "volume": 0.1,
           "loop": true,
           "fadeIn": 1500,
-          "fadeOut": null
+          "fadeOut": 1000
         },
         {
           "id": "end-song",
