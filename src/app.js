@@ -5,9 +5,6 @@ import {
   cancelAudioCues,
   pauseAudioCues,
   resumeAudioCues,
-  cancelCue,
-  restartNarrationCue,
-  reCueCue,
   setMuted,
   onNarrationBufferChange,
   preloadNarrationAhead,
@@ -242,27 +239,6 @@ function scheduleFrameAudio(app, frame) {
   });
 }
 
-function scheduleReplayNarration(app, frame, narrationCue) {
-  if (!narrationCue) return;
-
-  const holdAfterNarration = getHoldAfterNarration(frame);
-  const onNarrationEnd = wrapOnNarrationEndWithBoost(
-    frame.audioCues,
-    makeNarrationEndCallback(app, frame, holdAfterNarration),
-  );
-  const maxNarrationDurationMs = getMaxNarrationDuration(
-    frame,
-    app.audioDurations,
-    app.projectMaxCaptionMs,
-  );
-
-  scheduleAudioCues([narrationCue], {
-    onNarrationEnd,
-    maxNarrationDurationMs,
-    audioDurations: app.audioDurations,
-  });
-}
-
 function resumeDeferredFrameAudio(app, { cancelExisting = false } = {}) {
   if (!app.deferFrameAudioUntilResume) return false;
 
@@ -272,22 +248,6 @@ function resumeDeferredFrameAudio(app, { cancelExisting = false } = {}) {
   }
   scheduleFrameAudio(app, app.frames[app.currentIndex]);
   return true;
-}
-
-function resumeReplayPendingAudio(app) {
-  app.replayPending = false;
-  const frame = app.frames[app.currentIndex];
-  const narrationCue = getNarrationCueFromFrame(frame);
-
-  if (resumeDeferredFrameAudio(app, { cancelExisting: true })) {
-    return;
-  }
-
-  if (narrationCue) {
-    cancelCue('narration');
-  }
-  resumeAudioCues();
-  scheduleReplayNarration(app, frame, narrationCue);
 }
 
 function buildNarration(app, frame) {
@@ -514,7 +474,6 @@ function cleanupCurrentScene(app) {
   app.captionEntries = [];
 
   app.deferFrameAudioUntilResume = false;
-  app.replayPending = false;
 }
 
 function manageFocusAfterTransition(app) {
@@ -716,16 +675,7 @@ function doResume(app) {
   app.state = app.pausedFromState ?? State.SCENE_ACTIVE;
   app.pausedFromState = null;
 
-  if (app.replayPending) {
-    resumeReplayPendingAudio(app);
-    // Clear caption DOM created as side effect of tl.pause(0) in
-    // replayNarration — play(0) will recreate them cleanly.
-    clearCaptionElements(app.captionEntries);
-    if (app.textTimeline && !app.buffering) {
-      app.textTimeline.play(0);
-    }
-    setupAutoAdvance(app);
-  } else if (firstPlay) {
+  if (firstPlay) {
     dismissLoadingScreen(app.els.loadingScreen);
     // Move focus to the pause button so a pending Space keyup doesn't
     // activate an unintended control (e.g., btn-next) after the loading
@@ -796,55 +746,19 @@ function replayNarration(app) {
 
   app.userHasInteracted = true;
 
-  // Invalidate stale onend callbacks from prior narration play.
-  // Without this, a queued onend could pass the generation guard
-  // and schedule a spurious auto-advance.
-  app.generation++;
-
-  app.buffering = false;
-  app.els.sceneStage.classList.remove('buffering');
-
-  clearAutoAdvance(app);
-
-  const frame = app.frames[app.currentIndex];
-  const narrationCue = getNarrationCueFromFrame(frame);
+  // Full scene reset — identical to hard-jump navigation (ADR-004 addendum).
+  // cleanupCurrentScene kills all audio, effects, text, captions, analyser.
+  // showFrame reloads effects, rebuilds text, and schedules all audio fresh.
+  cleanupCurrentScene(app);
 
   if (app.paused) {
-    // Replay while paused: cue narration audio, reset text, stay paused.
-    // Set replayPending so doResume knows to schedule narration with onend
-    // instead of just resuming a paused Howl.
-    if (narrationCue) {
-      cancelCue('narration');
-      reCueCue('narration', narrationCue);
-    }
-    buildNarration(app, frame);
-    app.replayPending = true;
-    if (app.textTimeline) {
-      app.textTimeline.pause(0);
-    }
+    app.deferFrameAudioUntilResume = true;
+    showFrame(app, app.currentIndex);
+    const frame = app.frames[app.currentIndex];
+    app.state = STATE_BY_FRAME_TYPE[frame.frameType] || State.SCENE_ACTIVE;
+    doPause(app);
   } else {
-    buildNarration(app, frame);
-    if (narrationCue) {
-      const holdAfterNarration = getHoldAfterNarration(frame);
-      const narrationOpts = {
-        onNarrationEnd: wrapOnNarrationEndWithBoost(
-          frame.audioCues,
-          makeNarrationEndCallback(app, frame, holdAfterNarration),
-        ),
-        maxNarrationDurationMs: getMaxNarrationDuration(
-          frame,
-          app.audioDurations,
-          app.projectMaxCaptionMs,
-        ),
-        audioDurations: app.audioDurations,
-      };
-      // Reuse existing Howl to avoid HTML5 Audio pool exhaustion on rapid replays.
-      // Falls back to cancel + fresh schedule if no Howl exists yet.
-      if (!restartNarrationCue(narrationCue, narrationOpts)) {
-        cancelCue('narration');
-        scheduleAudioCues([narrationCue], narrationOpts);
-      }
-    }
+    showFrame(app, app.currentIndex);
     if (app.textTimeline) app.textTimeline.play(0);
     setupAutoAdvance(app);
   }
@@ -1019,7 +933,6 @@ export function createApp() {
     pendingNavIndex: null,
     generation: 0,
     deferFrameAudioUntilResume: false,
-    replayPending: false,
     pendingPause: false,
     buffering: false,
     effectsReady: null,

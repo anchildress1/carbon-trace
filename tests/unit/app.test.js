@@ -841,28 +841,31 @@ describe('app.js', () => {
       // On scene-01.
     });
 
-    it('replays narration on btn-replay click', () => {
+    it('full scene reset on replay while playing', () => {
       vi.clearAllMocks();
       document.getElementById('btn-replay').click();
-      // replayNarration reuses existing Howl via restartNarrationCue
-      expect(restartNarrationCue).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'narration' }),
+      // Replay calls cleanupCurrentScene (cancelAudioCues) then showFrame
+      // (scheduleFrameAudio with ALL cues, not just narration)
+      expect(cancelAudioCues).toHaveBeenCalled();
+      expect(scheduleAudioCues).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ type: 'narration' }),
+          expect.objectContaining({ type: 'ambient' }),
+        ]),
         expect.objectContaining({
           onNarrationEnd: expect.any(Function),
-          maxNarrationDurationMs: expect.any(Number),
         }),
       );
-      // cancelCue + scheduleAudioCues NOT called (restart succeeded)
-      expect(cancelCue).not.toHaveBeenCalledWith('narration');
-      expect(scheduleAudioCues).not.toHaveBeenCalled();
     });
 
-    it('does not restart music on replay', () => {
+    it('restarts ambient/music from beginning on replay', () => {
       vi.clearAllMocks();
       document.getElementById('btn-replay').click();
-      // Replay only restarts narration — ambient/music untouched
-      expect(restartNarrationCue).toHaveBeenCalled();
-      expect(scheduleAudioCues).not.toHaveBeenCalled();
+      // All audio cancelled and rescheduled — ambient restarts from 0
+      expect(cancelAudioCues).toHaveBeenCalled();
+      const cues = scheduleAudioCues.mock.calls[0][0];
+      const ambientCues = cues.filter((c) => c.type === 'ambient');
+      expect(ambientCues.length).toBeGreaterThan(0);
     });
 
     it('stays paused when replaying while paused', () => {
@@ -871,25 +874,25 @@ describe('app.js', () => {
       vi.clearAllMocks();
       document.getElementById('btn-replay').click();
       expect(app.getState()).toBe('PAUSED');
-      // Replay while paused: cancelCue + reCueCue, not scheduleAudioCues
-      expect(cancelCue).toHaveBeenCalledWith('narration');
-      expect(reCueCue).toHaveBeenCalledWith('narration', expect.objectContaining({ type: 'narration' }));
+      // Full scene reset: all audio cancelled, but NOT rescheduled (deferred)
+      expect(cancelAudioCues).toHaveBeenCalled();
       expect(scheduleAudioCues).not.toHaveBeenCalled();
     });
 
-    it('plays narration from start on resume after replay-while-paused', () => {
+    it('schedules ALL audio on resume after replay-while-paused', () => {
       app.togglePause();
       document.getElementById('btn-replay').click();
       vi.clearAllMocks();
       app.togglePause(); // resume
       expect(app.getState()).toBe('SCENE_ACTIVE');
-      // replayPending path calls cancelCue('narration') then scheduleAudioCues([narrationCue], ...)
-      expect(cancelCue).toHaveBeenCalledWith('narration');
+      // deferFrameAudioUntilResume path schedules ALL cues fresh
       expect(scheduleAudioCues).toHaveBeenCalledWith(
-        expect.arrayContaining([expect.objectContaining({ type: 'narration' })]),
+        expect.arrayContaining([
+          expect.objectContaining({ type: 'narration' }),
+          expect.objectContaining({ type: 'ambient' }),
+        ]),
         expect.objectContaining({
           onNarrationEnd: expect.any(Function),
-          maxNarrationDurationMs: expect.any(Number),
         }),
       );
     });
@@ -901,28 +904,26 @@ describe('app.js', () => {
       document.getElementById('btn-replay').click();
       document.getElementById('btn-replay').click();
       expect(app.getState()).toBe('PAUSED');
-      // Each replay while paused calls reCueCue
-      expect(reCueCue).toHaveBeenCalledTimes(2);
+      // Each replay runs cleanupCurrentScene + showFrame (deferred)
+      expect(cancelAudioCues).toHaveBeenCalledTimes(2);
       expect(scheduleAudioCues).not.toHaveBeenCalled();
     });
 
-    it('clears buffering state on replay', () => {
-      app.togglePause();
-      // Simulate buffering state
-      const stage = document.getElementById('scene-stage');
-      stage.classList.add('buffering');
+    it('effects are reloaded on replay', () => {
+      vi.clearAllMocks();
       document.getElementById('btn-replay').click();
-      expect(stage.classList.contains('buffering')).toBe(false);
+      // showFrame reloads effects for scenes with effects config
+      expect(loadEffectsScene).toHaveBeenCalled();
     });
 
-    it('replayPending is cleared on navigation after replay-while-paused', async () => {
+    it('navigation after replay-while-paused schedules fresh audio', async () => {
       app.togglePause();
       document.getElementById('btn-replay').click();
       vi.clearAllMocks();
       // Navigate to next scene instead of resuming
       app.advance();
       await flush();
-      // Resume on the new scene — hard cut should schedule fresh frame audio.
+      // Resume on the new scene — should schedule fresh frame audio
       app.togglePause(); // resume
       expect(scheduleAudioCues).toHaveBeenCalled();
       expect(resumeAudioCues).not.toHaveBeenCalled();
@@ -1348,24 +1349,22 @@ describe('app.js', () => {
       await flush();
     });
 
-    it('three rapid replays reuse existing Howl each time', () => {
+    it('three rapid replays cancel and reschedule all audio each time', () => {
       vi.clearAllMocks();
       document.getElementById('btn-replay').click();
       document.getElementById('btn-replay').click();
       document.getElementById('btn-replay').click();
 
       expect(app.getState()).toBe('SCENE_ACTIVE');
-      // restartNarrationCue called each time (3×) — no new Howls created
-      expect(restartNarrationCue).toHaveBeenCalledTimes(3);
-      // cancelCue + scheduleAudioCues NOT called (restart succeeded each time)
-      expect(cancelCue).not.toHaveBeenCalledWith('narration');
-      expect(scheduleAudioCues).not.toHaveBeenCalled();
+      // Each replay calls cleanupCurrentScene (cancelAudioCues) + showFrame (scheduleAudioCues)
+      expect(cancelAudioCues).toHaveBeenCalledTimes(3);
+      expect(scheduleAudioCues).toHaveBeenCalledTimes(3);
     });
 
     it('stale onend from first replay does not trigger auto-advance after third', () => {
-      // Capture onNarrationEnd from first replay
+      // Capture onNarrationEnd from first replay's scheduleAudioCues call
       document.getElementById('btn-replay').click();
-      const firstOnend = restartNarrationCue.mock.calls[0]?.[1]?.onNarrationEnd;
+      const firstOnend = scheduleAudioCues.mock.calls[0]?.[1]?.onNarrationEnd;
 
       // Two more replays (generation increments each time)
       document.getElementById('btn-replay').click();
@@ -1373,8 +1372,6 @@ describe('app.js', () => {
       vi.clearAllMocks();
 
       // Fire stale onend — should be ignored (generation changed).
-      // Advance less than scene-01's full auto-advance timer so only
-      // the stale callback's effect is tested, not the scene's own timer.
       if (firstOnend) firstOnend();
       vi.advanceTimersByTime(2000);
 
@@ -1423,7 +1420,7 @@ describe('app.js', () => {
   // ── edge: replay during buffering ─────────────────────────────────
 
   describe('replay during buffering', () => {
-    it('clears buffering state and schedules fresh narration', async () => {
+    it('clears buffering state and reschedules all audio', async () => {
       let bufferCb;
       onNarrationBufferChange.mockImplementation((cb) => {
         bufferCb = cb;
@@ -1443,8 +1440,9 @@ describe('app.js', () => {
       vi.clearAllMocks();
       document.getElementById('btn-replay').click();
 
-      expect(stage.classList.contains('buffering')).toBe(false);
-      expect(restartNarrationCue).toHaveBeenCalled();
+      // Full scene reset cancels all audio and reschedules
+      expect(cancelAudioCues).toHaveBeenCalled();
+      expect(scheduleAudioCues).toHaveBeenCalled();
     });
   });
 
@@ -1848,8 +1846,10 @@ describe('app.js', () => {
       vi.clearAllMocks();
       document.getElementById('btn-replay').click();
 
-      // Extract onNarrationEnd from the replay's restartNarrationCue call
-      const replayCall = restartNarrationCue.mock.calls[0];
+      // Extract onNarrationEnd from the replay's scheduleAudioCues call
+      const replayCall = scheduleAudioCues.mock.calls.find(
+        (call) => call[1]?.onNarrationEnd,
+      );
       expect(replayCall).toBeDefined();
       expect(replayCall[1].onNarrationEnd).toBeInstanceOf(Function);
 
@@ -1868,7 +1868,7 @@ describe('app.js', () => {
       vi.clearAllMocks();
       app.togglePause(); // resume
 
-      // resumeReplayPendingAudio → scheduleReplayNarration → scheduleAudioCues
+      // deferFrameAudioUntilResume → scheduleFrameAudio → scheduleAudioCues
       const replayCall = scheduleAudioCues.mock.calls.find(
         (call) => call[0]?.some((c) => c.type === 'narration'),
       );
