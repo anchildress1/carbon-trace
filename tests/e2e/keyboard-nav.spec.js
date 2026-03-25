@@ -197,17 +197,17 @@ test.describe('keyboard boundary conditions', () => {
   });
 
   test('ArrowRight on credits frame does nothing — no error', async ({ page }) => {
-    test.setTimeout(45_000);
     const errors = [];
     page.on('pageerror', (err) => errors.push(err));
 
-    // Navigate to the last frame
-    for (let i = 0; i < TOTAL_FRAMES - 1; i++) {
-      await page.keyboard.press('ArrowRight');
-      await page.waitForTimeout(200);
-    }
-
+    // Dismiss loading screen then jump to last frame via dot click
+    await dismissLoadingScreen(page);
+    const lastDot = page.locator('.progress-dot').last();
+    await lastDot.click();
     const stage = page.locator('#scene-stage');
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(TOTAL_FRAMES - 1), {
+      timeout: 5000,
+    });
     const labelAtEnd = await stage.getAttribute('aria-label');
 
     // Try to advance past the end
@@ -220,11 +220,15 @@ test.describe('keyboard boundary conditions', () => {
   });
 
   test('next button is disabled at final frame', async ({ page }) => {
-    test.setTimeout(45_000);
-    for (let i = 0; i < TOTAL_FRAMES - 1; i++) {
-      await page.keyboard.press('ArrowRight');
-      await page.waitForTimeout(200);
-    }
+    // Dismiss loading screen then jump to last frame via dot click
+    await dismissLoadingScreen(page);
+    const lastDot = page.locator('.progress-dot').last();
+    await lastDot.click();
+    await expect(page.locator('#scene-stage')).toHaveAttribute(
+      'aria-label',
+      frameDescription(TOTAL_FRAMES - 1),
+      { timeout: 5000 },
+    );
 
     const nextBtn = page.locator('#btn-next');
     await expect(nextBtn).toBeDisabled();
