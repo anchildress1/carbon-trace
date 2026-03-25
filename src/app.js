@@ -818,6 +818,7 @@ function toggleCaptions(app) {
   const enabled = !areCaptionsEnabled();
   setCaptionsEnabled(enabled);
   app.els.btnCaptions.setAttribute('aria-pressed', String(enabled));
+  app.els.btnCaptions.classList.toggle('cc-on', enabled);
 
   if (enabled) {
     if (app.captionEntries?.length > 0 && app.textTimeline) {
@@ -848,6 +849,7 @@ function initApp(app) {
 
       const captionsEnabled = initCaptions();
       app.els.btnCaptions.setAttribute('aria-pressed', String(captionsEnabled));
+      app.els.btnCaptions.classList.toggle('cc-on', captionsEnabled);
 
       showFrame(app, 0);
 

@@ -425,6 +425,19 @@ body {
   display: flex;
 }
 
+/* Captions button icon toggle — default is off (strikethrough) */
+.btn-captions .icon-cc {
+  display: none;
+}
+
+.btn-captions.cc-on .icon-cc {
+  display: flex;
+}
+
+.btn-captions.cc-on .icon-cc-off {
+  display: none;
+}
+
 /* Accessibility */
 .sr-only {
   position: absolute;
