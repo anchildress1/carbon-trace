@@ -227,6 +227,10 @@ test.describe('carbon-trace narrative', () => {
   test('forward button is disabled on credits frame', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await dismissLoadingScreen(page);
+
+    // Pause so each ArrowRight triggers an instant hard-jump (no fade animation).
+    await page.keyboard.press('Space');
 
     const totalFrames = scenesData.frames.length;
     for (let i = 0; i < totalFrames - 1; i++) {
