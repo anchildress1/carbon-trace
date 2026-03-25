@@ -254,5 +254,82 @@ describe('effects.js — factory registry', () => {
       for (let i = 0; i < 10; i++) result.update(dt);
       expect(result.filter.time).toBe(0.1);
     });
+
+    it('shockwave trigger() resets cycle to time 0', () => {
+      const result = createEffect('shockwave', null, {
+        cycleDuration: 1,
+        cyclePause: 2,
+      });
+
+      // Advance past burst into rest
+      for (let i = 0; i < 120; i++) result.update(1 / 60);
+      expect(result.filter.time).toBe(1);
+
+      // Trigger resets the cycle
+      result.trigger();
+      result.update(1 / 60);
+      expect(result.filter.time).toBeGreaterThan(0);
+      expect(result.filter.time).toBeLessThan(0.1);
+    });
+
+    it('shockwave autoRepeat:false idles after one cycle', () => {
+      const result = createEffect('shockwave', null, {
+        cycleDuration: 0.1,
+        cyclePause: 0,
+        autoRepeat: false,
+      });
+
+      const dt = 1 / 60;
+
+      // Starts idle (elapsed = cycleDuration)
+      result.update(dt);
+      expect(result.filter.time).toBe(0.1);
+
+      // Still idle after many frames — no auto-repeat
+      for (let i = 0; i < 120; i++) result.update(dt);
+      expect(result.filter.time).toBe(0.1);
+    });
+
+    it('shockwave autoRepeat:false plays after trigger()', () => {
+      const result = createEffect('shockwave', null, {
+        cycleDuration: 0.5,
+        cyclePause: 0,
+        autoRepeat: false,
+      });
+
+      // Starts idle
+      result.update(1 / 60);
+      expect(result.filter.time).toBe(0.5);
+
+      // Trigger fires a new cycle
+      result.trigger();
+      result.update(1 / 60);
+      expect(result.filter.time).toBeGreaterThan(0);
+      expect(result.filter.time).toBeLessThan(0.1);
+
+      // Cycle plays through then idles again
+      for (let i = 0; i < 60; i++) result.update(1 / 60);
+      expect(result.filter.time).toBe(0.5);
+    });
+
+    it('shockwave autoRepeat:true (default) cycles normally', () => {
+      const result = createEffect('shockwave', null, {
+        cycleDuration: 0.1,
+        cyclePause: 0.1,
+      });
+
+      const dt = 1 / 60;
+
+      // First cycle — time advances
+      result.update(dt);
+      expect(result.filter.time).toBeGreaterThan(0);
+
+      // Advance past first full cycle into second
+      for (let i = 0; i < 20; i++) result.update(dt);
+
+      // Should have started cycling again (time goes back below cycleDuration)
+      const timeAfterCycle = result.filter.time;
+      expect(timeAfterCycle).toBeLessThanOrEqual(0.1);
+    });
   });
 });

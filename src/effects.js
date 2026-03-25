@@ -150,6 +150,10 @@ registerEffect('glow', (_sprite, params = {}) => {
 /**
  * Shockwave: radial ripple that expands outward from center and resets.
  * Uses the ShockwaveFilter for a real distortion wave effect.
+ *
+ * autoRepeat (default true): when false, the wave plays once through
+ * cycleDuration then idles. Call trigger() to fire a new cycle — this
+ * is how onset detection drives beat-synced shockwaves (ADR-008).
  */
 registerEffect('shockwave', (_sprite, params = {}) => {
   const {
@@ -161,6 +165,7 @@ registerEffect('shockwave', (_sprite, params = {}) => {
     radius = -1,
     cyclePause = 2,
     cycleDuration = 1.5,
+    autoRepeat = true,
   } = params;
 
   const filter = new ShockwaveFilter({
@@ -173,19 +178,22 @@ registerEffect('shockwave', (_sprite, params = {}) => {
   filter.time = cycleDuration;
 
   const totalCycle = cycleDuration + cyclePause;
-  let elapsed = 0;
+  let elapsed = autoRepeat ? 0 : cycleDuration;
 
   return {
     filter,
     update(dt) {
       elapsed += dt;
-      const cycle = elapsed % totalCycle;
 
-      if (cycle < cycleDuration) {
-        filter.time = cycle;
+      if (autoRepeat) {
+        const cycle = elapsed % totalCycle;
+        filter.time = Math.min(cycle, cycleDuration);
       } else {
-        filter.time = cycleDuration;
+        filter.time = Math.min(elapsed, cycleDuration);
       }
+    },
+    trigger() {
+      elapsed = 0;
     },
   };
 });
