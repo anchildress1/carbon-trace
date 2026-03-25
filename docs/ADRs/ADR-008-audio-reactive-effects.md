@@ -38,13 +38,23 @@ Each effect region can declare an optional `audioReactive` key that maps a frequ
 
 ### Signal chain
 
+carbon-trace uses Howler.js in `html5: true` mode exclusively. In html5 mode, `<audio>` elements output directly to the system audio device, bypassing the Web Audio graph entirely. `Howler.masterGain()` carries no signal from html5-mode sounds. To get FFT data, we route the target `<audio>` element through `createMediaElementSource()`, which re-enters the Web Audio graph:
+
 ```
-Howler AudioContext
-  └─ masterGain (Howler.masterGain())
+end-song <audio> element (Howler html5:true)
+  └─ createMediaElementSource(element)   ← takes ownership of element output
        └─ AnalyserNode (created by audio.js, fftSize: 2048)
+            ├─ ctx.destination             ← audio still plays to speakers
             └─ getByteFrequencyData() → Uint8Array[1024]
                  └─ effects-canvas.js ticker reads per frame
 ```
+
+**Why not `Howler.masterGain()`?** The original design assumed Web Audio mode routing. In html5 mode, `masterGain` is an orphan node with no input signal. `createMediaElementSource()` is the only way to tap an `<audio>` element's output into the Web Audio graph for analysis.
+
+**`createMediaElementSource()` constraints:**
+- Can only be called **once per `<audio>` element**. Calling it again on the same element throws `InvalidStateError`. The implementation tracks the connected element and skips reconnection.
+- Takes **ownership** of the element's output — audio no longer goes directly to speakers. The `AnalyserNode.connect(ctx.destination)` call restores playback through the Web Audio graph.
+- Has **CORS restrictions** — the audio file must be served from the same origin. carbon-trace serves all audio from same-origin (`/assets/audio/`), so this works.
 
 ### Per-frame modulation (inside PixiJS ticker)
 
@@ -68,18 +78,24 @@ FOR EACH region with audioReactive config:
 audio.js                    app.js                      effects-canvas.js
 ───────────                 ──────                      ─────────────────
 getAnalyserNode() ────→  bridge in showFrame() ────→  setAnalyser(node)
-                          (one-time call when              │
-                           audioReactive regions           ▼
-                           are present)              ticker reads FFT
-                                                     each frame
+connectAnalyserToCue()      (one-time call when              │
+  ↳ on cue play:             audioReactive regions           ▼
+    createMediaElement-      are present)              ticker reads FFT
+    Source() → analyser                                each frame
 ```
 
 app.js showFrame() wiring:
 ```js
 if (frame.effects?.regions?.some(r => r.audioReactive)) {
-  effectsCanvas.setAnalyser(audio.getAnalyserNode());
+  const analyser = audio.getAnalyserNode();
+  if (analyser) {
+    effectsCanvas.setAnalyser(analyser);
+    audio.connectAnalyserToCue(frame.effects.analyserCueId);
+  }
 }
 ```
+
+The `analyserCueId` field in the effects config identifies which audio cue should feed the AnalyserNode. For Scene 11, this is `"end-song"`. The connection happens inside `audio.js` when the matching cue starts playing — `app.js` only passes the cue ID, preserving leaf module isolation.
 
 **No cross-imports between leaf modules.** audio.js doesn't know about effects. effects-canvas.js doesn't know about Howler. app.js is the only module that touches both.
 
@@ -130,18 +146,27 @@ high  │ 93–744   │ ~2000–16000 Hz    │ cymbals, sibilance, air
 
 ## Module Changes
 
-### audio.js — one new export
+### audio.js — three new exports
 
 ```
-getAnalyserNode()  — lazy-create AnalyserNode on Howler's AudioContext,
-                     connect to Howler.masterGain(). Returns AnalyserNode.
-                     Subsequent calls return the same instance.
-                     fftSize: 2048, smoothingTimeConstant: 0.8
+getAnalyserNode()          — lazy-create AnalyserNode on Howler's AudioContext,
+                             connect to ctx.destination. Returns AnalyserNode.
+                             Subsequent calls return the same instance.
+                             fftSize: 2048, smoothingTimeConstant: 0.8
+
+connectAnalyserToCue(id)   — store target cue ID. When that cue starts playing
+                             (via crossfadeAmbientCue or playCue), connect its
+                             <audio> element to the AnalyserNode via
+                             createMediaElementSource(). Tracks connected element
+                             to prevent double-connection (InvalidStateError).
+
+disconnectAnalyserSource() — disconnect MediaElementSourceNode, clear tracking
+                             state. Called by cancelAudioCues() on scene change.
 ```
 
-**Implementation note:** Howler.js in `html5: true` mode uses `<audio>` elements. Connecting an AnalyserNode requires `createMediaElementSource()`, which has CORS restrictions — the audio file must be served from the same origin or with appropriate CORS headers. carbon-trace serves all audio from same-origin (`/assets/audio/`), so this should work. **This is a blocking verification dependency** — test on real devices before assuming the signal chain works. If CORS blocks the AnalyserNode, the fallback is `audioReactive` regions behaving as if audio is silent (parameters stay at `range[0]`).
+**Implementation note:** `createMediaElementSource()` takes ownership of the `<audio>` element's output. The `AnalyserNode.connect(ctx.destination)` call re-routes audio to speakers through the Web Audio graph. CORS restrictions apply — the audio file must be served from the same origin. carbon-trace serves all audio from same-origin (`/assets/audio/`), so this works. If CORS blocks the AnalyserNode, the fallback is `audioReactive` regions behaving as if audio is silent (parameters stay at `range[0]`).
 
-**Howler internals dependency:** `Howler.ctx` (AudioContext) and `Howler.masterGain()` are not part of Howler's documented public API. They work in current versions but could change. Pin Howler version and add a comment noting the internal API usage.
+**Howler internals dependency:** `Howler.ctx` (AudioContext) and `howl._sounds[0]._node` (underlying `<audio>` element) are not part of Howler's documented public API. They work in current versions but could change. Pin Howler version and add a comment noting the internal API usage.
 
 ### effects-canvas.js — one new method
 
@@ -153,7 +178,7 @@ setAnalyser(analyserNode)  — store reference. Ticker reads frequency data
 
 The FFT data array (`Uint8Array(analyserNode.frequencyBinCount)`) is allocated once and reused across frames. One `getByteFrequencyData()` call per frame, shared across all audioReactive regions.
 
-### app.js — bridge wiring in showFrame()
+### app.js — bridge wiring in showFrame() + cleanup
 
 ```js
 if (frame.effects?.regions?.some(r => r.audioReactive)) {
@@ -272,8 +297,8 @@ These require human judgment in-browser with actual music:
 
 ## Open Questions
 
-1. ~~**Howler html5 mode + AnalyserNode compatibility.**~~ Blocking verification dependency. Test same-origin audio with `createMediaElementSource()` in html5 mode. If it fails, audioReactive degrades gracefully (range[0] fallback).
-2. **Howler.masterGain() signal chain under mute.** Does `howl.mute()` zero the gain before or after the AnalyserNode tap point? Determines whether muted audio still drives visuals. Test and document behavior.
+1. ~~**Howler html5 mode + AnalyserNode compatibility.**~~ **Resolved:** `createMediaElementSource()` routes the `<audio>` element through the Web Audio graph. Same-origin audio works without CORS headers. The signal chain section above documents the corrected approach.
+2. **Howler mute behavior under `createMediaElementSource()`.** When `howl.mute(true)` is called, Howler sets the `<audio>` element's `muted` property. Since `createMediaElementSource()` taps the element *before* the muted flag is applied by the browser, the AnalyserNode may still receive signal. Test and document behavior — this determines whether muted audio still drives visuals.
 
 ---
 
