@@ -65,6 +65,7 @@ vi.mock('../../src/overlay.js', () => ({
   initOverlay: vi.fn(),
   updateProgress: vi.fn(),
   showControls: vi.fn(),
+  focusActiveDot: vi.fn(),
 }));
 
 vi.mock('../../src/canvas.js', () => ({
@@ -198,7 +199,7 @@ import {
 } from '../../src/effects-canvas.js';
 import { clearScene, drawFallback, loadImage } from '../../src/canvas.js';
 import { setCaptionsEnabled, areCaptionsEnabled, syncCaptionsToTime, clearCaptionElements } from '../../src/captions.js';
-import { initOverlay } from '../../src/overlay.js';
+import { initOverlay, focusActiveDot } from '../../src/overlay.js';
 import { preloadFirstFrameAudio } from '../../src/loader.js';
 
 function buildDOM() {
@@ -535,6 +536,26 @@ describe('app.js', () => {
       stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
       await flush();
       expect(cancelAudioCues).toHaveBeenCalled();
+    });
+
+    it('focusActiveDot is called after user-initiated advance', async () => {
+      app.togglePause();
+      vi.clearAllMocks();
+      const stage = document.getElementById('scene-stage');
+      stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      await flush();
+      expect(focusActiveDot).toHaveBeenCalled();
+    });
+
+    it('focusActiveDot is called after user-initiated retreat', async () => {
+      app.togglePause();
+      app.advance();
+      await flush();
+      vi.clearAllMocks();
+      const stage = document.getElementById('scene-stage');
+      stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+      await flush();
+      expect(focusActiveDot).toHaveBeenCalled();
     });
   });
 
@@ -1677,6 +1698,25 @@ describe('app.js', () => {
 
       // Should have triggered transition (cancelAudioCues called during cleanup)
       expect(cancelAudioCues).toHaveBeenCalled();
+    });
+
+    it('auto-advance does not call focusActiveDot', async () => {
+      app = createApp();
+      await flush();
+      vi.clearAllMocks();
+
+      document.getElementById('loading-screen').click();
+
+      const titleCall = scheduleAudioCues.mock.calls.find(
+        (call) => call[0]?.some((c) => c.src === 'title-narration.m4a'),
+      );
+      const onNarrationEnd = titleCall[1].onNarrationEnd;
+
+      vi.clearAllMocks();
+      onNarrationEnd();
+      vi.advanceTimersByTime(2000);
+
+      expect(focusActiveDot).not.toHaveBeenCalled();
     });
 
     it('does not auto-advance title if user navigates before narration ends', async () => {

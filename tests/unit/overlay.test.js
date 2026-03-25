@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { initOverlay, updateProgress, showControls } from '../../src/overlay.js';
+import { initOverlay, updateProgress, showControls, focusActiveDot } from '../../src/overlay.js';
 
 describe('overlay.js', () => {
   let dotsContainer;
@@ -180,6 +180,41 @@ describe('overlay.js', () => {
       controlsEl.remove();
 
       expect(() => showControls()).not.toThrow();
+    });
+  });
+
+  describe('focusActiveDot', () => {
+    it('focuses the current active dot', () => {
+      initOverlay(5);
+      updateProgress(3);
+
+      focusActiveDot();
+
+      const dots = dotsContainer.querySelectorAll('.progress-dot');
+      expect(document.activeElement).toBe(dots[2]);
+    });
+
+    it('does nothing when called before initOverlay', () => {
+      expect(() => focusActiveDot()).not.toThrow();
+    });
+
+    it('does nothing when sceneIndex is 0', () => {
+      initOverlay(3);
+      // sceneIndex never set (still -1 internally)
+      focusActiveDot();
+      const dots = dotsContainer.querySelectorAll('.progress-dot');
+      expect(document.activeElement).not.toBe(dots[0]);
+    });
+
+    it('focuses the updated dot after progress change', () => {
+      initOverlay(5);
+      updateProgress(2);
+      updateProgress(4);
+
+      focusActiveDot();
+
+      const dots = dotsContainer.querySelectorAll('.progress-dot');
+      expect(document.activeElement).toBe(dots[3]);
     });
   });
 });

@@ -63,6 +63,12 @@ export function updateProgress(sceneIndex) {
   }
 }
 
+export function focusActiveDot() {
+  if (currentSceneIndex >= 1 && currentSceneIndex <= dotElements.length) {
+    dotElements[currentSceneIndex - 1].focus();
+  }
+}
+
 export function showControls() {
   const controls = document.getElementById('overlay-controls');
   if (controls) {

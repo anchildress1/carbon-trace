@@ -23,7 +23,7 @@ import {
   pause as pauseEffects,
   resume as resumeEffects,
 } from './effects-canvas.js';
-import { initOverlay, updateProgress, showControls } from './overlay.js';
+import { initOverlay, updateProgress, showControls, focusActiveDot } from './overlay.js';
 import {
   initSceneCanvas,
   drawImage as drawSceneImage,
@@ -502,6 +502,7 @@ function transition(app, toIndex) {
         app.state = STATE_BY_FRAME_TYPE[prevFrame.frameType] || State.SCENE_ACTIVE;
       }
       doPause(app);
+      focusActiveDot();
       completePendingNav(app);
     };
 
@@ -545,6 +546,8 @@ function transition(app, toIndex) {
       if (document.activeElement?.closest('.control-buttons')) {
         document.activeElement.blur();
       }
+    } else {
+      focusActiveDot();
     }
     completePendingNav(app);
   };
