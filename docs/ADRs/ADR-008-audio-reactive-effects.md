@@ -304,13 +304,13 @@ These require human judgment in-browser with actual music:
 
 ## Action Items
 
-1. [ ] Add `getAnalyserNode()` to audio.js — lazy AnalyserNode on Howler's AudioContext
-2. [ ] Add `setAnalyser()` to effects-canvas.js — store analyser, read FFT in ticker
-3. [ ] Implement per-frame band extraction, EMA smoothing, and parameter lerp
-4. [ ] Implement dynamic sampleRate bin calculation (not hardcoded 44100Hz)
-5. [ ] Wire audio-reactive bridge in app.js showFrame()
+1. [x] Add `getAnalyserNode()` to audio.js — lazy AnalyserNode on Howler's AudioContext
+2. [x] Add `setAnalyser()` to effects-canvas.js — store analyser, read FFT in ticker
+3. [x] Implement per-frame band extraction, EMA smoothing, and parameter lerp
+4. [x] Implement dynamic sampleRate bin calculation (not hardcoded 44100Hz)
+5. [x] Wire audio-reactive bridge in app.js showFrame()
 6. [ ] Verify Howler html5 mode + AnalyserNode works with same-origin audio (blocking)
 7. [ ] Test Howler.masterGain() behavior under mute
-8. [ ] Author Scene 11 audioReactive regions (Ashley — artistic decisions)
+8. [x] Author Scene 11 audioReactive regions (Ashley — artistic decisions)
 9. [ ] Tune range/smoothing values in-browser with actual music (Ashley)
-10. [ ] Test: silence, muted, pause/resume, reduced motion, multiple bands, 48kHz sampleRate
+10. [x] Test: silence, muted, pause/resume, reduced motion, multiple bands, 48kHz sampleRate

@@ -473,7 +473,7 @@ These are scoped implementation choices, not architectural decisions. The ADR's 
 12. [x] Error boundary: try/catch around init(), webglAvailable flag, loadScene() no-op on failure
 13. [ ] Performance profiling — verify <2ms per frame on baseline hardware (see profiling gates)
 14. [ ] Update v5 spec §3, §4, §17
-15. [ ] Audio-reactive implementation — see ADR-008 action items
+15. [x] Audio-reactive implementation — see ADR-008 action items
 16. [x] Add request-generation guard in loadScene() — increment a generation counter on each call, check on async image/mask load resolve, discard stale results if counter has changed (prevents race when user navigates mid-load)
 17. [x] Resize active effect/mask bounds — ResizeObserver tracks screen-sized sprites (maskSprite, effectSprite) and updates their dimensions on resize. Noise sprites use scale.set() with repeat addressing (viewport-independent).
 18. [x] Texture lifecycle cleanup in clearAll() — disposableTextures array tracks per-scene mask, noise, and scene textures. Destroyed with .destroy(false) to avoid BindGroup corruption; TextureSources left for GCSystem reclamation. Sprites destroyed via child.destroy({ children: true, texture: false }).
