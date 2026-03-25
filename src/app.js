@@ -899,7 +899,7 @@ function initApp(app) {
         ]).catch((err) => console.error('Background asset preload failed:', err));
       }, 4000);
 
-      initKeyboard((action) => {
+      app.cleanupKeyboard = initKeyboard((action) => {
         app.userHasInteracted = true;
         switch (action) {
           case 'togglePause':
