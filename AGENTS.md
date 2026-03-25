@@ -88,7 +88,8 @@ Full system design: `docs/design/carbon-trace-system-design-v5.md` and `docs/ADR
 | `audio.js`          | Howler — ambient crossfade, narration, buffer monitoring       | DOM, canvas           |
 | `text.js`           | Ghost-drift GSAP timelines from config                         | Audio, canvas         |
 | `captions.js`       | Timed captions, localStorage persistence                       | Audio, canvas         |
-| `overlay.js`        | DOM controls — dot bar, buttons, progress                      | Canvas, audio         |
+| `keyboard.js`       | Declarative key-action map, document listener, button guard    | App state, DOM, audio |
+| `overlay.js`        | DOM controls — dot bar, roving-tabindex dots, progress         | Canvas, audio         |
 | `loader.js`         | Audio metadata preloading, frame-aware sequencing              | DOM, app state        |
 | `pausable-timer.js` | Pause-aware timer — used by audio.js and app.js                | Everything else       |
 

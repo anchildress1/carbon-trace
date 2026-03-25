@@ -24,13 +24,20 @@ content that `#accessible-narration` provides to assistive technology.
 | `Space` | Toggle play/pause |
 | `Enter` / `ArrowRight` | Advance to next scene |
 | `ArrowLeft` | Return to previous scene |
+| `Escape` | Pause (one-directional — never resumes) |
 | `Tab` | Navigate between controls |
 
 Space toggles play/pause (not advance). Enter and ArrowRight advance to the
-next scene. All control buttons (prev, pause, mute, captions, replay, next)
-are focusable and respond to keyboard activation. Space and Enter/ArrowRight
-do not fire when focus is inside the control bar to avoid conflicting with
-button activation.
+next scene. Escape always pauses; Space resumes. All control buttons (prev,
+pause, mute, captions, replay, next) are focusable and respond to keyboard
+activation. Space and Enter are suppressed when focus is on a button element,
+allowing native button activation. Arrow keys always navigate scenes
+regardless of focus location, except when focus is on a progress dot (see
+below).
+
+Keyboard shortcuts are defined declaratively in `keyboard.js` via a key-action
+map. The module exports `handleKeydown` (pure function for testing) and
+`initKeyboard` (document listener registration with cleanup).
 
 ## Focus Management
 
@@ -39,6 +46,27 @@ button activation.
 - Disabled buttons (`aria-disabled="true"` or `disabled` attribute) have
   reduced opacity (0.3) and do not respond to interaction.
 - Progress dots are buttons with `aria-label="Go to scene N of M"`.
+- Keyboard navigation (arrow keys, Enter) does **not** redirect focus to the
+  active dot — this preserves "global navigation mode" for sequential
+  browsing. Pointer-initiated navigation (button/dot clicks) redirects focus
+  to the active dot.
+
+### Progress Dots — Roving Tabindex
+
+The progress dot group is a composite widget following the WAI-ARIA toolbar
+pattern:
+
+- **Single Tab stop**: the dot group occupies one position in the Tab order.
+  Only the roving-target dot has `tabindex="0"`; all others have
+  `tabindex="-1"`.
+- **Arrow keys**: Left/Right/Up/Down move focus between dots with wrap-around.
+  Home/End jump to first/last dot. Arrow keys within the dot group call
+  `stopPropagation` to prevent global scene navigation.
+- **Enter/Space on a focused dot**: triggers navigation to that dot's scene
+  via the dot's click handler (native button activation).
+- **Focus ring vs active dot**: focus ring (keyboard highlight) and active
+  state (filled dot indicating the current scene) are independent. A user can
+  arrow-focus to any dot and press Enter to jump there.
 
 ## ARIA Attributes
 
