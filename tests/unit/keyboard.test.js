@@ -125,14 +125,28 @@ describe('handleKeydown', () => {
     });
   });
 
+  // ── non-Element targets ─────────────────────────────────────────────
+
+  describe('non-Element targets (e.g. Document)', () => {
+    it('Space still fires when target is document (no closest method)', () => {
+      const e = makeEvent(' ', document);
+      expect(handleKeydown(e, handler)).toBe(true);
+      expect(handler).toHaveBeenCalledWith('togglePause');
+    });
+
+    it('Enter still fires when target is null', () => {
+      const e = makeEvent('Enter', null);
+      expect(handleKeydown(e, handler)).toBe(true);
+      expect(handler).toHaveBeenCalledWith('advance');
+    });
+  });
+
   // ── unhandled keys ─────────────────────────────────────────────────
 
   describe('unhandled keys', () => {
-    it.each(['Tab', 'Escape' && 'a', 'Delete', 'Home', 'End', 'F1'])(
+    it.each(['Tab', 'a', 'Delete', 'Home', 'End', 'F1'])(
       '%s returns false with no side effects',
       (key) => {
-        // Escape IS handled, so filter it from the each list
-        if (key === 'Escape') return;
         const e = makeEvent(key);
         expect(handleKeydown(e, handler)).toBe(false);
         expect(handler).not.toHaveBeenCalled();

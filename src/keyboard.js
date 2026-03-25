@@ -26,7 +26,8 @@ export function handleKeydown(e, actionHandler) {
   const binding = KEY_MAP[e.key];
   if (!binding) return false;
 
-  if (!binding.allowOnButton && e.target?.closest('button')) return false;
+  if (!binding.allowOnButton && e.target instanceof Element && e.target.closest('button'))
+    return false;
 
   if (binding.preventDefault) e.preventDefault();
   actionHandler(binding.action);
