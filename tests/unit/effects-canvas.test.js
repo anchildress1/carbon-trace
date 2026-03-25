@@ -1260,10 +1260,8 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
         trigger: { threshold: 1.5, cooldown: 0.5 },
       });
 
-      // Build baseline with low energy. runningAvg starts at 0, so any
-      // energy triggers on frame 1. Run 40 frames (667ms) to let the
-      // running average stabilize AND exceed the 0.5s cooldown from
-      // that initial trigger.
+      // Build baseline with low energy. Run 40 frames (667ms) to let
+      // the running average stabilize AND exceed the 0.5s cooldown.
       analyser.getByteFrequencyData.mockImplementation((data) => {
         data.fill(0);
         for (let i = 1; i <= 12; i++) data[i] = 25;

@@ -165,7 +165,7 @@ function buildAudioReactiveState() {
         state.threshold = ar.trigger.threshold ?? 1.5;
         state.cooldown = ar.trigger.cooldown ?? 0.1;
         state.runningAvg = 0;
-        state.timeSinceLastTrigger = Infinity;
+        state.timeSinceLastTrigger = 0;
       }
       audioReactiveState.push(state);
     }
