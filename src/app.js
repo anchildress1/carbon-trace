@@ -65,6 +65,19 @@ function prefersReducedMotion() {
   return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
+function dismissLoadingScreen(el) {
+  const hide = () => {
+    el.hidden = true;
+  };
+  if (prefersReducedMotion()) {
+    hide();
+  } else {
+    el.classList.add('fade-out');
+    el.addEventListener('transitionend', hide, { once: true });
+    setTimeout(hide, 900);
+  }
+}
+
 function computeProjectMaxCaptionMs(frames) {
   let max = 0;
   for (const frame of frames) {
@@ -678,17 +691,7 @@ function doResume(app) {
     }
     setupAutoAdvance(app);
   } else if (firstPlay) {
-    // Fade out the loading screen to reveal the scene underneath.
-    const hideLoading = () => {
-      app.els.loadingScreen.hidden = true;
-    };
-    if (prefersReducedMotion()) {
-      hideLoading();
-    } else {
-      app.els.loadingScreen.classList.add('fade-out');
-      app.els.loadingScreen.addEventListener('transitionend', hideLoading, { once: true });
-      setTimeout(hideLoading, 900);
-    }
+    dismissLoadingScreen(app.els.loadingScreen);
     // Move focus to the pause button so a pending Space keyup doesn't
     // activate an unintended control (e.g., btn-next) after the loading
     // screen loses focus.
