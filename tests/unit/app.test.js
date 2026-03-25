@@ -559,6 +559,30 @@ describe('app.js', () => {
       await flush();
       expect(focusActiveDot).toHaveBeenCalled();
     });
+
+    it('Escape pauses when playing', () => {
+      app.togglePause(); // resume → SCENE_ACTIVE
+      expect(app.getState()).toBe('SCENE_ACTIVE');
+      const stage = document.getElementById('scene-stage');
+      stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      expect(app.getState()).toBe('PAUSED');
+    });
+
+    it('Escape does nothing when already paused', () => {
+      expect(app.getState()).toBe('PAUSED');
+      const stage = document.getElementById('scene-stage');
+      stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      expect(app.getState()).toBe('PAUSED');
+    });
+
+    it('unhandled keys do not trigger app actions', () => {
+      app.togglePause(); // resume → SCENE_ACTIVE
+      vi.clearAllMocks();
+      const stage = document.getElementById('scene-stage');
+      stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+      expect(cancelAudioCues).not.toHaveBeenCalled();
+      expect(app.getState()).toBe('SCENE_ACTIVE');
+    });
   });
 
   // ── first-play via keyboard ────────────────────────────────────────
