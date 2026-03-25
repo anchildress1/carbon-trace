@@ -1328,8 +1328,8 @@
           {
             "type": "shockwave",
             "mask": "assets/masks/mask-11-music-shockwave.png",
-            "centerX": 0.54,
-            "centerY": 0.33,
+            "centerX": 0.48,
+            "centerY": 0.43,
             "audioReactive": {
               "band": "bass",
               "target": "amplitude",

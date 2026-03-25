@@ -31,6 +31,7 @@ let disposableTextures = [];
 let loadGeneration = 0;
 let isPaused = false;
 let initPromise = null;
+let centeredEffects = []; // effects with normalized center → pixel conversion
 
 // Audio-reactive modulation state (ADR-008)
 let arAnalyser = null;
@@ -231,6 +232,21 @@ async function applyRegionEffect(region, sceneTexture, gen) {
     return null;
   }
 
+  // ShockwaveFilter center is in pixel coordinates (shader divides by
+  // uInputSize). Config stores normalized 0–1 values for responsiveness.
+  // Convert here and track for resize updates.
+  if (region.centerX !== undefined && region.centerY !== undefined) {
+    effect.filter.center = {
+      x: region.centerX * pixiApp.screen.width,
+      y: region.centerY * pixiApp.screen.height,
+    };
+    centeredEffects.push({
+      filter: effect.filter,
+      nx: region.centerX,
+      ny: region.centerY,
+    });
+  }
+
   const maskTexture = await loadLuminanceMask(region.mask);
   if (gen !== loadGeneration) {
     maskTexture.destroy(false);
@@ -341,6 +357,9 @@ async function doInit(el) {
         for (const sprite of screenSizedSprites) {
           sprite.width = w;
           sprite.height = h;
+        }
+        for (const ce of centeredEffects) {
+          ce.filter.center = { x: ce.nx * w, y: ce.ny * h };
         }
       }
     });
@@ -471,6 +490,7 @@ export function clearAll() {
 
   activeEffects = [];
   screenSizedSprites = [];
+  centeredEffects = [];
   audioReactiveState = [];
   arAnalyser = null;
 
@@ -587,6 +607,7 @@ export function destroy() {
   canvasEl = null;
   activeEffects = [];
   screenSizedSprites = [];
+  centeredEffects = [];
   disposableTextures = [];
   needsReinit = false;
   isPaused = false;
