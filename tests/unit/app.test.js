@@ -37,6 +37,9 @@ vi.mock('../../src/audio.js', () => ({
   preloadNarrationAhead: vi.fn(),
   clearNarrationCache: vi.fn(),
   wrapOnNarrationEndWithBoost: vi.fn((_cues, cb) => cb),
+  getAnalyserNode: vi.fn(() => null),
+  connectAnalyserToCue: vi.fn(),
+  disconnectAnalyserSource: vi.fn(),
 }));
 
 vi.mock('../../src/text.js', () => ({
@@ -60,6 +63,7 @@ vi.mock('../../src/effects-canvas.js', () => ({
   cancelPendingLoad: vi.fn(),
   pause: vi.fn(),
   resume: vi.fn(),
+  setAnalyser: vi.fn(),
 }));
 
 vi.mock('../../src/overlay.js', () => ({

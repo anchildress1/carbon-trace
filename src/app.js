@@ -13,6 +13,9 @@ import {
   preloadNarrationAhead,
   clearNarrationCache,
   wrapOnNarrationEndWithBoost,
+  getAnalyserNode,
+  connectAnalyserToCue,
+  disconnectAnalyserSource,
 } from './audio.js';
 import { PausableTimer } from './pausable-timer.js';
 import { buildNarrationTimeline, clearNarrationLayer } from './text.js';
@@ -58,6 +61,9 @@ function pauseEffects() {
 }
 function resumeEffects() {
   effectsMod?.resume();
+}
+function setEffectsAnalyser(node) {
+  effectsMod?.setAnalyser(node);
 }
 
 const State = Object.freeze({
@@ -390,9 +396,19 @@ function showFrame(app, index) {
   clearNarrationLayer(app.els.narrationLayer);
 
   if (frame.effects?.regions?.length) {
-    app.effectsReady = loadEffectsScene(frame.effects, frame.image).catch((err) =>
-      console.error('Effects load failed:', err.message),
-    );
+    app.effectsReady = loadEffectsScene(frame.effects, frame.image)
+      .then(() => {
+        // Wire audio-reactive bridge after effects are loaded (ADR-008).
+        // setAnalyser must run after loadScene so it isn't cleared by clearAll().
+        if (frame.effects.regions.some((r) => r.audioReactive)) {
+          const analyser = getAnalyserNode();
+          if (analyser) {
+            setEffectsAnalyser(analyser);
+            connectAnalyserToCue(frame.effects.analyserCueId ?? 'end-song');
+          }
+        }
+      })
+      .catch((err) => console.error('Effects load failed:', err.message));
   } else {
     cancelPendingLoad();
     clearEffects();
@@ -485,6 +501,7 @@ function cleanupCurrentScene(app) {
   app.generation++;
   clearAutoAdvance(app);
   cancelPendingLoad();
+  disconnectAnalyserSource();
   cancelAudioCues();
 
   clearCaptionElements(app.captionEntries);
