@@ -118,13 +118,13 @@
             "text": "Most came home.",
             "enter": 25000,
             "exit": 28000,
-            "x": 78,
+            "x": 73,
             "y": 75
           },
           {
             "text": "That's what we called living.",
             "enter": 30000,
-            "exit": 33000,
+            "exit": 35000,
             "x": 43,
             "y": 78
           }
@@ -208,9 +208,9 @@
           "type": "ambient",
           "src": "assets/audio/ambient/01-seam-mine.m4a",
           "enter": 4300,
-          "volume": 0.1,
+          "volume": 0.05,
           "loop": true,
-          "fadeIn": 1500,
+          "fadeIn": 500,
           "fadeOut": null
         }
       ]
@@ -234,7 +234,7 @@
             "text": "Work that was expected.",
             "enter": 4000,
             "exit": 7000,
-            "x": 74,
+            "x": 65,
             "y": 20
           },
           {
@@ -242,12 +242,12 @@
             "enter": 27000,
             "exit": 32000,
             "x": 2,
-            "y": 89
+            "y": 79
           },
           {
-            "text": "The way I was raised.",
-            "enter": 32000,
-            "exit": 35000,
+            "text": "Whether anybody sees it or not.",
+            "enter": 34000,
+            "exit": 40000,
             "x": 40,
             "y": 39
           }
@@ -353,7 +353,7 @@
       "narration": {
         "lines": [
           {
-            "text": "Growing up was a hard thing to do.",
+            "text": "Growing up was a hard thing.",
             "enter": 1200,
             "exit": 4000,
             "x": 40,
@@ -367,7 +367,7 @@
             "y": 22
           },
           {
-            "text": "Something in me just refused to burn.",
+            "text": "Something refused to burn.",
             "enter": 17000,
             "exit": 19500,
             "x": 56,
@@ -770,8 +770,8 @@
             "text": "Solved problems quietly.",
             "enter": 12000,
             "exit": 15000,
-            "x": 73,
-            "y": 89
+            "x": 64,
+            "y": 85
           },
           {
             "text": "There were special women along the way.",
@@ -784,8 +784,8 @@
             "text": "Carrying the light as if they'd been the ones underground.",
             "enter": 38000,
             "exit": 42000,
-            "x": 43,
-            "y": 11
+            "x": 50,
+            "y": 16
           }
         ],
         "captions": [
@@ -878,10 +878,10 @@
           "type": "ambient",
           "src": "assets/audio/ambient/06-storage-electromagnetic.m4a",
           "enter": 0,
-          "volume": 0.1,
+          "volume": 0.35,
           "loop": true,
           "fadeIn": 1500,
-          "fadeOut": null
+          "fadeOut": 1500
         }
       ]
     },
@@ -919,7 +919,7 @@
             "enter": 23000,
             "exit": 28000,
             "x": 63,
-            "y": 48
+            "y": 52
           },
           {
             "text": "They got done obliging.",
@@ -991,7 +991,7 @@
           "type": "ambient",
           "src": "assets/audio/ambient/07-missing-rain.m4a",
           "enter": 0,
-          "volume": 0.7,
+          "volume": 0.2,
           "loop": true,
           "fadeIn": 1500,
           "fadeOut": null
@@ -1001,7 +1001,7 @@
     {
       "id": "scene-08-empty",
       "frameType": "scene",
-      "holdAfterNarration": 8000,
+      "holdAfterNarration": 16000,
       "description": "Sparse room with tin on wall shelf, circuitry glowing on walls, bright window — a space where someone should be but isn't",
       "image": "assets/images/scene-08-empty.webp",
       "narration": {
@@ -1009,15 +1009,15 @@
           {
             "text": "All of them should still be here.",
             "enter": 0,
-            "exit": 2000,
+            "exit": 6000,
             "x": 8,
             "y": 21
           },
           {
             "text": "It's not supposed to be this quiet.",
-            "enter": 1500,
-            "exit": 4000,
-            "x": 20,
+            "enter": 4500,
+            "exit": 8000,
+            "x": 22,
             "y": 28
           }
         ],
@@ -1046,7 +1046,7 @@
           "volume": 1,
           "loop": true,
           "fadeIn": 1500,
-          "fadeOut": null
+          "fadeOut": 1500
         }
       ]
     },
@@ -1162,7 +1162,7 @@
           "type": "ambient",
           "src": "assets/audio/ambient/09-return-forest.m4a",
           "enter": 0,
-          "volume": 0.55,
+          "volume": 0.35,
           "loop": true,
           "fadeIn": 1500,
           "fadeOut": null
@@ -1281,7 +1281,7 @@
           "type": "ambient",
           "src": "assets/audio/ambient/10-building-welding.m4a",
           "enter": 0,
-          "volume": 0.2,
+          "volume": 0.15,
           "loop": true,
           "fadeIn": 1500,
           "fadeOut": null
@@ -1301,28 +1301,28 @@
             "enter": 2000,
             "exit": 6000,
             "x": 67,
-            "y": 87
+            "y": 71
           },
           {
             "text": "One little corner of the universe.",
             "enter": 18000,
             "exit": 21000,
-            "x": 64,
-            "y": 12
+            "x": 54,
+            "y": 30
           },
           {
             "text": "It's not dark no more.",
             "enter": 20000,
             "exit": 23000,
             "x": 19,
-            "y": 85
+            "y": 75
           },
           {
             "text": "Catch like wildfire.",
             "enter": 25000,
             "exit": 28000,
             "x": 42,
-            "y": 31
+            "y": 36
           }
         ],
         "captions": [
@@ -1394,7 +1394,7 @@
           "type": "ambient",
           "src": "assets/audio/ambient/11-music-vinyl.m4a",
           "enter": 0,
-          "volume": 0.2,
+          "volume": 0.1,
           "loop": true,
           "fadeIn": 1500,
           "fadeOut": null
@@ -1405,11 +1405,13 @@
           "src": "assets/audio/sfx/BridgeCitySinners_BreakTheChain.mp3",
           "enter": {
             "ref": "narration",
-            "offset": -5000
+            "offset": -12000
           },
-          "volume": 0.75,
+          "volume": 0.15,
+          "volumeAfterNarration": 0.75,
+          "fadeAfterNarration": 3000,
           "loop": true,
-          "fadeIn": 10000,
+          "fadeIn": 8000,
           "fadeOut": null
         }
       ]
