@@ -53,21 +53,18 @@ test.describe('keyboard focus management', () => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
   });
 
-  test('ArrowRight moves focus to the active progress dot', async ({ page }) => {
+  test('ArrowRight navigates without stealing focus to dot', async ({ page }) => {
     await page.keyboard.press('ArrowRight');
 
     const stage = page.locator('#scene-stage');
     await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
 
+    // Keyboard nav preserves focus position — does not redirect to dot
     const focused = await page.evaluate(() => document.activeElement?.classList.contains('progress-dot'));
-    expect(focused).toBe(true);
-
-    const ariaCurrent = await page.evaluate(() => document.activeElement?.getAttribute('aria-current'));
-    expect(ariaCurrent).toBe('step');
+    expect(focused).toBe(false);
   });
 
-  test('ArrowLeft moves focus to the active progress dot', async ({ page }) => {
-    // First advance two frames, then retreat
+  test('ArrowLeft navigates without stealing focus to dot', async ({ page }) => {
     await advanceByKeyboard(page, 2);
 
     await page.keyboard.press('ArrowLeft');
@@ -75,29 +72,27 @@ test.describe('keyboard focus management', () => {
     await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
 
     const focused = await page.evaluate(() => document.activeElement?.classList.contains('progress-dot'));
-    expect(focused).toBe(true);
+    expect(focused).toBe(false);
   });
 
-  test('Enter key moves focus to the active progress dot', async ({ page }) => {
+  test('Enter navigates without stealing focus to dot', async ({ page }) => {
     await page.keyboard.press('Enter');
 
     const stage = page.locator('#scene-stage');
     await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
 
     const focused = await page.evaluate(() => document.activeElement?.classList.contains('progress-dot'));
-    expect(focused).toBe(true);
+    expect(focused).toBe(false);
   });
 
   test('Space does NOT move focus to a progress dot (it toggles pause)', async ({ page }) => {
-    // Space toggles pause, should not redirect focus to a dot
     await page.keyboard.press('Space');
 
     const focused = await page.evaluate(() => document.activeElement?.classList.contains('progress-dot'));
     expect(focused).toBe(false);
   });
 
-  test('keyboard nav while paused (hardCut) moves focus to active dot', async ({ page }) => {
-    // App starts paused. ArrowRight while paused triggers hardCut.
+  test('keyboard nav while paused preserves focus position', async ({ page }) => {
     const pauseBtn = page.locator('#btn-pause');
     await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
 
@@ -108,18 +103,18 @@ test.describe('keyboard focus management', () => {
     // Still paused
     await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
 
+    // Keyboard nav does not steal focus
     const focused = await page.evaluate(() => document.activeElement?.classList.contains('progress-dot'));
-    expect(focused).toBe(true);
+    expect(focused).toBe(false);
   });
 
-  test('button click moves focus to the active dot (ring hidden by :focus-visible)', async ({ page }) => {
+  test('button click moves focus to the active dot', async ({ page }) => {
     await dismissLoadingScreen(page);
 
     await page.click('#btn-next');
     const stage = page.locator('#scene-stage');
     await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
 
-    // Focus moved to the active dot — :focus-visible hides ring for mouse users
     const focused = await page.evaluate(() => document.activeElement?.classList.contains('progress-dot'));
     expect(focused).toBe(true);
   });
@@ -132,16 +127,16 @@ test.describe('keyboard focus management', () => {
     const stage = page.locator('#scene-stage');
     await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
 
-    // Focus moved to the active dot for the navigated-to scene
     const focused = await page.evaluate(() => document.activeElement?.classList.contains('progress-dot'));
     expect(focused).toBe(true);
   });
 
-  test('sequential keyboard advances keep focus tracking the active dot', async ({ page }) => {
+  test('sequential keyboard advances do not redirect focus', async ({ page }) => {
     await advanceByKeyboard(page, 3);
 
-    const focusedIndex = await page.evaluate(() => document.activeElement?.dataset?.sceneIndex);
-    expect(focusedIndex).toBe('4'); // title(1) + 3 advances = scene index 4
+    // Keyboard nav preserves focus — not on a dot
+    const focused = await page.evaluate(() => document.activeElement?.classList.contains('progress-dot'));
+    expect(focused).toBe(false);
   });
 });
 
@@ -287,10 +282,10 @@ test.describe('spacebar — button activation and global pause', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
-//  4. ARROW KEYS — always navigate from any focus; ENTER activates buttons
+//  4. ARROW KEYS — navigate from control buttons; ENTER activates buttons
 // ═══════════════════════════════════════════════════════════════════
 
-test.describe('arrow keys — always navigate from any focus', () => {
+test.describe('arrow keys — navigate from control buttons', () => {
   test.beforeEach(async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
@@ -765,5 +760,131 @@ test.describe('error resilience under keyboard stress', () => {
     // Scene should not have changed (Tab might move focus but doesn't navigate)
     const labelAfter = await stage.getAttribute('aria-label');
     expect(labelAfter).toBe(labelBefore);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+//  11. ESCAPE KEY — one-directional pause
+// ═══════════════════════════════════════════════════════════════════
+
+test.describe('Escape key behavior', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+  });
+
+  test('Escape pauses when playing', async ({ page }) => {
+    await dismissLoadingScreen(page);
+
+    const pauseBtn = page.locator('#btn-pause');
+    await expect(pauseBtn).toHaveAttribute('aria-pressed', 'false');
+
+    await page.keyboard.press('Escape');
+    await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('Escape does nothing when already paused', async ({ page }) => {
+    const pauseBtn = page.locator('#btn-pause');
+    await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
+
+    await page.keyboard.press('Escape');
+    await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
+
+    // Scene unchanged
+    const stage = page.locator('#scene-stage');
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(0));
+  });
+
+  test('Escape then Space resumes playback', async ({ page }) => {
+    await dismissLoadingScreen(page);
+
+    const pauseBtn = page.locator('#btn-pause');
+    await page.keyboard.press('Escape');
+    await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
+
+    await page.keyboard.press('Space');
+    await expect(pauseBtn).toHaveAttribute('aria-pressed', 'false');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+//  12. ROVING TABINDEX — progress dots composite widget
+// ═══════════════════════════════════════════════════════════════════
+
+test.describe('roving tabindex on progress dots', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto('/');
+    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await dismissLoadingScreen(page);
+  });
+
+  test('dot group is a single Tab stop', async ({ page }) => {
+    // Tab from pause button should land on the dot with tabindex="0"
+    await page.focus('#btn-pause');
+    await page.keyboard.press('Shift+Tab');
+
+    const focused = await page.evaluate(() => document.activeElement?.classList.contains('progress-dot'));
+    expect(focused).toBe(true);
+
+    // Only one dot should have tabindex="0"
+    const tabbableDots = await page.evaluate(() =>
+      document.querySelectorAll('.progress-dot[tabindex="0"]').length,
+    );
+    expect(tabbableDots).toBe(1);
+  });
+
+  test('ArrowRight on focused dot moves focus to next dot without navigating', async ({ page }) => {
+    // Focus the first dot
+    const firstDot = page.locator('.progress-dot').first();
+    await firstDot.focus();
+
+    const stage = page.locator('#scene-stage');
+    const labelBefore = await stage.getAttribute('aria-label');
+
+    await page.keyboard.press('ArrowRight');
+
+    // Focus moved to second dot
+    const focusedIndex = await page.evaluate(() => document.activeElement?.dataset?.sceneIndex);
+    expect(focusedIndex).toBe('2');
+
+    // Scene did NOT navigate
+    const labelAfter = await stage.getAttribute('aria-label');
+    expect(labelAfter).toBe(labelBefore);
+  });
+
+  test('Enter on focused dot navigates to that scene', async ({ page }) => {
+    // Focus the third dot
+    const thirdDot = page.locator('.progress-dot').nth(2);
+    await thirdDot.focus();
+
+    await page.keyboard.press('Enter');
+
+    const stage = page.locator('#scene-stage');
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(2), { timeout: 5000 });
+  });
+
+  test('ArrowLeft on first dot wraps to last dot', async ({ page }) => {
+    const firstDot = page.locator('.progress-dot').first();
+    await firstDot.focus();
+
+    await page.keyboard.press('ArrowLeft');
+
+    const focusedIndex = await page.evaluate(() => document.activeElement?.dataset?.sceneIndex);
+    expect(focusedIndex).toBe(String(SCENE_COUNT));
+  });
+
+  test('Home/End navigate to first/last dot', async ({ page }) => {
+    const firstDot = page.locator('.progress-dot').first();
+    await firstDot.focus();
+
+    await page.keyboard.press('End');
+    const endIndex = await page.evaluate(() => document.activeElement?.dataset?.sceneIndex);
+    expect(endIndex).toBe(String(SCENE_COUNT));
+
+    await page.keyboard.press('Home');
+    const homeIndex = await page.evaluate(() => document.activeElement?.dataset?.sceneIndex);
+    expect(homeIndex).toBe('1');
   });
 });

@@ -540,16 +540,16 @@ describe('app.js', () => {
       expect(cancelAudioCues).toHaveBeenCalled();
     });
 
-    it('focusActiveDot is called after user-initiated advance', async () => {
+    it('keyboard advance does not steal focus to dot (preserves global nav mode)', async () => {
       app.togglePause();
       vi.clearAllMocks();
       const stage = document.getElementById('scene-stage');
       stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
       await flush();
-      expect(focusActiveDot).toHaveBeenCalled();
+      expect(focusActiveDot).not.toHaveBeenCalled();
     });
 
-    it('focusActiveDot is called after user-initiated retreat', async () => {
+    it('keyboard retreat does not steal focus to dot (preserves global nav mode)', async () => {
       app.togglePause();
       app.advance();
       await flush();
@@ -557,7 +557,7 @@ describe('app.js', () => {
       const stage = document.getElementById('scene-stage');
       stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
       await flush();
-      expect(focusActiveDot).toHaveBeenCalled();
+      expect(focusActiveDot).not.toHaveBeenCalled();
     });
 
     it('Escape pauses when playing', () => {

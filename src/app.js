@@ -477,9 +477,13 @@ function manageFocusAfterTransition(app) {
     } else if (document.activeElement?.closest('.control-buttons')) {
       document.activeElement.blur();
     }
-  } else {
+  } else if (app.lastNavSource !== 'keyboard') {
+    // Pointer/dot-click nav: move focus to active dot.
+    // Keyboard nav: leave focus where it is so arrow keys
+    // continue to navigate scenes (not roving-tabindex dots).
     focusActiveDot();
   }
+  app.lastNavSource = null;
 }
 
 function transition(app, toIndex) {
@@ -876,6 +880,7 @@ function initApp(app) {
 
       initKeyboard((action) => {
         app.userHasInteracted = true;
+        app.lastNavSource = 'keyboard';
         switch (action) {
           case 'togglePause':
             togglePause(app);
