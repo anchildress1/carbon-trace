@@ -792,7 +792,12 @@ function replayNarration(app) {
 }
 
 function handleKeydown(app, e) {
+  // When a button has focus, let Space and Enter activate it natively.
+  // Each button's click handler already performs the correct action.
+  const onButton = e.target?.tagName === 'BUTTON';
+
   if (e.key === ' ') {
+    if (onButton) return;
     e.preventDefault();
     app.userHasInteracted = true;
     togglePause(app);
@@ -800,7 +805,12 @@ function handleKeydown(app, e) {
     e.preventDefault();
     app.userHasInteracted = true;
     retreat(app);
-  } else if (e.key === 'ArrowRight' || e.key === 'Enter') {
+  } else if (e.key === 'Enter') {
+    if (onButton) return;
+    e.preventDefault();
+    app.userHasInteracted = true;
+    advance(app);
+  } else if (e.key === 'ArrowRight') {
     e.preventDefault();
     app.userHasInteracted = true;
     advance(app);

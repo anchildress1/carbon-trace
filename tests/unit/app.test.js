@@ -1457,7 +1457,7 @@ describe('app.js', () => {
         new KeyboardEvent('keydown', { key: ' ', bubbles: true }),
       );
 
-      // Space always toggles pause regardless of focus target
+      // Space on non-button element toggles pause
       expect(app.getState()).toBe('PAUSED');
     });
 
@@ -1468,7 +1468,7 @@ describe('app.js', () => {
         new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
       );
 
-      // All keyboard shortcuts work regardless of focus target
+      // Enter on non-button element advances
       expect(cancelAudioCues).toHaveBeenCalled();
     });
 
@@ -1479,7 +1479,6 @@ describe('app.js', () => {
         new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }),
       );
 
-      // All keyboard shortcuts work regardless of focus target
       expect(cancelAudioCues).toHaveBeenCalled();
     });
 
@@ -1493,7 +1492,38 @@ describe('app.js', () => {
         new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }),
       );
 
-      // ArrowLeft has no closest('#overlay-controls') guard — should retreat
+      expect(cancelAudioCues).toHaveBeenCalled();
+    });
+
+    it('Space on a focused button does not toggle pause', () => {
+      const btn = document.getElementById('btn-mute');
+      btn.dispatchEvent(
+        new KeyboardEvent('keydown', { key: ' ', bubbles: true }),
+      );
+
+      // Button should handle its own activation — global shortcut defers
+      expect(app.getState()).toBe('SCENE_ACTIVE');
+    });
+
+    it('Enter on a focused button does not advance', () => {
+      vi.clearAllMocks();
+      const btn = document.getElementById('btn-replay');
+      btn.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+      );
+
+      // Button should handle its own activation — global shortcut defers
+      expect(cancelAudioCues).not.toHaveBeenCalled();
+    });
+
+    it('ArrowRight on a focused button still advances (arrows are global)', () => {
+      vi.clearAllMocks();
+      const btn = document.getElementById('btn-mute');
+      btn.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }),
+      );
+
+      // Arrow keys are not guarded — they work globally
       expect(cancelAudioCues).toHaveBeenCalled();
     });
   });
