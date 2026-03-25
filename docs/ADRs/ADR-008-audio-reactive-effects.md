@@ -32,6 +32,8 @@ The goal: make effect parameters respond to the music in real time. When the bas
 
 Each effect region can declare an optional `audioReactive` key that maps a frequency band (bass/mid/high) to an effect parameter, with a target range and smoothing factor. The PixiJS ticker reads FFT data once per frame and lerps the target parameter between range bounds based on the band's energy.
 
+Additionally, `audioReactive` can include an optional `trigger` object for onset-triggered effects. When present, the system detects sudden energy spikes (beats/notes) and calls `effect.trigger()` to fire discrete animation cycles. Trigger and continuous modulation are composable — a single region can do both, e.g., fire a shockwave on each bass hit while modulating its amplitude to reflect hit intensity.
+
 ---
 
 ## How It Works
@@ -71,6 +73,28 @@ FOR EACH region with audioReactive config:
      value = range[0] + smoothed * (range[1] - range[0])
   5. Set the parameter on the PixiJS filter
 ```
+
+### Onset detection (trigger mode)
+
+When `audioReactive.trigger` is present, the ticker additionally runs onset detection each frame using spectral flux against a running average:
+
+```
+FOR EACH region with audioReactive.trigger:
+  1. Update running average:
+     runningAvg = runningAvg * 0.95 + energy * 0.05
+  2. Increment timeSinceLastTrigger by frame delta
+  3. IF energy > runningAvg * threshold AND timeSinceLastTrigger > cooldown:
+     a. Call effect.trigger() — resets the animation cycle (e.g., shockwave time=0)
+     b. Reset timeSinceLastTrigger = 0
+```
+
+The running average decay (0.95) adapts to the music's overall energy level. The `threshold` multiplier means "trigger when current energy exceeds the running average by this factor." A threshold of 1.5 = "50% above average." The `cooldown` prevents rapid re-triggering within a minimum interval.
+
+Trigger and continuous modulation run in the same frame. Continuous modulation sets the parameter value (e.g., amplitude), then trigger fires a new cycle if a beat is detected. Combined: each beat fires a shockwave whose intensity matches the hit strength.
+
+### Shockwave `autoRepeat` and `trigger()`
+
+The shockwave effect factory accepts an `autoRepeat` param (default `true`). When `false`, the wave plays once through `cycleDuration` then idles — it does not auto-repeat on a fixed timer. The `trigger()` method on the effect object resets the cycle timer to zero, starting a new wave expansion. This is the mechanism onset detection uses to fire discrete shockwaves on each detected beat.
 
 ### Module wiring (no cross-imports)
 
@@ -121,6 +145,29 @@ audioReactive is an optional key on any effect region (ADR-007 schema):
   }
 }
 ```
+
+With optional onset trigger (composable with continuous modulation above):
+
+```jsonc
+{
+  "type": "shockwave",
+  "mask": "assets/masks/11-shockwave.png",
+  "autoRepeat": false,       // ← no fixed-timer cycling; trigger controls timing
+  "cycleDuration": 0.4,      // ← fast expansion per beat
+  "audioReactive": {
+    "band": "bass",
+    "target": "amplitude",   // continuous: modulate intensity per hit strength
+    "range": [10, 30],
+    "smoothing": 0.3,        // lower = more responsive to transients
+    "trigger": {             // onset detection (optional)
+      "threshold": 1.5,      // fire when energy > runningAvg * 1.5
+      "cooldown": 0.08       // min 80ms between triggers (~12/sec max)
+    }
+  }
+}
+```
+
+When `trigger` is present alongside `target`/`range`/`smoothing`, both behaviors run each frame. When `trigger` is present without `target`/`range`, only onset triggering runs (no continuous modulation).
 
 ### Precedence rule
 
@@ -227,6 +274,18 @@ AnalyserNode            │ "no audio playing" — range[0] fallback.
 pulse + audioReactive   │ audioReactive wins. pulseSpeed/pulseRange
 on same parameter       │ ignored for that parameter. See precedence
                         │ rule above.
+────────────────────────┼─────────────────────────────────────────────
+Trigger: no audio       │ Running average stays at 0. Energy never
+                        │ exceeds threshold. No triggers fire. Effect
+                        │ idle at cycleDuration (shockwave invisible).
+────────────────────────┼─────────────────────────────────────────────
+Trigger: sustained      │ Running average rises to match sustained
+loud audio              │ energy. Triggers only fire on transients
+                        │ above the running average, not on steady
+                        │ volume. Adaptive by design.
+────────────────────────┼─────────────────────────────────────────────
+Trigger: reduced motion │ Trigger ignored (same as modulation).
+                        │ Effect static at base parameter value.
 ```
 
 ---
@@ -279,6 +338,16 @@ Precedence            │ audioReactive overrides pulse on same parameter
 CORS / same-origin    │ Verify AnalyserNode works with same-origin audio
                       │ served via Howler html5 mode
 Dynamic sampleRate    │ Verify bin calculation works at 48000Hz (not just 44100Hz)
+Trigger: onset        │ Energy spike above threshold * runningAvg fires
+                      │ effect.trigger(), resets shockwave cycle
+Trigger: cooldown     │ Rapid energy spikes within cooldown window
+                      │ are ignored (only first fires)
+Trigger: adaptation   │ Running average rises with sustained energy,
+                      │ only transients above average trigger
+Trigger + modulate    │ Combined mode: trigger fires cycle AND
+                      │ modulation drives amplitude in same frame
+Trigger: autoRepeat   │ autoRepeat:false shockwave idles after one
+                      │ cycle, only trigger() restarts it
 ```
 
 ---
@@ -309,8 +378,13 @@ These require human judgment in-browser with actual music:
 3. [x] Implement per-frame band extraction, EMA smoothing, and parameter lerp
 4. [x] Implement dynamic sampleRate bin calculation (not hardcoded 44100Hz)
 5. [x] Wire audio-reactive bridge in app.js showFrame()
-6. [ ] Verify Howler html5 mode + AnalyserNode works with same-origin audio (blocking)
-7. [ ] Test Howler.masterGain() behavior under mute
+6. [ ] Verify Howler html5 mode + AnalyserNode works with same-origin audio (blocking — in-browser)
+7. [ ] Test Howler.masterGain() behavior under mute (in-browser)
 8. [x] Author Scene 11 audioReactive regions (Ashley — artistic decisions)
-9. [ ] Tune range/smoothing values in-browser with actual music (Ashley)
+9. [ ] Tune range/smoothing/threshold/cooldown values in-browser with actual music (Ashley)
 10. [x] Test: silence, muted, pause/resume, reduced motion, multiple bands, 48kHz sampleRate
+11. [ ] Add `autoRepeat` param and `trigger()` method to shockwave factory in effects.js
+12. [ ] Add onset detection to effects-canvas.js tickerUpdate (spectral flux + trigger dispatch)
+13. [ ] Update Scene 11 config: trigger + modulate combined, fast cycleDuration, adjusted center
+14. [ ] Re-author `mask-11-music-shockwave.png` for upward-only column above record (Ashley)
+15. [ ] Test: onset detection, cooldown, combined trigger+modulate, autoRepeat false/true
