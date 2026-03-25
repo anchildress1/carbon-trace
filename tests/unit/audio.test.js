@@ -359,6 +359,23 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       expect(howl.play).toHaveBeenCalled();
     });
 
+    it('does not replay narration that already ended', () => {
+      const onEnd = vi.fn();
+      scheduleAudioCues([makeCue()], { onNarrationEnd: onEnd });
+      const howl = Howl.mock.results[0].value;
+
+      // Simulate narration ending naturally
+      const endHandler = howl.once.mock.calls.find(([e]) => e === 'end')[1];
+      endHandler();
+
+      vi.clearAllMocks();
+
+      // Pause then resume — narration should NOT restart
+      pauseAudioCues();
+      resumeAudioCues();
+      expect(howl.play).not.toHaveBeenCalled();
+    });
+
     it('does not pause cues in scheduled state', () => {
       scheduleAudioCues([makeCue({ enter: 5000 })]);
       // No Howl created yet (still scheduled)

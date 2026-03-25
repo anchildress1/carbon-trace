@@ -383,6 +383,7 @@ function wireNarrationEnd(entry, cue, opts) {
   const safeEnd = () => {
     if (ended) return;
     ended = true;
+    entry.state = 'ended';
     if (safetyTimer) safetyTimer.cancel();
     if (entry.timer === safetyTimer) entry.timer = null;
     cleanupBufferMonitoring();
