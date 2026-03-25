@@ -196,7 +196,8 @@ test.describe('keyboard boundary conditions', () => {
     expect(errors.length).toBe(0);
   });
 
-  test('ArrowRight on credits frame does nothing — no error', { timeout: 45000 }, async ({ page }) => {
+  test('ArrowRight on credits frame does nothing — no error', async ({ page }) => {
+    test.setTimeout(45_000);
     const errors = [];
     page.on('pageerror', (err) => errors.push(err));
 
@@ -218,7 +219,8 @@ test.describe('keyboard boundary conditions', () => {
     expect(errors.length).toBe(0);
   });
 
-  test('next button is disabled at final frame', { timeout: 45000 }, async ({ page }) => {
+  test('next button is disabled at final frame', async ({ page }) => {
+    test.setTimeout(45_000);
     for (let i = 0; i < TOTAL_FRAMES - 1; i++) {
       await page.keyboard.press('ArrowRight');
       await page.waitForTimeout(200);
