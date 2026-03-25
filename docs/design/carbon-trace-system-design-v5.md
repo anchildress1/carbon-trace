@@ -170,7 +170,7 @@ function clearNarrationLayer(container) {
 }
 ```
 
-Lines are absolutely positioned via `x` (vw), `y` (vh), `align` (left/center/right). Ghost-drift animation: blur(4px) + y:18 → clear + y:0 on enter; blur(3px) + y:-10 → gone on exit. Reduced motion: simple opacity fade, no spatial movement.
+Lines are absolutely positioned via `x` (%), `y` (%) relative to the narration layer. All positioned lines use left text alignment. Ghost-drift animation: blur(4px) + y:18 → clear + y:0 on enter; blur(3px) + y:-10 → gone on exit. Reduced motion: simple opacity fade, no spatial movement.
 
 Caption entries are GSAP `tl.call()` callbacks at `startSec`/`endSec` that create/remove caption DOM elements. `isCaptionEnabled` function is checked at callback time, enabling mid-scene caption toggle.
 
@@ -243,7 +243,7 @@ Every frame has identical shape via `meta.frameDefaults` merge. `null` = feature
       "image": "assets/images/scene-01-seam.webp",
       "narration": {
         "lines": [
-          { "text": "...", "enter": 2000, "exit": 5000, "x": 10, "y": 70, "align": "left" }
+          { "text": "...", "enter": 2000, "exit": 5000, "x": 10, "y": 70 }
         ],
         "captions": [
           { "text": "...", "start": 0, "end": 5000 }
@@ -368,7 +368,7 @@ const app = {
   muted: false,
   paused: false,
   pausedFromState: null,     // state to restore on resume
-  userHasInteracted: false,  // play-gate flag
+  userHasInteracted: false,  // loading-screen interaction flag
   generation: 0,             // incremented on every navigation — guards stale callbacks
   deferFrameAudioUntilResume: false, // true after paused hardJump — next resume schedules frame audio fresh
   replayPending: false,      // replay happened while paused — doResume schedules fresh narration
@@ -482,14 +482,14 @@ const onend = () => {
 };
 ```
 
-### 5.6 Play Gate
+### 5.6 Loading Screen Gate
 
-Experience starts paused behind a full-screen "click to begin" button (`#play-gate`). This serves two purposes:
+Experience starts paused behind the loading screen (`#loading-screen`), which doubles as the start gate. After assets load, a "begin experience" prompt appears inside the loading screen button. This serves two purposes:
 
 1. **Mobile audio context unlock:** The first user gesture enables the AudioContext via Howler's internal unlock.
-2. **LCP optimization:** The play-gate label text serves as the Lighthouse LCP element.
+2. **LCP optimization:** The loading-screen prompt text serves as the Lighthouse LCP element.
 
-On click: `togglePause()` → `doResume()` → `handleFirstPlay()` which triggers narration and auto-advance for the first frame.
+On click: `togglePause()` → `doResume()` → fade-out loading screen (CSS transition, respects `prefers-reduced-motion`) → `handleFirstPlay()` which triggers narration and auto-advance for the first frame.
 
 ### 5.7 togglePause()
 
@@ -538,7 +538,7 @@ else:
 
 - Resume effects canvas
 - `autoAdvanceTimer?.resume()` — reschedule with saved remaining
-- If first interaction: hide play-gate, `cancelAudioCues()`, then `handleFirstPlay()`.
+- If first interaction: fade out loading screen, `cancelAudioCues()`, then `handleFirstPlay()`.
 
 ### 5.8 replayNarration() — ADR-004
 
@@ -613,9 +613,9 @@ Auto-advance       │ (internal)           │ (internal)         │ advance(c
 
 ```html
 <div id="app" role="application" aria-label="carbon-trace visual narrative">
-  <div id="loading-screen" role="status" aria-label="Loading carbon-trace">
-    <!-- SVG trace animation + title -->
-  </div>
+  <button id="loading-screen" aria-label="carbon-trace, begin experience">
+    <!-- SVG trace animation + title + #loading-prompt (hidden until ready) -->
+  </button>
 
   <div id="scene-stage" hidden>
     <canvas id="scene-canvas" aria-hidden="true"></canvas>
@@ -623,10 +623,6 @@ Auto-advance       │ (internal)           │ (internal)         │ advance(c
     <div id="narration-layer" aria-hidden="true"></div>
     <div id="caption-layer" aria-hidden="true"></div>
   </div>
-
-  <button id="play-gate" hidden aria-label="Begin experience">
-    <!-- SVG play icon + "click to begin" label -->
-  </button>
 
   <div id="transition-loader" hidden aria-hidden="true"></div>
 
@@ -675,7 +671,7 @@ line 2:  ░░░░░░░░▓▓▓▓▓▓▓▓▓▓▓▓░░░�
 line 3:  ░░░░░░░░░░░░░░░▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░
 ```
 
-- Lines positioned absolutely via `x` (vw), `y` (vh), `align` (left/center/right)
+- Lines positioned absolutely via `x` (%), `y` (%) relative to the narration layer; left-aligned
 - Enter: blur(4px) + y:18 → clear + y:0 (1.2s, power3.out)
 - Exit: clear → blur(3px) + y:-10 (0.9s, power2.in)
 - Lines enter/exit independently, overlap allowed
@@ -727,7 +723,7 @@ On each `showFrame()` call, `prebufferNextScene()`:
 
 - **16:9 letterbox:** `#app` enforces 16:9 aspect ratio via `width: min(100%, calc(100vh * 16 / 9)); aspect-ratio: 16/9`. Centered within the viewport using flexbox on `body`. Black bars fill remaining viewport area (letterbox on tall screens, pillarbox on wide screens). All content — canvases, narration, controls — is positioned within the 16:9 box. This ensures masks, effects, and text positioning align with the 16:9 source images across all viewport dimensions.
 - ResizeObserver on both canvases (scene, effects). DPR-aware sizing. Redraw on resize. **Resize coordination (ADR-007):** scene-canvas resizes via its own ResizeObserver callback (Canvas 2D). effects-canvas resize calls `app.renderer.resize()` on the PixiJS Application — do NOT create a second ResizeObserver for PixiJS. One observer, one resize call, avoids double-resize flicker.
-- `clamp()` font sizes: narration text, captions, loading title, play-gate label
+- `clamp()` font sizes: narration text, captions, loading title, loading-screen prompt
 - 320px minimum functional width
 - `viewport-fit=cover` + `env(safe-area-inset-bottom)` for notched devices
 
