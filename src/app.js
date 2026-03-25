@@ -541,7 +541,9 @@ function transition(app, toIndex) {
     }
     if (app.autoAdvancing) {
       app.autoAdvancing = false;
-      if (document.activeElement?.closest('.control-buttons')) {
+      if (document.activeElement?.closest('.progress-dots')) {
+        focusActiveDot();
+      } else if (document.activeElement?.closest('.control-buttons')) {
         document.activeElement.blur();
       }
     } else {

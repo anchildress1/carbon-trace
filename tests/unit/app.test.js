@@ -1730,7 +1730,7 @@ describe('app.js', () => {
       expect(cancelAudioCues).toHaveBeenCalled();
     });
 
-    it('auto-advance does not call focusActiveDot', async () => {
+    it('auto-advance does not call focusActiveDot when focus is elsewhere', async () => {
       app = createApp();
       await flush();
       vi.clearAllMocks();
@@ -1745,8 +1745,37 @@ describe('app.js', () => {
       vi.clearAllMocks();
       onNarrationEnd();
       vi.advanceTimersByTime(2000);
+      await flush(); // let async fadeIn complete so landOnFrame runs
 
       expect(focusActiveDot).not.toHaveBeenCalled();
+    });
+
+    it('auto-advance moves focus to active dot when a progress dot is focused', async () => {
+      app = createApp();
+      await flush();
+      vi.clearAllMocks();
+
+      document.getElementById('loading-screen').click();
+
+      const titleCall = scheduleAudioCues.mock.calls.find(
+        (call) => call[0]?.some((c) => c.src === 'title-narration.m4a'),
+      );
+      const onNarrationEnd = titleCall[1].onNarrationEnd;
+
+      // Focus a progress dot after first play has moved focus to btnPause
+      const dotsContainer = document.getElementById('progress-dots');
+      dotsContainer.classList.add('progress-dots');
+      const dot = document.createElement('button');
+      dot.className = 'progress-dot';
+      dotsContainer.appendChild(dot);
+      dot.focus();
+
+      vi.clearAllMocks();
+      onNarrationEnd();
+      vi.advanceTimersByTime(2000);
+      await flush(); // let async fadeIn complete so landOnFrame runs
+
+      expect(focusActiveDot).toHaveBeenCalled();
     });
 
     it('does not auto-advance title if user navigates before narration ends', async () => {
