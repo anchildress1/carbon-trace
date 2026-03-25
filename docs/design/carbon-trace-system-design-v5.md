@@ -6,7 +6,7 @@
 **Supersedes:** v4 — reconciled with implementation as of PR #8 (feat/canvas-effects)
 **Spec convention:** This document describes the target architecture. Sections annotated with `(ADR-007)` reflect accepted ADR decisions that are not yet implemented in code. See each ADR's "Implementation Status" section for the code delta.
 **Implementation gap:** "Accepted" = architecture decision is final. "Accepted" ≠ code matches docs. Current codebase diverges from this spec in: effects-canvas.js context type, effects.js module, scenes.json schema shape, and index.html DOM structure. Do not assume code reflects this document until ADR action items are complete.
-**Removed:** ADR-006 (trace shimmer overlay) has been removed. The trace overlay canvas and shimmer engine were never implemented and are no longer planned.
+**Deferred:** ADR-006 (trace shimmer overlay) is deferred post-v1. The runtime code was removed from the codebase but the ADR preserves the design for future implementation.
 
 ---
 
