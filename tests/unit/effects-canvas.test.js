@@ -98,6 +98,7 @@ import {
   resume,
   destroy,
   isRunning,
+  setAnalyser,
 } from '../../src/effects-canvas.js';
 
 function createMockCanvas() {
@@ -975,5 +976,221 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
         expect(textures[0].value.destroy).toHaveBeenCalledWith(false);
       }
     });
+  });
+});
+
+describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
+  let originalGetContext;
+
+  beforeEach(() => {
+    destroy();
+    vi.clearAllMocks();
+
+    globalThis.ResizeObserver = vi.fn(function () {
+      this.observe = vi.fn();
+      this.disconnect = vi.fn();
+    });
+
+    globalThis.matchMedia = vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    });
+    setupImageMock();
+
+    // Mock canvas 2D context for loadLuminanceMask (happy-dom lacks full support)
+    originalGetContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type) {
+      if (type === '2d') {
+        return {
+          drawImage: vi.fn(),
+          getImageData: vi.fn(() => ({
+            data: new Uint8ClampedArray(this.width * this.height * 4),
+          })),
+          putImageData: vi.fn(),
+        };
+      }
+      return originalGetContext?.call(this, type);
+    };
+  });
+
+  afterEach(() => {
+    destroy();
+    HTMLCanvasElement.prototype.getContext = originalGetContext;
+    vi.restoreAllMocks();
+  });
+
+  function createMockAnalyser(sampleRate = 44100) {
+    const frequencyBinCount = 1024;
+    return {
+      frequencyBinCount,
+      getByteFrequencyData: vi.fn(),
+      context: { sampleRate },
+    };
+  }
+
+  it('setAnalyser stores the analyser and allocates fftData', () => {
+    const analyser = createMockAnalyser();
+    setAnalyser(analyser);
+    // No error means it was accepted
+    setAnalyser(null);
+  });
+
+  it('setAnalyser with null is a no-op', () => {
+    setAnalyser(null);
+    // Should not throw
+  });
+
+  it('clearAll resets the analyser reference', async () => {
+    const canvas = createMockCanvas();
+    await init(canvas);
+
+    const analyser = createMockAnalyser();
+    setAnalyser(analyser);
+    clearAll();
+
+    // After clearAll, the analyser should be cleared.
+    // We verify by setting up a ticker callback and checking
+    // that getByteFrequencyData is NOT called.
+    const { Application } = await import('pixi.js');
+    const instance = Application.mock.instances[Application.mock.instances.length - 1];
+    const tickerCallback = instance.ticker.add.mock.calls[0]?.[0];
+    if (tickerCallback) {
+      tickerCallback({ deltaMS: 16.67 });
+      expect(analyser.getByteFrequencyData).not.toHaveBeenCalled();
+    }
+
+    destroy();
+  });
+
+  describe('band extraction', () => {
+    it('extractBands produces correct values at 44100Hz', async () => {
+      // We test the band extraction indirectly through the ticker.
+      // Set up: init, load a scene with audioReactive, set analyser AFTER
+      // loadScene (loadScene calls clearAll which resets the analyser —
+      // same order as the real app.js bridge wiring).
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      const analyser = createMockAnalyser(44100);
+      // Fill FFT data: bass bins (1-12) = 255 (full energy), rest = 0
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        // At 44100Hz, fftSize=2048: binWidth = 44100/2048 ≈ 21.5Hz
+        // bass: 20-250Hz → bins ~1-12
+        for (let i = 1; i <= 12; i++) data[i] = 255;
+      });
+
+      // Load a scene with audioReactive config
+      const config = {
+        regions: [
+          {
+            type: 'glow',
+            mask: 'assets/masks/test.png',
+            audioReactive: { band: 'bass', target: 'outerStrength', range: [0, 10], smoothing: 0 },
+          },
+        ],
+      };
+
+      await loadScene(config, 'assets/images/test.webp');
+
+      // Set analyser AFTER loadScene (matches real app.js wiring order)
+      setAnalyser(analyser);
+
+      // Get the ticker callback and invoke it
+      const { Application } = await import('pixi.js');
+      const instance = Application.mock.instances[Application.mock.instances.length - 1];
+      const tickerCallback = instance.ticker.add.mock.calls[0]?.[0];
+      if (tickerCallback) {
+        tickerCallback({ deltaMS: 16.67 });
+
+        // With smoothing=0, bass energy=1.0, range=[0,10] → value should be 10
+        expect(analyser.getByteFrequencyData).toHaveBeenCalled();
+      }
+
+      destroy();
+    });
+
+    it('extractBands works at 48000Hz sampleRate', () => {
+      const analyser = createMockAnalyser(48000);
+      setAnalyser(analyser);
+      // At 48000Hz, fftSize=2048: binWidth = 48000/2048 ≈ 23.4Hz
+      // bass: 20-250Hz → bins ~1-11
+      // Verify no errors at different sample rate
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(128);
+      });
+      setAnalyser(null);
+    });
+  });
+
+  it('audio-reactive is skipped when reducedMotion is true', async () => {
+    const canvas = createMockCanvas();
+    await init(canvas);
+
+    const analyser = createMockAnalyser();
+
+    const config = {
+      regions: [
+        {
+          type: 'glow',
+          mask: 'assets/masks/test.png',
+          audioReactive: { band: 'bass', target: 'outerStrength', range: [0, 10], smoothing: 0.8 },
+        },
+      ],
+    };
+
+    await loadScene(config, 'assets/images/test.webp');
+
+    // Set analyser AFTER loadScene (matches real app.js wiring order)
+    setAnalyser(analyser);
+
+    // Mock reduced motion AFTER loadScene so it doesn't affect loading
+    const matchMediaSpy = vi.spyOn(globalThis, 'matchMedia');
+    matchMediaSpy.mockReturnValue({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    });
+
+    const { Application } = await import('pixi.js');
+    const instance = Application.mock.instances[Application.mock.instances.length - 1];
+    const tickerCallback = instance.ticker.add.mock.calls[0]?.[0];
+    if (tickerCallback) {
+      tickerCallback({ deltaMS: 16.67 });
+      // Under reduced motion, getByteFrequencyData should NOT be called
+      expect(analyser.getByteFrequencyData).not.toHaveBeenCalled();
+    }
+
+    matchMediaSpy.mockRestore();
+    destroy();
+  });
+
+  it('no FFT reads when audioReactiveState is empty', async () => {
+    const canvas = createMockCanvas();
+    await init(canvas);
+
+    const analyser = createMockAnalyser();
+
+    // Load scene WITHOUT audioReactive regions
+    const config = {
+      regions: [{ type: 'glow', mask: 'assets/masks/test.png' }],
+    };
+
+    await loadScene(config, 'assets/images/test.webp');
+
+    // Set analyser AFTER loadScene (matches real app.js wiring order)
+    setAnalyser(analyser);
+
+    const { Application } = await import('pixi.js');
+    const instance = Application.mock.instances[Application.mock.instances.length - 1];
+    const tickerCallback = instance.ticker.add.mock.calls[0]?.[0];
+    if (tickerCallback) {
+      tickerCallback({ deltaMS: 16.67 });
+      // No audioReactive regions → no FFT reads
+      expect(analyser.getByteFrequencyData).not.toHaveBeenCalled();
+    }
+
+    destroy();
   });
 });

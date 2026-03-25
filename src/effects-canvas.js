@@ -32,6 +32,11 @@ let loadGeneration = 0;
 let isPaused = false;
 let initPromise = null;
 
+// Audio-reactive modulation state (ADR-008)
+let arAnalyser = null;
+let fftData = null;
+let audioReactiveState = [];
+
 function reducedMotion() {
   return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
@@ -116,6 +121,47 @@ function handleContextRestored() {
   console.warn('WebGL context restored');
 }
 
+// --- Audio-reactive FFT band extraction (ADR-008) ---
+
+function avgBins(data, start, end) {
+  if (end <= start) return 0;
+  let sum = 0;
+  for (let i = start; i < end; i++) sum += data[i];
+  return sum / ((end - start) * 255);
+}
+
+function extractBands(data, sampleRate) {
+  const fftSize = data.length * 2;
+  const binWidth = sampleRate / fftSize;
+  const bassStart = Math.max(1, Math.round(20 / binWidth));
+  const bassEnd = Math.round(250 / binWidth);
+  const midEnd = Math.round(2000 / binWidth);
+  const highEnd = Math.min(Math.round(16000 / binWidth), data.length - 1);
+
+  return {
+    bass: avgBins(data, bassStart, bassEnd),
+    mid: avgBins(data, bassEnd, midEnd),
+    high: avgBins(data, midEnd, highEnd),
+  };
+}
+
+function buildAudioReactiveState() {
+  audioReactiveState = [];
+  for (let i = 0; i < activeEffects.length; i++) {
+    const ar = activeEffects[i].audioReactive;
+    if (ar) {
+      audioReactiveState.push({
+        effectIndex: i,
+        band: ar.band,
+        target: ar.target,
+        range: ar.range,
+        smoothing: ar.smoothing ?? 0.8,
+        smoothedValue: 0,
+      });
+    }
+  }
+}
+
 function tickerUpdate(ticker) {
   const dt = ticker.deltaMS / 1000;
   for (const effect of activeEffects) {
@@ -123,6 +169,24 @@ function tickerUpdate(ticker) {
       effect.update(dt);
     } catch (err) {
       console.error('Effect update failed:', err);
+    }
+  }
+
+  // Audio-reactive modulation (ADR-008) — runs AFTER effect updates
+  // so audioReactive overrides pulse on the same parameter.
+  if (arAnalyser && audioReactiveState.length > 0 && !reducedMotion()) {
+    try {
+      arAnalyser.getByteFrequencyData(fftData);
+      const bands = extractBands(fftData, arAnalyser.context.sampleRate);
+      for (const state of audioReactiveState) {
+        const energy = bands[state.band];
+        state.smoothedValue =
+          state.smoothedValue * state.smoothing + energy * (1 - state.smoothing);
+        const value = state.range[0] + state.smoothedValue * (state.range[1] - state.range[0]);
+        activeEffects[state.effectIndex].filter[state.target] = value;
+      }
+    } catch (err) {
+      console.error('Audio-reactive modulation failed:', err);
     }
   }
 }
@@ -307,7 +371,10 @@ async function loadRegionEffects(regions, sceneTexture, gen) {
     try {
       const effect = await applyRegionEffect(region, sceneTexture, gen);
       if (gen !== loadGeneration) return false;
-      if (effect) activeEffects.push(effect);
+      if (effect) {
+        if (region.audioReactive) effect.audioReactive = region.audioReactive;
+        activeEffects.push(effect);
+      }
     } catch (err) {
       console.warn(`Skipping effect region "${region.type}":`, err.message);
     }
@@ -375,6 +442,7 @@ export async function loadScene(effectsConfig, sceneImageUrl) {
     const completed = await loadRegionEffects(effectsConfig.regions, sceneTexture, gen);
     if (!completed) return;
 
+    buildAudioReactiveState();
     startOrRenderOnce();
   } catch (err) {
     console.error('Failed to load scene effects:', err.message);
@@ -403,6 +471,8 @@ export function clearAll() {
 
   activeEffects = [];
   screenSizedSprites = [];
+  audioReactiveState = [];
+  arAnalyser = null;
 
   // Wrap destroy calls in try/catch — a lost WebGL context can cause throws.
   try {
@@ -459,6 +529,18 @@ export function clearAll() {
  */
 export function cancelPendingLoad() {
   loadGeneration++;
+}
+
+/**
+ * Set the AnalyserNode for audio-reactive modulation (ADR-008).
+ * The ticker reads FFT data each frame and modulates effect parameters.
+ * Cleared on clearAll(). No-op when node is null.
+ */
+export function setAnalyser(node) {
+  arAnalyser = node;
+  if (node && !fftData) {
+    fftData = new Uint8Array(node.frequencyBinCount);
+  }
 }
 
 export function pause() {
