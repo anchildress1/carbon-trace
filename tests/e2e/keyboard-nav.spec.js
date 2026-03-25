@@ -230,10 +230,10 @@ test.describe('keyboard boundary conditions', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════
-//  3. SPACEBAR — always play/pause, never advance, from any focus
+//  3. SPACEBAR — activates focused button, global pause otherwise
 // ═══════════════════════════════════════════════════════════════════
 
-test.describe('spacebar isolation — always play/pause', () => {
+test.describe('spacebar — button activation and global pause', () => {
   test.beforeEach(async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
@@ -248,10 +248,10 @@ test.describe('spacebar isolation — always play/pause', () => {
     await expect(pauseBtn).toHaveAttribute('aria-pressed', 'false');
   });
 
-  test('Space toggles pause when focus is on next button', async ({ page }) => {
+  test('Space on focused pause button toggles pause via native activation', async ({ page }) => {
     await dismissLoadingScreen(page);
 
-    await page.focus('#btn-next');
+    await page.focus('#btn-pause');
     const pauseBtn = page.locator('#btn-pause');
     await expect(pauseBtn).toHaveAttribute('aria-pressed', 'false');
 
@@ -259,83 +259,38 @@ test.describe('spacebar isolation — always play/pause', () => {
     await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
   });
 
-  test('Space toggles pause when focus is on prev button', async ({ page }) => {
-    await dismissLoadingScreen(page);
-
-    await page.focus('#btn-prev');
-    const pauseBtn = page.locator('#btn-pause');
-    await expect(pauseBtn).toHaveAttribute('aria-pressed', 'false');
-
-    await page.keyboard.press('Space');
-    await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
-  });
-
-  test('Space toggles pause when focus is on mute button', async ({ page }) => {
+  test('Space on focused mute button toggles mute instead of pause', async ({ page }) => {
     await dismissLoadingScreen(page);
 
     await page.focus('#btn-mute');
+    const muteBtn = page.locator('#btn-mute');
     const pauseBtn = page.locator('#btn-pause');
 
     await page.keyboard.press('Space');
-    await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
-
-    await page.keyboard.press('Space');
+    // Mute button activates — pause state unchanged
+    await expect(muteBtn).toHaveClass(/muted/);
     await expect(pauseBtn).toHaveAttribute('aria-pressed', 'false');
   });
 
-  test('Space toggles pause when focus is on replay button', async ({ page }) => {
-    await dismissLoadingScreen(page);
-
-    await page.focus('#btn-replay');
-    const pauseBtn = page.locator('#btn-pause');
-
-    await page.keyboard.press('Space');
-    await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
-  });
-
-  test('Space toggles pause when focus is on a progress dot', async ({ page }) => {
-    await dismissLoadingScreen(page);
-
-    const firstDot = page.locator('.progress-dot').first();
-    await firstDot.focus();
-    const pauseBtn = page.locator('#btn-pause');
-
-    await page.keyboard.press('Space');
-    await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
-  });
-
-  test('Space toggles pause when focus is on captions button', async ({ page }) => {
+  test('Space on focused captions button toggles captions instead of pause', async ({ page }) => {
     await dismissLoadingScreen(page);
 
     await page.focus('#btn-captions');
+    const captionsBtn = page.locator('#btn-captions');
     const pauseBtn = page.locator('#btn-pause');
 
+    // Default off, Space activates native click → toggleCaptions
     await page.keyboard.press('Space');
-    await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
-  });
-
-  test('Space never advances the scene regardless of focus target', async ({ page }) => {
-    const stage = page.locator('#scene-stage');
-    const titleLabel = frameDescription(0);
-
-    // Press Space many times from different focus targets
-    const targets = ['#btn-next', '#btn-prev', '#btn-mute', '#btn-captions'];
-    for (const sel of targets) {
-      await page.focus(sel);
-      await page.keyboard.press('Space');
-    }
-
-    // Still on title frame
-    const label = await stage.getAttribute('aria-label');
-    expect(label).toBe(titleLabel);
+    await expect(captionsBtn).toHaveAttribute('aria-pressed', 'true');
+    await expect(pauseBtn).toHaveAttribute('aria-pressed', 'false');
   });
 });
 
 // ═══════════════════════════════════════════════════════════════════
-//  4. ARROW KEY + ENTER — always navigate, from any focus
+//  4. ARROW KEYS — always navigate from any focus; ENTER activates buttons
 // ═══════════════════════════════════════════════════════════════════
 
-test.describe('arrow keys + enter — always navigate from any focus', () => {
+test.describe('arrow keys — always navigate from any focus', () => {
   test.beforeEach(async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
@@ -359,14 +314,6 @@ test.describe('arrow keys + enter — always navigate from any focus', () => {
     await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
   });
 
-  test('Enter advances when focus is on replay button', async ({ page }) => {
-    await page.focus('#btn-replay');
-    await page.keyboard.press('Enter');
-
-    const stage = page.locator('#scene-stage');
-    await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
-  });
-
   test('ArrowLeft retreats when focus is inside overlay controls', async ({ page }) => {
     await advanceByKeyboard(page, 1);
 
@@ -377,13 +324,17 @@ test.describe('arrow keys + enter — always navigate from any focus', () => {
     await expect(stage).toHaveAttribute('aria-label', frameDescription(0), { timeout: 5000 });
   });
 
-  test('Enter advances when focus is on a progress dot', async ({ page }) => {
-    const firstDot = page.locator('.progress-dot').first();
-    await firstDot.focus();
-    await page.keyboard.press('Enter');
+  test('Enter on focused button activates it instead of global advance', async ({ page }) => {
+    const pauseBtn = page.locator('#btn-pause');
+    await page.focus('#btn-pause');
 
+    // Enter activates btn-pause via native click → togglePause
+    await page.keyboard.press('Enter');
+    await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
+
+    // Scene should not have advanced
     const stage = page.locator('#scene-stage');
-    await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(0));
   });
 });
 
@@ -435,9 +386,13 @@ test.describe('rapid keyboard input — race conditions', () => {
     const errors = [];
     page.on('pageerror', (err) => errors.push(err));
 
-    // Space (unpause) + ArrowRight (advance) + Space (pause)
+    // Space (unpause) + ArrowRight (advance)
     await page.keyboard.press('Space');
     await page.keyboard.press('ArrowRight');
+
+    // After transition, focus may have moved to a progress dot.
+    // Re-focus body so Space toggles pause via the global handler.
+    await page.evaluate(() => document.activeElement?.blur());
     await page.keyboard.press('Space');
 
     const pauseBtn = page.locator('#btn-pause');
