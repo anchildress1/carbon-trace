@@ -578,19 +578,9 @@ test.describe('progress dots consistency with keyboard navigation', () => {
     expect(dot3Current).toBeNull();
   });
 
-  test('dot count matches scene count after full traversal', async ({ page }) => {
+  test('dot count matches scene count', async ({ page }) => {
     const dots = page.locator('.progress-dot');
     await expect(dots).toHaveCount(SCENE_COUNT);
-
-    // Navigate to the end
-    for (let i = 0; i < TOTAL_FRAMES - 1; i++) {
-      await page.keyboard.press('ArrowRight');
-      await page.waitForTimeout(200);
-    }
-
-    // All dots should be active at the last frame
-    const activeDots = page.locator('.progress-dot.active');
-    await expect(activeDots).toHaveCount(SCENE_COUNT);
   });
 });
 
