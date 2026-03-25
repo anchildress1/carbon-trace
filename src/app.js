@@ -16,14 +16,31 @@ import {
 } from './audio.js';
 import { PausableTimer } from './pausable-timer.js';
 import { buildNarrationTimeline, clearNarrationLayer } from './text.js';
-import {
-  init as initEffectsCanvas,
-  loadScene as loadEffectsScene,
-  clearAll as clearEffects,
-  cancelPendingLoad,
-  pause as pauseEffects,
-  resume as resumeEffects,
-} from './effects-canvas.js';
+// Lazy-load pixi.js effects to keep it off the critical rendering path.
+// The dynamic import starts immediately but doesn't block initial paint,
+// reducing Total Blocking Time on slower CI runners.
+let effectsMod = null;
+const effectsLoaded = import('./effects-canvas.js').then((m) => {
+  effectsMod = m;
+});
+function initEffectsCanvas(el) {
+  return effectsLoaded.then(() => effectsMod.init(el));
+}
+function loadEffectsScene(...args) {
+  return effectsLoaded.then(() => effectsMod.loadScene(...args));
+}
+function clearEffects() {
+  effectsMod?.clearAll();
+}
+function cancelPendingLoad() {
+  effectsMod?.cancelPendingLoad();
+}
+function pauseEffects() {
+  effectsMod?.pause();
+}
+function resumeEffects() {
+  effectsMod?.resume();
+}
 import { initOverlay, updateProgress, showControls, focusActiveDot } from './overlay.js';
 import {
   initSceneCanvas,

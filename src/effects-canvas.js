@@ -13,6 +13,9 @@
  * calls become no-ops and the app continues without effects.
  */
 
+// Must run before any pixi.js import — patches shader compilation to
+// use CSP-safe alternatives, required by script-src 'self' policy.
+import 'pixi.js/unsafe-eval';
 import { Application, Container, Sprite, Texture } from 'pixi.js';
 import { createEffect, noiseFreeTypes, overlayTypes } from './effects.js';
 
