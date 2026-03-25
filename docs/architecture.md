@@ -45,7 +45,7 @@ When a frame becomes active, `showFrame(index)` runs this sequence:
 
 ```mermaid
 flowchart TD
-    A[showFrame] --> C[Set image + alt text + trace overlay]
+    A[showFrame] --> C[Set image + alt text]
     C --> D[clearEffects + clearNarrationLayer]
     D --> E[Run idle effect if defined]
     E --> E2[Resume effects canvas render loop]
@@ -147,7 +147,6 @@ frames[]:
   ambient: { src, volume, loop }
   music: { src, startVolume, fullVolume, crescendoMs, enter, exit }
   effects: { idle: "effect-name"|null, entry: "effect-name"|null }
-  traceOverlay: { opacity }
   transition: { type, duration }
 ```
 

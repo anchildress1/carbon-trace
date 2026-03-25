@@ -348,8 +348,6 @@ function showFrame(app, index) {
   const frame = app.frames[index];
   app.els.sceneStage.setAttribute('aria-label', frame.description || '');
   renderSceneImage(app, frame);
-  app.els.traceOverlay.style.opacity = frame.traceOverlay?.opacity ?? 0;
-
   clearNarrationLayer(app.els.narrationLayer);
 
   if (frame.effects?.regions?.length) {
@@ -924,7 +922,6 @@ export function createApp() {
     'loading-screen',
     'scene-stage',
     'scene-canvas',
-    'trace-overlay',
     'effects-canvas',
     'narration-layer',
     'caption-layer',
@@ -978,7 +975,6 @@ export function createApp() {
       loadingScreen: document.getElementById('loading-screen'),
       sceneStage: document.getElementById('scene-stage'),
       sceneCanvas: document.getElementById('scene-canvas'),
-      traceOverlay: document.getElementById('trace-overlay'),
       effectsCanvas: document.getElementById('effects-canvas'),
       narrationLayer: document.getElementById('narration-layer'),
       captionLayer: document.getElementById('caption-layer'),

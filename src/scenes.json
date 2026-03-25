@@ -71,7 +71,6 @@
         "type": "fade",
         "duration": 1500
       },
-      "traceOverlay": null,
       "audioCues": [
         {
           "id": "narration",
@@ -188,9 +187,6 @@
           "from": 1,
           "to": 1.15
         }
-      },
-      "traceOverlay": {
-        "opacity": 0.05
       },
       "audioCues": [
         {
@@ -318,9 +314,6 @@
         "type": "fade",
         "duration": 1200
       },
-      "traceOverlay": {
-        "opacity": 0.08
-      },
       "audioCues": [
         {
           "id": "narration",
@@ -445,9 +438,6 @@
       "transition": {
         "type": "fade",
         "duration": 1200
-      },
-      "traceOverlay": {
-        "opacity": 0.15
       },
       "audioCues": [
         {
@@ -587,9 +577,6 @@
         "type": "fade",
         "duration": 1200
       },
-      "traceOverlay": {
-        "opacity": 0.03
-      },
       "audioCues": [
         {
           "id": "narration",
@@ -725,9 +712,6 @@
         "type": "fade",
         "duration": 1200
       },
-      "traceOverlay": {
-        "opacity": 0.15
-      },
       "audioCues": [
         {
           "id": "narration",
@@ -859,9 +843,6 @@
         "type": "fade",
         "duration": 1200
       },
-      "traceOverlay": {
-        "opacity": 0.2
-      },
       "audioCues": [
         {
           "id": "narration",
@@ -972,9 +953,6 @@
         "type": "fade",
         "duration": 1200
       },
-      "traceOverlay": {
-        "opacity": 0.1
-      },
       "audioCues": [
         {
           "id": "narration",
@@ -1033,9 +1011,6 @@
       "transition": {
         "type": "fade",
         "duration": 1200
-      },
-      "traceOverlay": {
-        "opacity": 0.3
       },
       "audioCues": [
         {
@@ -1142,9 +1117,6 @@
       "transition": {
         "type": "fade",
         "duration": 1200
-      },
-      "traceOverlay": {
-        "opacity": 0.25
       },
       "audioCues": [
         {
@@ -1262,9 +1234,6 @@
         "type": "fade",
         "duration": 1200
       },
-      "traceOverlay": {
-        "opacity": 0.35
-      },
       "audioCues": [
         {
           "id": "narration",
@@ -1374,9 +1343,6 @@
       "transition": {
         "type": "fade",
         "duration": 1500
-      },
-      "traceOverlay": {
-        "opacity": 0.5
       },
       "audioCues": [
         {

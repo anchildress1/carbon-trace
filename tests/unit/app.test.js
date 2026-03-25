@@ -117,7 +117,7 @@ vi.mock('../../src/scenes.json', () => ({
         ],
         effects: null,
         transition: { type: 'fade', duration: 400 },
-        traceOverlay: null,
+
       },
       {
         id: 'scene-01',
@@ -136,7 +136,7 @@ vi.mock('../../src/scenes.json', () => ({
         ],
         effects: { regions: [{ type: 'glow', mask: 'diamond.png' }] },
         transition: { type: 'fade', duration: 400 },
-        traceOverlay: null,
+
       },
       {
         id: 'scene-02',
@@ -151,7 +151,7 @@ vi.mock('../../src/scenes.json', () => ({
         audioCues: null,
         effects: null,
         transition: { type: 'fade', duration: 400 },
-        traceOverlay: null,
+
       },
       {
         id: 'credits',
@@ -163,7 +163,7 @@ vi.mock('../../src/scenes.json', () => ({
         audioCues: null,
         effects: null,
         transition: { type: 'fade', duration: 400 },
-        traceOverlay: null,
+
       },
     ],
   },
@@ -206,7 +206,7 @@ function buildDOM() {
   document.body.replaceChildren();
 
   const ids = [
-    'loading-screen', 'scene-stage', 'scene-canvas', 'trace-overlay',
+    'loading-screen', 'scene-stage', 'scene-canvas',
     'effects-canvas', 'narration-layer', 'caption-layer', 'accessible-narration',
     'overlay-controls', 'progress-dots', 'btn-prev', 'btn-next',
     'btn-replay', 'btn-mute', 'btn-pause', 'btn-captions',
@@ -219,7 +219,7 @@ function buildDOM() {
 
   for (const id of ids) {
     let el;
-    if (id === 'scene-canvas' || id === 'effects-canvas' || id === 'trace-overlay') {
+    if (id === 'scene-canvas' || id === 'effects-canvas') {
       el = document.createElement('canvas');
       el.getContext = vi.fn(() => ({
         clearRect: vi.fn(),

@@ -3,14 +3,13 @@
 **Status:** Accepted
 **Date:** March 21, 2026 (addendum: March 22, 2026 — sceneSprite elimination, transparent overlay architecture)
 **Deciders:** Ashley Childress (@anchildress1)
-**Coexists with:** ADR-006 (trace shimmer overlay — separate system, separate canvas)
-**Supersedes:** ADR-006 §06.9 (v1/v2 boundary — effects.js no longer deferred to v2), ADR-006 §06.10 (effects.js listed as "untouched"), v5 §5.4 layer stack order (effects-canvas and trace-overlay swap)
+**Supersedes:** v5 §5.4 layer stack order
 **Affects:** v5 §17 Rules (getImageData restriction), effects.js (no longer no-op), effects-canvas.js (context changes from Canvas 2D to WebGL via PixiJS)
 **Extended by:** ADR-008 (audio-reactive effect modulation)
 
 ## Context
 
-Every scene image is a static painting. The narrative tells a story of transformation — coal, heat, water, light — but the images don't breathe. ADR-006 adds glowing trace lines, but that's additive light on top of the image. It doesn't make the image itself move.
+Every scene image is a static painting. The narrative tells a story of transformation — coal, heat, water, light — but the images don't breathe. The pixel effects system makes the images move.
 
 The goal: make the painted world feel alive. Water that clearly flows. Heat that visibly rises above the furnace. Dust that drifts gently around the diamond. Not overlays pulsing brightness. Not CSS filters. Actual pixel-level animation where the image content appears to move within specific regions.
 
@@ -22,12 +21,11 @@ The goal: make the painted world feel alive. Water that clearly flows. Heat that
 
 ### What this is NOT
 
-- Not ADR-006. Shimmer is additive light on a separate canvas. This is pixel manipulation on the effects canvas.
 - Not CSS overlays, filters, or blend-mode tricks.
 
 ### ADR-001 WebGL Revisit
 
-ADR-001 rejected WebGL because "GPU shader pipeline is overkill for 2D image rendering." That was correct for static scene images. Pixel-level animation effects have different requirements — real-time displacement maps, per-pixel masking, and sub-4ms frame budgets. Canvas 2D Perlin displacement was prototyped and failed: too slow at full resolution, heat-shimmer appearance instead of convincing flow, no GPU acceleration.
+ADR-001 rejected WebGL because "GPU shader pipeline is overkill for 2D image rendering." That was correct for static scene images. Pixel-level animation effects have different requirements — real-time displacement maps, per-pixel masking, and sub-4ms frame budgets. Canvas 2D Perlin displacement was prototyped and failed: too slow at full resolution, no GPU acceleration.
 
 **PixiJS** is adopted as the effects renderer. It uses WebGL internally but abstracts it as a library call — no manual shader compilation, no scene graphs, no 3D. ADR-001's rejection of raw WebGL still holds. PixiJS is scoped exclusively to the effects canvas; the scene canvas remains Canvas 2D.
 
@@ -39,7 +37,7 @@ ADR-001 rejected WebGL because "GPU shader pipeline is overkill for 2D image ren
 
 Each scene declares one or more effect regions. Each region is defined by a grayscale mask image (white = animate, black = don't) and an effect type (water, heat, dust, or any future type). PixiJS loads the scene image as a shared texture, creates per-region sprite clones inside masked Containers, applies displacement/blur filters to each, and composites the result as a transparent overlay at 60fps with GPU acceleration. The Canvas 2D layer underneath renders the static scene image — visible everywhere the PixiJS layer is transparent (i.e., outside effect regions).
 
-**Rendering library:** PixiJS v8 (MIT license, ~150KB gzipped). Bundled via Vite — no CDN in production. CSP is `connect-src 'none'` (ADR-006 §06.3.3); external scripts would violate `script-src`. POC may use CDN for rapid iteration.
+**Rendering library:** PixiJS v8 (MIT license, ~150KB gzipped). Bundled via Vite — no CDN in production. CSP is `connect-src 'none'`; external scripts would violate `script-src`. POC may use CDN for rapid iteration.
 
 ---
 
@@ -131,7 +129,7 @@ Canvas 2D remains useful         │ drawFallback() before images load, future
 
 **heat** — Rising distortion (PixiJS DisplacementFilter)
 - Same DisplacementFilter, direction locked upward, larger noise scale (wide wobble)
-- Lower intensity than water — subtle shimmer, not a river
+- Lower intensity than water — subtle distortion, not a river
 - Mask fades at edges via grayscale gradient in the mask image
 - Parameters: `speed`, `intensity`, `scale`
 
@@ -184,7 +182,7 @@ Audio-reactive effect modulation is specified in **ADR-008**. Any effect region 
 
 Replaces the current `effects: { idle: "dust-drift", entry: "fade-in" }` structure. The named-effect registry pattern in effects.js is replaced by typed regions with inline parameters.
 
-`effects: null` = no effects for this frame. `effects: { "regions": [] }` = equivalent (explicit empty). Both are valid. Convention matches all other optional keys in scenes.json (`narration: null`, `audioCues: null`, `traceOverlay: null`).
+`effects: null` = no effects for this frame. `effects: { "regions": [] }` = equivalent (explicit empty). Both are valid. Convention matches all other optional keys in scenes.json (`narration: null`, `audioCues: null`).
 
 ### Mask images
 
@@ -248,40 +246,20 @@ if (frame.effects?.regions?.length) {
 
 Pause/resume already wired. No new state variables.
 
-### Layer stack (CHANGED from v5 §5.4 — effects-canvas and trace-overlay swap)
+### Layer stack
 
 ```
 caption-layer    (DOM)
 narration-layer  (DOM)
-trace-overlay    (Canvas 2D)    ← ADR-006 shimmer renders here (mix-blend-mode: screen)
 effects-canvas   (PixiJS/WebGL) ← pixel effects render here
 scene-canvas     (Canvas 2D)    ← static image
-```
-
-**v5 had effects-canvas above trace-overlay.** That was fine when effects-canvas was a no-op. Now that effects-canvas renders opaque displaced pixels in masked regions, it would bury shimmer traces underneath. Swapping the order puts shimmer on top — its `mix-blend-mode: screen` adds glowing traces over both the static scene AND the animated water/heat below. Shimmer is the visual spine of the narrative (ADR-006 §06.1); it must be visible everywhere.
-
-**HTML change:**
-```html
-<!-- BEFORE (v5 §5.4) -->
-<canvas id="scene-canvas" aria-hidden="true"></canvas>
-<canvas id="trace-overlay" aria-hidden="true"></canvas>
-<canvas id="effects-canvas" aria-hidden="true"></canvas>
-
-<!-- AFTER -->
-<canvas id="scene-canvas" aria-hidden="true"></canvas>
-<canvas id="effects-canvas" aria-hidden="true"></canvas>
-<canvas id="trace-overlay" aria-hidden="true"></canvas>
 ```
 
 ### Context change: effects-canvas is now WebGL
 
 The `#effects-canvas` element previously used `getContext('2d')` via effects-canvas.js. A canvas element can only have ONE rendering context. PixiJS requires `getContext('webgl2')` (or `getContext('webgl')` fallback). The old Canvas 2D calls (`clearRect`, etc.) are replaced by PixiJS API calls. effects-canvas.js no longer calls `getContext('2d')` — PixiJS owns the context entirely.
 
-### Interaction with ADR-006 shimmer
-
-Shimmer and effects are separate systems on separate canvases with separate rendering contexts (Canvas 2D vs WebGL). Shimmer sits above effects in z-order so traces are always visible. Both pause/resume with the app. Both respect reduced motion.
-
-**Constraint: one WebGL context max.** `#effects-canvas` is the only WebGL context in the application. `#trace-overlay` MUST remain Canvas 2D. `#scene-canvas` MUST remain Canvas 2D. Multiple WebGL contexts cause GPU resource contention on low-end devices. If shimmer is ever migrated to PixiJS, it must share the effects-canvas PixiJS Application, not create a second one.
+**Constraint: one WebGL context max.** `#effects-canvas` is the only WebGL context in the application. `#scene-canvas` MUST remain Canvas 2D. Multiple WebGL contexts cause GPU resource contention on low-end devices.
 
 ---
 
@@ -314,7 +292,7 @@ All displacement stops. The masked regions display the static scene image with n
 
 ## Transition Behavior
 
-All transition behavior rides the existing `showFrame()` + GSAP container fade architecture, mirroring ADR-006 §06.6.
+All transition behavior rides the existing `showFrame()` + GSAP container fade architecture.
 
 ### Scene-to-scene (normal navigation)
 
@@ -324,7 +302,6 @@ All transition behavior rides the existing `showFrame()` + GSAP container fade a
    - canvas draws new image
    - if effects: effectsCanvas.loadScene(frame.effects, frame.image)
      else: effectsCanvas.clearAll()                        ← null-safe
-   - shimmer.loadScene(frame.traceOverlay)
    - text rebuilds
 3. GSAP fades #scene-stage to opacity 1    ← effects visible with new config
 ```
@@ -374,14 +351,8 @@ WebGL unavailability     │ Graceful degradation: effects disabled,
 ─────────────────────────┼──────────────────────────────────────
 Audio-reactive overhead  │ < 0.2ms total (see ADR-008 for detail).
 ─────────────────────────┼──────────────────────────────────────
-Multiple render loops    │ PixiJS ticker for effects. Shimmer has
-                         │ its own rAF. Scene canvas has none.
-                         │ If baseline profiling shows >4ms combined
-                         │ frame time: (1) move shimmer draw into
-                         │ PixiJS ticker as a post-render callback,
-                         │ eliminating the second rAF, or (2) reduce
-                         │ shimmer to 30fps via frame-skip counter.
-                         │ Decision deferred to profiling phase.
+Render loop              │ PixiJS ticker for effects. Scene canvas
+                         │ has none (static image).
 ```
 
 ### Target hardware matrix
@@ -432,8 +403,7 @@ REMEDIATION ORDER (if FAIL):
   1. Reduce displacement texture to 256×256
   2. Limit to 1 active region per scene
   3. Disable dust effect
-  4. Reduce shimmer to 30fps via frame-skip
-  5. Last resort: disable effects on baseline tier
+  4. Last resort: disable effects on baseline tier
 ```
 
 ---
@@ -485,9 +455,7 @@ These are scoped implementation choices, not architectural decisions. The ADR's 
 
 ## Implementation Status
 
-**Implemented.** All architectural items below have been completed: trace-overlay converted to canvas, effects-canvas.js uses PixiJS WebGL, effects.js is a factory registry, scenes.json uses `{ regions: [...] }` schema.
-
-**Implementation note (adversarial review, March 21 2026):** ADR-007 owns the `<div>` → `<canvas>` conversion for `#trace-overlay` and the layer stack reorder. This is done as the opening commit of ADR-007 implementation, independent of ADR-006 shimmer logic.
+**Implemented.** All architectural items below have been completed: effects-canvas.js uses PixiJS WebGL, effects.js is a factory registry, scenes.json uses `{ regions: [...] }` schema.
 
 ## Action Items
 
