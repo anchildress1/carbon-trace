@@ -55,6 +55,7 @@ import {
   isNarrationBuffering,
   preloadNarrationAhead,
   clearNarrationCache,
+  wrapOnNarrationEndWithBoost,
 } from '../../src/audio.js';
 import { Howl } from 'howler';
 
@@ -517,7 +518,9 @@ describe('audio.js — unified cue API (ADR-005)', () => {
         loop: true,
         fadeIn: 8000,
       });
-      scheduleAudioCues([narration, song], { onNarrationEnd: onEnd });
+      const allCues = [narration, song];
+      const wrappedOnEnd = wrapOnNarrationEndWithBoost(allCues, onEnd);
+      scheduleAudioCues(allCues, { onNarrationEnd: wrappedOnEnd });
 
       // Trigger narration end
       const narrationHowl = Howl.mock.results[0].value;
@@ -532,6 +535,71 @@ describe('audio.js — unified cue API (ADR-005)', () => {
         4000,
       );
       expect(onEnd).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('wrapOnNarrationEndWithBoost', () => {
+    it('returns original callback when no boost cues exist', () => {
+      const cb = vi.fn();
+      const result = wrapOnNarrationEndWithBoost([makeCue()], cb);
+      expect(result).toBe(cb);
+    });
+
+    it('returns original callback when cues is null', () => {
+      const cb = vi.fn();
+      expect(wrapOnNarrationEndWithBoost(null, cb)).toBe(cb);
+    });
+
+    it('returns original callback when cues is empty', () => {
+      const cb = vi.fn();
+      expect(wrapOnNarrationEndWithBoost([], cb)).toBe(cb);
+    });
+
+    it('wraps callback to fade boost cues and call original', () => {
+      const cb = vi.fn();
+      const song = makeCue({
+        id: 'end-song',
+        type: 'ambient',
+        src: 'song.mp3',
+        volume: 0.15,
+        volumeAfterNarration: 0.75,
+        fadeAfterNarration: 3000,
+        enter: 0,
+        loop: true,
+        fadeIn: 8000,
+      });
+
+      // Schedule the ambient cue so it's in activeCues
+      scheduleAudioCues([song]);
+      const songHowl = Howl.mock.results[0].value;
+
+      const wrapped = wrapOnNarrationEndWithBoost([song], cb);
+      wrapped();
+
+      expect(songHowl.fade).toHaveBeenCalledWith(songHowl.volume(), 0.75, 3000);
+      expect(cb).toHaveBeenCalledOnce();
+    });
+
+    it('uses default 3000ms fade when fadeAfterNarration is not set', () => {
+      const cb = vi.fn();
+      const song = makeCue({
+        id: 'end-song',
+        type: 'ambient',
+        src: 'song.mp3',
+        volume: 0.15,
+        volumeAfterNarration: 0.75,
+        enter: 0,
+        loop: true,
+        fadeIn: 8000,
+      });
+
+      scheduleAudioCues([song]);
+      const songHowl = Howl.mock.results[0].value;
+
+      const wrapped = wrapOnNarrationEndWithBoost([song], cb);
+      wrapped();
+
+      expect(songHowl.fade).toHaveBeenCalledWith(songHowl.volume(), 0.75, 3000);
     });
   });
 

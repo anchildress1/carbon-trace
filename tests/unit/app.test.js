@@ -36,6 +36,7 @@ vi.mock('../../src/audio.js', () => ({
   isNarrationBuffering: vi.fn().mockReturnValue(false),
   preloadNarrationAhead: vi.fn(),
   clearNarrationCache: vi.fn(),
+  wrapOnNarrationEndWithBoost: vi.fn((_cues, cb) => cb),
 }));
 
 vi.mock('../../src/text.js', () => ({
@@ -188,6 +189,7 @@ import {
   restartNarrationCue,
   reCueCue,
   onNarrationBufferChange,
+  wrapOnNarrationEndWithBoost,
 } from '../../src/audio.js';
 import { buildNarrationTimeline } from '../../src/text.js';
 import {

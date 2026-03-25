@@ -12,6 +12,7 @@ import {
   onNarrationBufferChange,
   preloadNarrationAhead,
   clearNarrationCache,
+  wrapOnNarrationEndWithBoost,
 } from './audio.js';
 import { PausableTimer } from './pausable-timer.js';
 import { buildNarrationTimeline, clearNarrationLayer } from './text.js';
@@ -185,7 +186,10 @@ function makeNarrationEndCallback(app, frame, holdAfterNarration) {
 
 function scheduleFrameAudio(app, frame) {
   const holdAfterNarration = getHoldAfterNarration(frame);
-  const onNarrationEnd = makeNarrationEndCallback(app, frame, holdAfterNarration);
+  const onNarrationEnd = wrapOnNarrationEndWithBoost(
+    frame.audioCues,
+    makeNarrationEndCallback(app, frame, holdAfterNarration),
+  );
   const maxNarrationDurationMs = getMaxNarrationDuration(
     frame,
     app.audioDurations,
@@ -204,7 +208,10 @@ function scheduleReplayNarration(app, frame, narrationCue) {
   if (!narrationCue) return;
 
   const holdAfterNarration = getHoldAfterNarration(frame);
-  const onNarrationEnd = makeNarrationEndCallback(app, frame, holdAfterNarration);
+  const onNarrationEnd = wrapOnNarrationEndWithBoost(
+    frame.audioCues,
+    makeNarrationEndCallback(app, frame, holdAfterNarration),
+  );
   const maxNarrationDurationMs = getMaxNarrationDuration(
     frame,
     app.audioDurations,
@@ -773,7 +780,10 @@ function replayNarration(app) {
     if (narrationCue) {
       const holdAfterNarration = getHoldAfterNarration(frame);
       const narrationOpts = {
-        onNarrationEnd: makeNarrationEndCallback(app, frame, holdAfterNarration),
+        onNarrationEnd: wrapOnNarrationEndWithBoost(
+          frame.audioCues,
+          makeNarrationEndCallback(app, frame, holdAfterNarration),
+        ),
         maxNarrationDurationMs: getMaxNarrationDuration(
           frame,
           app.audioDurations,
