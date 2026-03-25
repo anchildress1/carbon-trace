@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.3](https://github.com/anchildress1/carbon-trace/compare/carbon-trace-v0.0.2...carbon-trace-v0.0.3) (2026-03-25)
+
+
+### Features
+
+* add animations ([#21](https://github.com/anchildress1/carbon-trace/issues/21)) ([3a14957](https://github.com/anchildress1/carbon-trace/commit/3a1495776325c08798fde5e62dd77b3f1625284a))
+* audio text tuning ([#26](https://github.com/anchildress1/carbon-trace/issues/26)) ([01c0164](https://github.com/anchildress1/carbon-trace/commit/01c01640fed5fd600d2685dba0f5428047a9f726))
+
 ## [0.0.2](https://github.com/anchildress1/carbon-trace/compare/carbon-trace-v0.0.1...carbon-trace-v0.0.2) (2026-03-20)
 
 
