@@ -216,5 +216,159 @@ describe('overlay.js', () => {
       const dots = dotsContainer.querySelectorAll('.progress-dot');
       expect(document.activeElement).toBe(dots[3]);
     });
+
+    it('updates roving tabindex target to focused dot', () => {
+      initOverlay(5);
+      updateProgress(3);
+
+      focusActiveDot();
+
+      const dots = dotsContainer.querySelectorAll('.progress-dot');
+      expect(dots[2].getAttribute('tabindex')).toBe('0');
+      expect(dots[0].getAttribute('tabindex')).toBe('-1');
+      expect(dots[4].getAttribute('tabindex')).toBe('-1');
+    });
+  });
+
+  describe('roving tabindex', () => {
+    function pressKey(container, key) {
+      const e = new KeyboardEvent('keydown', { key, bubbles: true });
+      vi.spyOn(e, 'stopPropagation');
+      vi.spyOn(e, 'preventDefault');
+      container.dispatchEvent(e);
+      return e;
+    }
+
+    it('first dot gets tabindex="0", rest get tabindex="-1"', () => {
+      initOverlay(5);
+
+      const dots = dotsContainer.querySelectorAll('.progress-dot');
+      expect(dots[0].getAttribute('tabindex')).toBe('0');
+      expect(dots[1].getAttribute('tabindex')).toBe('-1');
+      expect(dots[4].getAttribute('tabindex')).toBe('-1');
+    });
+
+    it('ArrowRight moves focus to next dot and updates tabindex', () => {
+      initOverlay(5);
+      const dots = dotsContainer.querySelectorAll('.progress-dot');
+      dots[0].focus();
+
+      pressKey(dotsContainer, 'ArrowRight');
+
+      expect(document.activeElement).toBe(dots[1]);
+      expect(dots[0].getAttribute('tabindex')).toBe('-1');
+      expect(dots[1].getAttribute('tabindex')).toBe('0');
+    });
+
+    it('ArrowLeft moves focus to previous dot', () => {
+      initOverlay(5);
+      const dots = dotsContainer.querySelectorAll('.progress-dot');
+      // Move to dot 2 first
+      dots[0].focus();
+      pressKey(dotsContainer, 'ArrowRight');
+
+      pressKey(dotsContainer, 'ArrowLeft');
+
+      expect(document.activeElement).toBe(dots[0]);
+      expect(dots[0].getAttribute('tabindex')).toBe('0');
+    });
+
+    it('ArrowRight wraps from last dot to first', () => {
+      initOverlay(3);
+      const dots = dotsContainer.querySelectorAll('.progress-dot');
+
+      // Navigate to last dot
+      pressKey(dotsContainer, 'ArrowRight');
+      pressKey(dotsContainer, 'ArrowRight');
+      expect(document.activeElement).toBe(dots[2]);
+
+      // Wrap around
+      pressKey(dotsContainer, 'ArrowRight');
+      expect(document.activeElement).toBe(dots[0]);
+      expect(dots[0].getAttribute('tabindex')).toBe('0');
+    });
+
+    it('ArrowLeft wraps from first dot to last', () => {
+      initOverlay(3);
+      const dots = dotsContainer.querySelectorAll('.progress-dot');
+
+      pressKey(dotsContainer, 'ArrowLeft');
+
+      expect(document.activeElement).toBe(dots[2]);
+      expect(dots[2].getAttribute('tabindex')).toBe('0');
+    });
+
+    it('Home moves focus to first dot', () => {
+      initOverlay(5);
+      const dots = dotsContainer.querySelectorAll('.progress-dot');
+      pressKey(dotsContainer, 'ArrowRight');
+      pressKey(dotsContainer, 'ArrowRight');
+
+      pressKey(dotsContainer, 'Home');
+
+      expect(document.activeElement).toBe(dots[0]);
+      expect(dots[0].getAttribute('tabindex')).toBe('0');
+    });
+
+    it('End moves focus to last dot', () => {
+      initOverlay(5);
+      const dots = dotsContainer.querySelectorAll('.progress-dot');
+
+      pressKey(dotsContainer, 'End');
+
+      expect(document.activeElement).toBe(dots[4]);
+      expect(dots[4].getAttribute('tabindex')).toBe('0');
+    });
+
+    it('ArrowDown behaves like ArrowRight', () => {
+      initOverlay(3);
+      const dots = dotsContainer.querySelectorAll('.progress-dot');
+
+      pressKey(dotsContainer, 'ArrowDown');
+
+      expect(document.activeElement).toBe(dots[1]);
+    });
+
+    it('ArrowUp behaves like ArrowLeft', () => {
+      initOverlay(3);
+      const dots = dotsContainer.querySelectorAll('.progress-dot');
+
+      pressKey(dotsContainer, 'ArrowUp');
+
+      expect(document.activeElement).toBe(dots[2]);
+    });
+
+    it('arrow keys call stopPropagation to prevent global nav', () => {
+      initOverlay(3);
+
+      const e = pressKey(dotsContainer, 'ArrowRight');
+
+      expect(e.stopPropagation).toHaveBeenCalled();
+      expect(e.preventDefault).toHaveBeenCalled();
+    });
+
+    it('unhandled keys do not call stopPropagation', () => {
+      initOverlay(3);
+
+      const e = pressKey(dotsContainer, 'Tab');
+
+      expect(e.stopPropagation).not.toHaveBeenCalled();
+    });
+
+    it('Space and Enter are not intercepted (native button activation)', () => {
+      initOverlay(3);
+
+      const eSpace = pressKey(dotsContainer, ' ');
+      const eEnter = pressKey(dotsContainer, 'Enter');
+
+      expect(eSpace.stopPropagation).not.toHaveBeenCalled();
+      expect(eEnter.stopPropagation).not.toHaveBeenCalled();
+    });
+
+    it('handles zero dots without error', () => {
+      initOverlay(0);
+
+      expect(() => pressKey(dotsContainer, 'ArrowRight')).not.toThrow();
+    });
   });
 });
