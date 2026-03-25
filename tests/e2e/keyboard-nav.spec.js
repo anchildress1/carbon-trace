@@ -131,6 +131,36 @@ test.describe('keyboard focus management', () => {
     expect(focused).toBe(true);
   });
 
+  test('Space then btn-next click still moves focus to active dot', async ({ page }) => {
+    await dismissLoadingScreen(page);
+
+    // Space toggles pause — must NOT taint lastNavSource for subsequent pointer nav
+    await page.keyboard.press('Space');
+    await page.keyboard.press('Space');
+
+    // Pointer-initiated navigation should move focus to the active dot
+    await page.click('#btn-next');
+    const stage = page.locator('#scene-stage');
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
+
+    const focused = await page.evaluate(() => document.activeElement?.classList.contains('progress-dot'));
+    expect(focused).toBe(true);
+  });
+
+  test('Escape then btn-next click still moves focus to active dot', async ({ page }) => {
+    await dismissLoadingScreen(page);
+
+    // Escape pauses — must NOT taint lastNavSource for subsequent pointer nav
+    await page.keyboard.press('Escape');
+
+    await page.click('#btn-next');
+    const stage = page.locator('#scene-stage');
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
+
+    const focused = await page.evaluate(() => document.activeElement?.classList.contains('progress-dot'));
+    expect(focused).toBe(true);
+  });
+
   test('sequential keyboard advances do not redirect focus', async ({ page }) => {
     await advanceByKeyboard(page, 3);
 
@@ -887,5 +917,19 @@ test.describe('roving tabindex on progress dots', () => {
     await page.keyboard.press('Home');
     const homeIndex = await page.evaluate(() => document.activeElement?.dataset?.sceneIndex);
     expect(homeIndex).toBe('1');
+  });
+
+  test('clicking current dot syncs roving index for subsequent arrow nav', async ({ page }) => {
+    // Navigate to scene 2 via keyboard (roving index stays at 0)
+    await advanceByKeyboard(page, 2);
+
+    // Click the current dot (scene 2 = dotElements[1]) — no transition fires
+    const dot2 = page.locator('.progress-dot').nth(1);
+    await dot2.click();
+
+    // ArrowRight from dot 2 should move focus to dot 3, not dot 2
+    await page.keyboard.press('ArrowRight');
+    const focusedIndex = await page.evaluate(() => document.activeElement?.dataset?.sceneIndex);
+    expect(focusedIndex).toBe('3');
   });
 });

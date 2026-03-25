@@ -880,7 +880,6 @@ function initApp(app) {
 
       initKeyboard((action) => {
         app.userHasInteracted = true;
-        app.lastNavSource = 'keyboard';
         switch (action) {
           case 'togglePause':
             togglePause(app);
@@ -889,9 +888,11 @@ function initApp(app) {
             if (!app.paused) doPause(app);
             break;
           case 'advance':
+            app.lastNavSource = 'keyboard';
             advance(app);
             break;
           case 'retreat':
+            app.lastNavSource = 'keyboard';
             retreat(app);
             break;
         }

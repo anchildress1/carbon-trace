@@ -56,12 +56,11 @@ export function initOverlay(sceneCount, onDotClick) {
     dot.dataset.sceneIndex = String(i + 1);
     dot.setAttribute('title', `Scene ${i + 1} of ${sceneCount}`);
     dot.setAttribute('tabindex', i === 0 ? '0' : '-1');
-    if (onDotClick) {
-      dot.addEventListener('click', (e) => {
-        e.stopPropagation();
-        onDotClick(i + 1);
-      });
-    }
+    dot.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setRovingTarget(i);
+      if (onDotClick) onDotClick(i + 1);
+    });
     dotsContainer.appendChild(dot);
     dotElements.push(dot);
   }
