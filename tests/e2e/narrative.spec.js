@@ -53,7 +53,8 @@ test.describe('carbon-trace narrative', () => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
     await dismissLoadingScreen(page);
 
-    // App starts paused. Navigate to scene-01 via btn-next (hardCut, stays paused).
+    // Pause so btn-next triggers an instant hard-cut transition.
+    await page.click('#btn-pause');
     await page.click('#btn-next');
     const stage = page.locator('#scene-stage');
     await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });

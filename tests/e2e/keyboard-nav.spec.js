@@ -707,6 +707,7 @@ test.describe('error resilience under keyboard stress', () => {
   });
 
   test('full forward then full backward traversal produces no JS errors', async ({ page }) => {
+    test.slow(); // 22 iterations with waits — needs extended timeout in CI
     const errors = [];
     page.on('pageerror', (err) => errors.push(err));
 
