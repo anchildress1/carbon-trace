@@ -40,6 +40,7 @@ import {
   syncCaptionsToTime,
   clearCaptionElements,
 } from './captions.js';
+import { initKeyboard } from './keyboard.js';
 
 const State = Object.freeze({
   LOADING: 'LOADING',
@@ -803,32 +804,6 @@ function replayNarration(app) {
   }
 }
 
-function handleKeydown(app, e) {
-  // When a button has focus, let Space and Enter activate it natively.
-  // Each button's click handler already performs the correct action.
-  const onButton = e.target?.tagName === 'BUTTON';
-
-  if (e.key === ' ') {
-    if (onButton) return;
-    e.preventDefault();
-    app.userHasInteracted = true;
-    togglePause(app);
-  } else if (e.key === 'ArrowLeft') {
-    e.preventDefault();
-    app.userHasInteracted = true;
-    retreat(app);
-  } else if (e.key === 'Enter') {
-    if (onButton) return;
-    e.preventDefault();
-    app.userHasInteracted = true;
-    advance(app);
-  } else if (e.key === 'ArrowRight') {
-    e.preventDefault();
-    app.userHasInteracted = true;
-    advance(app);
-  }
-}
-
 function toggleMute(app) {
   app.muted = !app.muted;
   setMuted(app.muted);
@@ -895,13 +870,22 @@ function initApp(app) {
         ]).catch((err) => console.error('Background asset preload failed:', err));
       }, 4000);
 
-      const markInteracted = () => {
+      initKeyboard((action) => {
         app.userHasInteracted = true;
-      };
-
-      document.addEventListener('keydown', (e) => {
-        markInteracted();
-        handleKeydown(app, e);
+        switch (action) {
+          case 'togglePause':
+            togglePause(app);
+            break;
+          case 'pause':
+            if (!app.paused) doPause(app);
+            break;
+          case 'advance':
+            advance(app);
+            break;
+          case 'retreat':
+            retreat(app);
+            break;
+        }
       });
       app.els.btnPrev.addEventListener('click', (e) => {
         e.stopPropagation();
