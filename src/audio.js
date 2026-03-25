@@ -410,6 +410,23 @@ export function scheduleAudioCues(cues, opts = {}) {
   const crossfadeDurationMs = opts.crossfadeDurationMs ?? 800;
   const resolved = resolveAnchors(cues, opts);
 
+  // Two-phase volume: cues with volumeAfterNarration fade to their low
+  // volume during narration, then boost to the target when narration ends.
+  const boostCues = resolved.filter((c) => c.volumeAfterNarration !== undefined);
+  if (boostCues.length > 0) {
+    const originalOnEnd = opts.onNarrationEnd;
+    opts.onNarrationEnd = () => {
+      for (const cue of boostCues) {
+        const entry = activeCues.get(cue.id);
+        if (entry?.howl) {
+          const fadeDuration = cue.fadeAfterNarration ?? 3000;
+          entry.howl.fade(entry.howl.volume(), cue.volumeAfterNarration, fadeDuration);
+        }
+      }
+      originalOnEnd?.();
+    };
+  }
+
   for (const cue of resolved) {
     // Defensive: clean up any pre-existing entry with the same ID.
     // Always cancel pending timers. For ambient→ambient, skip howl unload —

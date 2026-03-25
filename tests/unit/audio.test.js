@@ -502,6 +502,37 @@ describe('audio.js — unified cue API (ADR-005)', () => {
 
       expect(onEnd).toHaveBeenCalledOnce();
     });
+
+    it('boosts cue volume to volumeAfterNarration when narration ends', () => {
+      const onEnd = vi.fn();
+      const narration = makeCue();
+      const song = makeCue({
+        id: 'end-song',
+        type: 'ambient',
+        src: 'song.mp3',
+        volume: 0.12,
+        volumeAfterNarration: 0.75,
+        fadeAfterNarration: 4000,
+        enter: 0,
+        loop: true,
+        fadeIn: 8000,
+      });
+      scheduleAudioCues([narration, song], { onNarrationEnd: onEnd });
+
+      // Trigger narration end
+      const narrationHowl = Howl.mock.results[0].value;
+      const endHandler = narrationHowl.once.mock.calls.find(([e]) => e === 'end');
+      endHandler[1]();
+
+      // The song howl should have been faded to 0.75 over 4000ms
+      const songHowl = Howl.mock.results[1].value;
+      expect(songHowl.fade).toHaveBeenCalledWith(
+        songHowl.volume(),
+        0.75,
+        4000,
+      );
+      expect(onEnd).toHaveBeenCalledOnce();
+    });
   });
 
   describe('cueAudioCues', () => {
