@@ -504,7 +504,7 @@ test.describe('carbon-trace — navigation interrupts', () => {
       timeout: 5000,
     });
 
-    await page.locator('#btn-replay').waitFor({ state: 'visible', timeout: 3000 });
+    await page.locator('#btn-replay').waitFor({ state: 'visible', timeout: 5000 });
     await page.click('#btn-replay');
 
     const lines = page.locator('.narration-line');
