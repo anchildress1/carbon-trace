@@ -66,30 +66,16 @@ describe('text.js', () => {
       const el = createLineElement('Positioned', container, { x: 10, y: 70 });
 
       expect(el.style.position).toBe('absolute');
-      expect(el.style.left).toBe('10vw');
-      expect(el.style.top).toBe('70vh');
+      expect(el.style.left).toBe('10%');
+      expect(el.style.top).toBe('70%');
       expect(el.classList.contains('narration-line--positioned')).toBe(true);
     });
 
-    it('applies left alignment by default when positioned', () => {
+    it('applies left alignment when positioned', () => {
       const el = createLineElement('Left text', container, { x: 10, y: 50 });
 
       expect(el.style.textAlign).toBe('left');
       expect(el.style.transform).toBe('translateY(-50%)');
-    });
-
-    it('applies center alignment with translate(-50%, -50%)', () => {
-      const el = createLineElement('Center text', container, { x: 50, y: 50, align: 'center' });
-
-      expect(el.style.textAlign).toBe('center');
-      expect(el.style.transform).toBe('translate(-50%, -50%)');
-    });
-
-    it('applies right alignment with translate(-100%, -50%)', () => {
-      const el = createLineElement('Right text', container, { x: 75, y: 88, align: 'right' });
-
-      expect(el.style.textAlign).toBe('right');
-      expect(el.style.transform).toBe('translate(-100%, -50%)');
     });
 
     it('does not apply positioning when x/y are not provided', () => {
@@ -109,12 +95,12 @@ describe('text.js', () => {
       const el = createLineElement('Origin', container, { x: 0, y: 0 });
 
       expect(el.style.position).toBe('absolute');
-      expect(el.style.left).toBe('0vw');
-      expect(el.style.top).toBe('0vh');
+      expect(el.style.left).toBe('0%');
+      expect(el.style.top).toBe('0%');
     });
 
-    it('defaults to left alignment when align is unrecognized', () => {
-      const el = createLineElement('Fallback', container, { x: 50, y: 50, align: 'justify' });
+    it('ignores unknown options and applies left alignment', () => {
+      const el = createLineElement('Fallback', container, { x: 50, y: 50, align: 'center' });
 
       expect(el.style.textAlign).toBe('left');
       expect(el.style.transform).toBe('translateY(-50%)');
@@ -227,21 +213,21 @@ describe('text.js', () => {
 
     it('passes position data to createLineElement', () => {
       const lines = [
-        { text: 'Positioned', enter: 0, exit: 1000, x: 10, y: 70, align: 'left' },
-        { text: 'Centered', enter: 500, exit: 2000, x: 50, y: 50, align: 'center' },
+        { text: 'Positioned', enter: 0, exit: 1000, x: 10, y: 70 },
+        { text: 'Centered', enter: 500, exit: 2000, x: 50, y: 50 },
       ];
 
       buildNarrationTimeline(lines, container);
 
       const first = container.children[0];
       expect(first.style.position).toBe('absolute');
-      expect(first.style.left).toBe('10vw');
-      expect(first.style.top).toBe('70vh');
+      expect(first.style.left).toBe('10%');
+      expect(first.style.top).toBe('70%');
       expect(first.style.textAlign).toBe('left');
 
       const second = container.children[1];
-      expect(second.style.left).toBe('50vw');
-      expect(second.style.textAlign).toBe('center');
+      expect(second.style.left).toBe('50%');
+      expect(second.style.textAlign).toBe('left');
     });
 
     it('handles lines without position data (backward-compatible)', () => {
@@ -298,7 +284,7 @@ describe('text.js', () => {
 
     it('handles mixed positioned and non-positioned lines', () => {
       const lines = [
-        { text: 'Positioned', enter: 0, exit: 1000, x: 10, y: 70, align: 'left' },
+        { text: 'Positioned', enter: 0, exit: 1000, x: 10, y: 70 },
         { text: 'Default', enter: 500, exit: 2000 },
       ];
 

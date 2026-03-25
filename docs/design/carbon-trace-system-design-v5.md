@@ -4,15 +4,16 @@
 **Author:** Ashley Childress (@anchildress1)
 **Deadline:** April 5, 2026 @ 11:59 PM PDT
 **Supersedes:** v4 — reconciled with implementation as of PR #8 (feat/canvas-effects)
-**Spec convention:** This document describes the target architecture. Sections annotated with `(ADR-006)` or `(ADR-007)` reflect accepted ADR decisions that are not yet implemented in code. See each ADR's "Implementation Status" section for the code delta.
-**Implementation gap:** "Accepted" = architecture decision is final. "Accepted" ≠ code matches docs. Current codebase diverges significantly from this spec in: layer stack order, effects-canvas.js context type, effects.js module, shimmer.js (does not exist yet), scenes.json schema shape, and index.html DOM structure. Do not assume code reflects this document until ADR action items are complete.
+**Spec convention:** This document describes the target architecture. Sections annotated with `(ADR-007)` reflect accepted ADR decisions that are not yet implemented in code. See each ADR's "Implementation Status" section for the code delta.
+**Implementation gap:** "Accepted" = architecture decision is final. "Accepted" ≠ code matches docs. Current codebase diverges from this spec in: effects-canvas.js context type, effects.js module, scenes.json schema shape, and index.html DOM structure. Do not assume code reflects this document until ADR action items are complete.
+**Deferred:** ADR-006 (trace shimmer overlay) is deferred post-v1. The runtime code was removed from the codebase but the ADR preserves the design for future implementation.
 
 ---
 
 ## 1. Tech Stack
 
 - **Build:** Vite
-- **Rendering:** Canvas 2D for scene + shimmer; PixiJS/WebGL for effects (ADR-007). GSAP animates DOM, rAF/ticker animates canvases.
+- **Rendering:** Canvas 2D for scene; PixiJS/WebGL for effects (ADR-007). GSAP animates DOM, rAF/ticker animates canvases.
 - **Animation:** GSAP
 - **Audio:** Howler.js (html5 mode — streaming, not full preload)
 - **Overlay:** Vanilla HTML/CSS (~25 DOM elements, no framework)
@@ -38,7 +39,6 @@ carbon-trace/
 │   ├── text.js                 # Ghost-drift text + caption entries — GSAP timelines
 │   ├── captions.js             # Timed captions, localStorage persistence
 │   ├── effects.js              # Effect factory registry — water, heat, dust, glow, shockwave (ADR-007)
-│   ├── shimmer.js              # Trace shimmer engine — glowing circuit paths, rAF loop (ADR-006)
 │   ├── overlay.js              # DOM controls — progress dots, buttons
 │   ├── loader.js               # Audio metadata preloading (sequential by scene)
 │   └── pausable-timer.js      # Pausable/cancelable timer utility
@@ -60,7 +60,7 @@ carbon-trace/
 
 ```
 app.js → canvas, effects-canvas, effects, audio, text,
-         captions, overlay, loader, pausable-timer, shimmer, scenes.json
+         captions, overlay, loader, pausable-timer, scenes.json
 
 audio.js → pausable-timer
 
@@ -170,7 +170,7 @@ function clearNarrationLayer(container) {
 }
 ```
 
-Lines are absolutely positioned via `x` (vw), `y` (vh), `align` (left/center/right). Ghost-drift animation: blur(4px) + y:18 → clear + y:0 on enter; blur(3px) + y:-10 → gone on exit. Reduced motion: simple opacity fade, no spatial movement.
+Lines are absolutely positioned via `x` (%), `y` (%) relative to the narration layer. All positioned lines use left text alignment. Ghost-drift animation: blur(4px) + y:18 → clear + y:0 on enter; blur(3px) + y:-10 → gone on exit. Reduced motion: simple opacity fade, no spatial movement.
 
 Caption entries are GSAP `tl.call()` callbacks at `startSec`/`endSec` that create/remove caption DOM elements. `isCaptionEnabled` function is checked at callback time, enabling mid-scene caption toggle.
 
@@ -192,18 +192,6 @@ createEffect(type, app, params)  → create PixiJS filter/emitter for this type
 ```
 
 Built-in registrations: `water`, `heat`, `dust`, `glow`, `shockwave`. Displacement types (water, heat, dust) return DisplacementFilter. Glow returns GlowFilter (`pixi-filters`). Shockwave returns ShockwaveFilter (`pixi-filters`). No particle emitter dependency. See ADR-007 for full specification.
-
-### shimmer.js (ADR-006)
-
-```
-init(canvasEl)      → acquire Canvas 2D context, start rAF, setup ResizeObserver
-loadScene(config)   → swap paths + intensity synchronously
-pause()             → stop rAF loop (WCAG 2.2.2)
-resume()            → restart rAF loop
-destroy()           → cancelAnimationFrame, disconnect observer
-```
-
-Leaf module — no imports from app, canvas, audio, text, effects, or overlay. Receives config, draws to its own canvas. Owns an offscreen canvas for cached static glow. See ADR-006 for full specification.
 
 ### overlay.js
 
@@ -232,7 +220,7 @@ Uses native `Audio()` elements with `preload: 'metadata'` — lightweight, no Ho
 
 ### 4.1 Schema
 
-Every frame has identical shape via `meta.frameDefaults` merge. `null` = feature not active on this frame. Applies uniformly to all optional keys: `narration: null`, `audioCues: null`, `effects: null`, `traceOverlay: null`.
+Every frame has identical shape via `meta.frameDefaults` merge. `null` = feature not active on this frame. Applies uniformly to all optional keys: `narration: null`, `audioCues: null`, `effects: null`.
 
 ```jsonc
 {
@@ -255,7 +243,7 @@ Every frame has identical shape via `meta.frameDefaults` merge. `null` = feature
       "image": "assets/images/scene-01-seam.webp",
       "narration": {
         "lines": [
-          { "text": "...", "enter": 2000, "exit": 5000, "x": 10, "y": 70, "align": "left" }
+          { "text": "...", "enter": 2000, "exit": 5000, "x": 10, "y": 70 }
         ],
         "captions": [
           { "text": "...", "start": 0, "end": 5000 }
@@ -276,13 +264,7 @@ Every frame has identical shape via `meta.frameDefaults` merge. `null` = feature
           }
         ]
       },
-      "transition": { "type": "fade", "duration": 1200 },
-      "traceOverlay": {
-        "opacity": 0.05,
-        "paths": [
-          { "points": [[0.1, 0.3], [0.2, 0.35], [0.4, 0.32]], "width": 2 }
-        ]
-      }
+      "transition": { "type": "fade", "duration": 1200 }
     }
   ]
 }
@@ -386,7 +368,7 @@ const app = {
   muted: false,
   paused: false,
   pausedFromState: null,     // state to restore on resume
-  userHasInteracted: false,  // play-gate flag
+  userHasInteracted: false,  // loading-screen interaction flag
   generation: 0,             // incremented on every navigation — guards stale callbacks
   deferFrameAudioUntilResume: false, // true after paused hardJump — next resume schedules frame audio fresh
   replayPending: false,      // replay happened while paused — doResume schedules fresh narration
@@ -500,14 +482,14 @@ const onend = () => {
 };
 ```
 
-### 5.6 Play Gate
+### 5.6 Loading Screen Gate
 
-Experience starts paused behind a full-screen "click to begin" button (`#play-gate`). This serves two purposes:
+Experience starts paused behind the loading screen (`#loading-screen`), which doubles as the start gate. After assets load, a "begin experience" prompt appears inside the loading screen button. This serves two purposes:
 
 1. **Mobile audio context unlock:** The first user gesture enables the AudioContext via Howler's internal unlock.
-2. **LCP optimization:** The play-gate label text serves as the Lighthouse LCP element.
+2. **LCP optimization:** The loading-screen prompt text serves as the Lighthouse LCP element.
 
-On click: `togglePause()` → `doResume()` → `handleFirstPlay()` which triggers narration and auto-advance for the first frame.
+On click: `togglePause()` → `doResume()` → fade-out loading screen (CSS transition, respects `prefers-reduced-motion`) → `handleFirstPlay()` which triggers narration and auto-advance for the first frame.
 
 ### 5.7 togglePause()
 
@@ -556,7 +538,7 @@ else:
 
 - Resume effects canvas
 - `autoAdvanceTimer?.resume()` — reschedule with saved remaining
-- If first interaction: hide play-gate, `cancelAudioCues()`, then `handleFirstPlay()`.
+- If first interaction: fade out loading screen, `cancelAudioCues()`, then `handleFirstPlay()`.
 
 ### 5.8 replayNarration() — ADR-004
 
@@ -618,7 +600,7 @@ Tab to controls    │ Tab                  │ —                  │ focus m
 Auto-advance       │ (internal)           │ (internal)         │ advance(cur+1)
 ```
 
-- **Stage click/tap does NOT navigate** — reserved for v2 interactive triggers (hover parallax, particle triggers). Ambient effects (water, heat, dust, glow) and shimmer run automatically without interaction (ADR-006, ADR-007). Navigation is exclusively via buttons, dots, and keyboard.
+- **Stage click/tap does NOT navigate** — reserved for v2 interactive triggers (hover parallax, particle triggers). Ambient effects (water, heat, dust, glow) run automatically without interaction (ADR-007). Navigation is exclusively via buttons, dots, and keyboard.
 - TRANSITIONING: navigation queued as pendingNavIndex, pause queued as pendingPause
 - PAUSED: hardJump — no lock, rapid dot-clicking works
 - CREDITS: advance disabled (last frame + CREDITS state)
@@ -631,21 +613,16 @@ Auto-advance       │ (internal)           │ (internal)         │ advance(c
 
 ```html
 <div id="app" role="application" aria-label="carbon-trace visual narrative">
-  <div id="loading-screen" role="status" aria-label="Loading carbon-trace">
-    <!-- SVG trace animation + title -->
-  </div>
+  <button id="loading-screen" aria-label="carbon-trace, begin experience">
+    <!-- SVG trace animation + title + #loading-prompt (hidden until ready) -->
+  </button>
 
   <div id="scene-stage" hidden>
     <canvas id="scene-canvas" aria-hidden="true"></canvas>
     <canvas id="effects-canvas" aria-hidden="true"></canvas>   <!-- PixiJS/WebGL — ADR-007 -->
-    <canvas id="trace-overlay" aria-hidden="true"></canvas>    <!-- Canvas 2D shimmer — ADR-006, swapped above effects per ADR-007 -->
     <div id="narration-layer" aria-hidden="true"></div>
     <div id="caption-layer" aria-hidden="true"></div>
   </div>
-
-  <button id="play-gate" hidden aria-label="Begin experience">
-    <!-- SVG play icon + "click to begin" label -->
-  </button>
 
   <div id="transition-loader" hidden aria-hidden="true"></div>
 
@@ -694,7 +671,7 @@ line 2:  ░░░░░░░░▓▓▓▓▓▓▓▓▓▓▓▓░░░�
 line 3:  ░░░░░░░░░░░░░░░▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░
 ```
 
-- Lines positioned absolutely via `x` (vw), `y` (vh), `align` (left/center/right)
+- Lines positioned absolutely via `x` (%), `y` (%) relative to the narration layer; left-aligned
 - Enter: blur(4px) + y:18 → clear + y:0 (1.2s, power3.out)
 - Exit: clear → blur(3px) + y:-10 (0.9s, power2.in)
 - Lines enter/exit independently, overlap allowed
@@ -745,8 +722,8 @@ On each `showFrame()` call, `prebufferNextScene()`:
 ## 11. Responsive
 
 - **16:9 letterbox:** `#app` enforces 16:9 aspect ratio via `width: min(100%, calc(100vh * 16 / 9)); aspect-ratio: 16/9`. Centered within the viewport using flexbox on `body`. Black bars fill remaining viewport area (letterbox on tall screens, pillarbox on wide screens). All content — canvases, narration, controls — is positioned within the 16:9 box. This ensures masks, effects, and text positioning align with the 16:9 source images across all viewport dimensions.
-- ResizeObserver on all three canvases (scene, effects, trace-overlay). DPR-aware sizing. Redraw on resize. **Resize coordination (ADR-007):** scene-canvas and trace-overlay resize via their own ResizeObserver callbacks (Canvas 2D). effects-canvas resize calls `app.renderer.resize()` on the PixiJS Application — do NOT create a second ResizeObserver for PixiJS. One observer, one resize call, avoids double-resize flicker.
-- `clamp()` font sizes: narration text, captions, loading title, play-gate label
+- ResizeObserver on both canvases (scene, effects). DPR-aware sizing. Redraw on resize. **Resize coordination (ADR-007):** scene-canvas resizes via its own ResizeObserver callback (Canvas 2D). effects-canvas resize calls `app.renderer.resize()` on the PixiJS Application — do NOT create a second ResizeObserver for PixiJS. One observer, one resize call, avoids double-resize flicker.
+- `clamp()` font sizes: narration text, captions, loading title, loading-screen prompt
 - 320px minimum functional width
 - `viewport-fit=cover` + `env(safe-area-inset-bottom)` for notched devices
 
@@ -780,7 +757,7 @@ connect-src 'none'; object-src 'none'; base-uri 'self'
 - DOM: `aria-live="polite"` narration region populated from caption text
 - Keyboard: Arrow ←/→ navigate, Space toggle pause, Enter advance, Tab to controls
 - Play/pause button satisfies WCAG 2.2.2 (Pause, Stop, Hide)
-- `prefers-reduced-motion`: ghost-drift → opacity fade, transitions → instant, effects static (no displacement/animation, audioReactive ignored — see ADR-007, ADR-008), shimmer static glow (no highlights/pulse — see ADR-006), loading animation disabled
+- `prefers-reduced-motion`: ghost-drift → opacity fade, transitions → instant, effects static (no displacement/animation, audioReactive ignored — see ADR-007, ADR-008), loading animation disabled
 - All buttons: `aria-label`, `aria-pressed` where stateful, `aria-disabled` when inactive
 - Focus-visible outlines on all interactive elements
 - Captions available as alternative to audio narration
@@ -897,12 +874,11 @@ ARCHITECTURE:
 RENDERING:
   ✓ scene-canvas (Canvas 2D) = static image plane
   ✓ effects-canvas (PixiJS/WebGL) = pixel displacement effects (ADR-007)
-  ✓ trace-overlay (Canvas 2D) = additive shimmer light (ADR-006)
   ✓ DOM overlay = semantic plane (text, buttons, a11y)
-  ✓ all three canvases are aria-hidden="true"
-  ✓ only one WebGL context (effects-canvas) — shimmer + scene stay Canvas 2D
+  ✓ both canvases are aria-hidden="true"
+  ✓ only one WebGL context (effects-canvas) — scene stays Canvas 2D
   ✓ GSAP animates DOM elements
-  ✓ requestAnimationFrame animates shimmer canvas; PixiJS ticker animates effects canvas
+  ✓ PixiJS ticker animates effects canvas
   ✓ transitions via GSAP opacity fade on scene-stage container
   ✓ NEVER getImageData() in a render loop for compositing (preserved — PixiJS handles effects on GPU, no exception granted)
 
@@ -959,6 +935,5 @@ PRE-SHIP CHECKLIST:
   □ Profile effects <2ms/frame on baseline hardware (ADR-007)
   □ Verify PixiJS bundle size after tree-shake (target ~150KB gzipped) (ADR-007)
   □ Confirm mask assets present for all scenes with effects (ADR-007)
-  □ Verify mix-blend-mode: screen over WebGL canvas across Chrome/Safari/Firefox (ADR-006 + ADR-007)
   □ Verify PixiJS Assets.load() for PNG textures does NOT use fetch/XHR under connect-src: 'none' (ADR-007)
 ```

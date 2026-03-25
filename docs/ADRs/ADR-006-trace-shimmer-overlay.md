@@ -3,7 +3,7 @@
 **Supersedes:** §4.5 (Circuit Trace Overlay Progression), §13 v2 bullet "Circuit traces baked in images + canvas shimmer" of `carbon-trace-system-design-v3-final.md`, v5 §5.4 line 594 (`<div id="trace-overlay">`), v5 §4.1 line 239 (opacity-only traceOverlay schema)
 **Date:** March 19, 2026
 **Author:** Ashley Childress (@anchildress1)
-**Status:** Accepted — architecture and engine spec are normative. Path authoring for scenes 02–11 is pending recording work (implementation gated, not the decision).
+**Status:** Deferred — architecture and engine spec are normative but implementation is deferred post-v1. Runtime code was removed from the codebase; this ADR preserves the design for future implementation.
 **Decision:** Promote canvas shimmer overlay from v2 to v1; define shimmer engine architecture
 
 ---

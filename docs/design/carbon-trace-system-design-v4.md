@@ -178,7 +178,6 @@ Every frame has identical shape. `null` = skip feature.
       "text": null,
       "audioCues": null,
       "effects": { "idle": null, "entry": null },
-      "traceOverlay": null,
       "transition": { "type": "fade", "duration": 1500 }
     },
     {
@@ -218,8 +217,7 @@ Every frame has identical shape. `null` = skip feature.
         }
       ],
       "effects": { "idle": null, "entry": null },
-      "transition": { "type": "zoom-in", "duration": 1200, "scale": { "from": 1.0, "to": 1.15 } },
-      "traceOverlay": { "opacity": 0.05, "animation": "shimmer" }
+      "transition": { "type": "zoom-in", "duration": 1200, "scale": { "from": 1.0, "to": 1.15 } }
     },
 
     // Scene 8 — holdUntilClick, ghost-drift text, no audio
@@ -236,7 +234,6 @@ Every frame has identical shape. `null` = skip feature.
       },
       "audioCues": null,
       "effects": { "idle": null, "entry": null },
-      "traceOverlay": { "opacity": 0.2, "animation": "tin-glow" },
       "transition": { "type": "fade", "duration": 1500 }
     },
 
@@ -301,27 +298,7 @@ FRAME                │ holdUntilClick │ holdAfterNarration
 11 Music             │ null           │ null (has narration + song)
 ```
 
-### 4.3 Trace Overlay Progression
-
-Traces baked into images. Runtime overlay adds shimmer/emphasis only.
-
-```
-SCENE              │ RUNTIME        │ DESCRIPTION
-───────────────────┼────────────────┼──────────────────────
-01 Seam            │ faint shimmer  │ Part of the rock
-02 Travel          │ brief light    │ Conveyor reveals edges
-03 Reach           │ heat-pulse     │ First legibility
-04 Pocket          │ near-still     │ Almost invisible
-05 Rinse           │ water-clarity  │ First true seeing
-06 Storage         │ persistence    │ Endures through time
-07 Empty           │ light-crack    │ Light activates trace
-08 Stillness       │ assembly-micro │ Prior traces converge
-09 Return          │ illum-spread   │ Intentional, not chaotic
-10 Building        │ room-carry     │ Traces become the light
-11 Music           │ machine-steady │ Persistent, running
-```
-
-### 4.4 audioCues Schema
+### 4.3 audioCues Schema
 
 Each cue in the `audioCues` array:
 

@@ -404,6 +404,29 @@ function wireNarrationEnd(entry, cue, opts) {
 
 // --- Public API (ADR-005) ---
 
+/**
+ * Wrap an onNarrationEnd callback to fade boost cues (volumeAfterNarration)
+ * when narration ends. Returns the original callback unchanged if no boost
+ * cues exist in the provided array.
+ */
+export function wrapOnNarrationEndWithBoost(cues, onNarrationEnd) {
+  if (!cues || cues.length === 0) return onNarrationEnd;
+
+  const boostCues = cues.filter((c) => c.volumeAfterNarration !== undefined);
+  if (boostCues.length === 0) return onNarrationEnd;
+
+  return () => {
+    for (const cue of boostCues) {
+      const entry = activeCues.get(cue.id);
+      if (entry?.howl) {
+        const fadeDuration = cue.fadeAfterNarration ?? 3000;
+        entry.howl.fade(entry.howl.volume(), cue.volumeAfterNarration, fadeDuration);
+      }
+    }
+    onNarrationEnd?.();
+  };
+}
+
 export function scheduleAudioCues(cues, opts = {}) {
   if (!cues || cues.length === 0) return;
 

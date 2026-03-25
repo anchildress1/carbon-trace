@@ -82,9 +82,9 @@ All 12 frames share identical schema shape — same keys, same types. `null` mea
 
 Lines pour in and blow out independently on the DOM overlay — overlap allowed. Atmospheric, not mechanical. GSAP drives opacity + subtle Y drift. Reduced motion swaps drift for simple fade.
 
-### 13. Baked traces in images + canvas shimmer (v1)
+### 13. Baked traces in images
 
-Circuit traces baked into Leonardo AI images at scene-appropriate visibility. Runtime canvas overlay adds shimmer/emphasis only. v2 will add procedural trace rendering via canvas pixel ops — same renderer, no switch needed.
+Circuit traces baked into Leonardo AI images at scene-appropriate visibility.
 
 ## Consequences
 

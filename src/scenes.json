@@ -24,39 +24,44 @@
           {
             "text": "I'm gonna tell you a story.",
             "enter": 10,
-            "exit": 3000,
-            "x": 50,
-            "y": 45,
-            "align": "center"
+            "exit": 1800,
+            "x": 15,
+            "y": 20
           },
           {
-            "text": "Not because it's special. But because it's mine.",
+            "text": "Not because it's special.",
             "enter": 3000,
+            "exit": 5500,
+            "x": 22,
+            "y": 30
+          },
+          {
+            "text": "Because it's mine.",
+            "enter": 5000,
             "exit": 8000,
             "x": 50,
-            "y": 55,
-            "align": "center"
+            "y": 40
           }
         ],
         "captions": [
           {
             "text": "[Appalachian English dialect]",
             "start": 100,
-            "end": 1000
+            "end": 1800
           },
           {
             "text": "I'm gonna tell you a story.",
-            "start": 1000,
-            "end": 2000
+            "start": 100,
+            "end": 1800
           },
           {
             "text": "Not because it's special. But because it's mine.",
             "start": 3000,
-            "end": 6000
+            "end": 6500
           },
           {
             "text": "And my Daddy always told me to finish what I started.",
-            "start": 6000,
+            "start": 6500,
             "end": 10000
           }
         ]
@@ -66,7 +71,6 @@
         "type": "fade",
         "duration": 1500
       },
-      "traceOverlay": null,
       "audioCues": [
         {
           "id": "narration",
@@ -90,72 +94,75 @@
         "lines": [
           {
             "text": "The ground either feeds you or buries you.",
-            "enter": 2000,
-            "exit": 5000,
+            "enter": 1300,
+            "exit": 4500,
             "x": 10,
-            "y": 70,
-            "align": "left"
+            "y": 20
           },
           {
             "text": "Buchanan County, Virginia.",
             "enter": 5000,
             "exit": 9000,
-            "x": 10,
-            "y": 76,
-            "align": "left"
+            "x": 69,
+            "y": 30
           },
           {
             "text": "Miner or miner's wife.",
             "enter": 10000,
             "exit": 15000,
-            "x": 10,
-            "y": 82,
-            "align": "left"
+            "x": 13,
+            "y": 40
           },
           {
-            "text": "That's just what we called living.",
+            "text": "Most came home.",
+            "enter": 25000,
+            "exit": 28000,
+            "x": 73,
+            "y": 75
+          },
+          {
+            "text": "That's what we called living.",
             "enter": 30000,
-            "exit": 33000,
-            "x": 75,
-            "y": 88,
-            "align": "right"
+            "exit": 35000,
+            "x": 43,
+            "y": 78
           }
         ],
         "captions": [
           {
             "text": "I come from a place where the ground either feeds you or buries you.",
             "start": 0,
-            "end": 5000
+            "end": 4500
           },
           {
             "text": "Buchanan County is one of the poorest in the whole state of Virginia.",
-            "start": 5000,
-            "end": 10000
+            "start": 5700,
+            "end": 9700
           },
           {
-            "text": "And if you're aren't a miner, that meant you're a miner's wife and probably didn't have a pot to piss in.",
+            "text": "And if you weren't a miner, then that meant you're a miner's wife and probably didn't have a pot to piss in.",
             "start": 10000,
-            "end": 16000
+            "end": 16500
           },
           {
             "text": "In these mountains, you ain't got many other options.",
-            "start": 16000,
-            "end": 20000
+            "start": 17000,
+            "end": 22000
           },
           {
             "text": "Every single day I watched my daddy go underground knowing most men came back home.",
-            "start": 20000,
-            "end": 27000
+            "start": 22000,
+            "end": 28200
           },
           {
             "text": "Not all of them, mind you, but most.",
-            "start": 27000,
+            "start": 28800,
             "end": 32000
           },
           {
             "text": "That's just what we called living.",
             "start": 32000,
-            "end": 34000
+            "end": 34500
           }
         ]
       },
@@ -164,12 +171,12 @@
           {
             "type": "glow",
             "mask": "assets/masks/mask-01-seam-diamond.png",
-            "color": 16775408,
-            "glowAlpha": 0.15,
-            "distance": 10,
-            "outerStrength": 2,
-            "pulseSpeed": 0.02,
-            "pulseDepth": 0.4
+            "color": 15189379,
+            "glowAlpha": 0.1,
+            "distance": 8,
+            "outerStrength": 3,
+            "pulseSpeed": 0.01,
+            "pulseDepth": 0.3
           }
         ]
       },
@@ -180,9 +187,6 @@
           "from": 1,
           "to": 1.15
         }
-      },
-      "traceOverlay": {
-        "opacity": 0.05
       },
       "audioCues": [
         {
@@ -198,12 +202,12 @@
         {
           "id": "ambient-01",
           "type": "ambient",
-          "src": "assets/audio/ambient/scene-01-seam.m4a",
-          "enter": 0,
-          "volume": 0.1,
+          "src": "assets/audio/ambient/01-seam-mine.m4a",
+          "enter": 4300,
+          "volume": 0.05,
           "loop": true,
           "fadeIn": 500,
-          "fadeOut": null
+          "fadeOut": 1000
         }
       ]
     },
@@ -217,67 +221,63 @@
         "lines": [
           {
             "text": "Work that got noticed.",
-            "enter": 3000,
+            "enter": 2500,
             "exit": 5000,
-            "x": 10,
-            "y": 15,
-            "align": "left"
+            "x": 6,
+            "y": 37
           },
           {
             "text": "Work that was expected.",
-            "enter": 5000,
-            "exit": 8000,
-            "x": 10,
-            "y": 21,
-            "align": "left"
+            "enter": 4000,
+            "exit": 7000,
+            "x": 65,
+            "y": 20
           },
           {
             "text": "Nobody called that much of nothing but being a good wife.",
-            "enter": 29000,
-            "exit": 33000,
-            "x": 75,
-            "y": 78,
-            "align": "right"
+            "enter": 27000,
+            "exit": 32000,
+            "x": 2,
+            "y": 79
           },
           {
-            "text": "That's how I was raised.",
-            "enter": 41000,
-            "exit": 44000,
-            "x": 75,
-            "y": 84,
-            "align": "right"
+            "text": "Whether anybody sees it or not.",
+            "enter": 34000,
+            "exit": 40000,
+            "x": 40,
+            "y": 39
           }
         ],
         "captions": [
           {
             "text": "I learned early the difference between work that got noticed and work that was just expected.",
             "start": 0,
-            "end": 6000
+            "end": 6100
           },
           {
             "text": "Daddy would come home covered in black coal and it was a badge of honor.",
-            "start": 6000,
-            "end": 11000
+            "start": 7000,
+            "end": 10800
           },
           {
             "text": "That meant he'd worked hard and he was respected for it.",
             "start": 11000,
-            "end": 15000
+            "end": 14800
           },
           {
             "text": "Mommy and Mawmaw kept the rest of the world from falling apart—",
             "start": 15000,
-            "end": 20000
+            "end": 18700
           },
           {
             "text": "the youngins to school, doing the running, supper on the table.",
-            "start": 20000,
-            "end": 23000
+            "start": 19000,
+            "end": 23400
           },
           {
             "text": "And it was always fixed and hot.",
             "start": 23000,
-            "end": 26000
+            "end": 26100
           },
           {
             "text": "Problem was, nobody called that much of nothing but being a good wife.",
@@ -285,19 +285,14 @@
             "end": 32000
           },
           {
-            "text": "So that's what I learned.",
+            "text": "That's the way I was raised.",
             "start": 32000,
             "end": 34000
           },
           {
-            "text": "Work like it mattered and keep on moving whether anybody sees it or not.",
+            "text": "To work like it mattered and keep on moving whether anybody sees it or not.",
             "start": 34000,
-            "end": 40000
-          },
-          {
-            "text": "That's how I was raised.",
-            "start": 40000,
-            "end": 42000
+            "end": 39000
           }
         ]
       },
@@ -306,21 +301,18 @@
           {
             "type": "glow",
             "mask": "assets/masks/mask-02-travel-diamond.png",
-            "color": 16775408,
-            "glowAlpha": 0.15,
-            "distance": 5,
-            "outerStrength": 2,
+            "color": 16769662,
+            "glowAlpha": 0.2,
+            "distance": 8,
+            "outerStrength": 1,
             "pulseSpeed": 0.02,
-            "pulseDepth": 0.4
+            "pulseDepth": 0.3
           }
         ]
       },
       "transition": {
         "type": "fade",
         "duration": 1200
-      },
-      "traceOverlay": {
-        "opacity": 0.08
       },
       "audioCues": [
         {
@@ -336,12 +328,12 @@
         {
           "id": "ambient-02",
           "type": "ambient",
-          "src": "assets/audio/ambient/scene-02-travel.m4a",
+          "src": "assets/audio/ambient/02-travel-fabric.m4a",
           "enter": 0,
-          "volume": 0.4,
+          "volume": 0.28,
           "loop": true,
-          "fadeIn": 1500,
-          "fadeOut": null
+          "fadeIn": 4500,
+          "fadeOut": 1500
         }
       ]
     },
@@ -354,78 +346,74 @@
       "narration": {
         "lines": [
           {
-            "text": "Growing up was a hard thing to do.",
-            "enter": 2000,
-            "exit": 5000,
-            "x": 10,
-            "y": 12,
-            "align": "left"
+            "text": "Growing up was a hard thing.",
+            "enter": 1200,
+            "exit": 4000,
+            "x": 40,
+            "y": 10
           },
           {
             "text": "Hot enough to ruin a person.",
-            "enter": 13000,
-            "exit": 15000,
-            "x": 50,
-            "y": 22,
-            "align": "center"
+            "enter": 10000,
+            "exit": 14000,
+            "x": 10,
+            "y": 22
           },
           {
-            "text": "Something in me just refused to burn.",
+            "text": "Something refused to burn.",
             "enter": 17000,
-            "exit": 20000,
-            "x": 50,
-            "y": 28,
-            "align": "center"
+            "exit": 19500,
+            "x": 56,
+            "y": 69
           },
           {
             "text": "Stubborn.",
             "enter": 22000,
             "exit": 24000,
-            "x": 85,
-            "y": 85,
-            "align": "right"
+            "x": 22,
+            "y": 44
           }
         ],
         "captions": [
           {
             "text": "I'll tell you what—growing up was a hard thing to do.",
             "start": 0,
-            "end": 4000
+            "end": 3500
           },
           {
-            "text": "Seemed like every time I got my feet under me, something else would come along and knock them back out again.",
+            "text": "Seemed like every time I got my feet under me, something would come along and knock them back out again.",
             "start": 4000,
-            "end": 10000
+            "end": 8900
           },
           {
             "text": "More than once, life came at me hot enough to ruin a person.",
-            "start": 10000,
-            "end": 16000
+            "start": 9700,
+            "end": 13500
           },
           {
             "text": "Liked to have killed me, if I'm being honest.",
-            "start": 16000,
-            "end": 19000
+            "start": 14500,
+            "end": 16500
           },
           {
             "text": "But something in me just refused to burn.",
-            "start": 19000,
-            "end": 23000
+            "start": 17000,
+            "end": 19000
           },
           {
             "text": "And I don't know what you'd call it except stubborn.",
-            "start": 23000,
-            "end": 29000
+            "start": 20000,
+            "end": 23000
           },
           {
             "text": "I just figured as long as I had fight left in me, then fighting is just what I'd do.",
-            "start": 29000,
-            "end": 36000
+            "start": 24000,
+            "end": 30000
           },
           {
             "text": "Turns out that sort of thinking probably saved my life a time or two over the years.",
-            "start": 36000,
-            "end": 43000
+            "start": 30000,
+            "end": 35000
           }
         ]
       },
@@ -438,21 +426,18 @@
           {
             "type": "glow",
             "mask": "assets/masks/mask-03-reach-diamond.png",
-            "color": 16775408,
-            "glowAlpha": 0.15,
-            "distance": 15,
+            "color": 13524247,
+            "glowAlpha": 0.2,
+            "distance": 8,
             "outerStrength": 3,
-            "pulseSpeed": 0.02,
-            "pulseDepth": 0.4
+            "pulseSpeed": 0.03,
+            "pulseDepth": 0.5
           }
         ]
       },
       "transition": {
         "type": "fade",
         "duration": 1200
-      },
-      "traceOverlay": {
-        "opacity": 0.15
       },
       "audioCues": [
         {
@@ -468,12 +453,12 @@
         {
           "id": "ambient-03",
           "type": "ambient",
-          "src": "assets/audio/ambient/scene-03-reach.m4a",
+          "src": "assets/audio/ambient/03-reach-fireplace.m4a",
           "enter": 0,
-          "volume": 0.75,
+          "volume": 0.35,
           "loop": true,
           "fadeIn": 1500,
-          "fadeOut": null
+          "fadeOut": 1500
         }
       ]
     },
@@ -488,86 +473,89 @@
           {
             "text": "I left home toting more than I knew.",
             "enter": 0,
-            "exit": 4000,
-            "x": 10,
-            "y": 12,
-            "align": "left"
+            "exit": 2700,
+            "x": 66,
+            "y": 44
           },
           {
             "text": "Not money. Not a plan.",
             "enter": 5000,
             "exit": 8000,
-            "x": 10,
-            "y": 18,
-            "align": "left"
+            "x": 15,
+            "y": 11
           },
           {
             "text": "16 of us for Sunday supper.",
-            "enter": 17000,
-            "exit": 20000,
-            "x": 50,
-            "y": 50,
-            "align": "center"
+            "enter": 18000,
+            "exit": 21000,
+            "x": 6,
+            "y": 34
           },
           {
-            "text": "I've kept it in my pocket my whole life.",
-            "enter": 39000,
-            "exit": 41000,
-            "x": 75,
-            "y": 85,
-            "align": "right"
+            "text": "Something took root.",
+            "enter": 25000,
+            "exit": 28000,
+            "x": 70,
+            "y": 60
+          },
+          {
+            "text": "I had it in my pocket the whole time.",
+            "enter": 40000,
+            "exit": 43000,
+            "x": 67,
+            "y": 19
           }
         ],
         "captions": [
           {
             "text": "I left home toting more than I knew.",
             "start": 0,
-            "end": 3000
+            "end": 2400
           },
           {
             "text": "Not money—we didn't have none of that.",
             "start": 3000,
-            "end": 7000
+            "end": 6000
           },
           {
             "text": "Not a plan neither—I guess nobody thought to hand me one of those and I probably wouldn't have listened no how.",
-            "start": 7000,
-            "end": 15000
+            "start": 6600,
+            "end": 14000
           },
           {
             "text": "But somewhere between watching my Mawmaw stretch a meal to feed 16 of us for Sunday supper",
             "start": 15000,
-            "end": 22000
+            "end": 21000
           },
           {
             "text": "and watching my mommy hold that house together on nothing, something took root.",
-            "start": 22000,
-            "end": 27000
+            "start": 21500,
+            "end": 26000
           },
           {
             "text": "I didn't learn how to survive by reading about it—",
             "start": 27000,
-            "end": 31000
+            "end": 30000
           },
           {
             "text": "I learned because I watched them all do it every single day.",
-            "start": 31000,
-            "end": 36000
+            "start": 30500,
+            "end": 34000
           },
           {
             "text": "I didn't rightly know what it was back then.",
-            "start": 36000,
-            "end": 40000
+            "start": 34000,
+            "end": 38000
           },
           {
             "text": "It just felt like the way I was made.",
-            "start": 40000,
-            "end": 42000
+            "start": 38000,
+            "end": 40000
           },
           {
-            "text": "But I've kept it in my pocket my whole life.",
-            "start": 42000,
-            "end": 46000
+            "text": "But I had it in my pocket the whole time.",
+            "start": 41000,
+            "end": 44000
           }
         ]
       },
@@ -576,11 +564,11 @@
           {
             "type": "glow",
             "mask": "assets/masks/mask-04-pocket-diamond.png",
-            "color": 16775408,
+            "color": 15909236,
             "glowAlpha": 0.15,
-            "distance": 15,
-            "outerStrength": 3,
-            "pulseSpeed": 0.02,
+            "distance": 6,
+            "outerStrength": 2,
+            "pulseSpeed": 0.03,
             "pulseDepth": 0.4
           }
         ]
@@ -588,9 +576,6 @@
       "transition": {
         "type": "fade",
         "duration": 1200
-      },
-      "traceOverlay": {
-        "opacity": 0.03
       },
       "audioCues": [
         {
@@ -606,12 +591,12 @@
         {
           "id": "ambient-04",
           "type": "ambient",
-          "src": "assets/audio/ambient/scene-04-pocket.m4a",
+          "src": "assets/audio/ambient/04-pocket-clock.m4a",
           "enter": 0,
-          "volume": 1,
+          "volume": 0.15,
           "loop": true,
-          "fadeIn": 1500,
-          "fadeOut": null
+          "fadeIn": 500,
+          "fadeOut": 500
         }
       ]
     },
@@ -625,42 +610,38 @@
         "lines": [
           {
             "text": "Trained in all the hard things.",
-            "enter": 3000,
+            "enter": 2000,
             "exit": 5000,
-            "x": 10,
-            "y": 12,
-            "align": "left"
+            "x": 72,
+            "y": 37
           },
           {
             "text": "Put on your big girl panties.",
-            "enter": 9000,
+            "enter": 8500,
             "exit": 12000,
-            "x": 10,
-            "y": 18,
-            "align": "left"
+            "x": 61,
+            "y": 23
           },
           {
             "text": "The dust started washing off.",
-            "enter": 29000,
-            "exit": 31000,
-            "x": 75,
-            "y": 78,
-            "align": "right"
+            "enter": 32000,
+            "exit": 34000,
+            "x": 17,
+            "y": 8
           },
           {
             "text": "Nobody expected that to look like me.",
-            "enter": 36000,
-            "exit": 40000,
-            "x": 75,
-            "y": 84,
-            "align": "right"
+            "enter": 40000,
+            "exit": 44000,
+            "x": 65,
+            "y": 79
           }
         ],
         "captions": [
           {
             "text": "By the time I found my way into tech, I'd already been trained in all the hard things.",
             "start": 0,
-            "end": 6000
+            "end": 4800
           },
           {
             "text": "Every time I thought about quitting school, I'd think of my Mommy telling me to put on my big girl panties.",
@@ -670,7 +651,7 @@
           {
             "text": "She still tells me that.",
             "start": 12000,
-            "end": 15000
+            "end": 14500
           },
           {
             "text": "And that was just our way of saying just because it's hard don't mean you ain't gonna do it.",
@@ -678,19 +659,19 @@
             "end": 20000
           },
           {
-            "text": "So I used all the stubbornness and grit I got from the mountains",
+            "text": "So I used all the stubbornness and grit from the mountains",
             "start": 20000,
-            "end": 26000
+            "end": 25500
           },
           {
-            "text": "and did a whole lot of just showing up until I finished school.",
+            "text": "and did a whole lot of just showing up to finish my schoolin'.",
             "start": 26000,
             "end": 29000
           },
           {
             "text": "Somewhere along the way, the dust started washing off.",
-            "start": 29000,
-            "end": 34000
+            "start": 30000,
+            "end": 33000
           },
           {
             "text": "Turns out what was under it was rightly what this kind of work needed.",
@@ -698,12 +679,12 @@
             "end": 39000
           },
           {
-            "text": "Now, I don't think nobody was quite expecting that to look like me by the time I got there.",
+            "text": "Now, I don't think nobody was quite expecting that to look like me by the time I showed up.",
             "start": 39000,
-            "end": 46000
+            "end": 45000
           },
           {
-            "text": "I didn't rightly care neither.",
+            "text": "But I didn't rightly care neither.",
             "start": 46000,
             "end": 48000
           }
@@ -718,10 +699,10 @@
           {
             "type": "glow",
             "mask": "assets/masks/mask-05-rinse-diamond.png",
-            "color": 16775408,
+            "color": 16642996,
             "glowAlpha": 0.15,
-            "distance": 15,
-            "outerStrength": 3,
+            "distance": 12,
+            "outerStrength": 2.5,
             "pulseSpeed": 0.02,
             "pulseDepth": 0.4
           }
@@ -730,9 +711,6 @@
       "transition": {
         "type": "fade",
         "duration": 1200
-      },
-      "traceOverlay": {
-        "opacity": 0.15
       },
       "audioCues": [
         {
@@ -748,12 +726,12 @@
         {
           "id": "ambient-05",
           "type": "ambient",
-          "src": "assets/audio/ambient/scene-05-rinse.m4a",
+          "src": "assets/audio/ambient/05-rinse-faucet.m4a",
           "enter": 0,
           "volume": 0.1,
           "loop": true,
           "fadeIn": 1500,
-          "fadeOut": null
+          "fadeOut": 500
         }
       ]
     },
@@ -767,82 +745,83 @@
         "lines": [
           {
             "text": "Built things other people got credit for.",
-            "enter": 7000,
-            "exit": 10000,
-            "x": 10,
-            "y": 12,
-            "align": "left"
+            "enter": 8000,
+            "exit": 11000,
+            "x": 5,
+            "y": 63
           },
           {
             "text": "Solved problems quietly.",
-            "enter": 10000,
-            "exit": 13000,
-            "x": 10,
-            "y": 18,
-            "align": "left"
+            "enter": 12000,
+            "exit": 15000,
+            "x": 64,
+            "y": 85
           },
           {
             "text": "There were special women along the way.",
             "enter": 17000,
-            "exit": 19000,
-            "x": 50,
-            "y": 50,
-            "align": "center"
+            "exit": 20000,
+            "x": 5,
+            "y": 35
           },
           {
             "text": "Carrying the light as if they'd been the ones underground.",
-            "enter": 40000,
-            "exit": 44000,
+            "enter": 38000,
+            "exit": 42000,
             "x": 50,
-            "y": 88,
-            "align": "center"
+            "y": 16
           }
         ],
         "captions": [
           {
-            "text": "For a long time I just did whatever work was thrown at me.",
+            "text": "I caught on fast enough to how this industry works.",
             "start": 0,
-            "end": 4000
+            "end": 2600
           },
           {
-            "text": "I kept my head down and built things that other people usually got the credit for.",
-            "start": 4000,
-            "end": 10000
+            "text": "I learned to keep my head down and do whatever work was thrown at me.",
+            "start": 3700,
+            "end": 7500
           },
           {
-            "text": "I solved problems quietly because that's the way I'd been taught to do it.",
-            "start": 10000,
-            "end": 15000
+            "text": "I built things that other people usually got the credit for.",
+            "start": 8000,
+            "end": 11000
           },
           {
-            "text": "There were special women along the way though.",
-            "start": 15000,
-            "end": 18000
+            "text": "And I solved problems quietly because that's how I stayed out of trouble.",
+            "start": 11000,
+            "end": 16000
+          },
+          {
+            "text": "There were special women along the way too.",
+            "start": 17000,
+            "end": 19500
           },
           {
             "text": "There always are, if you know where to look for them.",
-            "start": 18000,
+            "start": 20000,
             "end": 23000
           },
           {
-            "text": "They'd already walked through the fire and not one of them was gonna make you feel smaller if you was still in it.",
-            "start": 23000,
+            "text": "They'd already walked through the fire and wouldn't nobody gonna make you feel smaller if you was still in it.",
+            "start": 24000,
             "end": 30000
           },
           {
-            "text": "They didn't talk big because they didn't have to.",
+            "text": "They didn't talk big because they didn't need to.",
             "start": 30000,
-            "end": 34000
+            "end": 33000
           },
           {
             "text": "They just quietly shined the way.",
             "start": 34000,
-            "end": 37000
+            "end": 36000
           },
           {
             "text": "Walking in front of you—carrying the light as if they'd been the ones underground.",
-            "start": 37000,
-            "end": 44000
+            "start": 36000,
+            "end": 42000
           }
         ]
       },
@@ -852,10 +831,10 @@
             "type": "glow",
             "mask": "assets/masks/mask-06-storage-diamond.png",
             "color": 16775408,
-            "glowAlpha": 0.15,
+            "glowAlpha": 0.25,
             "distance": 15,
             "outerStrength": 3,
-            "pulseSpeed": 0.02,
+            "pulseSpeed": 0.03,
             "pulseDepth": 0.4
           }
         ]
@@ -863,9 +842,6 @@
       "transition": {
         "type": "fade",
         "duration": 1200
-      },
-      "traceOverlay": {
-        "opacity": 0.2
       },
       "audioCues": [
         {
@@ -881,12 +857,12 @@
         {
           "id": "ambient-06",
           "type": "ambient",
-          "src": "assets/audio/ambient/scene-06-storage.m4a",
+          "src": "assets/audio/ambient/06-storage-electromagnetic.m4a",
           "enter": 0,
           "volume": 0.35,
           "loop": true,
           "fadeIn": 1500,
-          "fadeOut": null
+          "fadeOut": 1500
         }
       ]
     },
@@ -902,60 +878,73 @@
             "text": "Not all of them made it.",
             "enter": 0,
             "exit": 4000,
-            "x": 10,
-            "y": 15,
-            "align": "left"
+            "x": 36,
+            "y": 67
           },
           {
             "text": "She was good. Too good.",
             "enter": 8000,
-            "exit": 12000,
-            "x": 10,
-            "y": 50,
-            "align": "left"
+            "exit": 11000,
+            "x": 6,
+            "y": 31
+          },
+          {
+            "text": "It ain't.",
+            "enter": 20000,
+            "exit": 22000,
+            "x": 63,
+            "y": 48
           },
           {
             "text": "Working harder. Paid less.",
-            "enter": 13000,
-            "exit": 16000,
-            "x": 10,
-            "y": 56,
-            "align": "left"
+            "enter": 23000,
+            "exit": 28000,
+            "x": 63,
+            "y": 52
           },
           {
             "text": "They got done obliging.",
-            "enter": 21000,
-            "exit": 24000,
-            "x": 10,
-            "y": 85,
-            "align": "left"
+            "enter": 33000,
+            "exit": 36000,
+            "x": 3,
+            "y": 77
           }
         ],
         "captions": [
           {
             "text": "But not all of them made it...",
             "start": 0,
-            "end": 3000
+            "end": 1900
           },
           {
             "text": "That girl fresh out of school? She never even got a chance—she was good. Too good.",
-            "start": 3000,
-            "end": 12000
+            "start": 2800,
+            "end": 10500
+          },
+          {
+            "text": "She didn't leave loud neither—she was just gone",
+            "start": 11000,
+            "end": 15000
+          },
+          {
+            "text": "Everybody seemed to move on with life like that's normal. It ain't.",
+            "start": 16000,
+            "end": 22000
           },
           {
             "text": "There was lots of women working harder than anybody else in the room and getting paid less for their troubles.",
-            "start": 12000,
-            "end": 20000
+            "start": 23000,
+            "end": 28000
           },
           {
             "text": "Some of them left because folks kept asking them to hide,",
-            "start": 20000,
-            "end": 24000
+            "start": 29000,
+            "end": 32500
           },
           {
             "text": "and I reckon they'd just got done obliging.",
-            "start": 24000,
-            "end": 27000
+            "start": 33000,
+            "end": 36000
           }
         ]
       },
@@ -963,9 +952,6 @@
       "transition": {
         "type": "fade",
         "duration": 1200
-      },
-      "traceOverlay": {
-        "opacity": 0.1
       },
       "audioCues": [
         {
@@ -981,19 +967,19 @@
         {
           "id": "ambient-07",
           "type": "ambient",
-          "src": "assets/audio/ambient/scene-07-missing.m4a",
+          "src": "assets/audio/ambient/07-missing-rain.m4a",
           "enter": 0,
-          "volume": 0.7,
+          "volume": 0.2,
           "loop": true,
           "fadeIn": 1500,
-          "fadeOut": null
+          "fadeOut": 1000
         }
       ]
     },
     {
       "id": "scene-08-empty",
       "frameType": "scene",
-      "holdAfterNarration": 8000,
+      "holdAfterNarration": 16000,
       "description": "Sparse room with tin on wall shelf, circuitry glowing on walls, bright window — a space where someone should be but isn't",
       "image": "assets/images/scene-08-empty.webp",
       "narration": {
@@ -1001,18 +987,16 @@
           {
             "text": "All of them should still be here.",
             "enter": 0,
-            "exit": 2000,
-            "x": 40,
-            "y": 45,
-            "align": "center"
+            "exit": 6000,
+            "x": 8,
+            "y": 21
           },
           {
             "text": "It's not supposed to be this quiet.",
-            "enter": 1500,
-            "exit": 4000,
-            "x": 45,
-            "y": 55,
-            "align": "center"
+            "enter": 4500,
+            "exit": 8000,
+            "x": 22,
+            "y": 28
           }
         ],
         "captions": [
@@ -1028,19 +1012,16 @@
         "type": "fade",
         "duration": 1200
       },
-      "traceOverlay": {
-        "opacity": 0.3
-      },
       "audioCues": [
         {
           "id": "ambient-08",
           "type": "ambient",
-          "src": "assets/audio/ambient/scene-08-empty.m4a",
+          "src": "assets/audio/ambient/08-empty-snow.m4a",
           "enter": 0,
           "volume": 1,
           "loop": true,
           "fadeIn": 1500,
-          "fadeOut": null
+          "fadeOut": 1500
         }
       ]
     },
@@ -1053,73 +1034,69 @@
       "narration": {
         "lines": [
           {
-            "text": "My world had a plan for me.",
-            "enter": 2000,
-            "exit": 4000,
-            "x": 10,
-            "y": 15,
-            "align": "left"
+            "text": "I refuse to let all that be forgot.",
+            "enter": 100,
+            "exit": 3000,
+            "x": 3,
+            "y": 56
           },
           {
-            "text": "I just didn't take it.",
-            "enter": 4000,
-            "exit": 7000,
-            "x": 10,
-            "y": 21,
-            "align": "left"
-          },
-          {
-            "text": "I ain't done with it yet.",
-            "enter": 12000,
+            "text": "Way past time.",
+            "enter": 11000,
             "exit": 14000,
-            "x": 10,
-            "y": 50,
-            "align": "left"
+            "x": 74,
+            "y": 22
           },
           {
             "text": "Don't lose your fight.",
-            "enter": 24000,
-            "exit": 26000,
-            "x": 10,
-            "y": 85,
-            "align": "left"
+            "enter": 23000,
+            "exit": 27000,
+            "x": 62,
+            "y": 51
+          },
+          {
+            "text": "A little bit brighter.",
+            "enter": 29000,
+            "exit": 33000,
+            "x": 7,
+            "y": 64
           }
         ],
         "captions": [
           {
-            "text": "My world had a plan for me before I ever got here.",
+            "text": "I refuse to let all that be forgot.",
             "start": 0,
             "end": 3000
           },
           {
-            "text": "I just didn't take what they was giving.",
+            "text": "Sitting on a shelf that ain't nobody gonna remember.",
             "start": 3000,
             "end": 6000
           },
           {
-            "text": "And I remember all those things handed to me over the years and I ain't done with it yet.",
+            "text": "So I pack it with me.",
             "start": 6000,
+            "end": 9000
+          },
+          {
+            "text": "And I finally decided it's way past time to do something with it.",
+            "start": 10000,
             "end": 14000
           },
           {
             "text": "Everything all the women before me hauled around—that matters.",
             "start": 14000,
-            "end": 22000
+            "end": 20000
           },
           {
             "text": "And all of you walking beside me while the industry aims to fix us—don't lose your fight.",
-            "start": 22000,
-            "end": 30000
+            "start": 20000,
+            "end": 26000
           },
           {
-            "text": "If nothing else, then we'll do it for all the youngins coming up next.",
-            "start": 30000,
-            "end": 35000
-          },
-          {
-            "text": "Cause they're gonna need things to look a little bit brighter before they get here.",
-            "start": 35000,
-            "end": 40000
+            "text": "If nothing else, then we'll do it for all the youngins coming up who need these things to be a little bright before they get here.",
+            "start": 26000,
+            "end": 34000
           }
         ]
       },
@@ -1141,9 +1118,6 @@
         "type": "fade",
         "duration": 1200
       },
-      "traceOverlay": {
-        "opacity": 0.25
-      },
       "audioCues": [
         {
           "id": "narration",
@@ -1158,12 +1132,12 @@
         {
           "id": "ambient-09",
           "type": "ambient",
-          "src": "assets/audio/ambient/scene-09-return.m4a",
+          "src": "assets/audio/ambient/09-return-forest.m4a",
           "enter": 0,
-          "volume": 0.55,
+          "volume": 0.35,
           "loop": true,
           "fadeIn": 1500,
-          "fadeOut": null
+          "fadeOut": 1000
         }
       ]
     },
@@ -1177,72 +1151,68 @@
         "lines": [
           {
             "text": "Smart things.",
-            "enter": 4000,
-            "exit": 6000,
-            "x": 10,
-            "y": 10,
-            "align": "left"
+            "enter": 2000,
+            "exit": 5000,
+            "x": 76,
+            "y": 10
           },
           {
-            "text": "Every hot coal I walked straight across.",
-            "enter": 15000,
+            "text": "Every hot coal led me right here.",
+            "enter": 11000,
             "exit": 17000,
-            "x": 50,
-            "y": 50,
-            "align": "center"
+            "x": 4,
+            "y": 20
           },
           {
-            "text": "I decided to cut one of my own.",
-            "enter": 20000,
+            "text": "Cutting one of my own.",
+            "enter": 21000,
             "exit": 24000,
-            "x": 50,
-            "y": 56,
-            "align": "center"
+            "x": 70,
+            "y": 66
           },
           {
-            "text": "That's exactly how you build anything worth having.",
-            "enter": 30000,
+            "text": "Worth having.",
+            "enter": 32000,
             "exit": 34000,
-            "x": 75,
-            "y": 88,
-            "align": "right"
+            "x": 86,
+            "y": 78
           }
         ],
         "captions": [
           {
-            "text": "For now, I'll build things. Smart things.",
+            "text": "Now, I build things. Smart things.",
             "start": 0,
-            "end": 6000
+            "end": 4900
           },
           {
             "text": "That's what a girl from a little old coal town can do when she gets her hands on the right parts.",
-            "start": 6000,
-            "end": 13000
+            "start": 4900,
+            "end": 11000
           },
           {
             "text": "Every hard thing I've done.",
-            "start": 13000,
-            "end": 15000
+            "start": 11000,
+            "end": 13000
           },
           {
             "text": "Every hot coal I walked straight across led me right here.",
-            "start": 15000,
-            "end": 20000
+            "start": 13000,
+            "end": 17500
           },
           {
-            "text": "Not cause of a path I found, but because I decided a long time ago to cut one of my own.",
-            "start": 20000,
-            "end": 27000
+            "text": "Not cause the path was easy. Because I got used to cutting one of my own.",
+            "start": 18000,
+            "end": 24000
           },
           {
-            "text": "And this work ain't always pretty. Sometimes it's hands and wires and not knowing if it'll hold.",
-            "start": 27000,
-            "end": 35000
+            "text": "And the work ain't always pretty. Sometimes it's hands and wires and not knowing if it'll hold.",
+            "start": 24000,
+            "end": 31000
           },
           {
-            "text": "But that's exactly how you build anything that's worth having.",
-            "start": 35000,
-            "end": 40000
+            "text": "But how you build anything that's worth having.",
+            "start": 31000,
+            "end": 34000
           }
         ]
       },
@@ -1251,11 +1221,11 @@
           {
             "type": "glow",
             "mask": "assets/masks/mask-10-building-diamond.png",
-            "color": 16775408,
+            "color": 16642996,
             "glowAlpha": 0.15,
-            "distance": 15,
+            "distance": 10,
             "outerStrength": 3,
-            "pulseSpeed": 0.02,
+            "pulseSpeed": 0.03,
             "pulseDepth": 0.4
           }
         ]
@@ -1263,9 +1233,6 @@
       "transition": {
         "type": "fade",
         "duration": 1200
-      },
-      "traceOverlay": {
-        "opacity": 0.35
       },
       "audioCues": [
         {
@@ -1281,12 +1248,12 @@
         {
           "id": "ambient-10",
           "type": "ambient",
-          "src": "assets/audio/ambient/scene-10-building.m4a",
+          "src": "assets/audio/ambient/10-building-welding.m4a",
           "enter": 0,
-          "volume": 0.2,
+          "volume": 0.15,
           "loop": true,
           "fadeIn": 1500,
-          "fadeOut": null
+          "fadeOut": 1000
         }
       ]
     },
@@ -1300,60 +1267,56 @@
         "lines": [
           {
             "text": "I want to leave more than I got.",
-            "enter": 3000,
-            "exit": 5000,
-            "x": 10,
-            "y": 12,
-            "align": "left"
+            "enter": 2000,
+            "exit": 6000,
+            "x": 67,
+            "y": 71
           },
           {
             "text": "One little corner of the universe.",
-            "enter": 19000,
+            "enter": 18000,
             "exit": 21000,
-            "x": 50,
-            "y": 45,
-            "align": "center"
+            "x": 54,
+            "y": 30
           },
           {
-            "text": "It ain't dark no more.",
+            "text": "It's not dark no more.",
             "enter": 20000,
             "exit": 23000,
-            "x": 50,
-            "y": 55,
-            "align": "center"
+            "x": 19,
+            "y": 75
           },
           {
-            "text": "Spread like wildfire.",
+            "text": "Catch like wildfire.",
             "enter": 25000,
-            "exit": 27000,
-            "x": 75,
-            "y": 88,
-            "align": "right"
+            "exit": 28000,
+            "x": 42,
+            "y": 36
           }
         ],
         "captions": [
           {
-            "text": "So that's what all of this is for.",
+            "text": "So that's what I built all this is for.",
             "start": 0,
-            "end": 4000
+            "end": 2200
           },
           {
             "text": "I want to leave more than I got when I started out.",
-            "start": 4000,
-            "end": 8000
+            "start": 2200,
+            "end": 6000
           },
           {
             "text": "I want it easier for the next ones coming up to build smart things without having to fight for every inch of it first.",
             "start": 8000,
-            "end": 16000
+            "end": 14000
           },
           {
-            "text": "I really just wanted to put a little light—and some music—into this one little corner of the universe so it ain't dark no more.",
-            "start": 16000,
-            "end": 26000
+            "text": "So this is me putting the light—and some music—into this one little corner of the universe so it's not dark no more.",
+            "start": 14000,
+            "end": 23000
           },
           {
-            "text": "And if we're lucky, it will spread like wildfire.",
+            "text": "And if we're lucky, it will catch like wildfire.",
             "start": 26000,
             "end": 32000
           }
@@ -1368,21 +1331,18 @@
           {
             "type": "glow",
             "mask": "assets/masks/mask-11-music-diamond.png",
-            "color": 16775408,
+            "color": 15526871,
             "glowAlpha": 0.15,
             "distance": 15,
             "outerStrength": 3,
-            "pulseSpeed": 0.02,
-            "pulseDepth": 0.4
+            "pulseSpeed": 0.05,
+            "pulseDepth": 0.5
           }
         ]
       },
       "transition": {
         "type": "fade",
         "duration": 1500
-      },
-      "traceOverlay": {
-        "opacity": 0.5
       },
       "audioCues": [
         {
@@ -1398,12 +1358,12 @@
         {
           "id": "ambient-11",
           "type": "ambient",
-          "src": "assets/audio/ambient/scene-11-music.m4a",
+          "src": "assets/audio/ambient/11-music-vinyl.m4a",
           "enter": 0,
-          "volume": 0.2,
+          "volume": 0.1,
           "loop": true,
           "fadeIn": 1500,
-          "fadeOut": null
+          "fadeOut": 1000
         },
         {
           "id": "end-song",
@@ -1411,11 +1371,13 @@
           "src": "assets/audio/sfx/BridgeCitySinners_BreakTheChain.mp3",
           "enter": {
             "ref": "narration",
-            "offset": -5000
+            "offset": -12000
           },
-          "volume": 0.75,
+          "volume": 0.15,
+          "volumeAfterNarration": 0.75,
+          "fadeAfterNarration": 3000,
           "loop": true,
-          "fadeIn": 10000,
+          "fadeIn": 8000,
           "fadeOut": null
         }
       ]

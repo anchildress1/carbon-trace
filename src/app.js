@@ -12,18 +12,11 @@ import {
   onNarrationBufferChange,
   preloadNarrationAhead,
   clearNarrationCache,
+  wrapOnNarrationEndWithBoost,
 } from './audio.js';
 import { PausableTimer } from './pausable-timer.js';
 import { buildNarrationTimeline, clearNarrationLayer } from './text.js';
-import {
-  init as initEffectsCanvas,
-  loadScene as loadEffectsScene,
-  clearAll as clearEffects,
-  cancelPendingLoad,
-  pause as pauseEffects,
-  resume as resumeEffects,
-} from './effects-canvas.js';
-import { initOverlay, updateProgress, showControls } from './overlay.js';
+import { initOverlay, updateProgress, showControls, focusActiveDot } from './overlay.js';
 import {
   initSceneCanvas,
   drawImage as drawSceneImage,
@@ -39,6 +32,33 @@ import {
   syncCaptionsToTime,
   clearCaptionElements,
 } from './captions.js';
+import { initKeyboard } from './keyboard.js';
+
+// Lazy-load pixi.js effects to keep it off the critical rendering path.
+// The dynamic import starts immediately but doesn't block initial paint,
+// reducing Total Blocking Time on slower CI runners.
+const effectsLoaded = import('./effects-canvas.js');
+let effectsMod = null;
+async function initEffectsCanvas(el) {
+  effectsMod ??= await effectsLoaded;
+  return effectsMod.init(el);
+}
+async function loadEffectsScene(...args) {
+  effectsMod ??= await effectsLoaded;
+  return effectsMod.loadScene(...args);
+}
+function clearEffects() {
+  effectsMod?.clearAll();
+}
+function cancelPendingLoad() {
+  effectsMod?.cancelPendingLoad();
+}
+function pauseEffects() {
+  effectsMod?.pause();
+}
+function resumeEffects() {
+  effectsMod?.resume();
+}
 
 const State = Object.freeze({
   LOADING: 'LOADING',
@@ -61,6 +81,19 @@ function applyFrameDefaults(scenesJson) {
 
 function prefersReducedMotion() {
   return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function dismissLoadingScreen(el) {
+  const hide = () => {
+    el.hidden = true;
+  };
+  if (prefersReducedMotion()) {
+    hide();
+  } else {
+    el.classList.add('fade-out');
+    el.addEventListener('transitionend', hide, { once: true });
+    setTimeout(hide, 900);
+  }
 }
 
 function computeProjectMaxCaptionMs(frames) {
@@ -117,6 +150,7 @@ function scheduleAutoAdvance(app, delay) {
   app.autoAdvanceTimer = new PausableTimer(() => {
     app.autoAdvanceTimer = null;
     if (app.paused || app.state === State.TRANSITIONING) return;
+    app.autoAdvancing = true;
     advance(app);
   }, delay);
 }
@@ -184,7 +218,10 @@ function makeNarrationEndCallback(app, frame, holdAfterNarration) {
 
 function scheduleFrameAudio(app, frame) {
   const holdAfterNarration = getHoldAfterNarration(frame);
-  const onNarrationEnd = makeNarrationEndCallback(app, frame, holdAfterNarration);
+  const onNarrationEnd = wrapOnNarrationEndWithBoost(
+    frame.audioCues,
+    makeNarrationEndCallback(app, frame, holdAfterNarration),
+  );
   const maxNarrationDurationMs = getMaxNarrationDuration(
     frame,
     app.audioDurations,
@@ -203,7 +240,10 @@ function scheduleReplayNarration(app, frame, narrationCue) {
   if (!narrationCue) return;
 
   const holdAfterNarration = getHoldAfterNarration(frame);
-  const onNarrationEnd = makeNarrationEndCallback(app, frame, holdAfterNarration);
+  const onNarrationEnd = wrapOnNarrationEndWithBoost(
+    frame.audioCues,
+    makeNarrationEndCallback(app, frame, holdAfterNarration),
+  );
   const maxNarrationDurationMs = getMaxNarrationDuration(
     frame,
     app.audioDurations,
@@ -347,8 +387,6 @@ function showFrame(app, index) {
   const frame = app.frames[index];
   app.els.sceneStage.setAttribute('aria-label', frame.description || '');
   renderSceneImage(app, frame);
-  app.els.traceOverlay.style.opacity = frame.traceOverlay?.opacity ?? 0;
-
   clearNarrationLayer(app.els.narrationLayer);
 
   if (frame.effects?.regions?.length) {
@@ -462,6 +500,23 @@ function cleanupCurrentScene(app) {
   app.replayPending = false;
 }
 
+function manageFocusAfterTransition(app) {
+  if (app.autoAdvancing) {
+    app.autoAdvancing = false;
+    if (document.activeElement?.closest('.progress-dots')) {
+      focusActiveDot();
+    } else if (document.activeElement?.closest('.control-buttons')) {
+      document.activeElement.blur();
+    }
+  } else if (app.lastNavSource !== 'keyboard') {
+    // Pointer/dot-click nav: move focus to active dot.
+    // Keyboard nav: leave focus where it is so arrow keys
+    // continue to navigate scenes (not roving-tabindex dots).
+    focusActiveDot();
+  }
+  app.lastNavSource = null;
+}
+
 function transition(app, toIndex) {
   if (app.state === State.TRANSITIONING) {
     app.pendingNavIndex = toIndex;
@@ -478,7 +533,7 @@ function transition(app, toIndex) {
   app.state = State.TRANSITIONING;
   app.buffering = false;
   app.els.sceneStage.classList.remove('buffering');
-  app.els.playGate.hidden = true;
+  app.els.loadingScreen.hidden = true;
 
   cleanupCurrentScene(app);
 
@@ -501,6 +556,7 @@ function transition(app, toIndex) {
         app.state = STATE_BY_FRAME_TYPE[prevFrame.frameType] || State.SCENE_ACTIVE;
       }
       doPause(app);
+      manageFocusAfterTransition(app);
       completePendingNav(app);
     };
 
@@ -539,6 +595,7 @@ function transition(app, toIndex) {
       if (app.textTimeline) app.textTimeline.play(0);
       setupAutoAdvance(app);
     }
+    manageFocusAfterTransition(app);
     completePendingNav(app);
   };
 
@@ -652,7 +709,11 @@ function doResume(app) {
     }
     setupAutoAdvance(app);
   } else if (firstPlay) {
-    app.els.playGate.hidden = true;
+    dismissLoadingScreen(app.els.loadingScreen);
+    // Move focus to the pause button so a pending Space keyup doesn't
+    // activate an unintended control (e.g., btn-next) after the loading
+    // screen loses focus.
+    app.els.btnPause.focus();
     // Clear stranded audio entries from showFrame's scheduleFrameAudio call —
     // handleFirstPlay will schedule audio fresh via scheduleFrameAudio.
     cancelAudioCues();
@@ -749,7 +810,10 @@ function replayNarration(app) {
     if (narrationCue) {
       const holdAfterNarration = getHoldAfterNarration(frame);
       const narrationOpts = {
-        onNarrationEnd: makeNarrationEndCallback(app, frame, holdAfterNarration),
+        onNarrationEnd: wrapOnNarrationEndWithBoost(
+          frame.audioCues,
+          makeNarrationEndCallback(app, frame, holdAfterNarration),
+        ),
         maxNarrationDurationMs: getMaxNarrationDuration(
           frame,
           app.audioDurations,
@@ -769,24 +833,6 @@ function replayNarration(app) {
   }
 }
 
-function handleKeydown(app, e) {
-  if (e.key === ' ') {
-    if (e.target.closest('#overlay-controls')) return;
-    e.preventDefault();
-    app.userHasInteracted = true;
-    togglePause(app);
-  } else if (e.key === 'ArrowLeft') {
-    e.preventDefault();
-    app.userHasInteracted = true;
-    retreat(app);
-  } else if (e.key === 'ArrowRight' || e.key === 'Enter') {
-    if (e.target.closest('#overlay-controls')) return;
-    e.preventDefault();
-    app.userHasInteracted = true;
-    advance(app);
-  }
-}
-
 function toggleMute(app) {
   app.muted = !app.muted;
   setMuted(app.muted);
@@ -798,6 +844,7 @@ function toggleCaptions(app) {
   const enabled = !areCaptionsEnabled();
   setCaptionsEnabled(enabled);
   app.els.btnCaptions.setAttribute('aria-pressed', String(enabled));
+  app.els.btnCaptions.classList.toggle('cc-on', enabled);
 
   if (enabled) {
     if (app.captionEntries?.length > 0 && app.textTimeline) {
@@ -822,32 +869,23 @@ function initApp(app) {
       app.els.sceneStage.hidden = false;
       showControls();
 
-      // Fade out loading screen to reveal the scene stage underneath
-      const hideLoading = () => {
-        app.els.loadingScreen.hidden = true;
-      };
-      if (prefersReducedMotion()) {
-        hideLoading();
-      } else {
-        app.els.loadingScreen.classList.add('fade-out');
-        app.els.loadingScreen.addEventListener('transitionend', hideLoading, { once: true });
-        setTimeout(hideLoading, 900);
-      }
-
       if (app.availableAudio.size > 0) {
         app.els.btnMute.removeAttribute('aria-disabled');
       }
 
       const captionsEnabled = initCaptions();
       app.els.btnCaptions.setAttribute('aria-pressed', String(captionsEnabled));
+      app.els.btnCaptions.classList.toggle('cc-on', captionsEnabled);
 
       showFrame(app, 0);
-      app.els.playGate.hidden = false;
 
-      // Start paused — everything waits for the user to press play.
-      // Set SCENE_ACTIVE first so doPause stores the correct resume state.
-      // The play-gate label text serves as the LCP element for Lighthouse.
-      // On play, doResume → handleFirstPlay sets up narration and auto-advance.
+      // Loading screen stays visible as the interactive start gate.
+      // Show the "click to begin" prompt and mark it ready for interaction.
+      // The prompt text serves as the LCP element for Lighthouse.
+      app.els.loadingPrompt.hidden = false;
+      app.els.loadingPrompt.classList.add('visible');
+      app.els.loadingScreen.classList.add('ready');
+
       app.state = State.SCENE_ACTIVE;
       doPause(app);
 
@@ -861,13 +899,24 @@ function initApp(app) {
         ]).catch((err) => console.error('Background asset preload failed:', err));
       }, 4000);
 
-      const markInteracted = () => {
+      app.cleanupKeyboard = initKeyboard((action) => {
         app.userHasInteracted = true;
-      };
-
-      document.addEventListener('keydown', (e) => {
-        markInteracted();
-        handleKeydown(app, e);
+        switch (action) {
+          case 'togglePause':
+            togglePause(app);
+            break;
+          case 'pause':
+            if (!app.paused) doPause(app);
+            break;
+          case 'advance':
+            app.lastNavSource = 'keyboard';
+            advance(app);
+            break;
+          case 'retreat':
+            app.lastNavSource = 'keyboard';
+            retreat(app);
+            break;
+        }
       });
       app.els.btnPrev.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -894,7 +943,7 @@ function initApp(app) {
         e.stopPropagation();
         toggleCaptions(app);
       });
-      app.els.playGate.addEventListener('click', (e) => {
+      app.els.loadingScreen.addEventListener('click', (e) => {
         e.stopPropagation();
         togglePause(app);
       });
@@ -902,6 +951,8 @@ function initApp(app) {
     .catch((err) => {
       console.error('Failed to initialize:', err);
       app.els.loadingScreen.textContent = 'Something went wrong. Please refresh.';
+      app.els.loadingScreen.setAttribute('aria-label', 'Something went wrong. Please refresh.');
+      app.els.loadingScreen.disabled = true;
     });
 }
 
@@ -910,7 +961,6 @@ export function createApp() {
     'loading-screen',
     'scene-stage',
     'scene-canvas',
-    'trace-overlay',
     'effects-canvas',
     'narration-layer',
     'caption-layer',
@@ -923,7 +973,7 @@ export function createApp() {
     'btn-mute',
     'btn-pause',
     'btn-captions',
-    'play-gate',
+    'loading-prompt',
     'transition-loader',
   ];
 
@@ -948,6 +998,7 @@ export function createApp() {
     textTimeline: null,
     captionEntries: [],
     autoAdvanceTimer: null,
+    autoAdvancing: false,
     pendingNavIndex: null,
     generation: 0,
     deferFrameAudioUntilResume: false,
@@ -963,7 +1014,6 @@ export function createApp() {
       loadingScreen: document.getElementById('loading-screen'),
       sceneStage: document.getElementById('scene-stage'),
       sceneCanvas: document.getElementById('scene-canvas'),
-      traceOverlay: document.getElementById('trace-overlay'),
       effectsCanvas: document.getElementById('effects-canvas'),
       narrationLayer: document.getElementById('narration-layer'),
       captionLayer: document.getElementById('caption-layer'),
@@ -975,7 +1025,7 @@ export function createApp() {
       btnMute: document.getElementById('btn-mute'),
       btnPause: document.getElementById('btn-pause'),
       btnCaptions: document.getElementById('btn-captions'),
-      playGate: document.getElementById('play-gate'),
+      loadingPrompt: document.getElementById('loading-prompt'),
       transitionLoader: document.getElementById('transition-loader'),
     },
   };

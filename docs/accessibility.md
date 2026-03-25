@@ -24,13 +24,20 @@ content that `#accessible-narration` provides to assistive technology.
 | `Space` | Toggle play/pause |
 | `Enter` / `ArrowRight` | Advance to next scene |
 | `ArrowLeft` | Return to previous scene |
+| `Escape` | Pause (one-directional — never resumes) |
 | `Tab` | Navigate between controls |
 
 Space toggles play/pause (not advance). Enter and ArrowRight advance to the
-next scene. All control buttons (prev, pause, mute, captions, replay, next)
-are focusable and respond to keyboard activation. Space and Enter/ArrowRight
-do not fire when focus is inside the control bar to avoid conflicting with
-button activation.
+next scene. Escape always pauses; Space resumes. All control buttons (prev,
+pause, mute, captions, replay, next) are focusable and respond to keyboard
+activation. Space and Enter are suppressed when focus is on a button element,
+allowing native button activation. Arrow keys always navigate scenes
+regardless of focus location, except when focus is on a progress dot (see
+below).
+
+Keyboard shortcuts are defined declaratively in `keyboard.js` via a key-action
+map. The module exports `handleKeydown` (pure function for testing) and
+`initKeyboard` (document listener registration with cleanup).
 
 ## Focus Management
 
@@ -39,6 +46,27 @@ button activation.
 - Disabled buttons (`aria-disabled="true"` or `disabled` attribute) have
   reduced opacity (0.3) and do not respond to interaction.
 - Progress dots are buttons with `aria-label="Go to scene N of M"`.
+- Keyboard navigation (arrow keys, Enter) does **not** redirect focus to the
+  active dot — this preserves "global navigation mode" for sequential
+  browsing. Pointer-initiated navigation (button/dot clicks) redirects focus
+  to the active dot.
+
+### Progress Dots — Roving Tabindex
+
+The progress dot group is a composite widget following the WAI-ARIA toolbar
+pattern:
+
+- **Single Tab stop**: the dot group occupies one position in the Tab order.
+  Only the roving-target dot has `tabindex="0"`; all others have
+  `tabindex="-1"`.
+- **Arrow keys**: Left/Right/Up/Down move focus between dots with wrap-around.
+  Home/End jump to first/last dot. Arrow keys within the dot group call
+  `stopPropagation` to prevent global scene navigation.
+- **Enter/Space on a focused dot**: triggers navigation to that dot's scene
+  via the dot's click handler (native button activation).
+- **Focus ring vs active dot**: focus ring (keyboard highlight) and active
+  state (filled dot indicating the current scene) are independent. A user can
+  arrow-focus to any dot and press Enter to jump there.
 
 ## ARIA Attributes
 
@@ -52,7 +80,6 @@ button activation.
 | `#btn-captions` | `aria-pressed` | Toggle state for captions on/off |
 | `#btn-mute` | `aria-label` | Updates between "Mute audio" / "Unmute audio" |
 | `#btn-mute` | `aria-disabled` | Disabled until audio is available |
-| `#trace-overlay` | `aria-hidden="true"` | Hides decorative shimmer canvas |
 | `#scene-stage` | `aria-label` | Scene description from `frame.description` |
 | progress dots | `aria-current="step"` | Identifies the current scene dot |
 
@@ -68,12 +95,10 @@ flowchart TD
     B --> D["Text: 0.3s opacity fade"]
     B --> E["Transitions: instant (no GSAP fade)"]
     B --> F["Effects: static (no displacement/animation, audioReactive ignored)"]
-    B --> G["Trace shimmer: static glow, no highlights, no pulse"]
 
     C --> H["Text: 1.2s blur + y + opacity"]
     C --> I["Transitions: GSAP two-phase fade"]
     C --> J["Effects: particles, pulses, etc."]
-    C --> K["Trace shimmer: layered glow + traveling highlights + pulse"]
 ```
 
 | Feature | Normal | Reduced Motion |
@@ -82,7 +107,6 @@ flowchart TD
 | Scene transitions | Two-phase GSAP fade | Instant swap |
 | Visual effects | Full displacement + particle effects | Static: no displacement, no animation (ADR-007) |
 | Audio-reactive modulation | Effect parameters driven by music FFT data | Ignored — base parameter values used, no modulation (ADR-008) |
-| Trace shimmer | Layered glow + traveling highlights + ambient pulse | Static glow at 0.5 brightness, no animation |
 
 The `prefersReducedMotion()` check is evaluated at the point of use (not
 cached), so it responds to runtime changes in the user's system preference.

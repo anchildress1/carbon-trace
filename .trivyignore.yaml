@@ -3,3 +3,6 @@ licenses:
   - id: MIT
   # GSAP — free for public, non-commercial use (WeCoded art entry)
   - id: "Standard 'no charge' license: https://gsap.com/standard-license."
+  # PixiJS transitive dependencies — BSD-3-Clause and ISC are permissive
+  - id: BSD-3-Clause
+  - id: ISC

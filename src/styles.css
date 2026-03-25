@@ -40,8 +40,22 @@ body {
   justify-content: center;
   width: 100%;
   height: 100%;
+  padding: 0;
+  border: none;
+  font: inherit;
   background: #0e0e0e;
+  color: inherit;
+  cursor: default;
   transition: opacity 0.8s ease;
+}
+
+.loading-screen.ready {
+  cursor: pointer;
+}
+
+.loading-screen.ready:focus-visible {
+  outline: 2px solid rgba(232, 228, 223, 0.4);
+  outline-offset: -2px;
 }
 
 .loading-screen.fade-out {
@@ -86,11 +100,12 @@ body {
 }
 
 .trace-node {
-  fill: rgba(232, 228, 223, 0.35);
+  fill: rgba(245, 230, 200, 0.6);
   opacity: 0;
+  filter: drop-shadow(0 0 3px rgba(255, 240, 200, 0.4));
   animation:
     node-appear 0.6s ease 1.4s forwards,
-    node-pulse 2.4s ease-in-out 2s infinite;
+    node-glow 2.4s ease-in-out 2s infinite;
 }
 
 .loading-title {
@@ -101,6 +116,36 @@ body {
   letter-spacing: 0.3em;
   color: rgba(232, 228, 223, 0);
   animation: title-emerge 1.8s ease 1.2s forwards;
+}
+
+.loading-prompt {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  font-family: 'Lora', serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(0.75rem, 1.1vw, 0.875rem);
+  letter-spacing: 0.15em;
+  text-transform: lowercase;
+  color: rgba(232, 228, 223, 0);
+  transition: color 0.8s ease;
+}
+
+.loading-play-icon {
+  width: 1em;
+  height: 1em;
+  fill: currentColor;
+  stroke: none;
+}
+
+.loading-prompt.visible {
+  color: rgba(232, 228, 223, 0.55);
+}
+
+.loading-screen.ready:hover .loading-prompt.visible,
+.loading-screen.ready:focus-visible .loading-prompt.visible {
+  color: rgba(232, 228, 223, 0.75);
 }
 
 @keyframes trace-draw {
@@ -115,19 +160,21 @@ body {
   }
 }
 
-@keyframes node-pulse {
+@keyframes node-glow {
   0%,
   100% {
-    fill: rgba(232, 228, 223, 0.25);
+    fill: rgba(245, 230, 200, 0.4);
+    filter: drop-shadow(0 0 2px rgba(255, 240, 200, 0.3));
   }
   50% {
-    fill: rgba(232, 228, 223, 0.55);
+    fill: rgba(255, 245, 220, 0.8);
+    filter: drop-shadow(0 0 6px rgba(255, 240, 200, 0.6));
   }
 }
 
 @keyframes title-emerge {
   to {
-    color: rgba(232, 228, 223, 0.4);
+    color: rgba(232, 228, 223, 0.55);
   }
 }
 
@@ -171,16 +218,6 @@ body {
   }
 }
 
-.trace-overlay {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.6s ease;
-}
-
 .effects-canvas {
   position: absolute;
   inset: 0;
@@ -218,66 +255,6 @@ body {
     0 1px 3px rgba(0, 0, 0, 0.6);
   filter: blur(0px);
   opacity: 0;
-}
-
-/* Play gate — large centered play button for title card entry */
-.play-gate {
-  position: absolute;
-  inset: 0;
-  z-index: 9;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  color: rgba(232, 228, 223, 0.6);
-  transition: color 0.3s ease;
-}
-
-.play-gate:hover,
-.play-gate:focus-visible {
-  color: rgba(232, 228, 223, 0.9);
-}
-
-.play-gate:focus-visible {
-  outline: 2px solid rgba(232, 228, 223, 0.6);
-  outline-offset: -2px;
-}
-
-.play-gate-icon {
-  width: clamp(72px, 12vw, 112px);
-  height: auto;
-}
-
-.play-gate-icon circle {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.2;
-  opacity: 0.3;
-  transition: opacity 0.3s ease;
-}
-
-.play-gate:hover .play-gate-icon circle,
-.play-gate:focus-visible .play-gate-icon circle {
-  opacity: 0.5;
-}
-
-.play-gate-icon polygon {
-  fill: currentColor;
-  opacity: 0.7;
-}
-
-.play-gate-label {
-  display: block;
-  margin-top: 0.75rem;
-  font-family: 'Lora', serif;
-  font-size: clamp(0.875rem, 2vw, 1.125rem);
-  font-style: italic;
-  letter-spacing: 0.15em;
-  text-transform: lowercase;
-  color: rgba(232, 228, 223, 0.35);
 }
 
 /* Transition loader — debounced spinner for slow image loads */
@@ -448,6 +425,19 @@ body {
   display: flex;
 }
 
+/* Captions button icon toggle — default is off (strikethrough) */
+.btn-captions .icon-cc {
+  display: none;
+}
+
+.btn-captions.cc-on .icon-cc {
+  display: flex;
+}
+
+.btn-captions.cc-on .icon-cc-off {
+  display: none;
+}
+
 /* Accessibility */
 .sr-only {
   position: absolute;
@@ -464,10 +454,6 @@ body {
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .narration-line {
-    transition: opacity 0.3s ease;
-  }
-
-  .trace-overlay {
     transition: opacity 0.3s ease;
   }
 
@@ -491,7 +477,7 @@ body {
   }
 
   .loading-title {
-    color: rgba(232, 228, 223, 0.4);
+    color: rgba(232, 228, 223, 0.55);
     animation: none;
   }
 
@@ -499,11 +485,7 @@ body {
     transition: none;
   }
 
-  .play-gate {
-    transition: none;
-  }
-
-  .play-gate-icon circle {
+  .loading-prompt {
     transition: none;
   }
 

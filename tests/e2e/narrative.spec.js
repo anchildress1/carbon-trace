@@ -13,6 +13,12 @@ function frameDescription(index) {
   return scenesData.frames[index]?.description || '';
 }
 
+async function dismissLoadingScreen(page) {
+  await page.waitForSelector('#loading-prompt:not([hidden])', { timeout: 15000 });
+  await page.click('#loading-screen');
+  await page.locator('#loading-screen').waitFor({ state: 'hidden', timeout: 3000 });
+}
+
 test.describe('carbon-trace narrative', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
@@ -45,8 +51,10 @@ test.describe('carbon-trace narrative', () => {
 
   test('clicking scene area does not advance the scene', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await dismissLoadingScreen(page);
 
-    // App starts paused. Navigate to scene-01 via btn-next (hardCut, stays paused).
+    // Pause so btn-next triggers an instant hard-cut transition.
+    await page.click('#btn-pause');
     await page.click('#btn-next');
     const stage = page.locator('#scene-stage');
     await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
@@ -63,6 +71,7 @@ test.describe('carbon-trace narrative', () => {
 
   test('forward button advances scene', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await dismissLoadingScreen(page);
 
     await page.click('#btn-next');
 
@@ -101,6 +110,7 @@ test.describe('carbon-trace narrative', () => {
   test('previous button navigates back after advancing', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
     await page.emulateMedia({ reducedMotion: 'reduce' });
+    await dismissLoadingScreen(page);
 
     await page.click('#btn-next');
     const stage = page.locator('#scene-stage');
@@ -143,6 +153,7 @@ test.describe('carbon-trace narrative', () => {
   test('replay button is enabled after playing narration scene', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await dismissLoadingScreen(page);
 
     // Advance to scene-01 (has narration audio)
     await page.click('#btn-next');
@@ -156,6 +167,7 @@ test.describe('carbon-trace narrative', () => {
   test('clicking replay button does not advance the scene', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await dismissLoadingScreen(page);
 
     // Advance to scene-01 so replay is enabled
     await page.click('#btn-next');
@@ -171,6 +183,7 @@ test.describe('carbon-trace narrative', () => {
   test('clicking replay restores narration text elements', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await dismissLoadingScreen(page);
 
     // Advance to scene-01 so replay is enabled
     await page.click('#btn-next');
@@ -194,6 +207,7 @@ test.describe('carbon-trace narrative', () => {
 
   test('scene stage description changes when scene advances', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await dismissLoadingScreen(page);
 
     const stage = page.locator('#scene-stage');
     const initialLabel = await stage.getAttribute('aria-label');
@@ -213,6 +227,10 @@ test.describe('carbon-trace narrative', () => {
   test('forward button is disabled on credits frame', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await dismissLoadingScreen(page);
+
+    // Pause so each ArrowRight triggers an instant hard-jump (no fade animation).
+    await page.keyboard.press('Space');
 
     const totalFrames = scenesData.frames.length;
     for (let i = 0; i < totalFrames - 1; i++) {
@@ -227,6 +245,7 @@ test.describe('carbon-trace narrative', () => {
 
   test('progress dots gain active class as scenes advance', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await dismissLoadingScreen(page);
 
     const firstDot = page.locator('.progress-dot').first();
     const secondDot = page.locator('.progress-dot').nth(1);
@@ -245,6 +264,7 @@ test.describe('carbon-trace narrative', () => {
 
   test('mute button aria-label toggles between mute and unmute', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await dismissLoadingScreen(page);
 
     const muteBtn = page.locator('#btn-mute');
     await page.evaluate(() => document.getElementById('btn-mute').removeAttribute('aria-disabled'));
@@ -262,6 +282,7 @@ test.describe('carbon-trace — scene alignment', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await dismissLoadingScreen(page);
   });
 
   test('scene-01 description appears after advancing', async ({ page }) => {
@@ -272,11 +293,12 @@ test.describe('carbon-trace — scene alignment', () => {
   });
 
   test('scene-02 description appears after advancing twice', async ({ page }) => {
-    await page.keyboard.press('ArrowRight');
-    await page.waitForTimeout(200);
-    await page.keyboard.press('ArrowRight');
+    // Advance to scene-01 then scene-02 from title card
+    await page.click('#btn-next');
     const stage = page.locator('#scene-stage');
-    await expect(stage).toHaveAttribute('aria-label', /Mine tunnel/, { timeout: 5000 });
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
+    await page.click('#btn-next');
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(2), { timeout: 5000 });
   });
 
   test('progress dots count matches scene count', async ({ page }) => {
@@ -293,7 +315,7 @@ test.describe('carbon-trace — positioned text', () => {
 
   test('overlay text elements have absolute positioning styles', async ({ page }) => {
     // Press play so narration renders on title frame
-    await page.click('#play-gate');
+    await page.click('#loading-screen');
 
     const lines = page.locator('.narration-line--positioned');
     await expect(lines.first()).toBeVisible({ timeout: 5000 });
@@ -305,55 +327,60 @@ test.describe('carbon-trace — positioned text', () => {
     expect(position).toBe('absolute');
   });
 
-  test('text alignment matches data for center-aligned lines', async ({ page }) => {
+  test('positioned lines use left alignment', async ({ page }) => {
     // Press play so narration renders on title frame
-    await page.click('#play-gate');
+    await page.click('#loading-screen');
 
     const lines = page.locator('.narration-line--positioned');
     await expect(lines.first()).toBeVisible({ timeout: 5000 });
     const first = lines.first();
 
     const textAlign = await first.evaluate((el) => el.style.textAlign);
-    expect(textAlign).toBe('center');
+    expect(textAlign).toBe('left');
   });
 });
 
-test.describe('carbon-trace — play gate', () => {
+test.describe('carbon-trace — loading screen gate', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
   });
 
-  test('play gate is visible on title card', async ({ page }) => {
-    const playGate = page.locator('#play-gate');
-    await expect(playGate).toBeVisible();
+  test('loading screen is visible on title card', async ({ page }) => {
+    const screen = page.locator('#loading-screen');
+    await expect(screen).toBeVisible();
   });
 
-  test('play gate has accessible label', async ({ page }) => {
-    const playGate = page.locator('#play-gate');
-    await expect(playGate).toHaveAttribute('aria-label', 'Begin experience');
+  test('loading screen has accessible label', async ({ page }) => {
+    const screen = page.locator('#loading-screen');
+    await expect(screen).toHaveAttribute('aria-label', 'carbon-trace, begin experience');
   });
 
-  test('clicking play gate unpauses and hides it', async ({ page }) => {
-    const playGate = page.locator('#play-gate');
+  test('loading screen shows click-to-begin prompt when ready', async ({ page }) => {
+    const prompt = page.locator('#loading-prompt');
+    await expect(prompt).toBeVisible({ timeout: 5000 });
+  });
+
+  test('clicking loading screen unpauses and hides it', async ({ page }) => {
+    const screen = page.locator('#loading-screen');
     const pauseBtn = page.locator('#btn-pause');
 
-    await expect(playGate).toBeVisible();
+    await expect(screen).toBeVisible();
     await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
 
-    await playGate.click();
+    await screen.click();
 
-    await expect(playGate).toBeHidden();
+    await expect(screen).toBeHidden({ timeout: 2000 });
     await expect(pauseBtn).toHaveAttribute('aria-pressed', 'false');
   });
 
-  test('play gate hides when navigating forward', async ({ page }) => {
-    const playGate = page.locator('#play-gate');
-    await expect(playGate).toBeVisible();
+  test('loading screen hides when navigating forward via keyboard', async ({ page }) => {
+    const screen = page.locator('#loading-screen');
+    await expect(screen).toBeVisible();
 
-    await page.click('#btn-next');
+    await page.keyboard.press('ArrowRight');
 
-    await expect(playGate).toBeHidden();
+    await expect(screen).toBeHidden({ timeout: 2000 });
   });
 });
 
@@ -371,13 +398,14 @@ test.describe('carbon-trace — pause/play', () => {
   test('pause button aria-pressed toggles on click', async ({ page }) => {
     const pauseBtn = page.locator('#btn-pause');
 
-    // Starts in paused state (play button shown)
+    // Starts paused behind loading screen
     await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
 
-    await pauseBtn.click(); // Play (unpause)
+    // Space bypasses loading screen and toggles pause
+    await page.keyboard.press('Space');
     await expect(pauseBtn).toHaveAttribute('aria-pressed', 'false');
 
-    await pauseBtn.click(); // Pause
+    await page.keyboard.press('Space');
     await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
   });
 
@@ -385,10 +413,11 @@ test.describe('carbon-trace — pause/play', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
 
     const pauseBtn = page.locator('#btn-pause');
-    // Starts in paused state
+    // Starts paused behind loading screen
     await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
 
-    await page.click('#btn-next');
+    // ArrowRight bypasses loading screen and navigates
+    await page.keyboard.press('ArrowRight');
 
     const stage = page.locator('#scene-stage');
     await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
@@ -401,6 +430,7 @@ test.describe('carbon-trace — captions', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await dismissLoadingScreen(page);
   });
 
   test('caption button aria-pressed is false by default', async ({ page }) => {
@@ -427,9 +457,7 @@ test.describe('carbon-trace — captions', () => {
     const captionBtn = page.locator('#btn-captions');
     await captionBtn.click();
 
-    // Press play to start (app loads paused)
-    await page.click('#btn-pause');
-
+    // dismissLoadingScreen already started playback.
     // Title frame has captions — some should appear
     const captionText = page.locator('.caption-text');
     await expect(captionText.first()).toBeVisible({ timeout: 5000 });
@@ -453,6 +481,7 @@ test.describe('carbon-trace — navigation interrupts', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await dismissLoadingScreen(page);
   });
 
   test('advancing mid-narration transitions cleanly', async ({ page }) => {
@@ -505,6 +534,7 @@ test.describe('carbon-trace narrative — prefers-reduced-motion', () => {
 
   test('forward button advances scene when reduced motion is set', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await dismissLoadingScreen(page);
 
     await page.click('#btn-next');
 

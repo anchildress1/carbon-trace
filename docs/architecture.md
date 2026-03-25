@@ -10,6 +10,7 @@ graph TD
     app --> audio["audio.js<br/>(3-channel mixer)"]
     app --> text["text.js<br/>(ghost-drift timeline)"]
     app --> effects["effects.js<br/>(effect registry)"]
+    app --> keyboard["keyboard.js<br/>(key-action map)"]
     app --> overlay["overlay.js<br/>(progress dots + controls)"]
     app --> captions["captions.js<br/>(timed subtitles)"]
     app --> loader["loader.js<br/>(audio preloading)"]
@@ -45,7 +46,7 @@ When a frame becomes active, `showFrame(index)` runs this sequence:
 
 ```mermaid
 flowchart TD
-    A[showFrame] --> C[Set image + alt text + trace overlay]
+    A[showFrame] --> C[Set image + alt text]
     C --> D[clearEffects + clearNarrationLayer]
     D --> E[Run idle effect if defined]
     E --> E2[Resume effects canvas render loop]
@@ -121,11 +122,21 @@ Caption show/hide scheduling is embedded in the GSAP timeline built by
 `text.js`, not driven by separate timers. See [accessibility.md](accessibility.md)
 for integration details.
 
+### keyboard.js (key-action map)
+
+Declarative mapping from `KeyboardEvent.key` values to action strings. Each
+entry specifies `preventDefault` behavior and whether the key is allowed when
+focus is on a `<button>` (the button guard). The pure `handleKeydown` function
+is testable without DOM setup. `initKeyboard` registers the document listener
+and returns a cleanup function. The module does not import any app functions —
+it receives an action handler callback.
+
 ### overlay.js (progress + controls)
 
 Creates one progress dot button per scene. Dots light up as the user advances.
-Clicking a dot navigates to that scene. The control bar contains prev, pause,
-mute, captions, replay, and next buttons.
+Clicking a dot navigates to that scene. The dot group uses roving tabindex
+(single Tab stop, arrow keys move focus between dots, Enter/Space activates).
+The control bar contains prev, pause, mute, captions, replay, and next buttons.
 
 ## scenes.json Schema
 
@@ -147,7 +158,6 @@ frames[]:
   ambient: { src, volume, loop }
   music: { src, startVolume, fullVolume, crescendoMs, enter, exit }
   effects: { idle: "effect-name"|null, entry: "effect-name"|null }
-  traceOverlay: { opacity }
   transition: { type, duration }
 ```
 

@@ -27,13 +27,13 @@
   </head>
   <body>
     <div id="app" role="application" aria-label="carbon-trace visual narrative">
-      <div
+      <button
         class="loading-screen"
         id="loading-screen"
-        role="status"
-        aria-label="Loading carbon-trace"
+        aria-label="carbon-trace, begin experience"
       >
-        <div class="loading-trace">
+        <span class="loading-trace">
+          <span class="loading-title">carbon-trace</span>
           <svg class="loading-svg" viewBox="0 0 200 40" aria-hidden="true">
             <path
               class="trace-glow"
@@ -45,25 +45,21 @@
             />
             <circle class="trace-node" cx="100" cy="20" r="2" />
           </svg>
-          <p class="loading-title">carbon-trace</p>
-        </div>
-      </div>
+          <span class="loading-prompt" id="loading-prompt" hidden>
+            <svg class="loading-play-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+            begin experience
+          </span>
+        </span>
+      </button>
 
       <div class="scene-stage" id="scene-stage" hidden>
         <canvas class="scene-canvas" id="scene-canvas" aria-hidden="true"></canvas>
         <canvas class="effects-canvas" id="effects-canvas" aria-hidden="true"></canvas>
-        <canvas class="trace-overlay" id="trace-overlay" aria-hidden="true"></canvas>
         <div class="narration-layer" id="narration-layer" aria-hidden="true"></div>
         <div class="caption-layer" id="caption-layer" aria-hidden="true"></div>
       </div>
-
-      <button class="play-gate" id="play-gate" hidden aria-label="Begin experience">
-        <svg class="play-gate-icon" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
-          <circle cx="32" cy="32" r="30" />
-          <polygon points="26,18 26,46 48,32" />
-        </svg>
-        <span class="play-gate-label">click to begin</span>
-      </button>
 
       <div class="transition-loader" id="transition-loader" hidden aria-hidden="true"></div>
 
@@ -75,15 +71,11 @@
               width="15"
               height="15"
               viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+              fill="currentColor"
               aria-hidden="true"
               focusable="false"
             >
-              <polyline points="15 18 9 12 15 6" />
+              <path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12l4.58-4.59z" />
             </svg>
           </button>
           <button class="btn-pause" id="btn-pause" aria-label="Pause" aria-pressed="false">
@@ -92,31 +84,22 @@
               width="15"
               height="15"
               viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+              fill="currentColor"
               aria-hidden="true"
               focusable="false"
             >
-              <rect x="6" y="4" width="4" height="16" />
-              <rect x="14" y="4" width="4" height="16" />
+              <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
             </svg>
             <svg
               class="icon-play"
               width="15"
               height="15"
               viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+              fill="currentColor"
               aria-hidden="true"
               focusable="false"
             >
-              <polygon points="5 3 19 12 5 21 5 3" />
+              <path d="M10 8.64 15.27 12 10 15.36V8.64M8 5v14l11-7L8 5z" />
             </svg>
           </button>
           <button class="btn-mute" id="btn-mute" aria-label="Mute audio" aria-disabled="true">
@@ -125,52 +108,54 @@
               width="15"
               height="15"
               viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+              fill="currentColor"
               aria-hidden="true"
               focusable="false"
             >
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-              <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+              <path
+                d="M3 9v6h4l5 5V4L7 9H3zm7-.17v6.34L7.83 13H5v-2h2.83L10 8.83zM16.5 12A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77 0-4.28-2.99-7.86-7-8.77z"
+              />
             </svg>
             <svg
               class="icon-muted"
               width="15"
               height="15"
               viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+              fill="currentColor"
               aria-hidden="true"
               focusable="false"
             >
-              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-              <line x1="23" y1="9" x2="17" y2="15" />
-              <line x1="17" y1="9" x2="23" y2="15" />
+              <path
+                d="M4.34 2.93 2.93 4.34 7.29 8.7 7 9H3v6h4l5 5v-6.59l4.18 4.18c-.65.49-1.38.88-2.18 1.11v2.06a8.94 8.94 0 0 0 3.61-1.75l2.05 2.05 1.41-1.41L4.34 2.93zM10 15.17 7.83 13H5v-2h2.83l.88-.88L10 11.41v3.76zM19 12c0 .82-.15 1.61-.41 2.34l1.53 1.53c.56-1.17.88-2.48.88-3.87 0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zm-7-8-1.88 1.88L12 7.76zm4.5 8A4.5 4.5 0 0 0 14 7.97v1.79l2.48 2.48c.01-.08.02-.16.02-.24z"
+              />
             </svg>
           </button>
           <button class="btn-captions" id="btn-captions" aria-label="Captions" aria-pressed="false">
             <svg
+              class="icon-cc"
               width="15"
               height="15"
               viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+              fill="currentColor"
               aria-hidden="true"
               focusable="false"
             >
-              <rect x="2" y="4" width="20" height="16" rx="2" />
-              <path d="M7 15h4" />
-              <path d="M13 15h4" />
-              <path d="M7 11h10" />
+              <path
+                d="M19 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H5V6h14v12zM7 15h3c.55 0 1-.45 1-1v-1H9.5v.5h-2v-3h2v.5H11v-1c0-.55-.45-1-1-1H7c-.55 0-1 .45-1 1v4c0 .55.45 1 1 1zm7 0h3c.55 0 1-.45 1-1v-1h-1.5v.5h-2v-3h2v.5H18v-1c0-.55-.45-1-1-1h-3c-.55 0-1 .45-1 1v4c0 .55.45 1 1 1z"
+              />
+            </svg>
+            <svg
+              class="icon-cc-off"
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path
+                d="M13 10c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1h-1.5v-.5h-2v1L13 10zm3.5 3.5 1.21 1.21c.18-.19.29-.44.29-.71v-1h-1.5v.5zM8.83 6H19v10.17l1.98 1.98c0-.05.02-.1.02-.16V6c0-1.1-.9-2-2-2H6.83l2 2zm10.95 16.61L17.17 20H5a2 2 0 0 1-2-2V6c0-.05.02-.1.02-.15L1.39 4.22 2.8 2.81l18.38 18.38-1.4 1.42zM7.5 13.5h2V13h.67l-2.5-2.5H7.5v3zm7.67 4.5L11 13.83V14c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1v-4c0-.32.16-.59.4-.78L5 7.83V18h10.17z"
+              />
             </svg>
           </button>
           <button class="btn-replay" id="btn-replay" aria-label="Replay narration" disabled>
@@ -178,16 +163,13 @@
               width="15"
               height="15"
               viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+              fill="currentColor"
               aria-hidden="true"
               focusable="false"
             >
-              <path d="M1 4v6h6" />
-              <path d="M3.51 15a9 9 0 1 0 .49-3.51" />
+              <path
+                d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"
+              />
             </svg>
           </button>
           <button class="btn-next" id="btn-next" aria-label="Next scene" disabled>
@@ -195,15 +177,11 @@
               width="15"
               height="15"
               viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+              fill="currentColor"
               aria-hidden="true"
               focusable="false"
             >
-              <polyline points="9 18 15 12 9 6" />
+              <path d="M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6-6-6z" />
             </svg>
           </button>
         </div>

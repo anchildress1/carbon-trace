@@ -1,13 +1,53 @@
 let dotElements = [];
 let currentSceneIndex = -1;
+let rovingIndex = 0;
+
+function setRovingTarget(index) {
+  if (index < 0 || index >= dotElements.length) return;
+  dotElements[rovingIndex]?.setAttribute('tabindex', '-1');
+  rovingIndex = index;
+  dotElements[rovingIndex].setAttribute('tabindex', '0');
+}
+
+function handleDotsKeydown(e) {
+  const len = dotElements.length;
+  if (len === 0) return;
+
+  let nextIndex;
+  switch (e.key) {
+    case 'ArrowRight':
+    case 'ArrowDown':
+      nextIndex = (rovingIndex + 1) % len;
+      break;
+    case 'ArrowLeft':
+    case 'ArrowUp':
+      nextIndex = (rovingIndex - 1 + len) % len;
+      break;
+    case 'Home':
+      nextIndex = 0;
+      break;
+    case 'End':
+      nextIndex = len - 1;
+      break;
+    default:
+      return;
+  }
+
+  e.preventDefault();
+  e.stopPropagation();
+  setRovingTarget(nextIndex);
+  dotElements[nextIndex].focus();
+}
 
 export function initOverlay(sceneCount, onDotClick) {
   const dotsContainer = document.getElementById('progress-dots');
   if (!dotsContainer) return;
 
   dotsContainer.replaceChildren();
+  dotsContainer.removeEventListener('keydown', handleDotsKeydown);
   dotElements = [];
   currentSceneIndex = -1;
+  rovingIndex = 0;
 
   for (let i = 0; i < sceneCount; i++) {
     const dot = document.createElement('button');
@@ -15,14 +55,18 @@ export function initOverlay(sceneCount, onDotClick) {
     dot.setAttribute('aria-label', `Go to scene ${i + 1} of ${sceneCount}`);
     dot.dataset.sceneIndex = String(i + 1);
     dot.setAttribute('title', `Scene ${i + 1} of ${sceneCount}`);
-    if (onDotClick) {
-      dot.addEventListener('click', (e) => {
-        e.stopPropagation();
-        onDotClick(i + 1);
-      });
-    }
+    dot.setAttribute('tabindex', i === 0 ? '0' : '-1');
+    dot.addEventListener('click', (e) => {
+      e.stopPropagation();
+      setRovingTarget(i);
+      if (onDotClick) onDotClick(i + 1);
+    });
     dotsContainer.appendChild(dot);
     dotElements.push(dot);
+  }
+
+  if (sceneCount > 0) {
+    dotsContainer.addEventListener('keydown', handleDotsKeydown);
   }
 }
 
@@ -60,6 +104,13 @@ export function updateProgress(sceneIndex) {
   // Set new current marker
   if (sceneIndex >= 1 && sceneIndex <= dotElements.length) {
     dotElements[sceneIndex - 1].setAttribute('aria-current', 'step');
+  }
+}
+
+export function focusActiveDot() {
+  if (currentSceneIndex >= 1 && currentSceneIndex <= dotElements.length) {
+    setRovingTarget(currentSceneIndex - 1);
+    dotElements[currentSceneIndex - 1].focus();
   }
 }
 

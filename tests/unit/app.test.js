@@ -36,6 +36,7 @@ vi.mock('../../src/audio.js', () => ({
   isNarrationBuffering: vi.fn().mockReturnValue(false),
   preloadNarrationAhead: vi.fn(),
   clearNarrationCache: vi.fn(),
+  wrapOnNarrationEndWithBoost: vi.fn((_cues, cb) => cb),
 }));
 
 vi.mock('../../src/text.js', () => ({
@@ -65,6 +66,7 @@ vi.mock('../../src/overlay.js', () => ({
   initOverlay: vi.fn(),
   updateProgress: vi.fn(),
   showControls: vi.fn(),
+  focusActiveDot: vi.fn(),
 }));
 
 vi.mock('../../src/canvas.js', () => ({
@@ -116,7 +118,7 @@ vi.mock('../../src/scenes.json', () => ({
         ],
         effects: null,
         transition: { type: 'fade', duration: 400 },
-        traceOverlay: null,
+
       },
       {
         id: 'scene-01',
@@ -135,7 +137,7 @@ vi.mock('../../src/scenes.json', () => ({
         ],
         effects: { regions: [{ type: 'glow', mask: 'diamond.png' }] },
         transition: { type: 'fade', duration: 400 },
-        traceOverlay: null,
+
       },
       {
         id: 'scene-02',
@@ -150,7 +152,7 @@ vi.mock('../../src/scenes.json', () => ({
         audioCues: null,
         effects: null,
         transition: { type: 'fade', duration: 400 },
-        traceOverlay: null,
+
       },
       {
         id: 'credits',
@@ -162,7 +164,7 @@ vi.mock('../../src/scenes.json', () => ({
         audioCues: null,
         effects: null,
         transition: { type: 'fade', duration: 400 },
-        traceOverlay: null,
+
       },
     ],
   },
@@ -187,6 +189,7 @@ import {
   restartNarrationCue,
   reCueCue,
   onNarrationBufferChange,
+  wrapOnNarrationEndWithBoost,
 } from '../../src/audio.js';
 import { buildNarrationTimeline } from '../../src/text.js';
 import {
@@ -198,18 +201,18 @@ import {
 } from '../../src/effects-canvas.js';
 import { clearScene, drawFallback, loadImage } from '../../src/canvas.js';
 import { setCaptionsEnabled, areCaptionsEnabled, syncCaptionsToTime, clearCaptionElements } from '../../src/captions.js';
-import { initOverlay } from '../../src/overlay.js';
+import { initOverlay, focusActiveDot } from '../../src/overlay.js';
 import { preloadFirstFrameAudio } from '../../src/loader.js';
 
 function buildDOM() {
   document.body.replaceChildren();
 
   const ids = [
-    'loading-screen', 'scene-stage', 'scene-canvas', 'trace-overlay',
+    'loading-screen', 'scene-stage', 'scene-canvas',
     'effects-canvas', 'narration-layer', 'caption-layer', 'accessible-narration',
     'overlay-controls', 'progress-dots', 'btn-prev', 'btn-next',
     'btn-replay', 'btn-mute', 'btn-pause', 'btn-captions',
-    'play-gate', 'transition-loader',
+    'loading-prompt', 'transition-loader',
   ];
 
   const root = document.createElement('div');
@@ -218,7 +221,7 @@ function buildDOM() {
 
   for (const id of ids) {
     let el;
-    if (id === 'scene-canvas' || id === 'effects-canvas' || id === 'trace-overlay') {
+    if (id === 'scene-canvas' || id === 'effects-canvas') {
       el = document.createElement('canvas');
       el.getContext = vi.fn(() => ({
         clearRect: vi.fn(),
@@ -226,14 +229,13 @@ function buildDOM() {
         scale: vi.fn(),
         resetTransform: vi.fn(),
       }));
-    } else if (id.startsWith('btn-')) {
+    } else if (id.startsWith('btn-') || id === 'loading-screen') {
       el = document.createElement('button');
     } else {
       el = document.createElement('div');
     }
     el.id = id;
     if (id === 'scene-stage') el.hidden = true;
-    if (id === 'play-gate') el.hidden = true;
     if (id === 'overlay-controls') el.hidden = true;
     if (id === 'transition-loader') el.hidden = true;
     root.appendChild(el);
@@ -323,7 +325,7 @@ describe('app.js', () => {
       await flush();
     });
 
-    it('starts paused (play gate)', () => {
+    it('starts paused (loading screen gate)', () => {
       expect(app.getState()).toBe('PAUSED');
     });
 
@@ -537,6 +539,50 @@ describe('app.js', () => {
       await flush();
       expect(cancelAudioCues).toHaveBeenCalled();
     });
+
+    it('keyboard advance does not steal focus to dot (preserves global nav mode)', async () => {
+      app.togglePause();
+      vi.clearAllMocks();
+      const stage = document.getElementById('scene-stage');
+      stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      await flush();
+      expect(focusActiveDot).not.toHaveBeenCalled();
+    });
+
+    it('keyboard retreat does not steal focus to dot (preserves global nav mode)', async () => {
+      app.togglePause();
+      app.advance();
+      await flush();
+      vi.clearAllMocks();
+      const stage = document.getElementById('scene-stage');
+      stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+      await flush();
+      expect(focusActiveDot).not.toHaveBeenCalled();
+    });
+
+    it('Escape pauses when playing', () => {
+      app.togglePause(); // resume → SCENE_ACTIVE
+      expect(app.getState()).toBe('SCENE_ACTIVE');
+      const stage = document.getElementById('scene-stage');
+      stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      expect(app.getState()).toBe('PAUSED');
+    });
+
+    it('Escape does nothing when already paused', () => {
+      expect(app.getState()).toBe('PAUSED');
+      const stage = document.getElementById('scene-stage');
+      stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      expect(app.getState()).toBe('PAUSED');
+    });
+
+    it('unhandled keys do not trigger app actions', () => {
+      app.togglePause(); // resume → SCENE_ACTIVE
+      vi.clearAllMocks();
+      const stage = document.getElementById('scene-stage');
+      stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+      expect(cancelAudioCues).not.toHaveBeenCalled();
+      expect(app.getState()).toBe('SCENE_ACTIVE');
+    });
   });
 
   // ── first-play via keyboard ────────────────────────────────────────
@@ -555,12 +601,13 @@ describe('app.js', () => {
       expect(scheduleAudioCues).toHaveBeenCalled();
     });
 
-    it('Space key hides play gate on first play', () => {
-      const gate = document.getElementById('play-gate');
-      expect(gate.hidden).toBe(false);
+    it('Space key hides loading screen on first play', () => {
+      const screen = document.getElementById('loading-screen');
+      expect(screen.hidden).toBe(false);
       const stage = document.getElementById('scene-stage');
       stage.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
-      expect(gate.hidden).toBe(true);
+      // Loading screen gets fade-out class; hidden is set after transition
+      expect(screen.classList.contains('fade-out')).toBe(true);
     });
 
     it('double Space does not call handleFirstPlay twice', () => {
@@ -606,33 +653,31 @@ describe('app.js', () => {
     });
   });
 
-  // ── play gate ──────────────────────────────────────────────────────
+  // ── loading screen gate ────────────────────────────────────────────
 
-  describe('play gate', () => {
+  describe('loading screen gate', () => {
     beforeEach(async () => {
       app = createApp();
       await flush();
     });
 
     it('is visible after init', () => {
-      const gate = document.getElementById('play-gate');
-      expect(gate.hidden).toBe(false);
+      const screen = document.getElementById('loading-screen');
+      expect(screen.hidden).toBe(false);
     });
 
-    it('hides on click and resumes', () => {
-      const gate = document.getElementById('play-gate');
-      gate.click();
+    it('fades out on click and resumes', () => {
+      const screen = document.getElementById('loading-screen');
+      screen.click();
       expect(app.getState()).toBe('SCENE_ACTIVE');
-      expect(gate.hidden).toBe(true);
+      expect(screen.classList.contains('fade-out')).toBe(true);
     });
 
     it('enables replay button on first play for non-credits frame', () => {
       const btn = document.getElementById('btn-replay');
-      // Before first play, replay is disabled (userHasInteracted was false)
       expect(btn.disabled).toBe(true);
 
-      // Click play gate — showFrame re-runs with userHasInteracted=true
-      document.getElementById('play-gate').click();
+      document.getElementById('loading-screen').click();
       expect(btn.disabled).toBe(false);
     });
   });
@@ -1432,34 +1477,35 @@ describe('app.js', () => {
       app.togglePause(); // resume → SCENE_ACTIVE
     });
 
-    it('Space inside overlay-controls does not toggle pause', () => {
+    it('Space inside overlay-controls still toggles pause', () => {
       const controls = document.getElementById('overlay-controls');
       controls.dispatchEvent(
         new KeyboardEvent('keydown', { key: ' ', bubbles: true }),
       );
 
-      // Should still be SCENE_ACTIVE — Space suppressed inside controls
-      expect(app.getState()).toBe('SCENE_ACTIVE');
+      // Space on non-button element toggles pause
+      expect(app.getState()).toBe('PAUSED');
     });
 
-    it('Enter inside overlay-controls does not advance', () => {
+    it('Enter inside overlay-controls still advances', () => {
       vi.clearAllMocks();
       const controls = document.getElementById('overlay-controls');
       controls.dispatchEvent(
         new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
       );
 
-      expect(cancelAudioCues).not.toHaveBeenCalled();
+      // Enter on non-button element advances
+      expect(cancelAudioCues).toHaveBeenCalled();
     });
 
-    it('ArrowRight inside overlay-controls does not advance', () => {
+    it('ArrowRight inside overlay-controls still advances', () => {
       vi.clearAllMocks();
       const controls = document.getElementById('overlay-controls');
       controls.dispatchEvent(
         new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }),
       );
 
-      expect(cancelAudioCues).not.toHaveBeenCalled();
+      expect(cancelAudioCues).toHaveBeenCalled();
     });
 
     it('ArrowLeft still retreats from inside overlay-controls', async () => {
@@ -1472,7 +1518,38 @@ describe('app.js', () => {
         new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }),
       );
 
-      // ArrowLeft has no closest('#overlay-controls') guard — should retreat
+      expect(cancelAudioCues).toHaveBeenCalled();
+    });
+
+    it('Space on a focused button does not toggle pause', () => {
+      const btn = document.getElementById('btn-mute');
+      btn.dispatchEvent(
+        new KeyboardEvent('keydown', { key: ' ', bubbles: true }),
+      );
+
+      // Button should handle its own activation — global shortcut defers
+      expect(app.getState()).toBe('SCENE_ACTIVE');
+    });
+
+    it('Enter on a focused button does not advance', () => {
+      vi.clearAllMocks();
+      const btn = document.getElementById('btn-replay');
+      btn.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+      );
+
+      // Button should handle its own activation — global shortcut defers
+      expect(cancelAudioCues).not.toHaveBeenCalled();
+    });
+
+    it('ArrowRight on a focused button still advances (arrows are global)', () => {
+      vi.clearAllMocks();
+      const btn = document.getElementById('btn-mute');
+      btn.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }),
+      );
+
+      // Arrow keys are not guarded — they work globally
       expect(cancelAudioCues).toHaveBeenCalled();
     });
   });
@@ -1531,30 +1608,30 @@ describe('app.js', () => {
     });
   });
 
-  // ── edge: no audio before play-gate ─────────────────────────────
+  // ── edge: no audio before start ─────────────────────────────────
 
-  describe('play-gate audio suppression', () => {
-    it('does not call scheduleAudioCues before play-gate click', async () => {
+  describe('loading screen audio suppression', () => {
+    it('does not call scheduleAudioCues before loading screen click', async () => {
       app = createApp();
       await flush();
 
-      // App is paused with play-gate visible. No audio should be scheduled.
+      // App is paused behind loading screen. No audio should be scheduled.
       expect(app.getState()).toBe('PAUSED');
       expect(scheduleAudioCues).not.toHaveBeenCalled();
     });
   });
 
-  // ── play gate → audio scheduling ──────────────────────────────────
+  // ── loading screen → audio scheduling ─────────────────────────────
 
-  describe('play gate audio scheduling', () => {
+  describe('loading screen audio scheduling', () => {
     beforeEach(async () => {
       app = createApp();
       await flush();
     });
 
-    it('schedules audio cues for the title frame on play-gate click', () => {
+    it('schedules audio cues for the title frame on loading screen click', () => {
       vi.clearAllMocks();
-      document.getElementById('play-gate').click();
+      document.getElementById('loading-screen').click();
 
       // handleFirstPlay must call scheduleAudioCues with the title frame's audioCues
       expect(scheduleAudioCues).toHaveBeenCalledWith(
@@ -1575,7 +1652,7 @@ describe('app.js', () => {
       cancelAudioCues.mockImplementation(() => callOrder.push('cancel'));
       scheduleAudioCues.mockImplementation(() => callOrder.push('schedule'));
 
-      document.getElementById('play-gate').click();
+      document.getElementById('loading-screen').click();
 
       // doResume calls cancelAudioCues, then handleFirstPlay → scheduleFrameAudio
       // The last cancel must precede the first schedule.
@@ -1586,7 +1663,7 @@ describe('app.js', () => {
     });
 
     it('plays narration timeline from position 0 on first play', () => {
-      document.getElementById('play-gate').click();
+      document.getElementById('loading-screen').click();
 
       // handleFirstPlay calls textTimeline.play(0) — not just resume
       expect(buildNarrationTimeline).toHaveBeenCalled();
@@ -1602,7 +1679,7 @@ describe('app.js', () => {
       app = createApp();
       await flush();
 
-      // buildNarration runs during showFrame(0) in init — before play gate click.
+      // buildNarration runs during showFrame(0) in init — before loading screen click.
       // Title narration cue has enter: 0 → captionDelay must be 0.
       expect(buildNarrationTimeline).toHaveBeenCalledWith(
         expect.any(Array),
@@ -1657,8 +1734,8 @@ describe('app.js', () => {
       await flush();
       vi.clearAllMocks();
 
-      // Click play gate → handleFirstPlay → scheduleAudioCues for title
-      document.getElementById('play-gate').click();
+      // Click loading screen → handleFirstPlay → scheduleAudioCues for title
+      document.getElementById('loading-screen').click();
 
       // Extract onNarrationEnd from the scheduleAudioCues call for the title frame
       const titleCall = scheduleAudioCues.mock.calls.find(
@@ -1679,11 +1756,59 @@ describe('app.js', () => {
       expect(cancelAudioCues).toHaveBeenCalled();
     });
 
+    it('auto-advance does not call focusActiveDot when focus is elsewhere', async () => {
+      app = createApp();
+      await flush();
+      vi.clearAllMocks();
+
+      document.getElementById('loading-screen').click();
+
+      const titleCall = scheduleAudioCues.mock.calls.find(
+        (call) => call[0]?.some((c) => c.src === 'title-narration.m4a'),
+      );
+      const onNarrationEnd = titleCall[1].onNarrationEnd;
+
+      vi.clearAllMocks();
+      onNarrationEnd();
+      vi.advanceTimersByTime(2000);
+      await flush(); // let async fadeIn complete so landOnFrame runs
+
+      expect(focusActiveDot).not.toHaveBeenCalled();
+    });
+
+    it('auto-advance moves focus to active dot when a progress dot is focused', async () => {
+      app = createApp();
+      await flush();
+      vi.clearAllMocks();
+
+      document.getElementById('loading-screen').click();
+
+      const titleCall = scheduleAudioCues.mock.calls.find(
+        (call) => call[0]?.some((c) => c.src === 'title-narration.m4a'),
+      );
+      const onNarrationEnd = titleCall[1].onNarrationEnd;
+
+      // Focus a progress dot after first play has moved focus to btnPause
+      const dotsContainer = document.getElementById('progress-dots');
+      dotsContainer.classList.add('progress-dots');
+      const dot = document.createElement('button');
+      dot.className = 'progress-dot';
+      dotsContainer.appendChild(dot);
+      dot.focus();
+
+      vi.clearAllMocks();
+      onNarrationEnd();
+      vi.advanceTimersByTime(2000);
+      await flush(); // let async fadeIn complete so landOnFrame runs
+
+      expect(focusActiveDot).toHaveBeenCalled();
+    });
+
     it('does not auto-advance title if user navigates before narration ends', async () => {
       app = createApp();
       await flush();
 
-      document.getElementById('play-gate').click();
+      document.getElementById('loading-screen').click();
 
       const titleCall = scheduleAudioCues.mock.calls.find(
         (call) => call[0]?.some((c) => c.src === 'title-narration.m4a'),
