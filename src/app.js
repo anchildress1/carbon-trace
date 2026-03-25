@@ -469,6 +469,19 @@ function cleanupCurrentScene(app) {
   app.replayPending = false;
 }
 
+function manageFocusAfterTransition(app) {
+  if (app.autoAdvancing) {
+    app.autoAdvancing = false;
+    if (document.activeElement?.closest('.progress-dots')) {
+      focusActiveDot();
+    } else if (document.activeElement?.closest('.control-buttons')) {
+      document.activeElement.blur();
+    }
+  } else {
+    focusActiveDot();
+  }
+}
+
 function transition(app, toIndex) {
   if (app.state === State.TRANSITIONING) {
     app.pendingNavIndex = toIndex;
@@ -508,7 +521,7 @@ function transition(app, toIndex) {
         app.state = STATE_BY_FRAME_TYPE[prevFrame.frameType] || State.SCENE_ACTIVE;
       }
       doPause(app);
-      focusActiveDot();
+      manageFocusAfterTransition(app);
       completePendingNav(app);
     };
 
@@ -547,16 +560,7 @@ function transition(app, toIndex) {
       if (app.textTimeline) app.textTimeline.play(0);
       setupAutoAdvance(app);
     }
-    if (app.autoAdvancing) {
-      app.autoAdvancing = false;
-      if (document.activeElement?.closest('.progress-dots')) {
-        focusActiveDot();
-      } else if (document.activeElement?.closest('.control-buttons')) {
-        document.activeElement.blur();
-      }
-    } else {
-      focusActiveDot();
-    }
+    manageFocusAfterTransition(app);
     completePendingNav(app);
   };
 
