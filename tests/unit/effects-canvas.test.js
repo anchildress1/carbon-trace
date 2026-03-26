@@ -1497,6 +1497,7 @@ describe('effects-canvas — dedicated analysis element (ADR-008 Approach B)', (
     const createdEl = ctx.createMediaElementSource.mock.calls[0][0];
     expect(createdEl.tagName).toBe('AUDIO');
     expect(createdEl.preload).toBe('auto');
+    expect(createdEl.loop).toBe(false);
     expect(createdEl.src).toContain('test-song.mp3');
 
     // Source → analyser → gain(0) → destination
@@ -1505,6 +1506,15 @@ describe('effects-canvas — dedicated analysis element (ADR-008 Approach B)', (
     expect(mockGain.gain.value).toBe(0);
     expect(analyser.connect).toHaveBeenCalledWith(mockGain);
     expect(mockGain.connect).toHaveBeenCalledWith(ctx.destination);
+  });
+
+  it('connectAnalysisAudio sets loop on the analysis element when loop=true', () => {
+    const { analyser, ctx } = createMockAnalyserWithContext();
+
+    connectAnalysisAudio('looping-song.mp3', analyser, true);
+
+    const createdEl = ctx.createMediaElementSource.mock.calls[0][0];
+    expect(createdEl.loop).toBe(true);
   });
 
   it('connectAnalysisAudio replaces previous analysis element', () => {

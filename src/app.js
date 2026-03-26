@@ -61,8 +61,8 @@ function resumeEffects() {
 function setEffectsAnalyser(node) {
   effectsMod?.setAnalyser(node);
 }
-function connectEffectsAnalysisAudio(src, analyser) {
-  effectsMod?.connectAnalysisAudio(src, analyser);
+function connectEffectsAnalysisAudio(src, analyser, loop) {
+  effectsMod?.connectAnalysisAudio(src, analyser, loop);
 }
 function startEffectsAnalysisPlayback() {
   effectsMod?.startAnalysisPlayback();
@@ -397,7 +397,7 @@ function wireAnalysisAudio(app, frame, analyser) {
   const enterDelay = resolveAnalyserCueEnter(frame, cue, app.audioDurations);
   if (enterDelay === null) return; // anchor unresolvable — analysis stays inert
 
-  connectEffectsAnalysisAudio(cue.src, analyser);
+  connectEffectsAnalysisAudio(cue.src, analyser, !!cue.loop);
 
   const wireGeneration = app.generation;
   const wireIndex = app.currentIndex;

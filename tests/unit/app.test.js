@@ -1935,7 +1935,7 @@ describe('app.js', () => {
       await flush();
 
       expect(setEffectsAnalyser).toHaveBeenCalledWith(mockAnalyser);
-      expect(connectEffectsAnalysisAudio).toHaveBeenCalledWith('credits-music.mp3', mockAnalyser);
+      expect(connectEffectsAnalysisAudio).toHaveBeenCalledWith('credits-music.mp3', mockAnalyser, true);
     });
 
     it('schedules analysis playback via PausableTimer when enter delay > 0', async () => {

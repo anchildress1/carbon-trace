@@ -664,7 +664,7 @@ function cleanupAnalysisElement() {
  * reaches ctx.destination — a dead-end analyser returns all-zero FFT data.
  * The GainNode is set to 0 so no duplicate audio is audible.
  */
-export function connectAnalysisAudio(audioSrc, analyserNode) {
+export function connectAnalysisAudio(audioSrc, analyserNode, loop = false) {
   cleanupAnalysisElement();
 
   if (!analyserNode) return;
@@ -674,6 +674,7 @@ export function connectAnalysisAudio(audioSrc, analyserNode) {
 
   const el = document.createElement('audio');
   el.preload = 'auto';
+  el.loop = loop;
   el.src = audioSrc;
 
   try {
