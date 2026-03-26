@@ -245,14 +245,116 @@ describe('effects.js — factory registry', () => {
 
       const dt = 1 / 60;
 
-      // During burst phase — time advances
+      // During burst phase — time advances, filter enabled
       result.update(dt);
+      expect(result.filter.enabled).toBe(true);
       expect(result.filter.time).toBeGreaterThan(0);
       expect(result.filter.time).toBeLessThan(0.1);
 
-      // Advance past burst into rest phase (need elapsed > 0.1s = 6+ ticks)
+      // Advance past burst into rest phase — filter disabled (no frozen wave)
       for (let i = 0; i < 10; i++) result.update(dt);
-      expect(result.filter.time).toBe(0.1);
+      expect(result.filter.enabled).toBe(false);
+    });
+
+    it('shockwave trigger() resets cycle to time 0', () => {
+      const result = createEffect('shockwave', null, {
+        cycleDuration: 1,
+        cyclePause: 2,
+      });
+
+      // Advance past burst into rest — filter disabled
+      for (let i = 0; i < 120; i++) result.update(1 / 60);
+      expect(result.filter.enabled).toBe(false);
+
+      // Trigger resets the cycle — filter re-enabled
+      result.trigger();
+      result.update(1 / 60);
+      expect(result.filter.enabled).toBe(true);
+      expect(result.filter.time).toBeGreaterThan(0);
+      expect(result.filter.time).toBeLessThan(0.1);
+    });
+
+    it('shockwave autoRepeat:false idles after one cycle', () => {
+      const result = createEffect('shockwave', null, {
+        cycleDuration: 0.1,
+        cyclePause: 0,
+        autoRepeat: false,
+      });
+
+      const dt = 1 / 60;
+
+      // Starts idle — filter disabled (no distortion before first beat)
+      expect(result.filter.enabled).toBe(false);
+      result.update(dt);
+      expect(result.filter.enabled).toBe(false);
+
+      // Still idle after many frames — no auto-repeat
+      for (let i = 0; i < 120; i++) result.update(dt);
+      expect(result.filter.enabled).toBe(false);
+    });
+
+    it('shockwave autoRepeat:false plays after trigger()', () => {
+      const result = createEffect('shockwave', null, {
+        cycleDuration: 0.5,
+        cyclePause: 0,
+        autoRepeat: false,
+      });
+
+      // Starts idle — filter disabled
+      expect(result.filter.enabled).toBe(false);
+
+      // Trigger enables filter and fires a new cycle
+      result.trigger();
+      expect(result.filter.enabled).toBe(true);
+      // filter.time must be 0 immediately after trigger so the first
+      // rendered frame starts at the beginning of the wave, not at the
+      // stale end-of-cycle value left by the previous completed wave.
+      expect(result.filter.time).toBe(0);
+      result.update(1 / 60);
+      expect(result.filter.time).toBeGreaterThan(0);
+      expect(result.filter.time).toBeLessThan(0.1);
+
+      // Cycle plays through then idles again — filter disabled
+      for (let i = 0; i < 60; i++) result.update(1 / 60);
+      expect(result.filter.enabled).toBe(false);
+    });
+
+    it('shockwave trigger() is ignored while a wave is still expanding', () => {
+      const result = createEffect('shockwave', null, {
+        cycleDuration: 1,
+        autoRepeat: false,
+      });
+
+      result.trigger();
+      expect(result.filter.enabled).toBe(true);
+      result.update(1 / 60); // mid-expansion
+
+      // A second trigger while the wave is expanding must be a no-op — resetting
+      // mid-expansion would freeze the wave near center.
+      const timeBeforeSecondTrigger = result.filter.time;
+      result.trigger();
+      expect(result.filter.time).toBe(timeBeforeSecondTrigger);
+      expect(result.filter.enabled).toBe(true);
+    });
+
+    it('shockwave autoRepeat:true (default) cycles normally', () => {
+      const result = createEffect('shockwave', null, {
+        cycleDuration: 0.1,
+        cyclePause: 0.1,
+      });
+
+      const dt = 1 / 60;
+
+      // First cycle — time advances
+      result.update(dt);
+      expect(result.filter.time).toBeGreaterThan(0);
+
+      // Advance past first full cycle into second
+      for (let i = 0; i < 20; i++) result.update(dt);
+
+      // Should have started cycling again (time goes back below cycleDuration)
+      const timeAfterCycle = result.filter.time;
+      expect(timeAfterCycle).toBeLessThanOrEqual(0.1);
     });
   });
 });

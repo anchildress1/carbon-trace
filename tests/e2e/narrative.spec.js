@@ -1,6 +1,6 @@
-import { readFileSync } from 'fs';
-import { dirname, resolve } from 'path';
-import { fileURLToPath } from 'url';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { test, expect } from '@playwright/test';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -504,7 +504,7 @@ test.describe('carbon-trace — navigation interrupts', () => {
       timeout: 5000,
     });
 
-    await page.locator('#btn-replay').waitFor({ state: 'visible', timeout: 3000 });
+    await page.locator('#btn-replay').waitFor({ state: 'visible', timeout: 5000 });
     await page.click('#btn-replay');
 
     const lines = page.locator('.narration-line');

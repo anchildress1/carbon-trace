@@ -150,6 +150,10 @@ registerEffect('glow', (_sprite, params = {}) => {
 /**
  * Shockwave: radial ripple that expands outward from center and resets.
  * Uses the ShockwaveFilter for a real distortion wave effect.
+ *
+ * autoRepeat (default true): when false, the wave plays once through
+ * cycleDuration then idles. Call trigger() to fire a new cycle — this
+ * is how onset detection drives beat-synced shockwaves (ADR-008).
  */
 registerEffect('shockwave', (_sprite, params = {}) => {
   const {
@@ -161,6 +165,7 @@ registerEffect('shockwave', (_sprite, params = {}) => {
     radius = -1,
     cyclePause = 2,
     cycleDuration = 1.5,
+    autoRepeat = true,
   } = params;
 
   const filter = new ShockwaveFilter({
@@ -172,20 +177,43 @@ registerEffect('shockwave', (_sprite, params = {}) => {
   });
   filter.time = cycleDuration;
 
+  // When trigger-driven (autoRepeat:false), the filter starts disabled
+  // so no distortion is visible before the first beat fires. PixiJS skips
+  // the entire filter pipeline when enabled=false — no shader execution.
+  if (!autoRepeat) filter.enabled = false;
+
   const totalCycle = cycleDuration + cyclePause;
-  let elapsed = 0;
+  let elapsed = autoRepeat ? 0 : cycleDuration;
 
   return {
     filter,
     update(dt) {
       elapsed += dt;
-      const cycle = elapsed % totalCycle;
 
-      if (cycle < cycleDuration) {
-        filter.time = cycle;
+      if (autoRepeat) {
+        const cycle = elapsed % totalCycle;
+        if (cycle < cycleDuration) {
+          filter.enabled = true;
+          filter.time = cycle;
+        } else {
+          filter.enabled = false;
+        }
       } else {
-        filter.time = cycleDuration;
+        filter.time = Math.min(elapsed, cycleDuration);
+        if (elapsed >= cycleDuration) {
+          filter.enabled = false;
+        }
       }
+    },
+    trigger() {
+      // Ignore triggers while a wave is still expanding — resetting
+      // mid-expansion causes the wave to freeze near the center.
+      if (filter.enabled) return;
+      elapsed = 0;
+      // Reset filter.time so the first rendered frame starts at the
+      // beginning of the wave cycle, not at the stale end-of-cycle value.
+      filter.time = 0;
+      filter.enabled = true;
     },
   };
 });

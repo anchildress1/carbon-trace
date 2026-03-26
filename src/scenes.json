@@ -1323,10 +1323,30 @@
         ]
       },
       "effects": {
+        "analyserCueId": "end-song",
         "regions": [
           {
             "type": "shockwave",
-            "mask": "assets/masks/mask-11-music-shockwave.png"
+            "mask": "assets/masks/mask-11-music-shockwave.png",
+            "centerX": 0.46,
+            "centerY": 0.47,
+            "autoRepeat": false,
+            "cycleDuration": 2.0,
+            "cyclePause": 0,
+            "speed": 400,
+            "amplitude": 20,
+            "wavelength": 120,
+            "audioReactive": {
+              "band": "bass",
+              "target": "amplitude",
+              "range": [10, 30],
+              "smoothing": 0.3,
+              "trigger": {
+                "threshold": 3.0,
+                "cooldown": 0.08,
+                "minEnergy": 0.8
+              }
+            }
           },
           {
             "type": "glow",
@@ -1336,7 +1356,7 @@
             "distance": 15,
             "outerStrength": 3,
             "pulseSpeed": 0.05,
-            "pulseDepth": 0.5
+            "pulseDepth": 0.4
           }
         ]
       },

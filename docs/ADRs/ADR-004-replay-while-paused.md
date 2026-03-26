@@ -181,3 +181,57 @@ None. This is a behavioral change in `app.js` only.
 ## State Changes
 
 One addition: `replayPending` (boolean, default `false`). Set in `replayNarration()` when paused, checked in `doResume()` to schedule fresh narration with `onend` callback instead of resuming a paused Howl. Cleared on resume and on navigation (`cleanupCurrentScene`). This is a resume-path hint, not a runtime behavior modifier — it does not affect any code path while the app is paused or playing.
+
+---
+
+## Addendum: Full Scene Reset (March 2026)
+
+**Status:** Supersedes the narration-only replay behavior described above.
+
+### Motivation
+
+Testing revealed that restarting only narration while ambient/music audio continues
+from its current position creates an incoherent experience — the user expects replay
+to restart the scene from scratch, identical to navigating away and back. The replay
+button should be equivalent to a hard jump to the current frame.
+
+### Change
+
+`replayNarration()` now delegates to `cleanupCurrentScene()` + `showFrame()` — the
+same code path used by scene navigation. This resets **all** scene state:
+
+- All audio cancelled and rescheduled from the beginning (narration, ambient, SFX)
+- Effects cleared and reloaded (PixiJS filters, displacement sprites, audio-reactive bridge)
+- Text timeline rebuilt and played from 0 (or paused at 0 if paused)
+- Captions cleared and recreated
+- Auto-advance rearmed
+
+**Playing path:** `cleanupCurrentScene` → `showFrame` → `textTimeline.play(0)` → `setupAutoAdvance`
+
+**Paused path:** `cleanupCurrentScene` → `deferFrameAudioUntilResume = true` → `showFrame` → `doPause` (mirrors hard-jump navigation)
+
+### Retired
+
+- `replayPending` flag — replaced by the existing `deferFrameAudioUntilResume` mechanism
+- `scheduleReplayNarration()` — no longer needed; `scheduleFrameAudio()` handles all cues
+- `resumeReplayPendingAudio()` — no longer needed; `resumeDeferredFrameAudio()` handles resume
+- `restartNarrationCue()` Howl-reuse optimization during replay — `cancelAudioCues()` unloads
+  Howls before new ones are created, returning elements to the pool. Rapid clicking degrades
+  gracefully via Howler's built-in pool management.
+
+### Updated Edge Cases
+
+```
+CASE                                │ BEHAVIOR
+────────────────────────────────────┼──────────────────────────────
+Replay while playing                │ Full scene reset. All audio restarts,
+                                    │ effects reload, text plays from 0.
+Replay while paused                 │ Full scene reset, stay paused. Audio
+                                    │ deferred until play. Effects reloaded.
+Replay while paused, then play      │ doResume() sees deferFrameAudioUntilResume,
+                                    │ schedules ALL audio fresh, plays text from 0.
+Replay while paused, then navigate  │ Normal transition. deferFrameAudioUntilResume
+                                    │ cleared by cleanupCurrentScene.
+Multiple replays while paused       │ Each replay runs cleanupCurrentScene +
+                                    │ showFrame. Idempotent. No leaked timers.
+```
