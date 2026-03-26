@@ -1237,8 +1237,7 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
         trigger: { threshold: 3.0, cooldown: 0 },
       });
 
-      // Warmup: 65 frames × 16.67ms ≈ 1.08s exceeds default 1.0s warmup.
-      // Alternating energy builds flux average and accumulates activeTime.
+      // 65 frames of alternating low energy to stabilize flux running average.
       let warmupFrame = 0;
       analyser.getByteFrequencyData.mockImplementation((data) => {
         data.fill(0);
@@ -1266,7 +1265,7 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
         trigger: { threshold: 3.0, cooldown: 0.5 },
       });
 
-      // Warmup: 65 frames × 16.67ms ≈ 1.08s exceeds default 1.0s warmup.
+      // 65 frames of alternating low energy to stabilize flux running average.
       let warmupFrame = 0;
       analyser.getByteFrequencyData.mockImplementation((data) => {
         data.fill(0);
@@ -1301,6 +1300,42 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
       destroy();
     });
 
+    it('minEnergy gates triggers below configured level', async () => {
+      const { analyser, tickerCallback, triggerFn } = await setupTriggerScene({
+        band: 'bass',
+        trigger: { threshold: 3.0, cooldown: 0, minEnergy: 0.8 },
+      });
+
+      // 65 frames of alternating low energy to stabilize flux running average.
+      let warmupFrame = 0;
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        const val = warmupFrame % 2 === 0 ? 25 : 30;
+        for (let i = 1; i <= 12; i++) data[i] = val;
+        warmupFrame++;
+      });
+      for (let i = 0; i < 65; i++) tickerCallback({ deltaMS: 16.67 });
+      triggerFn.mockClear();
+
+      // Energy spike to ~0.70 — above flux threshold but below minEnergy 0.80
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        for (let i = 1; i <= 12; i++) data[i] = 180;
+      });
+      tickerCallback({ deltaMS: 16.67 });
+      expect(triggerFn).not.toHaveBeenCalled();
+
+      // Energy spike to 1.0 — above minEnergy, should trigger
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        for (let i = 1; i <= 12; i++) data[i] = 255;
+      });
+      tickerCallback({ deltaMS: 16.67 });
+      expect(triggerFn).toHaveBeenCalled();
+
+      destroy();
+    });
+
     it('combined trigger + modulation both run in same frame', async () => {
       const { analyser, tickerCallback, triggerFn } = await setupTriggerScene({
         band: 'bass',
@@ -1310,7 +1345,7 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
         trigger: { threshold: 3.0, cooldown: 0 },
       });
 
-      // Warmup: 65 frames × 16.67ms ≈ 1.08s exceeds default 1.0s warmup
+      // 65 frames of alternating low energy to stabilize flux running average
       let warmupFrame = 0;
       analyser.getByteFrequencyData.mockImplementation((data) => {
         data.fill(0);

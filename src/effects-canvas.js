@@ -169,10 +169,9 @@ function buildAudioReactiveState() {
         state.trigger = true;
         state.threshold = ar.trigger.threshold ?? 3.0;
         state.cooldown = ar.trigger.cooldown ?? 0.1;
-        state.warmup = ar.trigger.warmup ?? 1.0;
+        state.minEnergy = ar.trigger.minEnergy ?? 0;
         state.prevEnergy = 0;
         state.fluxAvg = 0;
-        state.activeTime = 0;
         state.timeSinceLastTrigger = 0;
       }
       audioReactiveState.push(state);
@@ -193,12 +192,10 @@ function applyTrigger(state, energy, dt) {
   state.fluxAvg = state.fluxAvg * 0.95 + flux * 0.05;
   state.timeSinceLastTrigger += dt;
 
-  // Accumulate time with actual audio signal present
-  if (energy > 0.01) state.activeTime += dt;
-
-  // Wait for warmup period after audio arrives. Allows flux average to
-  // stabilize and prevents false triggers during audio fade-in.
-  if (state.activeTime < state.warmup) return;
+  // Gate triggers until energy reaches the configured minimum level.
+  // Prevents false triggers during audio fade-in when the analysis
+  // element is at full volume but the audible Howler cue is still quiet.
+  if (energy < state.minEnergy) return;
 
   if (flux > state.fluxAvg * state.threshold && state.timeSinceLastTrigger > state.cooldown) {
     activeEffects[state.effectIndex].trigger?.();

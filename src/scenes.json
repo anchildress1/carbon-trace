@@ -1344,7 +1344,7 @@
               "trigger": {
                 "threshold": 3.0,
                 "cooldown": 0.08,
-                "warmup": 4.0
+                "minEnergy": 0.8
               }
             }
           },
@@ -1356,7 +1356,7 @@
             "distance": 15,
             "outerStrength": 3,
             "pulseSpeed": 0.05,
-            "pulseDepth": 0.5
+            "pulseDepth": 0.4
           }
         ]
       },
