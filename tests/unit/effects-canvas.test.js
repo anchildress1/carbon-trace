@@ -809,7 +809,7 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
         self.naturalWidth = 256;
         self.naturalHeight = 256;
         Object.defineProperty(this, 'src', {
-          set(val) {
+          set(_val) {
             callCount++;
             // Fail the second Image load (first mask's luminance processing)
             // but succeed on others (noise, scene texture, second mask)
@@ -1437,7 +1437,6 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
 
 describe('effects-canvas — dedicated analysis element (ADR-008 Approach B)', () => {
   let originalGetContext;
-  let originalCreateElement;
 
   beforeEach(() => {
     destroy();
@@ -1603,6 +1602,23 @@ describe('effects-canvas — dedicated analysis element (ADR-008 Approach B)', (
 
     const { analyser, ctx, mockSource, mockGain } = createMockAnalyserWithContext();
 
+    connectAnalysisAudio('test-song.mp3', analyser);
+
+    const createdEl = ctx.createMediaElementSource.mock.calls[0][0];
+    createdEl.pause = vi.fn();
+    createdEl.load = vi.fn();
+
+    clearAll();
+
+    expect(mockGain.disconnect).toHaveBeenCalled();
+    expect(mockSource.disconnect).toHaveBeenCalled();
+    expect(createdEl.pause).toHaveBeenCalled();
+  });
+
+  it('clearAll cleans analysis graph even when WebGL app is unavailable', () => {
+    const { analyser, ctx, mockSource, mockGain } = createMockAnalyserWithContext();
+
+    // No init() call here: pixiApp remains null (fallback path).
     connectAnalysisAudio('test-song.mp3', analyser);
 
     const createdEl = ctx.createMediaElementSource.mock.calls[0][0];

@@ -468,14 +468,14 @@ function startOrRenderOnce() {
  * navigates to a new scene while textures are still loading.
  */
 export async function loadScene(effectsConfig, sceneImageUrl) {
-  if (!webglAvailable) return;
+  if (!webglAvailable) return false;
 
   // Wait for init() to complete if it is still in progress. This
   // prevents the first loadScene call from racing ahead of PixiJS
   // Application.init() and silently returning due to pixiApp === null.
   if (initPromise) {
     await initPromise;
-    if (!webglAvailable) return;
+    if (!webglAvailable) return false;
   }
 
   const gen = ++loadGeneration;
@@ -485,11 +485,11 @@ export async function loadScene(effectsConfig, sceneImageUrl) {
       await reinit();
     } catch {
       webglAvailable = false;
-      return;
+      return false;
     }
   }
 
-  if (!pixiApp || gen !== loadGeneration) return;
+  if (!pixiApp || gen !== loadGeneration) return false;
 
   clearAll();
 
@@ -497,18 +497,20 @@ export async function loadScene(effectsConfig, sceneImageUrl) {
     const sceneTexture = await loadTexture(sceneImageUrl);
     if (gen !== loadGeneration) {
       sceneTexture.destroy(false);
-      return;
+      return false;
     }
     disposableTextures.push(sceneTexture);
 
     const completed = await loadRegionEffects(effectsConfig.regions, sceneTexture, gen);
-    if (!completed) return;
+    if (!completed) return false;
 
     buildAudioReactiveState();
     startOrRenderOnce();
+    return true;
   } catch (err) {
     console.error('Failed to load scene effects:', err.message);
     if (gen === loadGeneration) clearAll();
+    return false;
   }
 }
 
@@ -525,12 +527,9 @@ async function reinit() {
  * rationale below). The ticker stops but the Application stays alive for reuse.
  */
 export function clearAll() {
-  if (!webglAvailable || !pixiApp) return;
-
-  // Stop the ticker first to prevent update callbacks from running
-  // against partially-destroyed state during cleanup below.
-  pixiApp.ticker.stop();
-
+  // Always clear audio-reactive and analysis audio state, even if WebGL
+  // is unavailable. This avoids hidden analysis streams persisting in
+  // fallback mode where pixiApp is null.
   activeEffects = [];
   screenSizedSprites = [];
   centeredEffects = [];
@@ -538,6 +537,12 @@ export function clearAll() {
   arAnalyser = null;
   fftData = null;
   cleanupAnalysisElement();
+
+  if (!webglAvailable || !pixiApp) return;
+
+  // Stop the ticker first to prevent update callbacks from running
+  // against partially-destroyed state during cleanup below.
+  pixiApp.ticker.stop();
 
   // Wrap destroy calls in try/catch — a lost WebGL context can cause throws.
   try {
@@ -728,6 +733,7 @@ export function resume() {
 
 export function destroy() {
   pause();
+  cleanupAnalysisElement();
 
   if (canvasEl) {
     canvasEl.removeEventListener('webglcontextlost', handleContextLost);
