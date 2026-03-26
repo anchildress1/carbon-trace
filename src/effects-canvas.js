@@ -631,7 +631,12 @@ export function connectAnalysisAudio(audioSrc, analyserNode) {
   if (!ctx) return;
 
   const el = document.createElement('audio');
-  el.muted = true;
+  // Use volume=0 instead of muted=true. Chrome does not decode audio for
+  // muted elements, so MediaElementSource receives silence and FFT reads
+  // return all zeros. volume=0 allows decoding through Web Audio while
+  // producing no direct output. createMediaElementSource takes ownership
+  // of the element's output anyway, so there is no audible double-play.
+  el.volume = 0;
   el.crossOrigin = 'anonymous';
   el.preload = 'auto';
   el.src = audioSrc;

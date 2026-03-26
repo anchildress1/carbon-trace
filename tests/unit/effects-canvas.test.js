@@ -1430,7 +1430,7 @@ describe('effects-canvas — dedicated analysis element (ADR-008 Approach B)', (
     expect(ctx.createMediaElementSource).toHaveBeenCalledTimes(1);
     const createdEl = ctx.createMediaElementSource.mock.calls[0][0];
     expect(createdEl.tagName).toBe('AUDIO');
-    expect(createdEl.muted).toBe(true);
+    expect(createdEl.volume).toBe(0);
     expect(createdEl.crossOrigin).toBe('anonymous');
     expect(createdEl.preload).toBe('auto');
     expect(createdEl.src).toContain('test-song.mp3');

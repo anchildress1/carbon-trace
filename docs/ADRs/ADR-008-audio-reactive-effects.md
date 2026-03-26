@@ -42,18 +42,20 @@ Additionally, `audioReactive` can include an optional `trigger` object for onset
 
 carbon-trace uses Howler.js in `html5: true` mode exclusively. In html5 mode, `<audio>` elements output directly to the system audio device, bypassing the Web Audio graph entirely. `Howler.masterGain()` carries no signal from html5-mode sounds.
 
-To get FFT data without touching Howler's audio, a **dedicated muted `<audio>` element** streams the same audio file independently. This element is connected to the AnalyserNode via `createMediaElementSource()`. Howler's playback element is completely untouched — no ownership transfer, no routing changes:
+To get FFT data without touching Howler's audio, a **dedicated silent `<audio>` element** streams the same audio file independently. This element is connected to the AnalyserNode via `createMediaElementSource()`. Howler's playback element is completely untouched — no ownership transfer, no routing changes:
 
 ```
 Howler end-song <audio> (html5:true)   →  system audio output (playback, untouched)
 
-Dedicated analysis <audio> (muted, same src)
+Dedicated analysis <audio> (volume=0, same src)
   └─ createMediaElementSource(element)
        └─ AnalyserNode (audio.js, fftSize: 2048)
             └─ getByteFrequencyData() → Uint8Array[1024]
                  └─ effects-canvas.js ticker reads per frame
 
-NOT connected to ctx.destination — element.muted = true prevents any output.
+NOT connected to ctx.destination — createMediaElementSource takes ownership.
+element.volume = 0 (NOT muted — Chrome skips audio decoding for muted elements,
+causing MediaElementSource to receive silence and FFT to return all zeros).
 ```
 
 **Why a dedicated element instead of tapping Howler's?** `createMediaElementSource()` takes permanent ownership of an `<audio>` element's output — audio no longer goes directly to speakers, but must route through the Web Audio graph. When applied to Howler's element in html5 mode, this caused audio loss (see Implementation Findings). The dedicated element isolates this side effect: if the analysis routing fails, only FFT data is lost; playback is unaffected.
@@ -112,7 +114,7 @@ The shockwave effect factory accepts an `autoRepeat` param (default `true`). Whe
 audio.js                    app.js                      effects-canvas.js
 ───────────                 ──────                      ─────────────────
 getAnalyserNode() ────→  showFrame() bridge ────→  connectAnalysisAudio(src, node)
-                            resolves analyserCueId       ├─ creates muted <audio>
+                            resolves analyserCueId       ├─ creates silent <audio> (volume=0)
                             to audio src URL             ├─ createMediaElementSource
                             ↓                            ├─ source.connect(analyserNode)
                           PausableTimer ────────→       startAnalysisPlayback()
@@ -236,7 +238,7 @@ disconnectAnalyserSource() — clear AnalyserNode reference. Called by
 
 ```
 connectAnalysisAudio(src, analyserNode)
-                           — create a muted <audio> element for the given src,
+                           — create a silent <audio> element (volume=0) for the given src,
                              connect via createMediaElementSource to the
                              analyserNode. Element starts buffering immediately
                              (preload: 'auto') but does not play yet.
@@ -460,4 +462,4 @@ The current `createMediaElementSource()` approach must be replaced. Evaluated al
 14. [ ] Re-author `mask-11-music-shockwave.png` for upward-only column above record (Ashley)
 15. [x] Test: onset detection, cooldown, combined trigger+modulate, autoRepeat false/true
 16. [x] **Revert commit e58b60f** — done. Audio restored; `createMediaElementSource` wiring removed.
-17. [x] **Approach B chosen** — dedicated muted `<audio>` element for FFT analysis, Howler untouched.
+17. [x] **Approach B chosen** — dedicated silent `<audio>` element (volume=0) for FFT analysis, Howler untouched.
