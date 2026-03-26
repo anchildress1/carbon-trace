@@ -210,6 +210,9 @@ registerEffect('shockwave', (_sprite, params = {}) => {
       // mid-expansion causes the wave to freeze near the center.
       if (filter.enabled) return;
       elapsed = 0;
+      // Reset filter.time so the first rendered frame starts at the
+      // beginning of the wave cycle, not at the stale end-of-cycle value.
+      filter.time = 0;
       filter.enabled = true;
     },
   };

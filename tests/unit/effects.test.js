@@ -306,6 +306,10 @@ describe('effects.js — factory registry', () => {
       // Trigger enables filter and fires a new cycle
       result.trigger();
       expect(result.filter.enabled).toBe(true);
+      // filter.time must be 0 immediately after trigger so the first
+      // rendered frame starts at the beginning of the wave, not at the
+      // stale end-of-cycle value left by the previous completed wave.
+      expect(result.filter.time).toBe(0);
       result.update(1 / 60);
       expect(result.filter.time).toBeGreaterThan(0);
       expect(result.filter.time).toBeLessThan(0.1);
@@ -313,6 +317,24 @@ describe('effects.js — factory registry', () => {
       // Cycle plays through then idles again — filter disabled
       for (let i = 0; i < 60; i++) result.update(1 / 60);
       expect(result.filter.enabled).toBe(false);
+    });
+
+    it('shockwave trigger() is ignored while a wave is still expanding', () => {
+      const result = createEffect('shockwave', null, {
+        cycleDuration: 1,
+        autoRepeat: false,
+      });
+
+      result.trigger();
+      expect(result.filter.enabled).toBe(true);
+      result.update(1 / 60); // mid-expansion
+
+      // A second trigger while the wave is expanding must be a no-op — resetting
+      // mid-expansion would freeze the wave near center.
+      const timeBeforeSecondTrigger = result.filter.time;
+      result.trigger();
+      expect(result.filter.time).toBe(timeBeforeSecondTrigger);
+      expect(result.filter.enabled).toBe(true);
     });
 
     it('shockwave autoRepeat:true (default) cycles normally', () => {
