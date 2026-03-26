@@ -281,13 +281,14 @@ describe('effects.js — factory registry', () => {
 
       const dt = 1 / 60;
 
-      // Starts idle (elapsed = cycleDuration)
+      // Starts idle — filter disabled (no distortion before first beat)
+      expect(result.filter.enabled).toBe(false);
       result.update(dt);
-      expect(result.filter.time).toBe(0.1);
+      expect(result.filter.enabled).toBe(false);
 
       // Still idle after many frames — no auto-repeat
       for (let i = 0; i < 120; i++) result.update(dt);
-      expect(result.filter.time).toBe(0.1);
+      expect(result.filter.enabled).toBe(false);
     });
 
     it('shockwave autoRepeat:false plays after trigger()', () => {
@@ -297,19 +298,19 @@ describe('effects.js — factory registry', () => {
         autoRepeat: false,
       });
 
-      // Starts idle
-      result.update(1 / 60);
-      expect(result.filter.time).toBe(0.5);
+      // Starts idle — filter disabled
+      expect(result.filter.enabled).toBe(false);
 
-      // Trigger fires a new cycle
+      // Trigger enables filter and fires a new cycle
       result.trigger();
+      expect(result.filter.enabled).toBe(true);
       result.update(1 / 60);
       expect(result.filter.time).toBeGreaterThan(0);
       expect(result.filter.time).toBeLessThan(0.1);
 
-      // Cycle plays through then idles again
+      // Cycle plays through then idles again — filter disabled
       for (let i = 0; i < 60; i++) result.update(1 / 60);
-      expect(result.filter.time).toBe(0.5);
+      expect(result.filter.enabled).toBe(false);
     });
 
     it('shockwave autoRepeat:true (default) cycles normally', () => {

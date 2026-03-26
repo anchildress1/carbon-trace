@@ -83,18 +83,23 @@ FOR EACH region with audioReactive.trigger:
   1. Update running average:
      runningAvg = runningAvg * 0.95 + energy * 0.05
   2. Increment timeSinceLastTrigger by frame delta
-  3. IF energy > runningAvg * threshold AND timeSinceLastTrigger > cooldown:
+  3. IF runningAvg < 0.05: SKIP (warmup guard — see below)
+  4. IF energy > runningAvg * threshold AND timeSinceLastTrigger > cooldown:
      a. Call effect.trigger() — resets the animation cycle (e.g., shockwave time=0)
      b. Reset timeSinceLastTrigger = 0
 ```
 
 The running average decay (0.95) adapts to the music's overall energy level. The `threshold` multiplier means "trigger when current energy exceeds the running average by this factor." A threshold of 1.5 = "50% above average." The `cooldown` prevents rapid re-triggering within a minimum interval.
 
+**Warmup guard (step 3):** `runningAvg` starts at 0. Without the guard, the first frame with any non-zero audio energy would satisfy `energy > 0 * threshold` and trigger falsely during audio fade-in. The 0.05 floor (5% of max band energy) ensures the running average has built up enough baseline signal for the threshold comparison to be meaningful. For the end-song cue (initial volume 0.15, 8-second fade-in), the running average naturally exceeds 0.05 once the music reaches audible levels.
+
 Trigger and continuous modulation run in the same frame. Continuous modulation sets the parameter value (e.g., amplitude), then trigger fires a new cycle if a beat is detected. Combined: each beat fires a shockwave whose intensity matches the hit strength.
 
 ### Shockwave `autoRepeat` and `trigger()`
 
 The shockwave effect factory accepts an `autoRepeat` param (default `true`). When `false`, the wave plays once through `cycleDuration` then idles — it does not auto-repeat on a fixed timer. The `trigger()` method on the effect object resets the cycle timer to zero, starting a new wave expansion. This is the mechanism onset detection uses to fire discrete shockwaves on each detected beat.
+
+**Idle state via `filter.enabled`:** When `autoRepeat: false`, the ShockwaveFilter starts with `filter.enabled = false` (PixiJS skips the entire filter pipeline — no render target, no shader execution). `trigger()` sets `filter.enabled = true` to begin a wave cycle. When `elapsed >= cycleDuration`, `update()` sets `filter.enabled = false` again. This ensures zero visual distortion between beats. Continuous modulation (`applyModulation`) freely updates `filter.amplitude` on the disabled filter — the value is a JS property write that takes effect when the filter next enables, so the first visible frame of a triggered wave already has the correct FFT-derived amplitude.
 
 ### Module wiring (no cross-imports)
 
@@ -199,7 +204,17 @@ high  │ 93–744   │ ~2000–16000 Hz    │ cymbals, sibilance, air
 getAnalyserNode()          — lazy-create AnalyserNode on Howler's AudioContext,
                              connect to ctx.destination. Returns AnalyserNode.
                              Subsequent calls return the same instance.
-                             fftSize: 2048, smoothingTimeConstant: 0.8
+                             fftSize: 2048, smoothingTimeConstant: 0.4
+
+smoothingTimeConstant is set to 0.4 — low enough to preserve transient
+peaks for onset detection, high enough to reduce frame-to-frame FFT noise
+that would raise the running average baseline and mask real beats.
+Previously set to 0.8, which dampened transients below the onset threshold
+before the detection algorithm ever saw them. At 0.4, a spike from
+baseline 80→255 is reported as ~185 (strong transient preserved), while
+frame-to-frame noise (±15) is dampened to ±9. Per-region EMA via the
+`smoothing` field provides additional consumer-specific smoothing for
+continuous modulation.
 
 connectAnalyserToCue(id)   — store target cue ID. When that cue starts playing
                              (via crossfadeAmbientCue or playCue), connect its

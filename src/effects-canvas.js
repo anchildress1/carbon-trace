@@ -181,6 +181,10 @@ function applyModulation(state, energy) {
 function applyTrigger(state, energy, dt) {
   state.runningAvg = state.runningAvg * 0.95 + energy * 0.05;
   state.timeSinceLastTrigger += dt;
+  // Require running average to stabilize before allowing triggers.
+  // Prevents false triggers during audio fade-in when runningAvg is near
+  // zero and any non-trivial energy would exceed threshold.
+  if (state.runningAvg < 0.05) return;
   if (energy > state.runningAvg * state.threshold && state.timeSinceLastTrigger > state.cooldown) {
     activeEffects[state.effectIndex].trigger?.();
     state.timeSinceLastTrigger = 0;

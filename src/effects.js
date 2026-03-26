@@ -177,6 +177,11 @@ registerEffect('shockwave', (_sprite, params = {}) => {
   });
   filter.time = cycleDuration;
 
+  // When trigger-driven (autoRepeat:false), the filter starts disabled
+  // so no distortion is visible before the first beat fires. PixiJS skips
+  // the entire filter pipeline when enabled=false — no shader execution.
+  if (!autoRepeat) filter.enabled = false;
+
   const totalCycle = cycleDuration + cyclePause;
   let elapsed = autoRepeat ? 0 : cycleDuration;
 
@@ -190,10 +195,14 @@ registerEffect('shockwave', (_sprite, params = {}) => {
         filter.time = Math.min(cycle, cycleDuration);
       } else {
         filter.time = Math.min(elapsed, cycleDuration);
+        if (elapsed >= cycleDuration) {
+          filter.enabled = false;
+        }
       }
     },
     trigger() {
       elapsed = 0;
+      filter.enabled = true;
     },
   };
 });

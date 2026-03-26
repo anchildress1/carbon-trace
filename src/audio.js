@@ -290,15 +290,15 @@ function playCue(cue) {
     });
   }
 
+  // Audio-reactive: register before play() so the 'play' event is never missed (ADR-008)
+  if (cue.id === analyserTargetCueId && analyserNode) {
+    howl.once('play', () => connectHowlToAnalyser(howl));
+  }
+
   howl.play();
 
   if (cue.fadeIn > 0) {
     howl.fade(0, cue.volume, cue.fadeIn);
-  }
-
-  // Audio-reactive: connect to analyser when target cue starts playing (ADR-008)
-  if (cue.id === analyserTargetCueId && analyserNode) {
-    howl.once('play', () => connectHowlToAnalyser(howl));
   }
 
   return howl;
@@ -365,13 +365,13 @@ function crossfadeAmbientCue(cue, crossfadeDurationMs) {
     }
   };
 
-  newHowl.play();
-  newHowl.fade(0, cue.volume, cue.fadeIn > 0 ? cue.fadeIn : crossfadeDurationMs);
-
-  // Audio-reactive: connect to analyser when target cue starts playing (ADR-008)
+  // Audio-reactive: register before play() so the 'play' event is never missed (ADR-008)
   if (cue.id === analyserTargetCueId && analyserNode) {
     newHowl.once('play', () => connectHowlToAnalyser(newHowl));
   }
+
+  newHowl.play();
+  newHowl.fade(0, cue.volume, cue.fadeIn > 0 ? cue.fadeIn : crossfadeDurationMs);
 
   return newHowl;
 }
@@ -436,7 +436,7 @@ export function getAnalyserNode() {
   if (!analyserNode) {
     analyserNode = ctx.createAnalyser();
     analyserNode.fftSize = 2048;
-    analyserNode.smoothingTimeConstant = 0.8;
+    analyserNode.smoothingTimeConstant = 0.4;
     analyserNode.connect(ctx.destination);
   }
 

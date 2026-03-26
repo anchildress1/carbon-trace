@@ -997,7 +997,7 @@ describe('audio.js — audio-reactive analyser (ADR-008)', () => {
     const node = getAnalyserNode();
     expect(node).not.toBeNull();
     expect(node.fftSize).toBe(2048);
-    expect(node.smoothingTimeConstant).toBe(0.8);
+    expect(node.smoothingTimeConstant).toBe(0.4);
     expect(node.connect).toHaveBeenCalledWith(mockHowlerCtx.destination);
     expect(mockHowlerCtx.createAnalyser).toHaveBeenCalledTimes(1);
   });
