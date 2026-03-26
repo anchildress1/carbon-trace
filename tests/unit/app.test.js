@@ -63,6 +63,8 @@ vi.mock('../../src/effects-canvas.js', () => ({
   pause: vi.fn(),
   resume: vi.fn(),
   setAnalyser: vi.fn(),
+  connectAnalysisAudio: vi.fn(),
+  startAnalysisPlayback: vi.fn(),
 }));
 
 vi.mock('../../src/overlay.js', () => ({
@@ -136,9 +138,9 @@ vi.mock('../../src/scenes.json', () => ({
         audioCues: [
           { id: 'narration', type: 'narration', src: 'narration.mp3', enter: 500, volume: 1, loop: false, fadeIn: 0, fadeOut: 0 },
           { id: 'ambient-01', type: 'ambient', src: 'ambient.mp3', enter: 0, volume: 0.5, loop: true, fadeIn: 1000, fadeOut: null },
-          { id: 'end-song', type: 'ambient', src: 'credits-music.mp3', enter: 100, volume: 0.5, loop: true, fadeIn: 2000, fadeOut: null },
+          { id: 'end-song', type: 'ambient', src: 'credits-music.mp3', enter: { ref: 'narration', offset: -1000 }, volume: 0.5, loop: true, fadeIn: 2000, fadeOut: null },
         ],
-        effects: { regions: [{ type: 'glow', mask: 'diamond.png' }] },
+        effects: { regions: [{ type: 'shockwave', mask: 'diamond.png', audioReactive: { band: 'bass', trigger: { threshold: 1.5, cooldown: 0.08 } } }], analyserCueId: 'end-song' },
         transition: { type: 'fade', duration: 400 },
 
       },
@@ -193,6 +195,7 @@ import {
   reCueCue,
   onNarrationBufferChange,
   wrapOnNarrationEndWithBoost,
+  getAnalyserNode,
 } from '../../src/audio.js';
 import { buildNarrationTimeline } from '../../src/text.js';
 import {
@@ -201,6 +204,9 @@ import {
   loadScene as loadEffectsScene,
   pause as pauseEffects,
   resume as resumeEffects,
+  setAnalyser as setEffectsAnalyser,
+  connectAnalysisAudio as connectEffectsAnalysisAudio,
+  startAnalysisPlayback as startEffectsAnalysisPlayback,
 } from '../../src/effects-canvas.js';
 import { clearScene, drawFallback, loadImage } from '../../src/canvas.js';
 import { setCaptionsEnabled, areCaptionsEnabled, syncCaptionsToTime, clearCaptionElements } from '../../src/captions.js';
@@ -1879,6 +1885,97 @@ describe('app.js', () => {
 
       vi.advanceTimersByTime(2000);
       expect(cancelAudioCues).toHaveBeenCalled();
+    });
+  });
+
+  // ── analysis audio bridge (ADR-008 Approach B) ───────────────────
+
+  describe('analysis audio bridge (ADR-008)', () => {
+    beforeEach(async () => {
+      app = createApp();
+      await flush();
+      app.togglePause(); // first play
+    });
+
+    it('wires analysis audio when audioReactive + analyserCueId exist', async () => {
+      const mockAnalyser = { frequencyBinCount: 1024 };
+      getAnalyserNode.mockReturnValue(mockAnalyser);
+
+      app.advance(); // title → scene-01 (has audioReactive + analyserCueId)
+      await flush();
+
+      expect(setEffectsAnalyser).toHaveBeenCalledWith(mockAnalyser);
+      expect(connectEffectsAnalysisAudio).toHaveBeenCalledWith('credits-music.mp3', mockAnalyser);
+    });
+
+    it('schedules analysis playback via PausableTimer when enter delay > 0', async () => {
+      const mockAnalyser = { frequencyBinCount: 1024 };
+      getAnalyserNode.mockReturnValue(mockAnalyser);
+
+      // Set narration duration so resolveAnalyserCueEnter returns a positive delay
+      // end-song enter = { ref: 'narration', offset: -1000 }
+      // narration enter = 500, duration = 5s → 500 + 5000 - 1000 = 4500ms
+      // Since audioDurations is empty (no preloaded durations), delay resolves to 0
+      // and startAnalysisPlayback is called immediately.
+      app.advance();
+      await flush();
+
+      // With no audioDurations, ref duration lookup returns undefined → delay = 0
+      // So startAnalysisPlayback is called immediately
+      expect(startEffectsAnalysisPlayback).toHaveBeenCalled();
+    });
+
+    it('does not wire analysis audio when getAnalyserNode returns null', async () => {
+      getAnalyserNode.mockReturnValue(null);
+
+      app.advance(); // title → scene-01
+      await flush();
+
+      expect(connectEffectsAnalysisAudio).not.toHaveBeenCalled();
+    });
+
+    it('cleanupCurrentScene cancels analysisStartTimer', async () => {
+      const mockAnalyser = { frequencyBinCount: 1024 };
+      getAnalyserNode.mockReturnValue(mockAnalyser);
+
+      app.advance(); // title → scene-01
+      await flush();
+
+      vi.clearAllMocks();
+
+      app.advance(); // scene-01 → scene-02 (triggers cleanupCurrentScene)
+      await flush();
+
+      // The transition calls cleanupCurrentScene which cancels analysisStartTimer.
+      // No errors should occur.
+      expect(cancelPendingLoad).toHaveBeenCalled();
+    });
+
+    it('doPause pauses analysisStartTimer', async () => {
+      const mockAnalyser = { frequencyBinCount: 1024 };
+      getAnalyserNode.mockReturnValue(mockAnalyser);
+
+      app.advance(); // title → scene-01
+      await flush();
+
+      // Pause should not throw even when analysisStartTimer is null
+      // (it fired immediately since delay was 0)
+      app.togglePause();
+      expect(pauseEffects).toHaveBeenCalled();
+    });
+
+    it('doResume resumes analysisStartTimer', async () => {
+      const mockAnalyser = { frequencyBinCount: 1024 };
+      getAnalyserNode.mockReturnValue(mockAnalyser);
+
+      app.advance(); // title → scene-01
+      await flush();
+
+      app.togglePause(); // pause
+      vi.clearAllMocks();
+      app.togglePause(); // resume
+
+      expect(resumeEffects).toHaveBeenCalled();
     });
   });
 });

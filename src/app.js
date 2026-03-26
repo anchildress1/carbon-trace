@@ -61,6 +61,12 @@ function resumeEffects() {
 function setEffectsAnalyser(node) {
   effectsMod?.setAnalyser(node);
 }
+function connectEffectsAnalysisAudio(src, analyser) {
+  effectsMod?.connectAnalysisAudio(src, analyser);
+}
+function startEffectsAnalysisPlayback() {
+  effectsMod?.startAnalysisPlayback();
+}
 
 const State = Object.freeze({
   LOADING: 'LOADING',
@@ -218,6 +224,20 @@ function makeNarrationEndCallback(app, frame, holdAfterNarration) {
   };
 }
 
+function resolveAnalyserCueEnter(frame, cue, audioDurations) {
+  if (typeof cue.enter === 'number') return cue.enter;
+  if (cue.enter?.ref) {
+    const refCue = frame.audioCues?.find((c) => c.id === cue.enter.ref);
+    if (!refCue) return 0;
+    const refEnter = typeof refCue.enter === 'number' ? refCue.enter : 0;
+    const refDuration = audioDurations?.get(refCue.src);
+    if (refDuration > 0) {
+      return refEnter + refDuration * 1000 + (cue.enter.offset || 0);
+    }
+  }
+  return 0;
+}
+
 function scheduleFrameAudio(app, frame) {
   const holdAfterNarration = getHoldAfterNarration(frame);
   const onNarrationEnd = wrapOnNarrationEndWithBoost(
@@ -348,6 +368,23 @@ function prebufferNextScene(app, index) {
   }
 }
 
+function wireAnalysisAudio(app, frame, analyser) {
+  if (!frame.effects.analyserCueId) return;
+  const cue = frame.audioCues?.find((c) => c.id === frame.effects.analyserCueId);
+  if (!cue?.src) return;
+
+  connectEffectsAnalysisAudio(cue.src, analyser);
+  const enterDelay = resolveAnalyserCueEnter(frame, cue, app.audioDurations);
+  if (enterDelay > 0) {
+    app.analysisStartTimer = new PausableTimer(() => {
+      app.analysisStartTimer = null;
+      startEffectsAnalysisPlayback();
+    }, enterDelay);
+  } else {
+    startEffectsAnalysisPlayback();
+  }
+}
+
 function showFrame(app, index) {
   const frame = app.frames[index];
   app.els.sceneStage.setAttribute('aria-label', frame.description || '');
@@ -363,6 +400,7 @@ function showFrame(app, index) {
           const analyser = getAnalyserNode();
           if (analyser) {
             setEffectsAnalyser(analyser);
+            wireAnalysisAudio(app, frame, analyser);
           }
         }
       })
@@ -461,6 +499,11 @@ function cleanupCurrentScene(app) {
   cancelPendingLoad();
   disconnectAnalyserSource();
   cancelAudioCues();
+
+  if (app.analysisStartTimer) {
+    app.analysisStartTimer.cancel();
+    app.analysisStartTimer = null;
+  }
 
   clearCaptionElements(app.captionEntries);
   try {
@@ -700,6 +743,8 @@ function doResume(app) {
     setupAutoAdvance(app);
   }
 
+  app.analysisStartTimer?.resume();
+
   app.els.btnPause.setAttribute('aria-pressed', 'false');
   app.els.btnPause.classList.remove('paused');
 }
@@ -718,6 +763,7 @@ function doPause(app) {
   pauseEffects();
 
   app.autoAdvanceTimer?.pause();
+  app.analysisStartTimer?.pause();
 
   app.els.btnPause.setAttribute('aria-pressed', 'true');
   app.els.btnPause.classList.add('paused');
@@ -927,6 +973,7 @@ export function createApp() {
     textTimeline: null,
     captionEntries: [],
     autoAdvanceTimer: null,
+    analysisStartTimer: null,
     autoAdvancing: false,
     pendingNavIndex: null,
     generation: 0,

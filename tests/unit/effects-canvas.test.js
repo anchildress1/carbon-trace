@@ -99,6 +99,8 @@ import {
   destroy,
   isRunning,
   setAnalyser,
+  connectAnalysisAudio,
+  startAnalysisPlayback,
 } from '../../src/effects-canvas.js';
 
 function createMockCanvas() {
@@ -1359,5 +1361,213 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
 
       destroy();
     });
+  });
+});
+
+describe('effects-canvas — dedicated analysis element (ADR-008 Approach B)', () => {
+  let originalGetContext;
+  let originalCreateElement;
+
+  beforeEach(() => {
+    destroy();
+    vi.clearAllMocks();
+
+    globalThis.ResizeObserver = vi.fn(function () {
+      this.observe = vi.fn();
+      this.disconnect = vi.fn();
+    });
+
+    globalThis.matchMedia = vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    });
+    setupImageMock();
+
+    originalGetContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type) {
+      if (type === '2d') {
+        return {
+          drawImage: vi.fn(),
+          getImageData: vi.fn(() => ({
+            data: new Uint8ClampedArray(this.width * this.height * 4),
+          })),
+          putImageData: vi.fn(),
+        };
+      }
+      return originalGetContext?.call(this, type);
+    };
+  });
+
+  afterEach(() => {
+    destroy();
+    HTMLCanvasElement.prototype.getContext = originalGetContext;
+    vi.restoreAllMocks();
+  });
+
+  function createMockAnalyserWithContext() {
+    const mockSource = { connect: vi.fn(), disconnect: vi.fn() };
+    const ctx = {
+      sampleRate: 44100,
+      createMediaElementSource: vi.fn(() => mockSource),
+    };
+    return {
+      analyser: {
+        frequencyBinCount: 1024,
+        getByteFrequencyData: vi.fn(),
+        context: ctx,
+      },
+      ctx,
+      mockSource,
+    };
+  }
+
+  it('connectAnalysisAudio creates muted element and connects source to analyser', () => {
+    const { analyser, ctx, mockSource } = createMockAnalyserWithContext();
+
+    connectAnalysisAudio('test-song.mp3', analyser);
+
+    expect(ctx.createMediaElementSource).toHaveBeenCalledTimes(1);
+    const createdEl = ctx.createMediaElementSource.mock.calls[0][0];
+    expect(createdEl.tagName).toBe('AUDIO');
+    expect(createdEl.muted).toBe(true);
+    expect(createdEl.crossOrigin).toBe('anonymous');
+    expect(createdEl.preload).toBe('auto');
+    expect(createdEl.src).toContain('test-song.mp3');
+
+    // Source connected to analyser, NOT to destination
+    expect(mockSource.connect).toHaveBeenCalledWith(analyser);
+  });
+
+  it('connectAnalysisAudio replaces previous analysis element', () => {
+    const { analyser, ctx, mockSource } = createMockAnalyserWithContext();
+
+    connectAnalysisAudio('song-1.mp3', analyser);
+    const firstSource = mockSource;
+
+    // Create new mock source for second call
+    const secondSource = { connect: vi.fn(), disconnect: vi.fn() };
+    ctx.createMediaElementSource.mockReturnValueOnce(secondSource);
+
+    connectAnalysisAudio('song-2.mp3', analyser);
+
+    // First source should have been disconnected
+    expect(firstSource.disconnect).toHaveBeenCalled();
+  });
+
+  it('connectAnalysisAudio handles createMediaElementSource failure gracefully', () => {
+    const ctx = {
+      sampleRate: 44100,
+      createMediaElementSource: vi.fn(() => {
+        throw new Error('Already connected');
+      }),
+    };
+    const analyser = {
+      frequencyBinCount: 1024,
+      getByteFrequencyData: vi.fn(),
+      context: ctx,
+    };
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    connectAnalysisAudio('bad.mp3', analyser);
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Failed to create analysis audio source:',
+      expect.any(String),
+    );
+    warnSpy.mockRestore();
+
+    // startAnalysisPlayback should be a no-op since element was not stored
+    startAnalysisPlayback();
+  });
+
+  it('connectAnalysisAudio is a no-op when analyserNode is null', () => {
+    // Should not throw
+    connectAnalysisAudio('test.mp3', null);
+  });
+
+  it('connectAnalysisAudio is a no-op when analyserNode.context is missing', () => {
+    const analyser = {
+      frequencyBinCount: 1024,
+      getByteFrequencyData: vi.fn(),
+      context: null,
+    };
+
+    // Should not throw
+    connectAnalysisAudio('test.mp3', analyser);
+  });
+
+  it('startAnalysisPlayback calls play on the analysis element', () => {
+    const { analyser, ctx } = createMockAnalyserWithContext();
+
+    connectAnalysisAudio('test-song.mp3', analyser);
+
+    const createdEl = ctx.createMediaElementSource.mock.calls[0][0];
+    createdEl.play = vi.fn().mockResolvedValue(undefined);
+
+    startAnalysisPlayback();
+    expect(createdEl.play).toHaveBeenCalled();
+  });
+
+  it('startAnalysisPlayback is a no-op when no analysis element exists', () => {
+    // Should not throw
+    startAnalysisPlayback();
+  });
+
+  it('clearAll cleans up the analysis element', async () => {
+    const canvas = createMockCanvas();
+    await init(canvas);
+
+    const { analyser, ctx, mockSource } = createMockAnalyserWithContext();
+
+    connectAnalysisAudio('test-song.mp3', analyser);
+
+    const createdEl = ctx.createMediaElementSource.mock.calls[0][0];
+    createdEl.pause = vi.fn();
+    createdEl.load = vi.fn();
+
+    clearAll();
+
+    expect(mockSource.disconnect).toHaveBeenCalled();
+    expect(createdEl.pause).toHaveBeenCalled();
+  });
+
+  it('pause stops the analysis element', () => {
+    const { analyser, ctx } = createMockAnalyserWithContext();
+
+    connectAnalysisAudio('test-song.mp3', analyser);
+
+    const createdEl = ctx.createMediaElementSource.mock.calls[0][0];
+    createdEl.pause = vi.fn();
+
+    pause();
+    expect(createdEl.pause).toHaveBeenCalled();
+  });
+
+  it('resume restarts the analysis element when not reduced motion', () => {
+    const { analyser, ctx } = createMockAnalyserWithContext();
+
+    connectAnalysisAudio('test-song.mp3', analyser);
+
+    const createdEl = ctx.createMediaElementSource.mock.calls[0][0];
+    createdEl.play = vi.fn().mockResolvedValue(undefined);
+
+    resume();
+    expect(createdEl.play).toHaveBeenCalled();
+  });
+
+  it('resume does not restart analysis element under reduced motion', () => {
+    const { analyser, ctx } = createMockAnalyserWithContext();
+
+    connectAnalysisAudio('test-song.mp3', analyser);
+
+    const createdEl = ctx.createMediaElementSource.mock.calls[0][0];
+    createdEl.play = vi.fn().mockResolvedValue(undefined);
+
+    globalThis.matchMedia = vi.fn().mockReturnValue({ matches: true });
+
+    resume();
+    expect(createdEl.play).not.toHaveBeenCalled();
   });
 });

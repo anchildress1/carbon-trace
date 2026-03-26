@@ -38,6 +38,10 @@ let arAnalyser = null;
 let fftData = null;
 let audioReactiveState = [];
 
+// Dedicated analysis audio element (ADR-008 approach B)
+let analysisElement = null;
+let analysisSource = null;
+
 function reducedMotion() {
   return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
@@ -523,6 +527,7 @@ export function clearAll() {
   centeredEffects = [];
   audioReactiveState = [];
   arAnalyser = null;
+  cleanupAnalysisElement();
 
   // Wrap destroy calls in try/catch — a lost WebGL context can cause throws.
   try {
@@ -593,14 +598,85 @@ export function setAnalyser(node) {
   }
 }
 
+function cleanupAnalysisElement() {
+  if (analysisSource) {
+    try {
+      analysisSource.disconnect();
+    } catch {
+      /* already disconnected */
+    }
+    analysisSource = null;
+  }
+  if (analysisElement) {
+    analysisElement.pause();
+    analysisElement.removeAttribute('src');
+    analysisElement.load();
+    analysisElement = null;
+  }
+}
+
+/**
+ * Create a dedicated muted <audio> element for FFT analysis (ADR-008 approach B).
+ * The element streams the same audio file as the playback cue but is completely
+ * independent of Howler. createMediaElementSource() routes its output through
+ * the AnalyserNode for FFT reads. The element is muted at the HTML level so
+ * no duplicate audio plays even if Web Audio routing fails.
+ */
+export function connectAnalysisAudio(audioSrc, analyserNode) {
+  cleanupAnalysisElement();
+
+  if (!analyserNode) return;
+
+  const ctx = analyserNode.context;
+  if (!ctx) return;
+
+  const el = document.createElement('audio');
+  el.muted = true;
+  el.crossOrigin = 'anonymous';
+  el.preload = 'auto';
+  el.src = audioSrc;
+
+  try {
+    const source = ctx.createMediaElementSource(el);
+    source.connect(analyserNode);
+
+    analysisElement = el;
+    analysisSource = source;
+
+    arAnalyser = analyserNode;
+    if (!fftData) {
+      fftData = new Uint8Array(analyserNode.frequencyBinCount);
+    }
+  } catch (err) {
+    console.warn('Failed to create analysis audio source:', err.message);
+    el.removeAttribute('src');
+  }
+}
+
+/**
+ * Start playback on the analysis element. Called by app.js when the
+ * matching audio cue begins playing, so FFT data tracks the same
+ * point in the audio. No-op if no analysis element exists.
+ */
+export function startAnalysisPlayback() {
+  if (!analysisElement) return;
+  analysisElement.play().catch((err) => {
+    console.warn('Analysis audio play failed:', err.message);
+  });
+}
+
 export function pause() {
   isPaused = true;
+  if (analysisElement) analysisElement.pause();
   if (!webglAvailable || !pixiApp) return;
   pixiApp.ticker.stop();
 }
 
 export function resume() {
   isPaused = false;
+  if (analysisElement && !reducedMotion()) {
+    analysisElement.play().catch(() => {});
+  }
   if (!webglAvailable || !pixiApp || reducedMotion()) return;
   if (activeEffects.length > 0) {
     pixiApp.ticker.start();
