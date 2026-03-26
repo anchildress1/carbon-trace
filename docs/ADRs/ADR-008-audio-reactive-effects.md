@@ -40,18 +40,23 @@ Additionally, `audioReactive` can include an optional `trigger` object for onset
 
 ### Signal chain
 
-carbon-trace uses Howler.js in `html5: true` mode exclusively. In html5 mode, `<audio>` elements output directly to the system audio device, bypassing the Web Audio graph entirely. `Howler.masterGain()` carries no signal from html5-mode sounds. To get FFT data, we route the target `<audio>` element through `createMediaElementSource()`, which re-enters the Web Audio graph:
+carbon-trace uses Howler.js in `html5: true` mode exclusively. In html5 mode, `<audio>` elements output directly to the system audio device, bypassing the Web Audio graph entirely. `Howler.masterGain()` carries no signal from html5-mode sounds.
+
+To get FFT data without touching Howler's audio, a **dedicated muted `<audio>` element** streams the same audio file independently. This element is connected to the AnalyserNode via `createMediaElementSource()`. Howler's playback element is completely untouched — no ownership transfer, no routing changes:
 
 ```
-end-song <audio> element (Howler html5:true)
-  └─ createMediaElementSource(element)   ← takes ownership of element output
-       └─ AnalyserNode (created by audio.js, fftSize: 2048)
-            ├─ ctx.destination             ← audio still plays to speakers
+Howler end-song <audio> (html5:true)   →  system audio output (playback, untouched)
+
+Dedicated analysis <audio> (muted, same src)
+  └─ createMediaElementSource(element)
+       └─ AnalyserNode (audio.js, fftSize: 2048)
             └─ getByteFrequencyData() → Uint8Array[1024]
                  └─ effects-canvas.js ticker reads per frame
+
+NOT connected to ctx.destination — element.muted = true prevents any output.
 ```
 
-**Why not `Howler.masterGain()`?** The original design assumed Web Audio mode routing. In html5 mode, `masterGain` is an orphan node with no input signal. `createMediaElementSource()` is the only way to tap an `<audio>` element's output into the Web Audio graph for analysis.
+**Why a dedicated element instead of tapping Howler's?** `createMediaElementSource()` takes permanent ownership of an `<audio>` element's output — audio no longer goes directly to speakers, but must route through the Web Audio graph. When applied to Howler's element in html5 mode, this caused audio loss (see Implementation Findings). The dedicated element isolates this side effect: if the analysis routing fails, only FFT data is lost; playback is unaffected.
 
 **`createMediaElementSource()` constraints:**
 - Can only be called **once per `<audio>` element**. Calling it again on the same element throws `InvalidStateError`. The implementation tracks the connected element and skips reconnection.
@@ -106,25 +111,38 @@ The shockwave effect factory accepts an `autoRepeat` param (default `true`). Whe
 ```
 audio.js                    app.js                      effects-canvas.js
 ───────────                 ──────                      ─────────────────
-getAnalyserNode() ────→  bridge in showFrame() ────→  setAnalyser(node)
-connectAnalyserToCue()      (one-time call when              │
-  ↳ on cue play:             audioReactive regions           ▼
-    createMediaElement-      are present)              ticker reads FFT
-    Source() → analyser                                each frame
+getAnalyserNode() ────→  showFrame() bridge ────→  connectAnalysisAudio(src, node)
+                            resolves analyserCueId       ├─ creates muted <audio>
+                            to audio src URL             ├─ createMediaElementSource
+                            ↓                            ├─ source.connect(analyserNode)
+                          PausableTimer ────────→       startAnalysisPlayback()
+                            (fires at cue enter)              │
+                                                              ▼
+                          cleanupCurrentScene() ──→     clearAll() cleans up element
 ```
 
 app.js showFrame() wiring:
 ```js
 if (frame.effects?.regions?.some(r => r.audioReactive)) {
   const analyser = audio.getAnalyserNode();
-  if (analyser) {
-    effectsCanvas.setAnalyser(analyser);
-    audio.connectAnalyserToCue(frame.effects.analyserCueId);
+  if (analyser && frame.effects.analyserCueId) {
+    const cue = frame.audioCues?.find(c => c.id === frame.effects.analyserCueId);
+    if (cue?.src) {
+      effectsCanvas.connectAnalysisAudio(cue.src, analyser);
+      const enterDelay = resolveAnalyserCueEnter(frame, cue, app.audioDurations);
+      // Schedule analysis start to match when the Howl starts playing
+      if (enterDelay > 0) {
+        app.analysisStartTimer = new PausableTimer(
+          () => effectsCanvas.startAnalysisPlayback(), enterDelay);
+      } else {
+        effectsCanvas.startAnalysisPlayback();
+      }
+    }
   }
 }
 ```
 
-The `analyserCueId` field in the effects config identifies which audio cue should feed the AnalyserNode. For Scene 11, this is `"end-song"`. The connection happens inside `audio.js` when the matching cue starts playing — `app.js` only passes the cue ID, preserving leaf module isolation.
+The `analyserCueId` field in the effects config identifies which audio cue provides the analysis source. For Scene 11, this is `"end-song"`. app.js resolves it to the cue's `src` URL and passes it to `effects-canvas.js`, which creates the dedicated analysis element. audio.js knows nothing about the analysis element — it only provides the AnalyserNode on Howler's AudioContext.
 
 **No cross-imports between leaf modules.** audio.js doesn't know about effects. effects-canvas.js doesn't know about Howler. app.js is the only module that touches both.
 
@@ -198,41 +216,35 @@ high  │ 93–744   │ ~2000–16000 Hz    │ cymbals, sibilance, air
 
 ## Module Changes
 
-### audio.js — three new exports
+### audio.js — two exports
 
 ```
-getAnalyserNode()          — lazy-create AnalyserNode on Howler's AudioContext,
-                             connect to ctx.destination. Returns AnalyserNode.
-                             Subsequent calls return the same instance.
+getAnalyserNode()          — lazy-create AnalyserNode on Howler's AudioContext.
+                             NOT connected to ctx.destination (no audio output).
+                             Returns the same instance on subsequent calls.
                              fftSize: 2048, smoothingTimeConstant: 0.4
 
-smoothingTimeConstant is set to 0.4 — low enough to preserve transient
-peaks for onset detection, high enough to reduce frame-to-frame FFT noise
-that would raise the running average baseline and mask real beats.
-Previously set to 0.8, which dampened transients below the onset threshold
-before the detection algorithm ever saw them. At 0.4, a spike from
-baseline 80→255 is reported as ~185 (strong transient preserved), while
-frame-to-frame noise (±15) is dampened to ±9. Per-region EMA via the
-`smoothing` field provides additional consumer-specific smoothing for
-continuous modulation.
-
-connectAnalyserToCue(id)   — store target cue ID. When that cue starts playing
-                             (via crossfadeAmbientCue or playCue), connect its
-                             <audio> element to the AnalyserNode via
-                             createMediaElementSource(). Tracks connected element
-                             to prevent double-connection (InvalidStateError).
-
-disconnectAnalyserSource() — disconnect MediaElementSourceNode, clear tracking
-                             state. Called by cancelAudioCues() on scene change.
+disconnectAnalyserSource() — clear AnalyserNode reference. Called by
+                             cancelAudioCues() on scene change.
 ```
 
-**Implementation note:** `createMediaElementSource()` takes ownership of the `<audio>` element's output. The `AnalyserNode.connect(ctx.destination)` call re-routes audio to speakers through the Web Audio graph. CORS restrictions apply — the audio file must be served from the same origin. carbon-trace serves all audio from same-origin (`/assets/audio/`), so this works. If CORS blocks the AnalyserNode, the fallback is `audioReactive` regions behaving as if audio is silent (parameters stay at `range[0]`).
+`smoothingTimeConstant` is 0.4 — low enough to preserve transient peaks for onset detection, high enough to reduce frame-to-frame FFT noise. Previously 0.8, which dampened transients below the onset threshold.
 
-**Howler internals dependency:** `Howler.ctx` (AudioContext) and `howl._sounds[0]._node` (underlying `<audio>` element) are not part of Howler's documented public API. They work in current versions but could change. Pin Howler version and add a comment noting the internal API usage.
+**Howler internals dependency:** `Howler.ctx` (AudioContext) is not part of Howler's documented public API. Pin Howler version and note the internal API usage.
 
-### effects-canvas.js — one new method
+### effects-canvas.js — analysis element + FFT
 
 ```
+connectAnalysisAudio(src, analyserNode)
+                           — create a muted <audio> element for the given src,
+                             connect via createMediaElementSource to the
+                             analyserNode. Element starts buffering immediately
+                             (preload: 'auto') but does not play yet.
+                             Cleans up any previous analysis element first.
+
+startAnalysisPlayback()    — call play() on the analysis element. No-op if
+                             no element exists (graceful degradation).
+
 setAnalyser(analyserNode)  — store reference. Ticker reads frequency data
                              each frame if analyser is set and regions have
                              audioReactive config. Cleared on clearAll().
@@ -437,8 +449,8 @@ The current `createMediaElementSource()` approach must be replaced. Evaluated al
 3. [x] Implement per-frame band extraction, EMA smoothing, and parameter lerp
 4. [x] Implement dynamic sampleRate bin calculation (not hardcoded 44100Hz)
 5. [x] Wire audio-reactive bridge in app.js showFrame()
-6. **BLOCKED** — `createMediaElementSource()` causes audio loss when analyser connects. See Implementation Findings. Requires new approach (A/B/C).
-7. [ ] Test Howler.masterGain() behavior under mute (in-browser) — moot if approach changes
+6. [x] ~~BLOCKED~~ — Resolved via Approach B (dedicated analysis element). `createMediaElementSource()` on a separate muted `<audio>` element; Howler untouched.
+7. [ ] Test Howler.masterGain() behavior under mute (in-browser) — moot with Approach B
 8. [x] Author Scene 11 audioReactive regions (Ashley — artistic decisions)
 9. [ ] Tune range/smoothing/threshold/cooldown values in-browser with actual music (Ashley)
 10. [x] Test: silence, muted, pause/resume, reduced motion, multiple bands, 48kHz sampleRate
@@ -447,5 +459,5 @@ The current `createMediaElementSource()` approach must be replaced. Evaluated al
 13. [x] Update Scene 11 config: trigger + modulate combined, fast cycleDuration, adjusted center
 14. [ ] Re-author `mask-11-music-shockwave.png` for upward-only column above record (Ashley)
 15. [x] Test: onset detection, cooldown, combined trigger+modulate, autoRepeat false/true
-16. [ ] **Revert commit e58b60f** — restore audio by undoing `once('play')` ordering fix. Preserves `filter.enabled`, warmup guard, `smoothingTimeConstant=0.4`, and ADR updates. Shockwave will be inert (analyser never connects) until a new approach is chosen.
-17. [ ] **Choose replacement approach** (A, B, or C) and implement — see Implementation Findings
+16. [x] **Revert commit e58b60f** — done. Audio restored; `createMediaElementSource` wiring removed.
+17. [x] **Approach B chosen** — dedicated muted `<audio>` element for FFT analysis, Howler untouched.
