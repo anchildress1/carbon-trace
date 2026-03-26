@@ -238,11 +238,11 @@ function resolveAnalyserCueEnter(frame, cue, audioDurations) {
     }
     const refEnter = typeof refCue.enter === 'number' ? refCue.enter : 0;
 
-    // Tier 1: metadata duration from preloader
-    let refDuration = audioDurations?.get(refCue.src);
+    // Tier 1: metadata duration from preloader (coerce undefined → 0)
+    let refDuration = audioDurations?.get(refCue.src) ?? 0;
 
     // Tier 2: caption-derived duration (fallback when preload hasn't finished)
-    if (!(refDuration > 0) && frame.narration?.captions?.length) {
+    if (refDuration <= 0 && frame.narration?.captions?.length) {
       refDuration = Math.max(...frame.narration.captions.map((c) => c.end)) / 1000;
     }
 
@@ -481,25 +481,15 @@ function clearPauseState(app) {
 
 function handleBufferChange(app, isBuffering) {
   app.buffering = isBuffering;
+  app.els.sceneStage.classList.toggle('buffering', isBuffering);
 
   // Guard: do not touch the text timeline during transitions —
   // landOnFrame will start it once the fade-in completes.
-  if (app.state === State.TRANSITIONING) {
-    if (isBuffering) app.els.sceneStage.classList.add('buffering');
-    else app.els.sceneStage.classList.remove('buffering');
-    return;
-  }
+  if (app.state === State.TRANSITIONING) return;
 
-  if (isBuffering) {
-    if (!app.paused) {
-      if (app.textTimeline) app.textTimeline.pause();
-    }
-    app.els.sceneStage.classList.add('buffering');
-  } else {
-    if (!app.paused) {
-      if (app.textTimeline) app.textTimeline.resume();
-    }
-    app.els.sceneStage.classList.remove('buffering');
+  if (!app.paused && app.textTimeline) {
+    if (isBuffering) app.textTimeline.pause();
+    else app.textTimeline.resume();
   }
 }
 

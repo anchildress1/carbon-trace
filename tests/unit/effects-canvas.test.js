@@ -1032,8 +1032,7 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
 
   it('setAnalyser stores the analyser and allocates fftData', () => {
     const analyser = createMockAnalyser();
-    setAnalyser(analyser);
-    // No error means it was accepted
+    expect(() => setAnalyser(analyser)).not.toThrow();
     setAnalyser(null);
   });
 
@@ -1042,23 +1041,21 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
     setAnalyser(analyser512);
     // Second analyser with different bin count — must reallocate, not reuse
     const analyser2048 = createMockAnalyser(44100, 2048);
-    setAnalyser(analyser2048);
-    // No error and no throw means reallocation succeeded
+    expect(() => setAnalyser(analyser2048)).not.toThrow();
+    setAnalyser(null);
   });
 
   it('setAnalyser(null) clears fftData', () => {
     const analyser = createMockAnalyser();
     setAnalyser(analyser);
-    // Passing null must clear fftData so a later setAnalyser reallocates correctly
     setAnalyser(null);
-    // Re-setting the same analyser should not throw
-    setAnalyser(analyser);
+    // Re-setting the same analyser after clearing should not throw
+    expect(() => setAnalyser(analyser)).not.toThrow();
     setAnalyser(null);
   });
 
   it('setAnalyser with null is a no-op', () => {
-    setAnalyser(null);
-    // Should not throw
+    expect(() => setAnalyser(null)).not.toThrow();
   });
 
   it('clearAll resets the analyser reference', async () => {
@@ -1133,13 +1130,11 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
 
     it('extractBands works at 48000Hz sampleRate', () => {
       const analyser = createMockAnalyser(48000);
-      setAnalyser(analyser);
-      // At 48000Hz, fftSize=2048: binWidth = 48000/2048 ≈ 23.4Hz
-      // bass: 20-250Hz → bins ~1-11
-      // Verify no errors at different sample rate
       analyser.getByteFrequencyData.mockImplementation((data) => {
         data.fill(128);
       });
+      // Verify analyser is accepted at non-standard sample rate
+      expect(() => setAnalyser(analyser)).not.toThrow();
       setAnalyser(null);
     });
   });
@@ -1564,8 +1559,7 @@ describe('effects-canvas — dedicated analysis element (ADR-008 Approach B)', (
   });
 
   it('connectAnalysisAudio is a no-op when analyserNode is null', () => {
-    // Should not throw
-    connectAnalysisAudio('test.mp3', null);
+    expect(() => connectAnalysisAudio('test.mp3', null)).not.toThrow();
   });
 
   it('connectAnalysisAudio is a no-op when analyserNode.context is missing', () => {
@@ -1575,8 +1569,7 @@ describe('effects-canvas — dedicated analysis element (ADR-008 Approach B)', (
       context: null,
     };
 
-    // Should not throw
-    connectAnalysisAudio('test.mp3', analyser);
+    expect(() => connectAnalysisAudio('test.mp3', analyser)).not.toThrow();
   });
 
   it('startAnalysisPlayback calls play on the analysis element', () => {
@@ -1592,8 +1585,7 @@ describe('effects-canvas — dedicated analysis element (ADR-008 Approach B)', (
   });
 
   it('startAnalysisPlayback is a no-op when no analysis element exists', () => {
-    // Should not throw
-    startAnalysisPlayback();
+    expect(() => startAnalysisPlayback()).not.toThrow();
   });
 
   it('clearAll cleans up the analysis element and gain node', async () => {

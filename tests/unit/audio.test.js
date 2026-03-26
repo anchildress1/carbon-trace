@@ -1013,7 +1013,7 @@ describe('audio.js — audio-reactive analyser (ADR-008)', () => {
   it('disconnectAnalyserSource clears analyser state', () => {
     getAnalyserNode();
     disconnectAnalyserSource();
-    // Should not throw — idempotent
-    disconnectAnalyserSource();
+    // Idempotent — second call should not throw
+    expect(() => disconnectAnalyserSource()).not.toThrow();
   });
 });
