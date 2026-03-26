@@ -42,6 +42,7 @@ let audioReactiveState = [];
 let analysisElement = null;
 let analysisSource = null;
 let analysisSilentGain = null;
+let analysisAnalyserRef = null; // tracks which analyserNode is wired into the analysis graph for cleanup
 
 function reducedMotion() {
   return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -167,7 +168,7 @@ function buildAudioReactiveState() {
       // Onset trigger fields — spectral flux detection (ADR-008)
       if (ar.trigger) {
         state.trigger = true;
-        state.threshold = ar.trigger.threshold ?? 3.0;
+        state.threshold = ar.trigger.threshold ?? 3;
         state.cooldown = ar.trigger.cooldown ?? 0.1;
         state.minEnergy = ar.trigger.minEnergy ?? 0;
         state.prevEnergy = 0;
@@ -535,6 +536,7 @@ export function clearAll() {
   centeredEffects = [];
   audioReactiveState = [];
   arAnalyser = null;
+  fftData = null;
   cleanupAnalysisElement();
 
   // Wrap destroy calls in try/catch — a lost WebGL context can cause throws.
@@ -601,13 +603,27 @@ export function cancelPendingLoad() {
  */
 export function setAnalyser(node) {
   arAnalyser = node;
-  if (node && !fftData) {
-    fftData = new Uint8Array(node.frequencyBinCount);
+  if (node) {
+    if (!fftData || fftData.length !== node.frequencyBinCount) {
+      fftData = new Uint8Array(node.frequencyBinCount);
+    }
+  } else {
+    fftData = null;
   }
 }
 
 function cleanupAnalysisElement() {
   if (analysisSilentGain) {
+    // Disconnect analyserNode → gain before dropping the gain reference.
+    // Without this, the analyserNode accumulates orphaned output connections
+    // to dead-end gain nodes across scene transitions (memory leak).
+    if (analysisAnalyserRef) {
+      try {
+        analysisAnalyserRef.disconnect(analysisSilentGain);
+      } catch {
+        /* already disconnected */
+      }
+    }
     try {
       analysisSilentGain.disconnect();
     } catch {
@@ -615,6 +631,7 @@ function cleanupAnalysisElement() {
     }
     analysisSilentGain = null;
   }
+  analysisAnalyserRef = null;
   if (analysisSource) {
     try {
       analysisSource.disconnect();
@@ -667,9 +684,10 @@ export function connectAnalysisAudio(audioSrc, analyserNode) {
     analysisElement = el;
     analysisSource = source;
     analysisSilentGain = gain;
+    analysisAnalyserRef = analyserNode;
 
     arAnalyser = analyserNode;
-    if (!fftData) {
+    if (!fftData || fftData.length !== analyserNode.frequencyBinCount) {
       fftData = new Uint8Array(analyserNode.frequencyBinCount);
     }
   } catch (err) {

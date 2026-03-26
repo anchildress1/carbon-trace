@@ -1022,8 +1022,7 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
     vi.restoreAllMocks();
   });
 
-  function createMockAnalyser(sampleRate = 44100) {
-    const frequencyBinCount = 1024;
+  function createMockAnalyser(sampleRate = 44100, frequencyBinCount = 1024) {
     return {
       frequencyBinCount,
       getByteFrequencyData: vi.fn(),
@@ -1035,6 +1034,25 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
     const analyser = createMockAnalyser();
     setAnalyser(analyser);
     // No error means it was accepted
+    setAnalyser(null);
+  });
+
+  it('setAnalyser reallocates fftData when frequencyBinCount changes', () => {
+    const analyser512 = createMockAnalyser(44100, 512);
+    setAnalyser(analyser512);
+    // Second analyser with different bin count — must reallocate, not reuse
+    const analyser2048 = createMockAnalyser(44100, 2048);
+    setAnalyser(analyser2048);
+    // No error and no throw means reallocation succeeded
+  });
+
+  it('setAnalyser(null) clears fftData', () => {
+    const analyser = createMockAnalyser();
+    setAnalyser(analyser);
+    // Passing null must clear fftData so a later setAnalyser reallocates correctly
+    setAnalyser(null);
+    // Re-setting the same analyser should not throw
+    setAnalyser(analyser);
     setAnalyser(null);
   });
 
@@ -1472,6 +1490,7 @@ describe('effects-canvas — dedicated analysis element (ADR-008 Approach B)', (
       getByteFrequencyData: vi.fn(),
       context: ctx,
       connect: vi.fn(),
+      disconnect: vi.fn(),
     };
     return { analyser, ctx, mockSource, mockGain };
   }
@@ -1513,6 +1532,9 @@ describe('effects-canvas — dedicated analysis element (ADR-008 Approach B)', (
     // First source and gain should have been disconnected
     expect(firstSource.disconnect).toHaveBeenCalled();
     expect(firstGain.disconnect).toHaveBeenCalled();
+    // AnalyserNode must be explicitly disconnected from the old gain to
+    // avoid accumulating orphaned analyserNode → dead-end-gain connections.
+    expect(analyser.disconnect).toHaveBeenCalledWith(firstGain);
   });
 
   it('connectAnalysisAudio handles createMediaElementSource failure gracefully', () => {
