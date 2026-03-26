@@ -381,8 +381,52 @@ These require human judgment in-browser with actual music:
 
 ## Open Questions
 
-1. ~~**Howler html5 mode + AnalyserNode compatibility.**~~ **Resolved:** `createMediaElementSource()` routes the `<audio>` element through the Web Audio graph. Same-origin audio works without CORS headers. The signal chain section above documents the corrected approach.
+1. ~~**Howler html5 mode + AnalyserNode compatibility.**~~ **Reopened — see Implementation Findings below.** `createMediaElementSource()` takes ownership of the `<audio>` element's output. When the analyser actually connects (race condition fixed), audio output is lost. The routing chain `MediaElementSourceNode → AnalyserNode → ctx.destination` does not reliably restore playback in Howler html5 mode.
 2. **Howler mute behavior under `createMediaElementSource()`.** When `howl.mute(true)` is called, Howler sets the `<audio>` element's `muted` property. Since `createMediaElementSource()` taps the element *before* the muted flag is applied by the browser, the AnalyserNode may still receive signal. Test and document behavior — this determines whether muted audio still drives visuals.
+
+---
+
+## Implementation Findings (March 2026)
+
+### Critical: `createMediaElementSource()` causes audio loss
+
+The `createMediaElementSource()` approach has a fatal architectural incompatibility with Howler html5 mode.
+
+**What happened across three iterations:**
+
+1. **Original code**: `howl.once('play', connectHowlToAnalyser)` was registered *after* `howl.play()`. The `play` event fired before the listener existed — `connectHowlToAnalyser()` never ran. Audio played normally (no Web Audio interference) but the AnalyserNode received zero FFT data. Shockwave never triggered.
+
+2. **Race condition fix**: Moved `once('play')` registration before `play()`. The analyser connected successfully. `createMediaElementSource()` took ownership of the `<audio>` element's output. The chain `element → MediaElementSourceNode → AnalyserNode → ctx.destination` was correctly wired. **Result: zero audio output.**
+
+3. **The dilemma**: Either the analyser never connects (audio works, shockwave dead) or it connects and kills audio (shockwave works, nothing to hear). There is no working middle ground with `createMediaElementSource()` + Howler html5 mode.
+
+**Root cause is architectural.** Howler html5 mode was designed to bypass the Web Audio graph — `<audio>` elements output directly to the system audio device. `createMediaElementSource()` forces the element back through the Web Audio graph. Even though the chain `AnalyserNode → ctx.destination` should restore playback, it fails in practice. Possible contributing factors (unconfirmed):
+
+- AudioContext may be `suspended` when the analyser is created; Howler's internal `resume()` timing may not propagate through the `createMediaElementSource()` routing
+- Howler html5 mode controls volume/fade/mute directly on the `<audio>` element, which may interact unpredictably with `createMediaElementSource()` ownership
+- Browser-specific behavior when `createMediaElementSource()` is called on an element that's already playing with active fades
+
+### Correct fixes (preserve regardless of approach)
+
+These changes are independent of the routing problem and should be retained:
+
+| Fix | Location | Detail |
+|---|---|---|
+| `filter.enabled` lifecycle | effects.js | ShockwaveFilter starts `enabled=false` when `autoRepeat:false`. `trigger()` enables; `update()` disables after `cycleDuration`. PixiJS skips the entire filter pipeline when disabled. |
+| `smoothingTimeConstant = 0.4` | audio.js | 0.8 (original ADR value) dampened bass transients below the onset detection threshold. 0 was too noisy — frame-to-frame noise raised the running average baseline, masking real beats. 0.4 preserves transients while dampening noise. |
+| Warmup guard | effects-canvas.js | `if (runningAvg < 0.05) return` in `applyTrigger()`. Prevents false trigger during audio fade-in when `runningAvg` is near zero and any energy > 0 exceeds `threshold * 0`. |
+| Event registration order | audio.js | `howl.once('play', ...)` must register before `howl.play()` — Howler may emit the event synchronously. *However: this fix is what exposes the `createMediaElementSource()` audio loss.* |
+
+### Alternative approaches for audio-reactive
+
+The current `createMediaElementSource()` approach must be replaced. Evaluated alternatives:
+
+| # | Approach | How it works | Risk to audio | Tradeoff |
+|---|---|---|---|---|
+| **A** | **Pre-analyzed beat map** | Offline analysis produces a JSON array of beat timestamps embedded in scene config. `effects-canvas.js` fires `trigger()` at each timestamp relative to the cue's start time. No Web Audio API at runtime. | **None** | Deterministic, zero runtime risk. Drops continuous amplitude modulation (each beat would use a fixed or pre-analyzed intensity). Requires offline tooling or manual beat marking. Locked to a specific audio file — re-analyze if the track changes. |
+| **B** | **Dedicated analysis element** | Create a second, muted `<audio>` element pointing to the same audio file. Connect only this element via `createMediaElementSource()` for FFT analysis. Howler's playback audio is completely untouched. Periodically sync `currentTime` between the two elements. | **None** | Real-time FFT without risking playback. Preserves continuous modulation. Double bandwidth (two streams of the same file). Time synchronization adds complexity — drift between elements could desync beats. Additional `<audio>` element may impact mobile memory. |
+| **C** | **Howler Web Audio mode for end-song** | Use `html5: false` for the end-song cue only. In Web Audio mode, Howler routes audio through its `AudioContext` natively. Tap `Howler.masterGain` or insert an AnalyserNode in the native routing — no `createMediaElementSource()` needed. | **Low** | Uses Howler's own Web Audio routing as designed. But Web Audio mode buffers the entire file into memory (no streaming), may have different latency, and may behave differently on mobile (memory constraints for a full music track). All other cues remain html5. |
+| **D** | **Fix current approach** | Debug why `AnalyserNode → ctx.destination` doesn't produce audio after `createMediaElementSource()`. | **High** | Three iterations produced three regressions. The approach fights Howler's design. Even if fixed, the failure mode is catastrophic (zero audio for a decorative feature). |
 
 ---
 
@@ -393,13 +437,15 @@ These require human judgment in-browser with actual music:
 3. [x] Implement per-frame band extraction, EMA smoothing, and parameter lerp
 4. [x] Implement dynamic sampleRate bin calculation (not hardcoded 44100Hz)
 5. [x] Wire audio-reactive bridge in app.js showFrame()
-6. [ ] Verify Howler html5 mode + AnalyserNode works with same-origin audio (blocking — in-browser)
-7. [ ] Test Howler.masterGain() behavior under mute (in-browser)
+6. **BLOCKED** — `createMediaElementSource()` causes audio loss when analyser connects. See Implementation Findings. Requires new approach (A/B/C).
+7. [ ] Test Howler.masterGain() behavior under mute (in-browser) — moot if approach changes
 8. [x] Author Scene 11 audioReactive regions (Ashley — artistic decisions)
 9. [ ] Tune range/smoothing/threshold/cooldown values in-browser with actual music (Ashley)
 10. [x] Test: silence, muted, pause/resume, reduced motion, multiple bands, 48kHz sampleRate
-11. [ ] Add `autoRepeat` param and `trigger()` method to shockwave factory in effects.js
-12. [ ] Add onset detection to effects-canvas.js tickerUpdate (spectral flux + trigger dispatch)
-13. [ ] Update Scene 11 config: trigger + modulate combined, fast cycleDuration, adjusted center
+11. [x] Add `autoRepeat` param and `trigger()` method to shockwave factory in effects.js
+12. [x] Add onset detection to effects-canvas.js tickerUpdate (spectral flux + trigger dispatch)
+13. [x] Update Scene 11 config: trigger + modulate combined, fast cycleDuration, adjusted center
 14. [ ] Re-author `mask-11-music-shockwave.png` for upward-only column above record (Ashley)
-15. [ ] Test: onset detection, cooldown, combined trigger+modulate, autoRepeat false/true
+15. [x] Test: onset detection, cooldown, combined trigger+modulate, autoRepeat false/true
+16. [ ] **Revert commit e58b60f** — restore audio by undoing `once('play')` ordering fix. Preserves `filter.enabled`, warmup guard, `smoothingTimeConstant=0.4`, and ADR updates. Shockwave will be inert (analyser never connects) until a new approach is chosen.
+17. [ ] **Choose replacement approach** (A, B, or C) and implement — see Implementation Findings
