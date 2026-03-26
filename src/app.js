@@ -394,9 +394,10 @@ function wireAnalysisAudio(app, frame, analyser) {
     return;
   }
 
-  connectEffectsAnalysisAudio(cue.src, analyser);
   const enterDelay = resolveAnalyserCueEnter(frame, cue, app.audioDurations);
   if (enterDelay === null) return; // anchor unresolvable — analysis stays inert
+
+  connectEffectsAnalysisAudio(cue.src, analyser);
 
   const wireGeneration = app.generation;
   const wireIndex = app.currentIndex;
