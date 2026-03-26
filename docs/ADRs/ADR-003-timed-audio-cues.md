@@ -236,9 +236,9 @@ The breaking schema change is acceptable because no production config exists yet
 
 ## Action Items
 
-1. [x] Replace `ambient` + `narration` slots with `audioCues` array in schema
-2. [x] Rewrite audio.js around cue scheduling
-3. [x] Implement anchor resolution with duration metadata
-4. [x] Update all 12 frame configs in scenes.json
-5. [x] Update app.js: buildAndRunTimeline, hardCut, togglePause to use new audio API
-6. [x] Update v4 spec (superseded by v5)
+1. ~~done~~ Replace `ambient` + `narration` slots with `audioCues` array in schema
+2. ~~done~~ Rewrite audio.js around cue scheduling
+3. ~~done~~ Implement anchor resolution with duration metadata
+4. ~~done~~ Update all 12 frame configs in scenes.json
+5. ~~done~~ Update app.js: buildAndRunTimeline, hardCut, togglePause to use new audio API
+6. ~~done~~ Update v4 spec (superseded by v5)

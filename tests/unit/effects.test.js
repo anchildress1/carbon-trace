@@ -245,14 +245,15 @@ describe('effects.js — factory registry', () => {
 
       const dt = 1 / 60;
 
-      // During burst phase — time advances
+      // During burst phase — time advances, filter enabled
       result.update(dt);
+      expect(result.filter.enabled).toBe(true);
       expect(result.filter.time).toBeGreaterThan(0);
       expect(result.filter.time).toBeLessThan(0.1);
 
-      // Advance past burst into rest phase (need elapsed > 0.1s = 6+ ticks)
+      // Advance past burst into rest phase — filter disabled (no frozen wave)
       for (let i = 0; i < 10; i++) result.update(dt);
-      expect(result.filter.time).toBe(0.1);
+      expect(result.filter.enabled).toBe(false);
     });
 
     it('shockwave trigger() resets cycle to time 0', () => {
@@ -261,13 +262,14 @@ describe('effects.js — factory registry', () => {
         cyclePause: 2,
       });
 
-      // Advance past burst into rest
+      // Advance past burst into rest — filter disabled
       for (let i = 0; i < 120; i++) result.update(1 / 60);
-      expect(result.filter.time).toBe(1);
+      expect(result.filter.enabled).toBe(false);
 
-      // Trigger resets the cycle
+      // Trigger resets the cycle — filter re-enabled
       result.trigger();
       result.update(1 / 60);
+      expect(result.filter.enabled).toBe(true);
       expect(result.filter.time).toBeGreaterThan(0);
       expect(result.filter.time).toBeLessThan(0.1);
     });

@@ -1331,7 +1331,7 @@
             "centerX": 0.46,
             "centerY": 0.47,
             "autoRepeat": false,
-            "cycleDuration": 0.4,
+            "cycleDuration": 2.0,
             "cyclePause": 0,
             "speed": 400,
             "amplitude": 20,
@@ -1342,7 +1342,7 @@
               "range": [10, 30],
               "smoothing": 0.3,
               "trigger": {
-                "threshold": 1.5,
+                "threshold": 3.0,
                 "cooldown": 0.08
               }
             }

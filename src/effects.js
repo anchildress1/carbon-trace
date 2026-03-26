@@ -192,7 +192,12 @@ registerEffect('shockwave', (_sprite, params = {}) => {
 
       if (autoRepeat) {
         const cycle = elapsed % totalCycle;
-        filter.time = Math.min(cycle, cycleDuration);
+        if (cycle < cycleDuration) {
+          filter.enabled = true;
+          filter.time = cycle;
+        } else {
+          filter.enabled = false;
+        }
       } else {
         filter.time = Math.min(elapsed, cycleDuration);
         if (elapsed >= cycleDuration) {
@@ -201,6 +206,9 @@ registerEffect('shockwave', (_sprite, params = {}) => {
       }
     },
     trigger() {
+      // Ignore triggers while a wave is still expanding — resetting
+      // mid-expansion causes the wave to freeze near the center.
+      if (filter.enabled) return;
       elapsed = 0;
       filter.enabled = true;
     },

@@ -41,6 +41,7 @@ let audioReactiveState = [];
 // Dedicated analysis audio element (ADR-008 approach B)
 let analysisElement = null;
 let analysisSource = null;
+let analysisSilentGain = null;
 
 function reducedMotion() {
   return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -163,12 +164,14 @@ function buildAudioReactiveState() {
         smoothing: ar.smoothing ?? 0.8,
         smoothedValue: 0,
       };
-      // Onset trigger fields (ADR-008 trigger mode)
+      // Onset trigger fields — spectral flux detection (ADR-008)
       if (ar.trigger) {
         state.trigger = true;
-        state.threshold = ar.trigger.threshold ?? 1.5;
+        state.threshold = ar.trigger.threshold ?? 3.0;
         state.cooldown = ar.trigger.cooldown ?? 0.1;
-        state.runningAvg = 0;
+        state.prevEnergy = 0;
+        state.fluxAvg = 0;
+        state.activeFrames = 0;
         state.timeSinceLastTrigger = 0;
       }
       audioReactiveState.push(state);
@@ -183,13 +186,20 @@ function applyModulation(state, energy) {
 }
 
 function applyTrigger(state, energy, dt) {
-  state.runningAvg = state.runningAvg * 0.95 + energy * 0.05;
+  // Spectral flux: positive energy change only (onsets, not decays)
+  const flux = Math.max(0, energy - state.prevEnergy);
+  state.prevEnergy = energy;
+  state.fluxAvg = state.fluxAvg * 0.95 + flux * 0.05;
   state.timeSinceLastTrigger += dt;
-  // Require running average to stabilize before allowing triggers.
-  // Prevents false triggers during audio fade-in when runningAvg is near
-  // zero and any non-trivial energy would exceed threshold.
-  if (state.runningAvg < 0.05) return;
-  if (energy > state.runningAvg * state.threshold && state.timeSinceLastTrigger > state.cooldown) {
+
+  // Count frames with actual audio to gate warmup
+  if (energy > 0.01) state.activeFrames++;
+
+  // Wait ~1 second of audio data for flux average to stabilize.
+  // Prevents false trigger on the initial energy jump from silence.
+  if (state.activeFrames < 60) return;
+
+  if (flux > state.fluxAvg * state.threshold && state.timeSinceLastTrigger > state.cooldown) {
     activeEffects[state.effectIndex].trigger?.();
     state.timeSinceLastTrigger = 0;
   }
@@ -599,6 +609,14 @@ export function setAnalyser(node) {
 }
 
 function cleanupAnalysisElement() {
+  if (analysisSilentGain) {
+    try {
+      analysisSilentGain.disconnect();
+    } catch {
+      /* already disconnected */
+    }
+    analysisSilentGain = null;
+  }
   if (analysisSource) {
     try {
       analysisSource.disconnect();
@@ -616,11 +634,15 @@ function cleanupAnalysisElement() {
 }
 
 /**
- * Create a dedicated muted <audio> element for FFT analysis (ADR-008 approach B).
+ * Create a dedicated <audio> element for FFT analysis (ADR-008 approach B).
  * The element streams the same audio file as the playback cue but is completely
  * independent of Howler. createMediaElementSource() routes its output through
- * the AnalyserNode for FFT reads. The element is muted at the HTML level so
- * no duplicate audio plays even if Web Audio routing fails.
+ * the AnalyserNode for FFT reads.
+ *
+ * Signal chain: MediaElementSource → AnalyserNode → GainNode(0) → destination.
+ * Chrome does not process audio through an AnalyserNode unless the graph
+ * reaches ctx.destination — a dead-end analyser returns all-zero FFT data.
+ * The GainNode is set to 0 so no duplicate audio is audible.
  */
 export function connectAnalysisAudio(audioSrc, analyserNode) {
   cleanupAnalysisElement();
@@ -631,13 +653,6 @@ export function connectAnalysisAudio(audioSrc, analyserNode) {
   if (!ctx) return;
 
   const el = document.createElement('audio');
-  // Use volume=0 instead of muted=true. Chrome does not decode audio for
-  // muted elements, so MediaElementSource receives silence and FFT reads
-  // return all zeros. volume=0 allows decoding through Web Audio while
-  // producing no direct output. createMediaElementSource takes ownership
-  // of the element's output anyway, so there is no audible double-play.
-  el.volume = 0;
-  el.crossOrigin = 'anonymous';
   el.preload = 'auto';
   el.src = audioSrc;
 
@@ -645,8 +660,15 @@ export function connectAnalysisAudio(audioSrc, analyserNode) {
     const source = ctx.createMediaElementSource(el);
     source.connect(analyserNode);
 
+    // Route analyser → silent gain → destination so Chrome processes FFT.
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+    analyserNode.connect(gain);
+    gain.connect(ctx.destination);
+
     analysisElement = el;
     analysisSource = source;
+    analysisSilentGain = gain;
 
     arAnalyser = analyserNode;
     if (!fftData) {

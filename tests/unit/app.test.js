@@ -1912,16 +1912,17 @@ describe('app.js', () => {
       const mockAnalyser = { frequencyBinCount: 1024 };
       getAnalyserNode.mockReturnValue(mockAnalyser);
 
-      // Set narration duration so resolveAnalyserCueEnter returns a positive delay
       // end-song enter = { ref: 'narration', offset: -1000 }
-      // narration enter = 500, duration = 5s → 500 + 5000 - 1000 = 4500ms
-      // Since audioDurations is empty (no preloaded durations), delay resolves to 0
-      // and startAnalysisPlayback is called immediately.
+      // narration enter = 500, captions end = 2000 → caption duration = 2s
+      // delay = 500 + 2000 - 1000 = 1500ms (caption-derived fallback)
       app.advance();
       await flush();
 
-      // With no audioDurations, ref duration lookup returns undefined → delay = 0
-      // So startAnalysisPlayback is called immediately
+      // Not called yet — waiting on PausableTimer
+      expect(startEffectsAnalysisPlayback).not.toHaveBeenCalled();
+
+      // Advance past the delay
+      vi.advanceTimersByTime(1500);
       expect(startEffectsAnalysisPlayback).toHaveBeenCalled();
     });
 

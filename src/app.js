@@ -228,12 +228,21 @@ function resolveAnalyserCueEnter(frame, cue, audioDurations) {
   if (typeof cue.enter === 'number') return cue.enter;
   if (cue.enter?.ref) {
     const refCue = frame.audioCues?.find((c) => c.id === cue.enter.ref);
-    if (!refCue) return 0;
+    if (!refCue) return null;
     const refEnter = typeof refCue.enter === 'number' ? refCue.enter : 0;
-    const refDuration = audioDurations?.get(refCue.src);
+
+    // Tier 1: metadata duration from preloader
+    let refDuration = audioDurations?.get(refCue.src);
+
+    // Tier 2: caption-derived duration (fallback when preload hasn't finished)
+    if (!(refDuration > 0) && frame.narration?.captions?.length) {
+      refDuration = Math.max(...frame.narration.captions.map((c) => c.end)) / 1000;
+    }
+
     if (refDuration > 0) {
       return refEnter + refDuration * 1000 + (cue.enter.offset || 0);
     }
+    return null; // anchor unresolvable — don't guess
   }
   return 0;
 }
@@ -375,6 +384,7 @@ function wireAnalysisAudio(app, frame, analyser) {
 
   connectEffectsAnalysisAudio(cue.src, analyser);
   const enterDelay = resolveAnalyserCueEnter(frame, cue, app.audioDurations);
+  if (enterDelay === null) return; // anchor unresolvable — analysis stays inert
   if (enterDelay > 0) {
     app.analysisStartTimer = new PausableTimer(() => {
       app.analysisStartTimer = null;
@@ -442,6 +452,14 @@ function clearPauseState(app) {
 
 function handleBufferChange(app, isBuffering) {
   app.buffering = isBuffering;
+
+  // Guard: do not touch the text timeline during transitions —
+  // landOnFrame will start it once the fade-in completes.
+  if (app.state === State.TRANSITIONING) {
+    if (isBuffering) app.els.sceneStage.classList.add('buffering');
+    else app.els.sceneStage.classList.remove('buffering');
+    return;
+  }
 
   if (isBuffering) {
     if (!app.paused) {
@@ -609,7 +627,9 @@ function transition(app, toIndex) {
       app.pendingPause = false;
       doPause(app);
     } else {
-      if (app.textTimeline) app.textTimeline.play(0);
+      if (app.textTimeline) {
+        app.textTimeline.play(0);
+      }
       setupAutoAdvance(app);
     }
     manageFocusAfterTransition(app);

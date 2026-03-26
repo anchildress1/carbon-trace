@@ -47,22 +47,24 @@ To get FFT data without touching Howler's audio, a **dedicated silent `<audio>` 
 ```
 Howler end-song <audio> (html5:true)   →  system audio output (playback, untouched)
 
-Dedicated analysis <audio> (volume=0, same src)
+Dedicated analysis <audio> (same src)
   └─ createMediaElementSource(element)
        └─ AnalyserNode (audio.js, fftSize: 2048)
-            └─ getByteFrequencyData() → Uint8Array[1024]
-                 └─ effects-canvas.js ticker reads per frame
+            ├─ getByteFrequencyData() → Uint8Array[1024]
+            │    └─ effects-canvas.js ticker reads per frame
+            └─ GainNode (gain: 0)
+                 └─ ctx.destination (silent — required for Chrome to process FFT)
 
-NOT connected to ctx.destination — createMediaElementSource takes ownership.
-element.volume = 0 (NOT muted — Chrome skips audio decoding for muted elements,
-causing MediaElementSource to receive silence and FFT to return all zeros).
+Chrome does not process audio through an AnalyserNode unless the Web Audio graph
+reaches ctx.destination. A dead-end analyser returns all-zero FFT data. The
+GainNode with gain=0 satisfies this requirement while producing no audible output.
 ```
 
 **Why a dedicated element instead of tapping Howler's?** `createMediaElementSource()` takes permanent ownership of an `<audio>` element's output — audio no longer goes directly to speakers, but must route through the Web Audio graph. When applied to Howler's element in html5 mode, this caused audio loss (see Implementation Findings). The dedicated element isolates this side effect: if the analysis routing fails, only FFT data is lost; playback is unaffected.
 
 **`createMediaElementSource()` constraints:**
 - Can only be called **once per `<audio>` element**. Calling it again on the same element throws `InvalidStateError`. The implementation tracks the connected element and skips reconnection.
-- Takes **ownership** of the element's output — audio no longer goes directly to speakers. The `AnalyserNode.connect(ctx.destination)` call restores playback through the Web Audio graph.
+- Takes **ownership** of the element's output — audio no longer goes directly to speakers. The `AnalyserNode → GainNode(0) → ctx.destination` chain routes through Web Audio silently.
 - Has **CORS restrictions** — the audio file must be served from the same origin. carbon-trace serves all audio from same-origin (`/assets/audio/`), so this works.
 
 ### Per-frame modulation (inside PixiJS ticker)
@@ -83,22 +85,27 @@ FOR EACH region with audioReactive config:
 
 ### Onset detection (trigger mode)
 
-When `audioReactive.trigger` is present, the ticker additionally runs onset detection each frame using spectral flux against a running average:
+When `audioReactive.trigger` is present, the ticker additionally runs onset detection each frame using **spectral flux** — the positive change in band energy between consecutive frames:
 
 ```
 FOR EACH region with audioReactive.trigger:
-  1. Update running average:
-     runningAvg = runningAvg * 0.95 + energy * 0.05
-  2. Increment timeSinceLastTrigger by frame delta
-  3. IF runningAvg < 0.05: SKIP (warmup guard — see below)
-  4. IF energy > runningAvg * threshold AND timeSinceLastTrigger > cooldown:
+  1. Compute spectral flux:
+     flux = max(0, currentEnergy - previousEnergy)
+     (only positive changes — onsets, not decays)
+  2. Update flux running average:
+     fluxAvg = fluxAvg * 0.95 + flux * 0.05
+  3. Increment timeSinceLastTrigger by frame delta
+  4. IF activeFrames < 60: SKIP (warmup guard — see below)
+  5. IF flux > fluxAvg * threshold AND timeSinceLastTrigger > cooldown:
      a. Call effect.trigger() — resets the animation cycle (e.g., shockwave time=0)
      b. Reset timeSinceLastTrigger = 0
 ```
 
-The running average decay (0.95) adapts to the music's overall energy level. The `threshold` multiplier means "trigger when current energy exceeds the running average by this factor." A threshold of 1.5 = "50% above average." The `cooldown` prevents rapid re-triggering within a minimum interval.
+**Why spectral flux, not absolute level.** The original algorithm compared absolute band energy to a running energy average (`energy > avgEnergy * 1.5`). This fails for music with sustained bass (folk-punk, rock, etc.) where the bass energy fluctuates only ±15% around the mean — the running average converges to the same level and the threshold is never exceeded. Spectral flux measures *change* between frames instead. A kick drum causes a sudden energy *increase* (high flux) even when the overall bass level is consistently high. The running average of flux is typically low (small frame-to-frame jitter), so even moderate increases in energy produce flux spikes that exceed the threshold.
 
-**Warmup guard (step 3):** `runningAvg` starts at 0. Without the guard, the first frame with any non-zero audio energy would satisfy `energy > 0 * threshold` and trigger falsely during audio fade-in. The 0.05 floor (5% of max band energy) ensures the running average has built up enough baseline signal for the threshold comparison to be meaningful. For the end-song cue (initial volume 0.15, 8-second fade-in), the running average naturally exceeds 0.05 once the music reaches audible levels.
+The `threshold` multiplier means "trigger when flux exceeds the average flux by this factor." A threshold of 3.0 = "3x the typical frame-to-frame change." The `cooldown` prevents rapid re-triggering within a minimum interval.
+
+**Warmup guard (step 4):** When the analysis audio first starts, energy jumps from 0 to a high value in one frame, producing a massive flux spike. The `activeFrames` counter tracks frames where energy > 0.01. Until 60 such frames have passed (~1 second of audio at 60fps), all triggers are suppressed. This gives the flux running average time to stabilize so the threshold comparison is meaningful.
 
 Trigger and continuous modulation run in the same frame. Continuous modulation sets the parameter value (e.g., amplitude), then trigger fires a new cycle if a beat is detected. Combined: each beat fires a shockwave whose intensity matches the hit strength.
 
@@ -178,14 +185,14 @@ With optional onset trigger (composable with continuous modulation above):
   "type": "shockwave",
   "mask": "assets/masks/11-shockwave.png",
   "autoRepeat": false,       // ← no fixed-timer cycling; trigger controls timing
-  "cycleDuration": 0.4,      // ← fast expansion per beat
+  "cycleDuration": 2.0,      // ← time for wave to expand across screen
   "audioReactive": {
     "band": "bass",
     "target": "amplitude",   // continuous: modulate intensity per hit strength
     "range": [10, 30],
     "smoothing": 0.3,        // lower = more responsive to transients
-    "trigger": {             // onset detection (optional)
-      "threshold": 1.5,      // fire when energy > runningAvg * 1.5
+    "trigger": {             // onset detection via spectral flux (optional)
+      "threshold": 3.0,      // fire when flux > fluxAvg * 3.0
       "cooldown": 0.08       // min 80ms between triggers (~12/sec max)
     }
   }
@@ -308,10 +315,11 @@ Trigger: no audio       │ Running average stays at 0. Energy never
                         │ exceeds threshold. No triggers fire. Effect
                         │ idle at cycleDuration (shockwave invisible).
 ────────────────────────┼─────────────────────────────────────────────
-Trigger: sustained      │ Running average rises to match sustained
-loud audio              │ energy. Triggers only fire on transients
-                        │ above the running average, not on steady
-                        │ volume. Adaptive by design.
+Trigger: sustained      │ Spectral flux detects onsets even when
+loud audio              │ absolute bass level is consistently high.
+                        │ Triggers fire on energy *increases*
+                        │ (beats), not absolute level. Adaptive
+                        │ by design.
 ────────────────────────┼─────────────────────────────────────────────
 Trigger: reduced motion │ Trigger ignored (same as modulation).
                         │ Effect static at base parameter value.
@@ -367,12 +375,13 @@ Precedence            │ audioReactive overrides pulse on same parameter
 CORS / same-origin    │ Verify AnalyserNode works with same-origin audio
                       │ served via Howler html5 mode
 Dynamic sampleRate    │ Verify bin calculation works at 48000Hz (not just 44100Hz)
-Trigger: onset        │ Energy spike above threshold * runningAvg fires
-                      │ effect.trigger(), resets shockwave cycle
-Trigger: cooldown     │ Rapid energy spikes within cooldown window
+Trigger: onset        │ Spectral flux spike above fluxAvg * threshold
+                      │ fires effect.trigger(), resets shockwave cycle
+Trigger: cooldown     │ Rapid flux spikes within cooldown window
                       │ are ignored (only first fires)
-Trigger: adaptation   │ Running average rises with sustained energy,
-                      │ only transients above average trigger
+Trigger: adaptation   │ Flux average adapts to music dynamics.
+                      │ Sustained energy = low flux = low fluxAvg.
+                      │ Beats produce flux spikes above threshold.
 Trigger + modulate    │ Combined mode: trigger fires cycle AND
                       │ modulation drives amplitude in same frame
 Trigger: autoRepeat   │ autoRepeat:false shockwave idles after one
@@ -428,7 +437,7 @@ These changes are independent of the routing problem and should be retained:
 |---|---|---|
 | `filter.enabled` lifecycle | effects.js | ShockwaveFilter starts `enabled=false` when `autoRepeat:false`. `trigger()` enables; `update()` disables after `cycleDuration`. PixiJS skips the entire filter pipeline when disabled. |
 | `smoothingTimeConstant = 0.4` | audio.js | 0.8 (original ADR value) dampened bass transients below the onset detection threshold. 0 was too noisy — frame-to-frame noise raised the running average baseline, masking real beats. 0.4 preserves transients while dampening noise. |
-| Warmup guard | effects-canvas.js | `if (runningAvg < 0.05) return` in `applyTrigger()`. Prevents false trigger during audio fade-in when `runningAvg` is near zero and any energy > 0 exceeds `threshold * 0`. |
+| Warmup guard | effects-canvas.js | `if (activeFrames < 60) return` in `applyTrigger()`. Prevents false trigger when audio first arrives — the initial energy jump from 0 produces a massive spectral flux spike before the flux average has stabilized. |
 | Event registration order | audio.js | `howl.once('play', ...)` must register before `howl.play()` — Howler may emit the event synchronously. *However: this fix is what exposes the `createMediaElementSource()` audio loss.* |
 
 ### Alternative approaches for audio-reactive
@@ -446,20 +455,20 @@ The current `createMediaElementSource()` approach must be replaced. Evaluated al
 
 ## Action Items
 
-1. [x] Add `getAnalyserNode()` to audio.js — lazy AnalyserNode on Howler's AudioContext
-2. [x] Add `setAnalyser()` to effects-canvas.js — store analyser, read FFT in ticker
-3. [x] Implement per-frame band extraction, EMA smoothing, and parameter lerp
-4. [x] Implement dynamic sampleRate bin calculation (not hardcoded 44100Hz)
-5. [x] Wire audio-reactive bridge in app.js showFrame()
-6. [x] ~~BLOCKED~~ — Resolved via Approach B (dedicated analysis element). `createMediaElementSource()` on a separate muted `<audio>` element; Howler untouched.
+1. ~~done~~ Add `getAnalyserNode()` to audio.js — lazy AnalyserNode on Howler's AudioContext
+2. ~~done~~ Add `setAnalyser()` to effects-canvas.js — store analyser, read FFT in ticker
+3. ~~done~~ Implement per-frame band extraction, EMA smoothing, and parameter lerp
+4. ~~done~~ Implement dynamic sampleRate bin calculation (not hardcoded 44100Hz)
+5. ~~done~~ Wire audio-reactive bridge in app.js showFrame()
+6. ~~done~~ ~~BLOCKED~~ — Resolved via Approach B (dedicated analysis element). `createMediaElementSource()` on a separate muted `<audio>` element; Howler untouched.
 7. [ ] Test Howler.masterGain() behavior under mute (in-browser) — moot with Approach B
-8. [x] Author Scene 11 audioReactive regions (Ashley — artistic decisions)
+8. ~~done~~ Author Scene 11 audioReactive regions (Ashley — artistic decisions)
 9. [ ] Tune range/smoothing/threshold/cooldown values in-browser with actual music (Ashley)
-10. [x] Test: silence, muted, pause/resume, reduced motion, multiple bands, 48kHz sampleRate
-11. [x] Add `autoRepeat` param and `trigger()` method to shockwave factory in effects.js
-12. [x] Add onset detection to effects-canvas.js tickerUpdate (spectral flux + trigger dispatch)
-13. [x] Update Scene 11 config: trigger + modulate combined, fast cycleDuration, adjusted center
+10. ~~done~~ Test: silence, muted, pause/resume, reduced motion, multiple bands, 48kHz sampleRate
+11. ~~done~~ Add `autoRepeat` param and `trigger()` method to shockwave factory in effects.js
+12. ~~done~~ Add onset detection to effects-canvas.js tickerUpdate (spectral flux + trigger dispatch)
+13. ~~done~~ Update Scene 11 config: trigger + modulate combined, fast cycleDuration, adjusted center
 14. [ ] Re-author `mask-11-music-shockwave.png` for upward-only column above record (Ashley)
-15. [x] Test: onset detection, cooldown, combined trigger+modulate, autoRepeat false/true
-16. [x] **Revert commit e58b60f** — done. Audio restored; `createMediaElementSource` wiring removed.
-17. [x] **Approach B chosen** — dedicated silent `<audio>` element (volume=0) for FFT analysis, Howler untouched.
+15. ~~done~~ Test: onset detection, cooldown, combined trigger+modulate, autoRepeat false/true
+16. ~~done~~ **Revert commit e58b60f** — done. Audio restored; `createMediaElementSource` wiring removed.
+17. ~~done~~ **Approach B chosen** — dedicated silent `<audio>` element (volume=0) for FFT analysis, Howler untouched.

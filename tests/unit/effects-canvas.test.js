@@ -1231,24 +1231,28 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
       return { analyser, tickerCallback, triggerFn };
     }
 
-    it('onset detection fires trigger on energy spike', async () => {
+    it('spectral flux fires trigger on energy increase', async () => {
       const { analyser, tickerCallback, triggerFn } = await setupTriggerScene({
         band: 'bass',
-        trigger: { threshold: 1.5, cooldown: 0 },
+        trigger: { threshold: 3.0, cooldown: 0 },
       });
 
-      // First few frames: build up running average with low energy
+      // Warmup: 65 frames of alternating low energy to build flux average.
+      // activeFrames must reach 60 before triggers are allowed.
+      let warmupFrame = 0;
       analyser.getByteFrequencyData.mockImplementation((data) => {
         data.fill(0);
-        for (let i = 1; i <= 12; i++) data[i] = 25; // low bass
+        const val = warmupFrame % 2 === 0 ? 25 : 30;
+        for (let i = 1; i <= 12; i++) data[i] = val;
+        warmupFrame++;
       });
-      for (let i = 0; i < 10; i++) tickerCallback({ deltaMS: 16.67 });
+      for (let i = 0; i < 65; i++) tickerCallback({ deltaMS: 16.67 });
       triggerFn.mockClear();
 
-      // Spike: high energy well above running average
+      // Spike: large energy increase → high spectral flux exceeds fluxAvg * 3
       analyser.getByteFrequencyData.mockImplementation((data) => {
         data.fill(0);
-        for (let i = 1; i <= 12; i++) data[i] = 255; // max bass
+        for (let i = 1; i <= 12; i++) data[i] = 255;
       });
       tickerCallback({ deltaMS: 16.67 });
 
@@ -1259,19 +1263,22 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
     it('cooldown prevents rapid re-triggering', async () => {
       const { analyser, tickerCallback, triggerFn } = await setupTriggerScene({
         band: 'bass',
-        trigger: { threshold: 1.5, cooldown: 0.5 },
+        trigger: { threshold: 3.0, cooldown: 0.5 },
       });
 
-      // Build baseline with low energy. Run 40 frames (667ms) to let
-      // the running average stabilize AND exceed the 0.5s cooldown.
+      // Warmup: 65 frames of alternating energy to build flux average
+      // and pass the 60-frame warmup guard.
+      let warmupFrame = 0;
       analyser.getByteFrequencyData.mockImplementation((data) => {
         data.fill(0);
-        for (let i = 1; i <= 12; i++) data[i] = 25;
+        const val = warmupFrame % 2 === 0 ? 25 : 30;
+        for (let i = 1; i <= 12; i++) data[i] = val;
+        warmupFrame++;
       });
-      for (let i = 0; i < 40; i++) tickerCallback({ deltaMS: 16.67 });
+      for (let i = 0; i < 65; i++) tickerCallback({ deltaMS: 16.67 });
       triggerFn.mockClear();
 
-      // Spike — should trigger (energy well above runningAvg * 1.5)
+      // Spike — should trigger (large flux exceeds fluxAvg * 3)
       analyser.getByteFrequencyData.mockImplementation((data) => {
         data.fill(0);
         for (let i = 1; i <= 12; i++) data[i] = 255;
@@ -1279,9 +1286,18 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
       tickerCallback({ deltaMS: 16.67 });
       expect(triggerFn).toHaveBeenCalledTimes(1);
 
-      // Another spike immediately (within 0.5s cooldown) — should NOT trigger
+      // Drop back down then spike again immediately (within 0.5s cooldown)
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        for (let i = 1; i <= 12; i++) data[i] = 25;
+      });
       tickerCallback({ deltaMS: 16.67 });
-      expect(triggerFn).toHaveBeenCalledTimes(1);
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        for (let i = 1; i <= 12; i++) data[i] = 255;
+      });
+      tickerCallback({ deltaMS: 16.67 });
+      expect(triggerFn).toHaveBeenCalledTimes(1); // cooldown blocked it
 
       destroy();
     });
@@ -1292,15 +1308,18 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
         target: 'amplitude',
         range: [0, 10],
         smoothing: 0,
-        trigger: { threshold: 1.5, cooldown: 0 },
+        trigger: { threshold: 3.0, cooldown: 0 },
       });
 
-      // Build baseline
+      // Warmup: 65 frames of alternating energy
+      let warmupFrame = 0;
       analyser.getByteFrequencyData.mockImplementation((data) => {
         data.fill(0);
-        for (let i = 1; i <= 12; i++) data[i] = 25;
+        const val = warmupFrame % 2 === 0 ? 25 : 30;
+        for (let i = 1; i <= 12; i++) data[i] = val;
+        warmupFrame++;
       });
-      for (let i = 0; i < 10; i++) tickerCallback({ deltaMS: 16.67 });
+      for (let i = 0; i < 65; i++) tickerCallback({ deltaMS: 16.67 });
       triggerFn.mockClear();
 
       // Spike — both modulation and trigger should fire
@@ -1407,52 +1426,59 @@ describe('effects-canvas — dedicated analysis element (ADR-008 Approach B)', (
 
   function createMockAnalyserWithContext() {
     const mockSource = { connect: vi.fn(), disconnect: vi.fn() };
+    const mockGain = { gain: { value: 1 }, connect: vi.fn(), disconnect: vi.fn() };
     const ctx = {
       sampleRate: 44100,
       createMediaElementSource: vi.fn(() => mockSource),
+      createGain: vi.fn(() => mockGain),
+      destination: {},
     };
-    return {
-      analyser: {
-        frequencyBinCount: 1024,
-        getByteFrequencyData: vi.fn(),
-        context: ctx,
-      },
-      ctx,
-      mockSource,
+    const analyser = {
+      frequencyBinCount: 1024,
+      getByteFrequencyData: vi.fn(),
+      context: ctx,
+      connect: vi.fn(),
     };
+    return { analyser, ctx, mockSource, mockGain };
   }
 
-  it('connectAnalysisAudio creates muted element and connects source to analyser', () => {
-    const { analyser, ctx, mockSource } = createMockAnalyserWithContext();
+  it('connectAnalysisAudio creates element and routes through silent gain to destination', () => {
+    const { analyser, ctx, mockSource, mockGain } = createMockAnalyserWithContext();
 
     connectAnalysisAudio('test-song.mp3', analyser);
 
     expect(ctx.createMediaElementSource).toHaveBeenCalledTimes(1);
     const createdEl = ctx.createMediaElementSource.mock.calls[0][0];
     expect(createdEl.tagName).toBe('AUDIO');
-    expect(createdEl.volume).toBe(0);
-    expect(createdEl.crossOrigin).toBe('anonymous');
     expect(createdEl.preload).toBe('auto');
     expect(createdEl.src).toContain('test-song.mp3');
 
-    // Source connected to analyser, NOT to destination
+    // Source → analyser → gain(0) → destination
     expect(mockSource.connect).toHaveBeenCalledWith(analyser);
+    expect(ctx.createGain).toHaveBeenCalledTimes(1);
+    expect(mockGain.gain.value).toBe(0);
+    expect(analyser.connect).toHaveBeenCalledWith(mockGain);
+    expect(mockGain.connect).toHaveBeenCalledWith(ctx.destination);
   });
 
   it('connectAnalysisAudio replaces previous analysis element', () => {
-    const { analyser, ctx, mockSource } = createMockAnalyserWithContext();
+    const { analyser, ctx, mockSource, mockGain } = createMockAnalyserWithContext();
 
     connectAnalysisAudio('song-1.mp3', analyser);
     const firstSource = mockSource;
+    const firstGain = mockGain;
 
-    // Create new mock source for second call
+    // Create new mocks for second call
     const secondSource = { connect: vi.fn(), disconnect: vi.fn() };
+    const secondGain = { gain: { value: 1 }, connect: vi.fn(), disconnect: vi.fn() };
     ctx.createMediaElementSource.mockReturnValueOnce(secondSource);
+    ctx.createGain.mockReturnValueOnce(secondGain);
 
     connectAnalysisAudio('song-2.mp3', analyser);
 
-    // First source should have been disconnected
+    // First source and gain should have been disconnected
     expect(firstSource.disconnect).toHaveBeenCalled();
+    expect(firstGain.disconnect).toHaveBeenCalled();
   });
 
   it('connectAnalysisAudio handles createMediaElementSource failure gracefully', () => {
@@ -1515,11 +1541,11 @@ describe('effects-canvas — dedicated analysis element (ADR-008 Approach B)', (
     startAnalysisPlayback();
   });
 
-  it('clearAll cleans up the analysis element', async () => {
+  it('clearAll cleans up the analysis element and gain node', async () => {
     const canvas = createMockCanvas();
     await init(canvas);
 
-    const { analyser, ctx, mockSource } = createMockAnalyserWithContext();
+    const { analyser, ctx, mockSource, mockGain } = createMockAnalyserWithContext();
 
     connectAnalysisAudio('test-song.mp3', analyser);
 
@@ -1529,6 +1555,7 @@ describe('effects-canvas — dedicated analysis element (ADR-008 Approach B)', (
 
     clearAll();
 
+    expect(mockGain.disconnect).toHaveBeenCalled();
     expect(mockSource.disconnect).toHaveBeenCalled();
     expect(createdEl.pause).toHaveBeenCalled();
   });
