@@ -438,7 +438,7 @@ These changes are independent of the routing problem and should be retained:
 |---|---|---|
 | `filter.enabled` lifecycle | effects.js | ShockwaveFilter starts `enabled=false` when `autoRepeat:false`. `trigger()` enables; `update()` disables after `cycleDuration`. PixiJS skips the entire filter pipeline when disabled. |
 | `smoothingTimeConstant = 0.4` | audio.js | 0.8 (original ADR value) dampened bass transients below the onset detection threshold. 0 was too noisy — frame-to-frame noise raised the running average baseline, masking real beats. 0.4 preserves transients while dampening noise. |
-| Warmup guard | effects-canvas.js | `if (activeFrames < 60) return` in `applyTrigger()`. Prevents false trigger when audio first arrives — the initial energy jump from 0 produces a massive spectral flux spike before the flux average has stabilized. |
+| Energy gate (replaces warmup guard) | effects-canvas.js | `if (energy < state.minEnergy) return` in `applyTrigger()`. Prevents false triggers during audio fade-in: the analysis element plays at full volume while the Howler cue is still quiet, so raw flux spikes fire before audible beats begin. The `minEnergy` threshold (configured per scene in `scenes.json`) gates triggers until the audible signal arrives. The originally proposed `if (activeFrames < 60) return` frame-count warmup was not implemented — it would have been arbitrary and brittle compared to a signal-level gate. |
 | Event registration order | audio.js | `howl.once('play', ...)` must register before `howl.play()` — Howler may emit the event synchronously. *However: this fix is what exposes the `createMediaElementSource()` audio loss.* |
 
 ### Alternative approaches for audio-reactive
