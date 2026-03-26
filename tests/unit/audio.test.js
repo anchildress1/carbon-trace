@@ -93,7 +93,6 @@ import {
   clearNarrationCache,
   wrapOnNarrationEndWithBoost,
   getAnalyserNode,
-  connectAnalyserToCue,
   disconnectAnalyserSource,
 } from '../../src/audio.js';
 import { Howl, Howler } from 'howler';
@@ -993,12 +992,12 @@ describe('audio.js — audio-reactive analyser (ADR-008)', () => {
     Howler.ctx = originalCtx;
   });
 
-  it('creates AnalyserNode with correct config and connects to destination', () => {
+  it('creates AnalyserNode with correct config (no destination connect)', () => {
     const node = getAnalyserNode();
     expect(node).not.toBeNull();
     expect(node.fftSize).toBe(2048);
     expect(node.smoothingTimeConstant).toBe(0.4);
-    expect(node.connect).toHaveBeenCalledWith(mockHowlerCtx.destination);
+    expect(node.connect).not.toHaveBeenCalled();
     expect(mockHowlerCtx.createAnalyser).toHaveBeenCalledTimes(1);
   });
 
@@ -1011,69 +1010,10 @@ describe('audio.js — audio-reactive analyser (ADR-008)', () => {
     expect(mockHowlerCtx.createAnalyser).not.toHaveBeenCalled();
   });
 
-  it('connectAnalyserToCue wires connection when matching ambient cue plays', () => {
-    getAnalyserNode();
-    connectAnalyserToCue('end-song');
-
-    const cue = makeCue({
-      id: 'end-song',
-      type: 'ambient',
-      src: 'song.mp3',
-      loop: true,
-    });
-    scheduleAudioCues([cue]);
-
-    // crossfadeAmbientCue registers multiple once('play') handlers.
-    // Find all play callbacks on the last Howl instance.
-    const howlInstance = Howl.mock.instances[Howl.mock.instances.length - 1];
-    const playCallbacks = howlInstance.once.mock.calls.filter((c) => c[0] === 'play');
-    expect(playCallbacks.length).toBeGreaterThanOrEqual(1);
-
-    // Fire all play callbacks to simulate the play event
-    for (const [, cb] of playCallbacks) cb();
-    expect(mockHowlerCtx.createMediaElementSource).toHaveBeenCalled();
-  });
-
-  it('does not wire connection for non-matching cue ID', () => {
-    getAnalyserNode();
-    connectAnalyserToCue('end-song');
-
-    const cue = makeCue({ id: 'narration', type: 'narration' });
-    scheduleAudioCues([cue]);
-
-    // createMediaElementSource should not be called for a non-matching cue
-    expect(mockHowlerCtx.createMediaElementSource).not.toHaveBeenCalled();
-  });
-
-  it('disconnectAnalyserSource cleans up media source and tracking state', () => {
+  it('disconnectAnalyserSource clears analyser state', () => {
     getAnalyserNode();
     disconnectAnalyserSource();
     // Should not throw — idempotent
     disconnectAnalyserSource();
-  });
-
-  it('cancelAudioCues calls disconnectAnalyserSource', () => {
-    getAnalyserNode();
-    connectAnalyserToCue('end-song');
-
-    const cue = makeCue({
-      id: 'end-song',
-      type: 'ambient',
-      src: 'song.mp3',
-      loop: true,
-    });
-    scheduleAudioCues([cue]);
-    cancelAudioCues();
-
-    // After cancel, connecting a new cue should not trigger analyser wiring
-    // because analyserTargetCueId was cleared
-    const newCue = makeCue({
-      id: 'end-song',
-      type: 'ambient',
-      src: 'song.mp3',
-      loop: true,
-    });
-    scheduleAudioCues([newCue]);
-    expect(mockHowlerCtx.createMediaElementSource).not.toHaveBeenCalled();
   });
 });

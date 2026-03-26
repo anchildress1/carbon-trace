@@ -11,7 +11,6 @@ import {
   clearNarrationCache,
   wrapOnNarrationEndWithBoost,
   getAnalyserNode,
-  connectAnalyserToCue,
   disconnectAnalyserSource,
 } from './audio.js';
 import { PausableTimer } from './pausable-timer.js';
@@ -364,7 +363,6 @@ function showFrame(app, index) {
           const analyser = getAnalyserNode();
           if (analyser) {
             setEffectsAnalyser(analyser);
-            connectAnalyserToCue(frame.effects.analyserCueId ?? 'end-song');
           }
         }
       })

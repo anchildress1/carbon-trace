@@ -20,9 +20,6 @@ let bufferEventCleanup = null;
 // Uses Howler.ctx (AudioContext) — an internal Howler.js property,
 // not part of the public API. Pinned to howler@^2.2.4.
 let analyserNode = null;
-let mediaSourceNode = null;
-let analyserSourceElement = null;
-let analyserTargetCueId = null;
 
 // Ahead-of-time narration cache
 const narrationCache = new Map();
@@ -290,11 +287,6 @@ function playCue(cue) {
     });
   }
 
-  // Audio-reactive: register before play() so the 'play' event is never missed (ADR-008)
-  if (cue.id === analyserTargetCueId && analyserNode) {
-    howl.once('play', () => connectHowlToAnalyser(howl));
-  }
-
   howl.play();
 
   if (cue.fadeIn > 0) {
@@ -365,11 +357,6 @@ function crossfadeAmbientCue(cue, crossfadeDurationMs) {
     }
   };
 
-  // Audio-reactive: register before play() so the 'play' event is never missed (ADR-008)
-  if (cue.id === analyserTargetCueId && analyserNode) {
-    newHowl.once('play', () => connectHowlToAnalyser(newHowl));
-  }
-
   newHowl.play();
   newHowl.fade(0, cue.volume, cue.fadeIn > 0 ? cue.fadeIn : crossfadeDurationMs);
 
@@ -425,9 +412,14 @@ function wireNarrationEnd(entry, cue, opts) {
 // --- Audio-reactive analyser (ADR-008) ---
 
 /**
- * Lazy-create an AnalyserNode on Howler's AudioContext and connect it
- * to ctx.destination. Returns the same instance on subsequent calls.
+ * Lazy-create an AnalyserNode on Howler's AudioContext.
+ * Returns the same instance on subsequent calls.
  * Returns null if the AudioContext is unavailable.
+ *
+ * The AnalyserNode is NOT connected to ctx.destination — it receives
+ * input from a dedicated analysis <audio> element managed by
+ * effects-canvas.js (ADR-008 approach B). Howler's playback audio
+ * is completely independent.
  */
 export function getAnalyserNode() {
   const ctx = Howler.ctx;
@@ -437,64 +429,18 @@ export function getAnalyserNode() {
     analyserNode = ctx.createAnalyser();
     analyserNode.fftSize = 2048;
     analyserNode.smoothingTimeConstant = 0.4;
-    analyserNode.connect(ctx.destination);
   }
 
   return analyserNode;
 }
 
 /**
- * Store the target cue ID for analyser connection. When that cue
- * starts playing (via playCue or crossfadeAmbientCue), its <audio>
- * element is connected to the AnalyserNode via createMediaElementSource().
- */
-export function connectAnalyserToCue(cueId) {
-  analyserTargetCueId = cueId;
-}
-
-/**
- * Connect a Howl's <audio> element to the AnalyserNode. Called
- * internally when the target cue starts playing. createMediaElementSource()
- * can only be called once per element — tracks the connected element
- * to prevent InvalidStateError on reconnection.
- */
-function connectHowlToAnalyser(howl) {
-  if (!analyserNode || !howl) return;
-
-  const node = howl._sounds?.[0]?._node;
-  if (!node || node === analyserSourceElement) return;
-
-  try {
-    if (mediaSourceNode) {
-      try {
-        mediaSourceNode.disconnect();
-      } catch {
-        /* already disconnected */
-      }
-    }
-    mediaSourceNode = Howler.ctx.createMediaElementSource(node);
-    mediaSourceNode.connect(analyserNode);
-    analyserSourceElement = node;
-  } catch (err) {
-    console.warn('Failed to connect audio to analyser:', err.message);
-  }
-}
-
-/**
- * Disconnect the MediaElementSourceNode and clear tracking state.
- * Called by cancelAudioCues() on scene change.
+ * Disconnect and release the AnalyserNode. Called by cancelAudioCues()
+ * on scene change. The dedicated analysis element (managed by
+ * effects-canvas.js) is responsible for its own cleanup.
  */
 export function disconnectAnalyserSource() {
-  if (mediaSourceNode) {
-    try {
-      mediaSourceNode.disconnect();
-    } catch {
-      /* already disconnected */
-    }
-    mediaSourceNode = null;
-  }
-  analyserSourceElement = null;
-  analyserTargetCueId = null;
+  analyserNode = null;
 }
 
 // --- Public API (ADR-005) ---

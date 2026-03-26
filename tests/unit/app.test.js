@@ -38,7 +38,6 @@ vi.mock('../../src/audio.js', () => ({
   clearNarrationCache: vi.fn(),
   wrapOnNarrationEndWithBoost: vi.fn((_cues, cb) => cb),
   getAnalyserNode: vi.fn(() => null),
-  connectAnalyserToCue: vi.fn(),
   disconnectAnalyserSource: vi.fn(),
 }));
 
