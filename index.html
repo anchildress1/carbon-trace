@@ -47,7 +47,8 @@
           </svg>
           <span class="loading-prompt" id="loading-prompt" hidden>
             <svg class="loading-play-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-              <path d="M8 5v14l11-7z" />
+              <circle cx="12" cy="12" r="11" fill="none" stroke="currentColor" stroke-width="1.5" />
+              <path d="M9.5 7.5v9l7-4.5z" />
             </svg>
             begin experience
           </span>
@@ -55,8 +56,13 @@
       </button>
 
       <div class="scene-stage" id="scene-stage" hidden>
-        <canvas class="scene-canvas" id="scene-canvas" aria-hidden="true"></canvas>
-        <canvas class="effects-canvas" id="effects-canvas" aria-hidden="true"></canvas>
+        <canvas class="scene-canvas" id="scene-canvas" aria-hidden="true" tabindex="-1"></canvas>
+        <canvas
+          class="effects-canvas"
+          id="effects-canvas"
+          aria-hidden="true"
+          tabindex="-1"
+        ></canvas>
         <div class="narration-layer" id="narration-layer" aria-hidden="true"></div>
         <div class="caption-layer" id="caption-layer" aria-hidden="true"></div>
       </div>

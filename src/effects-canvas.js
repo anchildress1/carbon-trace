@@ -31,6 +31,18 @@ let disposableTextures = [];
 let loadGeneration = 0;
 let isPaused = false;
 let initPromise = null;
+let centeredEffects = []; // effects with normalized center → pixel conversion
+
+// Audio-reactive modulation state (ADR-008)
+let arAnalyser = null;
+let fftData = null;
+let audioReactiveState = [];
+
+// Dedicated analysis audio element (ADR-008 approach B)
+let analysisElement = null;
+let analysisSource = null;
+let analysisSilentGain = null;
+let analysisAnalyserRef = null; // tracks which analyserNode is wired into the analysis graph for cleanup
 
 function reducedMotion() {
   return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -116,6 +128,101 @@ function handleContextRestored() {
   console.warn('WebGL context restored');
 }
 
+// --- Audio-reactive FFT band extraction (ADR-008) ---
+
+function avgBins(data, start, end) {
+  if (end <= start) return 0;
+  let sum = 0;
+  for (let i = start; i < end; i++) sum += data[i];
+  return sum / ((end - start) * 255);
+}
+
+function extractBands(data, sampleRate) {
+  const fftSize = data.length * 2;
+  const binWidth = sampleRate / fftSize;
+  const bassStart = Math.max(1, Math.round(20 / binWidth));
+  const bassEnd = Math.round(250 / binWidth);
+  const midEnd = Math.round(2000 / binWidth);
+  const highEnd = Math.min(Math.round(16000 / binWidth), data.length - 1);
+
+  return {
+    bass: avgBins(data, bassStart, bassEnd),
+    mid: avgBins(data, bassEnd, midEnd),
+    high: avgBins(data, midEnd, highEnd),
+  };
+}
+
+function buildAudioReactiveState() {
+  audioReactiveState = [];
+  for (let i = 0; i < activeEffects.length; i++) {
+    const ar = activeEffects[i].audioReactive;
+    if (ar) {
+      const state = {
+        effectIndex: i,
+        band: ar.band,
+        target: ar.target,
+        range: ar.range,
+        smoothing: ar.smoothing ?? 0.8,
+        smoothedValue: 0,
+      };
+      // Onset trigger fields — spectral flux detection (ADR-008)
+      if (ar.trigger) {
+        state.trigger = true;
+        state.threshold = ar.trigger.threshold ?? 3;
+        state.cooldown = ar.trigger.cooldown ?? 0.1;
+        state.minEnergy = ar.trigger.minEnergy ?? 0;
+        state.prevEnergy = 0;
+        state.fluxAvg = 0;
+        state.timeSinceLastTrigger = 0;
+      }
+      audioReactiveState.push(state);
+    }
+  }
+}
+
+function applyModulation(state, energy) {
+  state.smoothedValue = state.smoothedValue * state.smoothing + energy * (1 - state.smoothing);
+  const value = state.range[0] + state.smoothedValue * (state.range[1] - state.range[0]);
+  activeEffects[state.effectIndex].filter[state.target] = value;
+}
+
+function applyTrigger(state, energy, dt) {
+  // Spectral flux: positive energy change only (onsets, not decays)
+  const flux = Math.max(0, energy - state.prevEnergy);
+  state.prevEnergy = energy;
+  state.fluxAvg = state.fluxAvg * 0.95 + flux * 0.05;
+  state.timeSinceLastTrigger += dt;
+
+  // Gate triggers until energy reaches the configured minimum level.
+  // Prevents false triggers during audio fade-in when the analysis
+  // element is at full volume but the audible Howler cue is still quiet.
+  if (energy < state.minEnergy) return;
+
+  if (flux > state.fluxAvg * state.threshold && state.timeSinceLastTrigger > state.cooldown) {
+    activeEffects[state.effectIndex].trigger?.();
+    state.timeSinceLastTrigger = 0;
+  }
+}
+
+/**
+ * Audio-reactive modulation (ADR-008) — runs AFTER effect updates
+ * so audioReactive overrides pulse on the same parameter.
+ */
+function processAudioReactive(dt) {
+  if (!arAnalyser || audioReactiveState.length === 0 || reducedMotion()) return;
+  try {
+    arAnalyser.getByteFrequencyData(fftData);
+    const bands = extractBands(fftData, arAnalyser.context.sampleRate);
+    for (const state of audioReactiveState) {
+      const energy = bands[state.band];
+      if (state.target && state.range) applyModulation(state, energy);
+      if (state.trigger) applyTrigger(state, energy, dt);
+    }
+  } catch (err) {
+    console.error('Audio-reactive modulation failed:', err);
+  }
+}
+
 function tickerUpdate(ticker) {
   const dt = ticker.deltaMS / 1000;
   for (const effect of activeEffects) {
@@ -125,6 +232,7 @@ function tickerUpdate(ticker) {
       console.error('Effect update failed:', err);
     }
   }
+  processAudioReactive(dt);
 }
 
 /**
@@ -165,6 +273,21 @@ async function applyRegionEffect(region, sceneTexture, gen) {
       noiseSprite.removeFromParent();
     }
     return null;
+  }
+
+  // ShockwaveFilter center is in pixel coordinates (shader divides by
+  // uInputSize). Config stores normalized 0–1 values for responsiveness.
+  // Convert here and track for resize updates.
+  if (region.centerX !== undefined && region.centerY !== undefined) {
+    effect.filter.center = {
+      x: region.centerX * pixiApp.screen.width,
+      y: region.centerY * pixiApp.screen.height,
+    };
+    centeredEffects.push({
+      filter: effect.filter,
+      nx: region.centerX,
+      ny: region.centerY,
+    });
   }
 
   const maskTexture = await loadLuminanceMask(region.mask);
@@ -278,6 +401,9 @@ async function doInit(el) {
           sprite.width = w;
           sprite.height = h;
         }
+        for (const ce of centeredEffects) {
+          ce.filter.center = { x: ce.nx * w, y: ce.ny * h };
+        }
       }
     });
     observer.observe(el);
@@ -307,7 +433,10 @@ async function loadRegionEffects(regions, sceneTexture, gen) {
     try {
       const effect = await applyRegionEffect(region, sceneTexture, gen);
       if (gen !== loadGeneration) return false;
-      if (effect) activeEffects.push(effect);
+      if (effect) {
+        if (region.audioReactive) effect.audioReactive = region.audioReactive;
+        activeEffects.push(effect);
+      }
     } catch (err) {
       console.warn(`Skipping effect region "${region.type}":`, err.message);
     }
@@ -339,14 +468,14 @@ function startOrRenderOnce() {
  * navigates to a new scene while textures are still loading.
  */
 export async function loadScene(effectsConfig, sceneImageUrl) {
-  if (!webglAvailable) return;
+  if (!webglAvailable) return false;
 
   // Wait for init() to complete if it is still in progress. This
   // prevents the first loadScene call from racing ahead of PixiJS
   // Application.init() and silently returning due to pixiApp === null.
   if (initPromise) {
     await initPromise;
-    if (!webglAvailable) return;
+    if (!webglAvailable) return false;
   }
 
   const gen = ++loadGeneration;
@@ -356,11 +485,11 @@ export async function loadScene(effectsConfig, sceneImageUrl) {
       await reinit();
     } catch {
       webglAvailable = false;
-      return;
+      return false;
     }
   }
 
-  if (!pixiApp || gen !== loadGeneration) return;
+  if (!pixiApp || gen !== loadGeneration) return false;
 
   clearAll();
 
@@ -368,17 +497,20 @@ export async function loadScene(effectsConfig, sceneImageUrl) {
     const sceneTexture = await loadTexture(sceneImageUrl);
     if (gen !== loadGeneration) {
       sceneTexture.destroy(false);
-      return;
+      return false;
     }
     disposableTextures.push(sceneTexture);
 
     const completed = await loadRegionEffects(effectsConfig.regions, sceneTexture, gen);
-    if (!completed) return;
+    if (!completed) return false;
 
+    buildAudioReactiveState();
     startOrRenderOnce();
+    return true;
   } catch (err) {
     console.error('Failed to load scene effects:', err.message);
     if (gen === loadGeneration) clearAll();
+    return false;
   }
 }
 
@@ -395,14 +527,22 @@ async function reinit() {
  * rationale below). The ticker stops but the Application stays alive for reuse.
  */
 export function clearAll() {
+  // Always clear audio-reactive and analysis audio state, even if WebGL
+  // is unavailable. This avoids hidden analysis streams persisting in
+  // fallback mode where pixiApp is null.
+  activeEffects = [];
+  screenSizedSprites = [];
+  centeredEffects = [];
+  audioReactiveState = [];
+  arAnalyser = null;
+  fftData = null;
+  cleanupAnalysisElement();
+
   if (!webglAvailable || !pixiApp) return;
 
   // Stop the ticker first to prevent update callbacks from running
   // against partially-destroyed state during cleanup below.
   pixiApp.ticker.stop();
-
-  activeEffects = [];
-  screenSizedSprites = [];
 
   // Wrap destroy calls in try/catch — a lost WebGL context can cause throws.
   try {
@@ -461,14 +601,131 @@ export function cancelPendingLoad() {
   loadGeneration++;
 }
 
+/**
+ * Set the AnalyserNode for audio-reactive modulation (ADR-008).
+ * The ticker reads FFT data each frame and modulates effect parameters.
+ * Cleared on clearAll(). No-op when node is null.
+ */
+export function setAnalyser(node) {
+  arAnalyser = node;
+  if (node) {
+    if (!fftData || fftData.length !== node.frequencyBinCount) {
+      fftData = new Uint8Array(node.frequencyBinCount);
+    }
+  } else {
+    fftData = null;
+  }
+}
+
+function cleanupAnalysisElement() {
+  if (analysisSilentGain) {
+    // Disconnect analyserNode → gain before dropping the gain reference.
+    // Without this, the analyserNode accumulates orphaned output connections
+    // to dead-end gain nodes across scene transitions (memory leak).
+    if (analysisAnalyserRef) {
+      try {
+        analysisAnalyserRef.disconnect(analysisSilentGain);
+      } catch {
+        /* already disconnected */
+      }
+    }
+    try {
+      analysisSilentGain.disconnect();
+    } catch {
+      /* already disconnected */
+    }
+    analysisSilentGain = null;
+  }
+  analysisAnalyserRef = null;
+  if (analysisSource) {
+    try {
+      analysisSource.disconnect();
+    } catch {
+      /* already disconnected */
+    }
+    analysisSource = null;
+  }
+  if (analysisElement) {
+    analysisElement.pause();
+    analysisElement.removeAttribute('src');
+    analysisElement.load();
+    analysisElement = null;
+  }
+}
+
+/**
+ * Create a dedicated <audio> element for FFT analysis (ADR-008 approach B).
+ * The element streams the same audio file as the playback cue but is completely
+ * independent of Howler. createMediaElementSource() routes its output through
+ * the AnalyserNode for FFT reads.
+ *
+ * Signal chain: MediaElementSource → AnalyserNode → GainNode(0) → destination.
+ * Chrome does not process audio through an AnalyserNode unless the graph
+ * reaches ctx.destination — a dead-end analyser returns all-zero FFT data.
+ * The GainNode is set to 0 so no duplicate audio is audible.
+ */
+export function connectAnalysisAudio(audioSrc, analyserNode, loop = false) {
+  cleanupAnalysisElement();
+
+  if (!analyserNode) return;
+
+  const ctx = analyserNode.context;
+  if (!ctx) return;
+
+  const el = document.createElement('audio');
+  el.preload = 'auto';
+  el.loop = loop;
+  el.src = audioSrc;
+
+  try {
+    const source = ctx.createMediaElementSource(el);
+    source.connect(analyserNode);
+
+    // Route analyser → silent gain → destination so Chrome processes FFT.
+    const gain = ctx.createGain();
+    gain.gain.value = 0;
+    analyserNode.connect(gain);
+    gain.connect(ctx.destination);
+
+    analysisElement = el;
+    analysisSource = source;
+    analysisSilentGain = gain;
+    analysisAnalyserRef = analyserNode;
+
+    arAnalyser = analyserNode;
+    if (!fftData || fftData.length !== analyserNode.frequencyBinCount) {
+      fftData = new Uint8Array(analyserNode.frequencyBinCount);
+    }
+  } catch (err) {
+    console.warn('Failed to create analysis audio source:', err.message);
+    el.removeAttribute('src');
+  }
+}
+
+/**
+ * Start playback on the analysis element. Called by app.js when the
+ * matching audio cue begins playing, so FFT data tracks the same
+ * point in the audio. No-op if no analysis element exists.
+ */
+export function startAnalysisPlayback() {
+  if (!analysisElement) return;
+  analysisElement.play().catch((err) => {
+    console.warn('Analysis audio play failed:', err.message);
+  });
+}
+
 export function pause() {
   isPaused = true;
+  if (analysisElement) analysisElement.pause();
   if (!webglAvailable || !pixiApp) return;
   pixiApp.ticker.stop();
 }
 
 export function resume() {
   isPaused = false;
+  if (analysisElement && !reducedMotion()) {
+    analysisElement.play().catch(() => {});
+  }
   if (!webglAvailable || !pixiApp || reducedMotion()) return;
   if (activeEffects.length > 0) {
     pixiApp.ticker.start();
@@ -477,6 +734,7 @@ export function resume() {
 
 export function destroy() {
   pause();
+  cleanupAnalysisElement();
 
   if (canvasEl) {
     canvasEl.removeEventListener('webglcontextlost', handleContextLost);
@@ -505,6 +763,7 @@ export function destroy() {
   canvasEl = null;
   activeEffects = [];
   screenSizedSprites = [];
+  centeredEffects = [];
   disposableTextures = [];
   needsReinit = false;
   isPaused = false;

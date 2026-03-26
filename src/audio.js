@@ -1,4 +1,4 @@
-import { Howl } from 'howler';
+import { Howl, Howler } from 'howler';
 import { PausableTimer } from './pausable-timer.js';
 
 // --- Global state ---
@@ -15,6 +15,11 @@ let bufferChangeCallback = null;
 let narrationBuffering = false;
 let bufferCheckTimer = null;
 let bufferEventCleanup = null;
+
+// Audio-reactive analyser state (ADR-008)
+// Uses Howler.ctx (AudioContext) — an internal Howler.js property,
+// not part of the public API. Pinned to howler@^2.2.4.
+let analyserNode = null;
 
 // Ahead-of-time narration cache
 const narrationCache = new Map();
@@ -354,6 +359,7 @@ function crossfadeAmbientCue(cue, crossfadeDurationMs) {
 
   newHowl.play();
   newHowl.fade(0, cue.volume, cue.fadeIn > 0 ? cue.fadeIn : crossfadeDurationMs);
+
   return newHowl;
 }
 
@@ -364,6 +370,7 @@ function wireNarrationEnd(entry, cue, opts) {
   const safeEnd = () => {
     if (ended) return;
     ended = true;
+    entry.state = 'ended';
     if (safetyTimer) safetyTimer.cancel();
     if (entry.timer === safetyTimer) entry.timer = null;
     cleanupBufferMonitoring();
@@ -400,6 +407,40 @@ function wireNarrationEnd(entry, cue, opts) {
       safeEnd();
     },
   });
+}
+
+// --- Audio-reactive analyser (ADR-008) ---
+
+/**
+ * Lazy-create an AnalyserNode on Howler's AudioContext.
+ * Returns the same instance on subsequent calls.
+ * Returns null if the AudioContext is unavailable.
+ *
+ * The AnalyserNode is NOT connected to ctx.destination — it receives
+ * input from a dedicated analysis <audio> element managed by
+ * effects-canvas.js (ADR-008 approach B). Howler's playback audio
+ * is completely independent.
+ */
+export function getAnalyserNode() {
+  const ctx = Howler.ctx;
+  if (!ctx) return null;
+
+  if (!analyserNode) {
+    analyserNode = ctx.createAnalyser();
+    analyserNode.fftSize = 2048;
+    analyserNode.smoothingTimeConstant = 0.4;
+  }
+
+  return analyserNode;
+}
+
+/**
+ * Disconnect and release the AnalyserNode. Called by cancelAudioCues()
+ * on scene change. The dedicated analysis element (managed by
+ * effects-canvas.js) is responsible for its own cleanup.
+ */
+export function disconnectAnalyserSource() {
+  analyserNode = null;
 }
 
 // --- Public API (ADR-005) ---
@@ -475,6 +516,7 @@ export function scheduleAudioCues(cues, opts = {}) {
 
 export function cancelAudioCues() {
   isAudioPaused = false;
+  disconnectAnalyserSource();
   for (const [, entry] of activeCues) {
     entry.timer?.cancel();
     entry.howl?._crossfadeCleanup?.();

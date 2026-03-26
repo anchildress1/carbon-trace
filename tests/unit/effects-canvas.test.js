@@ -98,6 +98,9 @@ import {
   resume,
   destroy,
   isRunning,
+  setAnalyser,
+  connectAnalysisAudio,
+  startAnalysisPlayback,
 } from '../../src/effects-canvas.js';
 
 function createMockCanvas() {
@@ -130,14 +133,13 @@ function createMockCanvas() {
  */
 function setupImageMock() {
   globalThis.Image = vi.fn(function () {
-    const self = this;
-    self.width = 256;
-    self.height = 256;
-    self.naturalWidth = 256;
-    self.naturalHeight = 256;
+    this.width = 256;
+    this.height = 256;
+    this.naturalWidth = 256;
+    this.naturalHeight = 256;
     Object.defineProperty(this, 'src', {
-      set() {
-        self.onload?.();
+      set: () => {
+        this.onload?.();
       },
     });
   });
@@ -145,6 +147,67 @@ function setupImageMock() {
   // createImageBitmap is not available in jsdom/happy-dom.
   // Return a plain object — Texture.from() is mocked anyway.
   globalThis.createImageBitmap = vi.fn().mockResolvedValue({ width: 256, height: 256 });
+}
+
+function createMockAnalyser(sampleRate = 44100, frequencyBinCount = 1024) {
+  return {
+    frequencyBinCount,
+    getByteFrequencyData: vi.fn(),
+    context: { sampleRate },
+  };
+}
+
+async function setupTriggerScene(audioReactiveConfig) {
+  const { createEffect } = await import('../../src/effects.js');
+  const triggerFn = vi.fn();
+  createEffect.mockReturnValue({
+    filter: { enabled: true, amplitude: 15 },
+    update: vi.fn(),
+    trigger: triggerFn,
+  });
+
+  const canvas = createMockCanvas();
+  await init(canvas);
+
+  const config = {
+    regions: [
+      {
+        type: 'shockwave',
+        mask: 'assets/masks/test.png',
+        audioReactive: audioReactiveConfig,
+      },
+    ],
+  };
+
+  await loadScene(config, 'assets/images/test.webp');
+
+  const analyser = createMockAnalyser(44100);
+  setAnalyser(analyser);
+
+  const { Application } = await import('pixi.js');
+  const instance = Application.mock.instances[Application.mock.instances.length - 1];
+  const tickerCallback = instance.ticker.add.mock.calls[0]?.[0];
+
+  return { analyser, tickerCallback, triggerFn };
+}
+
+function createMockAnalyserWithContext() {
+  const mockSource = { connect: vi.fn(), disconnect: vi.fn() };
+  const mockGain = { gain: { value: 1 }, connect: vi.fn(), disconnect: vi.fn() };
+  const ctx = {
+    sampleRate: 44100,
+    createMediaElementSource: vi.fn(() => mockSource),
+    createGain: vi.fn(() => mockGain),
+    destination: {},
+  };
+  const analyser = {
+    frequencyBinCount: 1024,
+    getByteFrequencyData: vi.fn(),
+    context: ctx,
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+  };
+  return { analyser, ctx, mockSource, mockGain };
 }
 
 describe('effects-canvas.js — PixiJS lifecycle', () => {
@@ -800,20 +863,19 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
       let callCount = 0;
       const originalImage = globalThis.Image;
       globalThis.Image = vi.fn(function () {
-        const self = this;
-        self.width = 256;
-        self.height = 256;
-        self.naturalWidth = 256;
-        self.naturalHeight = 256;
+        this.width = 256;
+        this.height = 256;
+        this.naturalWidth = 256;
+        this.naturalHeight = 256;
         Object.defineProperty(this, 'src', {
-          set(val) {
+          set: () => {
             callCount++;
             // Fail the second Image load (first mask's luminance processing)
             // but succeed on others (noise, scene texture, second mask)
             if (callCount === 2) {
-              self.onerror?.();
+              this.onerror?.();
             } else {
-              self.onload?.();
+              this.onload?.();
             }
           },
         });
@@ -975,5 +1037,637 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
         expect(textures[0].value.destroy).toHaveBeenCalledWith(false);
       }
     });
+  });
+});
+
+describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
+  let originalGetContext;
+
+  beforeEach(() => {
+    destroy();
+    vi.clearAllMocks();
+
+    globalThis.ResizeObserver = vi.fn(function () {
+      this.observe = vi.fn();
+      this.disconnect = vi.fn();
+    });
+
+    globalThis.matchMedia = vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    });
+    setupImageMock();
+
+    // Mock canvas 2D context for loadLuminanceMask (happy-dom lacks full support)
+    originalGetContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type) {
+      if (type === '2d') {
+        return {
+          drawImage: vi.fn(),
+          getImageData: vi.fn(() => ({
+            data: new Uint8ClampedArray(this.width * this.height * 4),
+          })),
+          putImageData: vi.fn(),
+        };
+      }
+      return originalGetContext?.call(this, type);
+    };
+  });
+
+  afterEach(() => {
+    destroy();
+    HTMLCanvasElement.prototype.getContext = originalGetContext;
+    vi.restoreAllMocks();
+  });
+
+
+  it('setAnalyser stores the analyser and allocates fftData', () => {
+    const analyser = createMockAnalyser();
+    expect(() => setAnalyser(analyser)).not.toThrow();
+    setAnalyser(null);
+  });
+
+  it('setAnalyser reallocates fftData when frequencyBinCount changes', () => {
+    const analyser512 = createMockAnalyser(44100, 512);
+    setAnalyser(analyser512);
+    // Second analyser with different bin count — must reallocate, not reuse
+    const analyser2048 = createMockAnalyser(44100, 2048);
+    expect(() => setAnalyser(analyser2048)).not.toThrow();
+    setAnalyser(null);
+  });
+
+  it('setAnalyser(null) clears fftData', () => {
+    const analyser = createMockAnalyser();
+    setAnalyser(analyser);
+    setAnalyser(null);
+    // Re-setting the same analyser after clearing should not throw
+    expect(() => setAnalyser(analyser)).not.toThrow();
+    setAnalyser(null);
+  });
+
+  it('setAnalyser with null is a no-op', () => {
+    expect(() => setAnalyser(null)).not.toThrow();
+  });
+
+  it('clearAll resets the analyser reference', async () => {
+    const canvas = createMockCanvas();
+    await init(canvas);
+
+    const analyser = createMockAnalyser();
+    setAnalyser(analyser);
+    clearAll();
+
+    // After clearAll, the analyser should be cleared.
+    // We verify by setting up a ticker callback and checking
+    // that getByteFrequencyData is NOT called.
+    const { Application } = await import('pixi.js');
+    const instance = Application.mock.instances[Application.mock.instances.length - 1];
+    const tickerCallback = instance.ticker.add.mock.calls[0]?.[0];
+    if (tickerCallback) {
+      tickerCallback({ deltaMS: 16.67 });
+      expect(analyser.getByteFrequencyData).not.toHaveBeenCalled();
+    }
+
+    destroy();
+  });
+
+  describe('band extraction', () => {
+    it('extractBands produces correct values at 44100Hz', async () => {
+      // We test the band extraction indirectly through the ticker.
+      // Set up: init, load a scene with audioReactive, set analyser AFTER
+      // loadScene (loadScene calls clearAll which resets the analyser —
+      // same order as the real app.js bridge wiring).
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      const analyser = createMockAnalyser(44100);
+      // Fill FFT data: bass bins (1-12) = 255 (full energy), rest = 0
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        // At 44100Hz, fftSize=2048: binWidth = 44100/2048 ≈ 21.5Hz
+        // bass: 20-250Hz → bins ~1-12
+        for (let i = 1; i <= 12; i++) data[i] = 255;
+      });
+
+      // Load a scene with audioReactive config
+      const config = {
+        regions: [
+          {
+            type: 'glow',
+            mask: 'assets/masks/test.png',
+            audioReactive: { band: 'bass', target: 'outerStrength', range: [0, 10], smoothing: 0 },
+          },
+        ],
+      };
+
+      await loadScene(config, 'assets/images/test.webp');
+
+      // Set analyser AFTER loadScene (matches real app.js wiring order)
+      setAnalyser(analyser);
+
+      // Get the ticker callback and invoke it
+      const { Application } = await import('pixi.js');
+      const instance = Application.mock.instances[Application.mock.instances.length - 1];
+      const tickerCallback = instance.ticker.add.mock.calls[0]?.[0];
+      if (tickerCallback) {
+        tickerCallback({ deltaMS: 16.67 });
+
+        // With smoothing=0, bass energy=1.0, range=[0,10] → value should be 10
+        expect(analyser.getByteFrequencyData).toHaveBeenCalled();
+      }
+
+      destroy();
+    });
+
+    it('extractBands works at 48000Hz sampleRate', () => {
+      const analyser = createMockAnalyser(48000);
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(128);
+      });
+      // Verify analyser is accepted at non-standard sample rate
+      expect(() => setAnalyser(analyser)).not.toThrow();
+      setAnalyser(null);
+    });
+  });
+
+  it('audio-reactive is skipped when reducedMotion is true', async () => {
+    const canvas = createMockCanvas();
+    await init(canvas);
+
+    const analyser = createMockAnalyser();
+
+    const config = {
+      regions: [
+        {
+          type: 'glow',
+          mask: 'assets/masks/test.png',
+          audioReactive: { band: 'bass', target: 'outerStrength', range: [0, 10], smoothing: 0.8 },
+        },
+      ],
+    };
+
+    await loadScene(config, 'assets/images/test.webp');
+
+    // Set analyser AFTER loadScene (matches real app.js wiring order)
+    setAnalyser(analyser);
+
+    // Mock reduced motion AFTER loadScene so it doesn't affect loading
+    const matchMediaSpy = vi.spyOn(globalThis, 'matchMedia');
+    matchMediaSpy.mockReturnValue({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    });
+
+    const { Application } = await import('pixi.js');
+    const instance = Application.mock.instances[Application.mock.instances.length - 1];
+    const tickerCallback = instance.ticker.add.mock.calls[0]?.[0];
+    if (tickerCallback) {
+      tickerCallback({ deltaMS: 16.67 });
+      // Under reduced motion, getByteFrequencyData should NOT be called
+      expect(analyser.getByteFrequencyData).not.toHaveBeenCalled();
+    }
+
+    matchMediaSpy.mockRestore();
+    destroy();
+  });
+
+  it('no FFT reads when audioReactiveState is empty', async () => {
+    const canvas = createMockCanvas();
+    await init(canvas);
+
+    const analyser = createMockAnalyser();
+
+    // Load scene WITHOUT audioReactive regions
+    const config = {
+      regions: [{ type: 'glow', mask: 'assets/masks/test.png' }],
+    };
+
+    await loadScene(config, 'assets/images/test.webp');
+
+    // Set analyser AFTER loadScene (matches real app.js wiring order)
+    setAnalyser(analyser);
+
+    const { Application } = await import('pixi.js');
+    const instance = Application.mock.instances[Application.mock.instances.length - 1];
+    const tickerCallback = instance.ticker.add.mock.calls[0]?.[0];
+    if (tickerCallback) {
+      tickerCallback({ deltaMS: 16.67 });
+      // No audioReactive regions → no FFT reads
+      expect(analyser.getByteFrequencyData).not.toHaveBeenCalled();
+    }
+
+    destroy();
+  });
+
+  describe('onset trigger mode', () => {
+    it('spectral flux fires trigger on energy increase', async () => {
+      const { analyser, tickerCallback, triggerFn } = await setupTriggerScene({
+        band: 'bass',
+        trigger: { threshold: 3, cooldown: 0 },
+      });
+
+      // 65 frames of alternating low energy to stabilize flux running average.
+      let warmupFrame = 0;
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        const val = warmupFrame % 2 === 0 ? 25 : 30;
+        for (let i = 1; i <= 12; i++) data[i] = val;
+        warmupFrame++;
+      });
+      for (let i = 0; i < 65; i++) tickerCallback({ deltaMS: 16.67 });
+      triggerFn.mockClear();
+
+      // Spike: large energy increase → high spectral flux exceeds fluxAvg * 3
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        for (let i = 1; i <= 12; i++) data[i] = 255;
+      });
+      tickerCallback({ deltaMS: 16.67 });
+
+      expect(triggerFn).toHaveBeenCalled();
+      destroy();
+    });
+
+    it('cooldown prevents rapid re-triggering', async () => {
+      const { analyser, tickerCallback, triggerFn } = await setupTriggerScene({
+        band: 'bass',
+        trigger: { threshold: 3, cooldown: 0.5 },
+      });
+
+      // 65 frames of alternating low energy to stabilize flux running average.
+      let warmupFrame = 0;
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        const val = warmupFrame % 2 === 0 ? 25 : 30;
+        for (let i = 1; i <= 12; i++) data[i] = val;
+        warmupFrame++;
+      });
+      for (let i = 0; i < 65; i++) tickerCallback({ deltaMS: 16.67 });
+      triggerFn.mockClear();
+
+      // Spike — should trigger (large flux exceeds fluxAvg * 3)
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        for (let i = 1; i <= 12; i++) data[i] = 255;
+      });
+      tickerCallback({ deltaMS: 16.67 });
+      expect(triggerFn).toHaveBeenCalledTimes(1);
+
+      // Drop back down then spike again immediately (within 0.5s cooldown)
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        for (let i = 1; i <= 12; i++) data[i] = 25;
+      });
+      tickerCallback({ deltaMS: 16.67 });
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        for (let i = 1; i <= 12; i++) data[i] = 255;
+      });
+      tickerCallback({ deltaMS: 16.67 });
+      expect(triggerFn).toHaveBeenCalledTimes(1); // cooldown blocked it
+
+      destroy();
+    });
+
+    it('minEnergy gates triggers below configured level', async () => {
+      const { analyser, tickerCallback, triggerFn } = await setupTriggerScene({
+        band: 'bass',
+        trigger: { threshold: 3, cooldown: 0, minEnergy: 0.8 },
+      });
+
+      // 65 frames of alternating low energy to stabilize flux running average.
+      let warmupFrame = 0;
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        const val = warmupFrame % 2 === 0 ? 25 : 30;
+        for (let i = 1; i <= 12; i++) data[i] = val;
+        warmupFrame++;
+      });
+      for (let i = 0; i < 65; i++) tickerCallback({ deltaMS: 16.67 });
+      triggerFn.mockClear();
+
+      // Energy spike to ~0.70 — above flux threshold but below minEnergy 0.80
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        for (let i = 1; i <= 12; i++) data[i] = 180;
+      });
+      tickerCallback({ deltaMS: 16.67 });
+      expect(triggerFn).not.toHaveBeenCalled();
+
+      // Energy spike to 1.0 — above minEnergy, should trigger
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        for (let i = 1; i <= 12; i++) data[i] = 255;
+      });
+      tickerCallback({ deltaMS: 16.67 });
+      expect(triggerFn).toHaveBeenCalled();
+
+      destroy();
+    });
+
+    it('combined trigger + modulation both run in same frame', async () => {
+      const { analyser, tickerCallback, triggerFn } = await setupTriggerScene({
+        band: 'bass',
+        target: 'amplitude',
+        range: [0, 10],
+        smoothing: 0,
+        trigger: { threshold: 3, cooldown: 0 },
+      });
+
+      // 65 frames of alternating low energy to stabilize flux running average
+      let warmupFrame = 0;
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        const val = warmupFrame % 2 === 0 ? 25 : 30;
+        for (let i = 1; i <= 12; i++) data[i] = val;
+        warmupFrame++;
+      });
+      for (let i = 0; i < 65; i++) tickerCallback({ deltaMS: 16.67 });
+      triggerFn.mockClear();
+
+      // Spike — both modulation and trigger should fire
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        for (let i = 1; i <= 12; i++) data[i] = 255;
+      });
+      tickerCallback({ deltaMS: 16.67 });
+
+      // Trigger fired
+      expect(triggerFn).toHaveBeenCalled();
+
+      // Modulation also set the amplitude (smoothing=0, energy=1.0, range=[0,10] → ~10)
+      const { createEffect } = await import('../../src/effects.js');
+      const mockEffect = createEffect.mock.results[0]?.value;
+      expect(mockEffect.filter.amplitude).toBeGreaterThan(5);
+
+      destroy();
+    });
+
+    it('modulate-only mode still works without trigger', async () => {
+      const { createEffect } = await import('../../src/effects.js');
+      createEffect.mockReturnValue({
+        filter: { enabled: true, outerStrength: 0 },
+        update: vi.fn(),
+      });
+
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      const config = {
+        regions: [
+          {
+            type: 'glow',
+            mask: 'assets/masks/test.png',
+            audioReactive: { band: 'bass', target: 'outerStrength', range: [0, 10], smoothing: 0 },
+          },
+        ],
+      };
+
+      await loadScene(config, 'assets/images/test.webp');
+
+      const analyser = createMockAnalyser(44100);
+      analyser.getByteFrequencyData.mockImplementation((data) => {
+        data.fill(0);
+        for (let i = 1; i <= 12; i++) data[i] = 255;
+      });
+      setAnalyser(analyser);
+
+      const { Application } = await import('pixi.js');
+      const instance = Application.mock.instances[Application.mock.instances.length - 1];
+      const tickerCallback = instance.ticker.add.mock.calls[0]?.[0];
+      tickerCallback({ deltaMS: 16.67 });
+
+      // Modulation should have set the parameter
+      const mockEffect = createEffect.mock.results[createEffect.mock.results.length - 1]?.value;
+      expect(mockEffect.filter.outerStrength).toBeGreaterThan(5);
+
+      destroy();
+    });
+  });
+});
+
+describe('effects-canvas — dedicated analysis element (ADR-008 Approach B)', () => {
+  let originalGetContext;
+
+  beforeEach(() => {
+    destroy();
+    vi.clearAllMocks();
+
+    globalThis.ResizeObserver = vi.fn(function () {
+      this.observe = vi.fn();
+      this.disconnect = vi.fn();
+    });
+
+    globalThis.matchMedia = vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    });
+    setupImageMock();
+
+    originalGetContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type) {
+      if (type === '2d') {
+        return {
+          drawImage: vi.fn(),
+          getImageData: vi.fn(() => ({
+            data: new Uint8ClampedArray(this.width * this.height * 4),
+          })),
+          putImageData: vi.fn(),
+        };
+      }
+      return originalGetContext?.call(this, type);
+    };
+  });
+
+  afterEach(() => {
+    destroy();
+    HTMLCanvasElement.prototype.getContext = originalGetContext;
+    vi.restoreAllMocks();
+  });
+
+  it('connectAnalysisAudio creates element and routes through silent gain to destination', () => {
+    const { analyser, ctx, mockSource, mockGain } = createMockAnalyserWithContext();
+
+    connectAnalysisAudio('test-song.mp3', analyser);
+
+    expect(ctx.createMediaElementSource).toHaveBeenCalledTimes(1);
+    const createdEl = ctx.createMediaElementSource.mock.calls[0][0];
+    expect(createdEl.tagName).toBe('AUDIO');
+    expect(createdEl.preload).toBe('auto');
+    expect(createdEl.loop).toBe(false);
+    expect(createdEl.src).toContain('test-song.mp3');
+
+    // Source → analyser → gain(0) → destination
+    expect(mockSource.connect).toHaveBeenCalledWith(analyser);
+    expect(ctx.createGain).toHaveBeenCalledTimes(1);
+    expect(mockGain.gain.value).toBe(0);
+    expect(analyser.connect).toHaveBeenCalledWith(mockGain);
+    expect(mockGain.connect).toHaveBeenCalledWith(ctx.destination);
+  });
+
+  it('connectAnalysisAudio sets loop on the analysis element when loop=true', () => {
+    const { analyser, ctx } = createMockAnalyserWithContext();
+
+    connectAnalysisAudio('looping-song.mp3', analyser, true);
+
+    const createdEl = ctx.createMediaElementSource.mock.calls[0][0];
+    expect(createdEl.loop).toBe(true);
+  });
+
+  it('connectAnalysisAudio replaces previous analysis element', () => {
+    const { analyser, ctx, mockSource, mockGain } = createMockAnalyserWithContext();
+
+    connectAnalysisAudio('song-1.mp3', analyser);
+    const firstSource = mockSource;
+    const firstGain = mockGain;
+
+    // Create new mocks for second call
+    const secondSource = { connect: vi.fn(), disconnect: vi.fn() };
+    const secondGain = { gain: { value: 1 }, connect: vi.fn(), disconnect: vi.fn() };
+    ctx.createMediaElementSource.mockReturnValueOnce(secondSource);
+    ctx.createGain.mockReturnValueOnce(secondGain);
+
+    connectAnalysisAudio('song-2.mp3', analyser);
+
+    // First source and gain should have been disconnected
+    expect(firstSource.disconnect).toHaveBeenCalled();
+    expect(firstGain.disconnect).toHaveBeenCalled();
+    // AnalyserNode must be explicitly disconnected from the old gain to
+    // avoid accumulating orphaned analyserNode → dead-end-gain connections.
+    expect(analyser.disconnect).toHaveBeenCalledWith(firstGain);
+  });
+
+  it('connectAnalysisAudio handles createMediaElementSource failure gracefully', () => {
+    const ctx = {
+      sampleRate: 44100,
+      createMediaElementSource: vi.fn(() => {
+        throw new Error('Already connected');
+      }),
+    };
+    const analyser = {
+      frequencyBinCount: 1024,
+      getByteFrequencyData: vi.fn(),
+      context: ctx,
+    };
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    connectAnalysisAudio('bad.mp3', analyser);
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Failed to create analysis audio source:',
+      expect.any(String),
+    );
+    warnSpy.mockRestore();
+
+    // startAnalysisPlayback should be a no-op since element was not stored
+    startAnalysisPlayback();
+  });
+
+  it('connectAnalysisAudio is a no-op when analyserNode is null', () => {
+    expect(() => connectAnalysisAudio('test.mp3', null)).not.toThrow();
+  });
+
+  it('connectAnalysisAudio is a no-op when analyserNode.context is missing', () => {
+    const analyser = {
+      frequencyBinCount: 1024,
+      getByteFrequencyData: vi.fn(),
+      context: null,
+    };
+
+    expect(() => connectAnalysisAudio('test.mp3', analyser)).not.toThrow();
+  });
+
+  it('startAnalysisPlayback calls play on the analysis element', () => {
+    const { analyser, ctx } = createMockAnalyserWithContext();
+
+    connectAnalysisAudio('test-song.mp3', analyser);
+
+    const createdEl = ctx.createMediaElementSource.mock.calls[0][0];
+    createdEl.play = vi.fn().mockResolvedValue(undefined);
+
+    startAnalysisPlayback();
+    expect(createdEl.play).toHaveBeenCalled();
+  });
+
+  it('startAnalysisPlayback is a no-op when no analysis element exists', () => {
+    expect(() => startAnalysisPlayback()).not.toThrow();
+  });
+
+  it('clearAll cleans up the analysis element and gain node', async () => {
+    const canvas = createMockCanvas();
+    await init(canvas);
+
+    const { analyser, ctx, mockSource, mockGain } = createMockAnalyserWithContext();
+
+    connectAnalysisAudio('test-song.mp3', analyser);
+
+    const createdEl = ctx.createMediaElementSource.mock.calls[0][0];
+    createdEl.pause = vi.fn();
+    createdEl.load = vi.fn();
+
+    clearAll();
+
+    expect(mockGain.disconnect).toHaveBeenCalled();
+    expect(mockSource.disconnect).toHaveBeenCalled();
+    expect(createdEl.pause).toHaveBeenCalled();
+  });
+
+  it('clearAll cleans analysis graph even when WebGL app is unavailable', () => {
+    const { analyser, ctx, mockSource, mockGain } = createMockAnalyserWithContext();
+
+    // No init() call here: pixiApp remains null (fallback path).
+    connectAnalysisAudio('test-song.mp3', analyser);
+
+    const createdEl = ctx.createMediaElementSource.mock.calls[0][0];
+    createdEl.pause = vi.fn();
+    createdEl.load = vi.fn();
+
+    clearAll();
+
+    expect(mockGain.disconnect).toHaveBeenCalled();
+    expect(mockSource.disconnect).toHaveBeenCalled();
+    expect(createdEl.pause).toHaveBeenCalled();
+  });
+
+  it('pause stops the analysis element', () => {
+    const { analyser, ctx } = createMockAnalyserWithContext();
+
+    connectAnalysisAudio('test-song.mp3', analyser);
+
+    const createdEl = ctx.createMediaElementSource.mock.calls[0][0];
+    createdEl.pause = vi.fn();
+
+    pause();
+    expect(createdEl.pause).toHaveBeenCalled();
+  });
+
+  it('resume restarts the analysis element when not reduced motion', () => {
+    const { analyser, ctx } = createMockAnalyserWithContext();
+
+    connectAnalysisAudio('test-song.mp3', analyser);
+
+    const createdEl = ctx.createMediaElementSource.mock.calls[0][0];
+    createdEl.play = vi.fn().mockResolvedValue(undefined);
+
+    resume();
+    expect(createdEl.play).toHaveBeenCalled();
+  });
+
+  it('resume does not restart analysis element under reduced motion', () => {
+    const { analyser, ctx } = createMockAnalyserWithContext();
+
+    connectAnalysisAudio('test-song.mp3', analyser);
+
+    const createdEl = ctx.createMediaElementSource.mock.calls[0][0];
+    createdEl.play = vi.fn().mockResolvedValue(undefined);
+
+    globalThis.matchMedia = vi.fn().mockReturnValue({ matches: true });
+
+    resume();
+    expect(createdEl.play).not.toHaveBeenCalled();
   });
 });

@@ -5,14 +5,13 @@ import {
   cancelAudioCues,
   pauseAudioCues,
   resumeAudioCues,
-  cancelCue,
-  restartNarrationCue,
-  reCueCue,
   setMuted,
   onNarrationBufferChange,
   preloadNarrationAhead,
   clearNarrationCache,
   wrapOnNarrationEndWithBoost,
+  getAnalyserNode,
+  disconnectAnalyserSource,
 } from './audio.js';
 import { PausableTimer } from './pausable-timer.js';
 import { buildNarrationTimeline, clearNarrationLayer } from './text.js';
@@ -58,6 +57,15 @@ function pauseEffects() {
 }
 function resumeEffects() {
   effectsMod?.resume();
+}
+function setEffectsAnalyser(node) {
+  effectsMod?.setAnalyser(node);
+}
+function connectEffectsAnalysisAudio(src, analyser, loop) {
+  effectsMod?.connectAnalysisAudio(src, analyser, loop);
+}
+function startEffectsAnalysisPlayback() {
+  effectsMod?.startAnalysisPlayback();
 }
 
 const State = Object.freeze({
@@ -216,6 +224,36 @@ function makeNarrationEndCallback(app, frame, holdAfterNarration) {
   };
 }
 
+function resolveAnalyserCueEnter(frame, cue, audioDurations) {
+  if (typeof cue.enter === 'number') return cue.enter;
+  if (cue.enter?.ref) {
+    const refCue = frame.audioCues?.find((c) => c.id === cue.enter.ref);
+    if (!refCue) return null;
+    if (typeof refCue.enter !== 'number') {
+      // Multi-hop anchor refs are not supported — only single-level numeric refs are resolved.
+      // If refCue also uses a ref-based enter, fall back to 0 and warn so the issue is visible.
+      console.warn(
+        `[effects] analyserCueEnter: ref "${cue.enter.ref}" has non-numeric enter — falling back to 0`,
+      );
+    }
+    const refEnter = typeof refCue.enter === 'number' ? refCue.enter : 0;
+
+    // Tier 1: metadata duration from preloader (coerce undefined → 0)
+    let refDuration = audioDurations?.get(refCue.src) ?? 0;
+
+    // Tier 2: caption-derived duration (fallback when preload hasn't finished)
+    if (refDuration <= 0 && frame.narration?.captions?.length) {
+      refDuration = Math.max(...frame.narration.captions.map((c) => c.end)) / 1000;
+    }
+
+    if (refDuration > 0) {
+      return refEnter + refDuration * 1000 + (cue.enter.offset || 0);
+    }
+    return null; // anchor unresolvable — don't guess
+  }
+  return 0;
+}
+
 function scheduleFrameAudio(app, frame) {
   const holdAfterNarration = getHoldAfterNarration(frame);
   const onNarrationEnd = wrapOnNarrationEndWithBoost(
@@ -236,27 +274,6 @@ function scheduleFrameAudio(app, frame) {
   });
 }
 
-function scheduleReplayNarration(app, frame, narrationCue) {
-  if (!narrationCue) return;
-
-  const holdAfterNarration = getHoldAfterNarration(frame);
-  const onNarrationEnd = wrapOnNarrationEndWithBoost(
-    frame.audioCues,
-    makeNarrationEndCallback(app, frame, holdAfterNarration),
-  );
-  const maxNarrationDurationMs = getMaxNarrationDuration(
-    frame,
-    app.audioDurations,
-    app.projectMaxCaptionMs,
-  );
-
-  scheduleAudioCues([narrationCue], {
-    onNarrationEnd,
-    maxNarrationDurationMs,
-    audioDurations: app.audioDurations,
-  });
-}
-
 function resumeDeferredFrameAudio(app, { cancelExisting = false } = {}) {
   if (!app.deferFrameAudioUntilResume) return false;
 
@@ -266,22 +283,6 @@ function resumeDeferredFrameAudio(app, { cancelExisting = false } = {}) {
   }
   scheduleFrameAudio(app, app.frames[app.currentIndex]);
   return true;
-}
-
-function resumeReplayPendingAudio(app) {
-  app.replayPending = false;
-  const frame = app.frames[app.currentIndex];
-  const narrationCue = getNarrationCueFromFrame(frame);
-
-  if (resumeDeferredFrameAudio(app, { cancelExisting: true })) {
-    return;
-  }
-
-  if (narrationCue) {
-    cancelCue('narration');
-  }
-  resumeAudioCues();
-  scheduleReplayNarration(app, frame, narrationCue);
 }
 
 function buildNarration(app, frame) {
@@ -383,6 +384,41 @@ function prebufferNextScene(app, index) {
   }
 }
 
+function wireAnalysisAudio(app, frame, analyser) {
+  if (!frame.effects.analyserCueId) return;
+  const cue = frame.audioCues?.find((c) => c.id === frame.effects.analyserCueId);
+  if (!cue?.src) {
+    console.warn(
+      `[effects] analyserCueId "${frame.effects.analyserCueId}" not found in frame audioCues — analysis audio inactive`,
+    );
+    return;
+  }
+
+  const enterDelay = resolveAnalyserCueEnter(frame, cue, app.audioDurations);
+  if (enterDelay === null) return; // anchor unresolvable — analysis stays inert
+
+  connectEffectsAnalysisAudio(cue.src, analyser, !!cue.loop);
+
+  const wireGeneration = app.generation;
+  const wireIndex = app.currentIndex;
+  const startAnalysisIfCurrent = () => {
+    // Ignore stale timers from superseded showFrame calls.
+    if (wireGeneration !== app.generation || wireIndex !== app.currentIndex) return;
+    app.analysisStartTimer = null;
+    startEffectsAnalysisPlayback();
+  };
+
+  // When paused, never start analysis playback immediately. Queue it on a
+  // timer and pause that timer so resume() controls when playback starts.
+  const shouldDeferStart = enterDelay > 0 || app.paused;
+  if (shouldDeferStart) {
+    app.analysisStartTimer = new PausableTimer(startAnalysisIfCurrent, Math.max(0, enterDelay));
+    if (app.paused) app.analysisStartTimer.pause();
+  } else {
+    startAnalysisIfCurrent();
+  }
+}
+
 function showFrame(app, index) {
   const frame = app.frames[index];
   app.els.sceneStage.setAttribute('aria-label', frame.description || '');
@@ -390,9 +426,25 @@ function showFrame(app, index) {
   clearNarrationLayer(app.els.narrationLayer);
 
   if (frame.effects?.regions?.length) {
-    app.effectsReady = loadEffectsScene(frame.effects, frame.image).catch((err) =>
-      console.error('Effects load failed:', err.message),
-    );
+    const showGeneration = app.generation;
+    const showIndex = index;
+    app.effectsReady = loadEffectsScene(frame.effects, frame.image)
+      .then((loaded) => {
+        // loadScene can resolve false when superseded, unavailable, or failed.
+        if (!loaded) return;
+        // Ignore stale completions from old showFrame calls.
+        if (showGeneration !== app.generation || showIndex !== app.currentIndex) return;
+        // Wire audio-reactive bridge after effects are loaded (ADR-008).
+        // setAnalyser must run after loadScene so it isn't cleared by clearAll().
+        if (frame.effects.regions.some((r) => r.audioReactive)) {
+          const analyser = getAnalyserNode();
+          if (analyser) {
+            setEffectsAnalyser(analyser);
+            wireAnalysisAudio(app, frame, analyser);
+          }
+        }
+      })
+      .catch((err) => console.error('Effects load failed:', err.message));
   } else {
     cancelPendingLoad();
     clearEffects();
@@ -430,17 +482,15 @@ function clearPauseState(app) {
 
 function handleBufferChange(app, isBuffering) {
   app.buffering = isBuffering;
+  app.els.sceneStage.classList.toggle('buffering', isBuffering);
 
-  if (isBuffering) {
-    if (!app.paused) {
-      if (app.textTimeline) app.textTimeline.pause();
-    }
-    app.els.sceneStage.classList.add('buffering');
-  } else {
-    if (!app.paused) {
-      if (app.textTimeline) app.textTimeline.resume();
-    }
-    app.els.sceneStage.classList.remove('buffering');
+  // Guard: do not touch the text timeline during transitions —
+  // landOnFrame will start it once the fade-in completes.
+  if (app.state === State.TRANSITIONING) return;
+
+  if (!app.paused && app.textTimeline) {
+    if (isBuffering) app.textTimeline.pause();
+    else app.textTimeline.resume();
   }
 }
 
@@ -485,7 +535,13 @@ function cleanupCurrentScene(app) {
   app.generation++;
   clearAutoAdvance(app);
   cancelPendingLoad();
+  disconnectAnalyserSource();
   cancelAudioCues();
+
+  if (app.analysisStartTimer) {
+    app.analysisStartTimer.cancel();
+    app.analysisStartTimer = null;
+  }
 
   clearCaptionElements(app.captionEntries);
   try {
@@ -497,7 +553,6 @@ function cleanupCurrentScene(app) {
   app.captionEntries = [];
 
   app.deferFrameAudioUntilResume = false;
-  app.replayPending = false;
 }
 
 function manageFocusAfterTransition(app) {
@@ -592,7 +647,9 @@ function transition(app, toIndex) {
       app.pendingPause = false;
       doPause(app);
     } else {
-      if (app.textTimeline) app.textTimeline.play(0);
+      if (app.textTimeline) {
+        app.textTimeline.play(0);
+      }
       setupAutoAdvance(app);
     }
     manageFocusAfterTransition(app);
@@ -699,16 +756,7 @@ function doResume(app) {
   app.state = app.pausedFromState ?? State.SCENE_ACTIVE;
   app.pausedFromState = null;
 
-  if (app.replayPending) {
-    resumeReplayPendingAudio(app);
-    // Clear caption DOM created as side effect of tl.pause(0) in
-    // replayNarration — play(0) will recreate them cleanly.
-    clearCaptionElements(app.captionEntries);
-    if (app.textTimeline && !app.buffering) {
-      app.textTimeline.play(0);
-    }
-    setupAutoAdvance(app);
-  } else if (firstPlay) {
+  if (firstPlay) {
     dismissLoadingScreen(app.els.loadingScreen);
     // Move focus to the pause button so a pending Space keyup doesn't
     // activate an unintended control (e.g., btn-next) after the loading
@@ -735,6 +783,8 @@ function doResume(app) {
     setupAutoAdvance(app);
   }
 
+  app.analysisStartTimer?.resume();
+
   app.els.btnPause.setAttribute('aria-pressed', 'false');
   app.els.btnPause.classList.remove('paused');
 }
@@ -753,6 +803,7 @@ function doPause(app) {
   pauseEffects();
 
   app.autoAdvanceTimer?.pause();
+  app.analysisStartTimer?.pause();
 
   app.els.btnPause.setAttribute('aria-pressed', 'true');
   app.els.btnPause.classList.add('paused');
@@ -779,55 +830,19 @@ function replayNarration(app) {
 
   app.userHasInteracted = true;
 
-  // Invalidate stale onend callbacks from prior narration play.
-  // Without this, a queued onend could pass the generation guard
-  // and schedule a spurious auto-advance.
-  app.generation++;
-
-  app.buffering = false;
-  app.els.sceneStage.classList.remove('buffering');
-
-  clearAutoAdvance(app);
-
-  const frame = app.frames[app.currentIndex];
-  const narrationCue = getNarrationCueFromFrame(frame);
+  // Full scene reset — identical to hard-jump navigation (ADR-004 addendum).
+  // cleanupCurrentScene kills all audio, effects, text, captions, analyser.
+  // showFrame reloads effects, rebuilds text, and schedules all audio fresh.
+  cleanupCurrentScene(app);
 
   if (app.paused) {
-    // Replay while paused: cue narration audio, reset text, stay paused.
-    // Set replayPending so doResume knows to schedule narration with onend
-    // instead of just resuming a paused Howl.
-    if (narrationCue) {
-      cancelCue('narration');
-      reCueCue('narration', narrationCue);
-    }
-    buildNarration(app, frame);
-    app.replayPending = true;
-    if (app.textTimeline) {
-      app.textTimeline.pause(0);
-    }
+    app.deferFrameAudioUntilResume = true;
+    showFrame(app, app.currentIndex);
+    const frame = app.frames[app.currentIndex];
+    app.state = STATE_BY_FRAME_TYPE[frame.frameType] || State.SCENE_ACTIVE;
+    doPause(app);
   } else {
-    buildNarration(app, frame);
-    if (narrationCue) {
-      const holdAfterNarration = getHoldAfterNarration(frame);
-      const narrationOpts = {
-        onNarrationEnd: wrapOnNarrationEndWithBoost(
-          frame.audioCues,
-          makeNarrationEndCallback(app, frame, holdAfterNarration),
-        ),
-        maxNarrationDurationMs: getMaxNarrationDuration(
-          frame,
-          app.audioDurations,
-          app.projectMaxCaptionMs,
-        ),
-        audioDurations: app.audioDurations,
-      };
-      // Reuse existing Howl to avoid HTML5 Audio pool exhaustion on rapid replays.
-      // Falls back to cancel + fresh schedule if no Howl exists yet.
-      if (!restartNarrationCue(narrationCue, narrationOpts)) {
-        cancelCue('narration');
-        scheduleAudioCues([narrationCue], narrationOpts);
-      }
-    }
+    showFrame(app, app.currentIndex);
     if (app.textTimeline) app.textTimeline.play(0);
     setupAutoAdvance(app);
   }
@@ -998,11 +1013,11 @@ export function createApp() {
     textTimeline: null,
     captionEntries: [],
     autoAdvanceTimer: null,
+    analysisStartTimer: null,
     autoAdvancing: false,
     pendingNavIndex: null,
     generation: 0,
     deferFrameAudioUntilResume: false,
-    replayPending: false,
     pendingPause: false,
     buffering: false,
     effectsReady: null,

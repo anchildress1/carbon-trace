@@ -33,11 +33,33 @@ function createMockHowlInstance() {
   };
 }
 
+const { mockHowlerCtx } = vi.hoisted(() => {
+  const mockHowlerCtx = {
+    createAnalyser: vi.fn(() => ({
+      fftSize: 0,
+      smoothingTimeConstant: 0,
+      frequencyBinCount: 1024,
+      connect: vi.fn(),
+      getByteFrequencyData: vi.fn(),
+      context: { sampleRate: 44100 },
+    })),
+    createMediaElementSource: vi.fn(() => ({
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+    })),
+    destination: {},
+    sampleRate: 44100,
+  };
+
+  return { mockHowlerCtx };
+});
+
 vi.mock('howler', () => ({
   Howl: vi.fn(function (opts) {
     lastHowlOptions = opts;
     Object.assign(this, createMockHowlInstance());
   }),
+  Howler: { ctx: mockHowlerCtx },
 }));
 
 import {
@@ -56,8 +78,10 @@ import {
   preloadNarrationAhead,
   clearNarrationCache,
   wrapOnNarrationEndWithBoost,
+  getAnalyserNode,
+  disconnectAnalyserSource,
 } from '../../src/audio.js';
-import { Howl } from 'howler';
+import { Howl, Howler } from 'howler';
 
 function makeCue(overrides = {}) {
   return {
@@ -65,7 +89,7 @@ function makeCue(overrides = {}) {
     type: 'narration',
     src: 'test.m4a',
     enter: 0,
-    volume: 1.0,
+    volume: 1,
     loop: false,
     fadeIn: 0,
     fadeOut: 0,
@@ -94,7 +118,7 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       scheduleAudioCues([cue]);
 
       expect(Howl).toHaveBeenCalledWith(
-        expect.objectContaining({ src: ['test.m4a'], volume: 1.0 }),
+        expect.objectContaining({ src: ['test.m4a'], volume: 1 }),
       );
       const howl = Howl.mock.results[0].value;
       expect(howl.play).toHaveBeenCalled();
@@ -132,7 +156,7 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       scheduleAudioCues([cue]);
 
       const howl = Howl.mock.results[0].value;
-      expect(howl.fade).toHaveBeenCalledWith(0, 1.0, 1000);
+      expect(howl.fade).toHaveBeenCalledWith(0, 1, 1000);
     });
 
     it('uses crossfadeAmbientCue for ambient type', () => {
@@ -318,6 +342,23 @@ describe('audio.js — unified cue API (ADR-005)', () => {
 
       resumeAudioCues();
       expect(howl.play).toHaveBeenCalled();
+    });
+
+    it('does not replay narration that already ended', () => {
+      const onEnd = vi.fn();
+      scheduleAudioCues([makeCue()], { onNarrationEnd: onEnd });
+      const howl = Howl.mock.results[0].value;
+
+      // Simulate narration ending naturally
+      const endHandler = howl.once.mock.calls.find(([e]) => e === 'end')[1];
+      endHandler();
+
+      vi.clearAllMocks();
+
+      // Pause then resume — narration should NOT restart
+      pauseAudioCues();
+      resumeAudioCues();
+      expect(howl.play).not.toHaveBeenCalled();
     });
 
     it('does not pause cues in scheduled state', () => {
@@ -913,5 +954,52 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       // play() should NOT have been called by the buffer recovery loop
       expect(mockNode.play).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('audio.js — audio-reactive analyser (ADR-008)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    mockNode.addEventListener.mockClear();
+    mockNode.removeEventListener.mockClear();
+    cancelAudioCues();
+    disconnectAnalyserSource();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('returns null when Howler.ctx is null', () => {
+    const originalCtx = Howler.ctx;
+    Howler.ctx = null;
+    expect(getAnalyserNode()).toBeNull();
+    Howler.ctx = originalCtx;
+  });
+
+  it('creates AnalyserNode with correct config (no destination connect)', () => {
+    const node = getAnalyserNode();
+    expect(node).not.toBeNull();
+    expect(node.fftSize).toBe(2048);
+    expect(node.smoothingTimeConstant).toBe(0.4);
+    expect(node.connect).not.toHaveBeenCalled();
+    expect(mockHowlerCtx.createAnalyser).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns the same instance on subsequent calls', () => {
+    const first = getAnalyserNode();
+    mockHowlerCtx.createAnalyser.mockClear();
+    const second = getAnalyserNode();
+    expect(first).toBe(second);
+    // createAnalyser should not be called again for the singleton
+    expect(mockHowlerCtx.createAnalyser).not.toHaveBeenCalled();
+  });
+
+  it('disconnectAnalyserSource clears analyser state', () => {
+    getAnalyserNode();
+    disconnectAnalyserSource();
+    // Idempotent — second call should not throw
+    expect(() => disconnectAnalyserSource()).not.toThrow();
   });
 });
