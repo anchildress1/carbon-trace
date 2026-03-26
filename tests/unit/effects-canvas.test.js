@@ -133,14 +133,13 @@ function createMockCanvas() {
  */
 function setupImageMock() {
   globalThis.Image = vi.fn(function () {
-    const self = this;
-    self.width = 256;
-    self.height = 256;
-    self.naturalWidth = 256;
-    self.naturalHeight = 256;
+    this.width = 256;
+    this.height = 256;
+    this.naturalWidth = 256;
+    this.naturalHeight = 256;
     Object.defineProperty(this, 'src', {
-      set() {
-        self.onload?.();
+      set: () => {
+        this.onload?.();
       },
     });
   });
@@ -148,6 +147,67 @@ function setupImageMock() {
   // createImageBitmap is not available in jsdom/happy-dom.
   // Return a plain object — Texture.from() is mocked anyway.
   globalThis.createImageBitmap = vi.fn().mockResolvedValue({ width: 256, height: 256 });
+}
+
+function createMockAnalyser(sampleRate = 44100, frequencyBinCount = 1024) {
+  return {
+    frequencyBinCount,
+    getByteFrequencyData: vi.fn(),
+    context: { sampleRate },
+  };
+}
+
+async function setupTriggerScene(audioReactiveConfig) {
+  const { createEffect } = await import('../../src/effects.js');
+  const triggerFn = vi.fn();
+  createEffect.mockReturnValue({
+    filter: { enabled: true, amplitude: 15 },
+    update: vi.fn(),
+    trigger: triggerFn,
+  });
+
+  const canvas = createMockCanvas();
+  await init(canvas);
+
+  const config = {
+    regions: [
+      {
+        type: 'shockwave',
+        mask: 'assets/masks/test.png',
+        audioReactive: audioReactiveConfig,
+      },
+    ],
+  };
+
+  await loadScene(config, 'assets/images/test.webp');
+
+  const analyser = createMockAnalyser(44100);
+  setAnalyser(analyser);
+
+  const { Application } = await import('pixi.js');
+  const instance = Application.mock.instances[Application.mock.instances.length - 1];
+  const tickerCallback = instance.ticker.add.mock.calls[0]?.[0];
+
+  return { analyser, tickerCallback, triggerFn };
+}
+
+function createMockAnalyserWithContext() {
+  const mockSource = { connect: vi.fn(), disconnect: vi.fn() };
+  const mockGain = { gain: { value: 1 }, connect: vi.fn(), disconnect: vi.fn() };
+  const ctx = {
+    sampleRate: 44100,
+    createMediaElementSource: vi.fn(() => mockSource),
+    createGain: vi.fn(() => mockGain),
+    destination: {},
+  };
+  const analyser = {
+    frequencyBinCount: 1024,
+    getByteFrequencyData: vi.fn(),
+    context: ctx,
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+  };
+  return { analyser, ctx, mockSource, mockGain };
 }
 
 describe('effects-canvas.js — PixiJS lifecycle', () => {
@@ -803,20 +863,19 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
       let callCount = 0;
       const originalImage = globalThis.Image;
       globalThis.Image = vi.fn(function () {
-        const self = this;
-        self.width = 256;
-        self.height = 256;
-        self.naturalWidth = 256;
-        self.naturalHeight = 256;
+        this.width = 256;
+        this.height = 256;
+        this.naturalWidth = 256;
+        this.naturalHeight = 256;
         Object.defineProperty(this, 'src', {
-          set(_val) {
+          set: () => {
             callCount++;
             // Fail the second Image load (first mask's luminance processing)
             // but succeed on others (noise, scene texture, second mask)
             if (callCount === 2) {
-              self.onerror?.();
+              this.onerror?.();
             } else {
-              self.onload?.();
+              this.onload?.();
             }
           },
         });
@@ -1022,13 +1081,6 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
     vi.restoreAllMocks();
   });
 
-  function createMockAnalyser(sampleRate = 44100, frequencyBinCount = 1024) {
-    return {
-      frequencyBinCount,
-      getByteFrequencyData: vi.fn(),
-      context: { sampleRate },
-    };
-  }
 
   it('setAnalyser stores the analyser and allocates fftData', () => {
     const analyser = createMockAnalyser();
@@ -1210,44 +1262,10 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
   });
 
   describe('onset trigger mode', () => {
-    async function setupTriggerScene(audioReactiveConfig) {
-      const { createEffect } = await import('../../src/effects.js');
-      const triggerFn = vi.fn();
-      createEffect.mockReturnValue({
-        filter: { enabled: true, amplitude: 15 },
-        update: vi.fn(),
-        trigger: triggerFn,
-      });
-
-      const canvas = createMockCanvas();
-      await init(canvas);
-
-      const config = {
-        regions: [
-          {
-            type: 'shockwave',
-            mask: 'assets/masks/test.png',
-            audioReactive: audioReactiveConfig,
-          },
-        ],
-      };
-
-      await loadScene(config, 'assets/images/test.webp');
-
-      const analyser = createMockAnalyser(44100);
-      setAnalyser(analyser);
-
-      const { Application } = await import('pixi.js');
-      const instance = Application.mock.instances[Application.mock.instances.length - 1];
-      const tickerCallback = instance.ticker.add.mock.calls[0]?.[0];
-
-      return { analyser, tickerCallback, triggerFn };
-    }
-
     it('spectral flux fires trigger on energy increase', async () => {
       const { analyser, tickerCallback, triggerFn } = await setupTriggerScene({
         band: 'bass',
-        trigger: { threshold: 3.0, cooldown: 0 },
+        trigger: { threshold: 3, cooldown: 0 },
       });
 
       // 65 frames of alternating low energy to stabilize flux running average.
@@ -1275,7 +1293,7 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
     it('cooldown prevents rapid re-triggering', async () => {
       const { analyser, tickerCallback, triggerFn } = await setupTriggerScene({
         band: 'bass',
-        trigger: { threshold: 3.0, cooldown: 0.5 },
+        trigger: { threshold: 3, cooldown: 0.5 },
       });
 
       // 65 frames of alternating low energy to stabilize flux running average.
@@ -1316,7 +1334,7 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
     it('minEnergy gates triggers below configured level', async () => {
       const { analyser, tickerCallback, triggerFn } = await setupTriggerScene({
         band: 'bass',
-        trigger: { threshold: 3.0, cooldown: 0, minEnergy: 0.8 },
+        trigger: { threshold: 3, cooldown: 0, minEnergy: 0.8 },
       });
 
       // 65 frames of alternating low energy to stabilize flux running average.
@@ -1355,7 +1373,7 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
         target: 'amplitude',
         range: [0, 10],
         smoothing: 0,
-        trigger: { threshold: 3.0, cooldown: 0 },
+        trigger: { threshold: 3, cooldown: 0 },
       });
 
       // 65 frames of alternating low energy to stabilize flux running average
@@ -1469,25 +1487,6 @@ describe('effects-canvas — dedicated analysis element (ADR-008 Approach B)', (
     HTMLCanvasElement.prototype.getContext = originalGetContext;
     vi.restoreAllMocks();
   });
-
-  function createMockAnalyserWithContext() {
-    const mockSource = { connect: vi.fn(), disconnect: vi.fn() };
-    const mockGain = { gain: { value: 1 }, connect: vi.fn(), disconnect: vi.fn() };
-    const ctx = {
-      sampleRate: 44100,
-      createMediaElementSource: vi.fn(() => mockSource),
-      createGain: vi.fn(() => mockGain),
-      destination: {},
-    };
-    const analyser = {
-      frequencyBinCount: 1024,
-      getByteFrequencyData: vi.fn(),
-      context: ctx,
-      connect: vi.fn(),
-      disconnect: vi.fn(),
-    };
-    return { analyser, ctx, mockSource, mockGain };
-  }
 
   it('connectAnalysisAudio creates element and routes through silent gain to destination', () => {
     const { analyser, ctx, mockSource, mockGain } = createMockAnalyserWithContext();
