@@ -34,20 +34,6 @@ function createMockHowlInstance() {
 }
 
 const { mockHowlerCtx } = vi.hoisted(() => {
-  const mockAnalyserNode = {
-    fftSize: 0,
-    smoothingTimeConstant: 0,
-    frequencyBinCount: 1024,
-    connect: vi.fn(),
-    getByteFrequencyData: vi.fn(),
-    context: { sampleRate: 44100 },
-  };
-
-  const mockMediaSource = {
-    connect: vi.fn(),
-    disconnect: vi.fn(),
-  };
-
   const mockHowlerCtx = {
     createAnalyser: vi.fn(() => ({
       fftSize: 0,
@@ -103,7 +89,7 @@ function makeCue(overrides = {}) {
     type: 'narration',
     src: 'test.m4a',
     enter: 0,
-    volume: 1.0,
+    volume: 1,
     loop: false,
     fadeIn: 0,
     fadeOut: 0,
@@ -132,7 +118,7 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       scheduleAudioCues([cue]);
 
       expect(Howl).toHaveBeenCalledWith(
-        expect.objectContaining({ src: ['test.m4a'], volume: 1.0 }),
+        expect.objectContaining({ src: ['test.m4a'], volume: 1 }),
       );
       const howl = Howl.mock.results[0].value;
       expect(howl.play).toHaveBeenCalled();
@@ -170,7 +156,7 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       scheduleAudioCues([cue]);
 
       const howl = Howl.mock.results[0].value;
-      expect(howl.fade).toHaveBeenCalledWith(0, 1.0, 1000);
+      expect(howl.fade).toHaveBeenCalledWith(0, 1, 1000);
     });
 
     it('uses crossfadeAmbientCue for ambient type', () => {
