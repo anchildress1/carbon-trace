@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.0.4](https://github.com/anchildress1/carbon-trace/compare/carbon-trace-v0.0.3...carbon-trace-v0.0.4) (2026-03-26)
+
+
+### Features
+
+* music animation ([#28](https://github.com/anchildress1/carbon-trace/issues/28)) ([e59fd80](https://github.com/anchildress1/carbon-trace/commit/e59fd807579c2b3cc67756444eb71ead208eacc6))
+
+
+### Bug Fixes
+
+* **deps:** remove npm lock file and patch picomatch/brace-expansion vulnerabilities ([#30](https://github.com/anchildress1/carbon-trace/issues/30)) ([a788cf8](https://github.com/anchildress1/carbon-trace/commit/a788cf8aa43297434798748d2ba667386697475e))
+
 ## [0.0.3](https://github.com/anchildress1/carbon-trace/compare/carbon-trace-v0.0.2...carbon-trace-v0.0.3) (2026-03-25)
 
 
