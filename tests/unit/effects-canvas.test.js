@@ -1237,8 +1237,8 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
         trigger: { threshold: 3.0, cooldown: 0 },
       });
 
-      // Warmup: 65 frames of alternating low energy to build flux average.
-      // activeFrames must reach 60 before triggers are allowed.
+      // Warmup: 65 frames × 16.67ms ≈ 1.08s exceeds default 1.0s warmup.
+      // Alternating energy builds flux average and accumulates activeTime.
       let warmupFrame = 0;
       analyser.getByteFrequencyData.mockImplementation((data) => {
         data.fill(0);
@@ -1266,8 +1266,7 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
         trigger: { threshold: 3.0, cooldown: 0.5 },
       });
 
-      // Warmup: 65 frames of alternating energy to build flux average
-      // and pass the 60-frame warmup guard.
+      // Warmup: 65 frames × 16.67ms ≈ 1.08s exceeds default 1.0s warmup.
       let warmupFrame = 0;
       analyser.getByteFrequencyData.mockImplementation((data) => {
         data.fill(0);
@@ -1311,7 +1310,7 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
         trigger: { threshold: 3.0, cooldown: 0 },
       });
 
-      // Warmup: 65 frames of alternating energy
+      // Warmup: 65 frames × 16.67ms ≈ 1.08s exceeds default 1.0s warmup
       let warmupFrame = 0;
       analyser.getByteFrequencyData.mockImplementation((data) => {
         data.fill(0);

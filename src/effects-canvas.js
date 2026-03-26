@@ -169,9 +169,10 @@ function buildAudioReactiveState() {
         state.trigger = true;
         state.threshold = ar.trigger.threshold ?? 3.0;
         state.cooldown = ar.trigger.cooldown ?? 0.1;
+        state.warmup = ar.trigger.warmup ?? 1.0;
         state.prevEnergy = 0;
         state.fluxAvg = 0;
-        state.activeFrames = 0;
+        state.activeTime = 0;
         state.timeSinceLastTrigger = 0;
       }
       audioReactiveState.push(state);
@@ -192,12 +193,12 @@ function applyTrigger(state, energy, dt) {
   state.fluxAvg = state.fluxAvg * 0.95 + flux * 0.05;
   state.timeSinceLastTrigger += dt;
 
-  // Count frames with actual audio to gate warmup
-  if (energy > 0.01) state.activeFrames++;
+  // Accumulate time with actual audio signal present
+  if (energy > 0.01) state.activeTime += dt;
 
-  // Wait ~1 second of audio data for flux average to stabilize.
-  // Prevents false trigger on the initial energy jump from silence.
-  if (state.activeFrames < 60) return;
+  // Wait for warmup period after audio arrives. Allows flux average to
+  // stabilize and prevents false triggers during audio fade-in.
+  if (state.activeTime < state.warmup) return;
 
   if (flux > state.fluxAvg * state.threshold && state.timeSinceLastTrigger > state.cooldown) {
     activeEffects[state.effectIndex].trigger?.();

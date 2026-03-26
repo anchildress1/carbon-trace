@@ -95,7 +95,7 @@ FOR EACH region with audioReactive.trigger:
   2. Update flux running average:
      fluxAvg = fluxAvg * 0.95 + flux * 0.05
   3. Increment timeSinceLastTrigger by frame delta
-  4. IF activeFrames < 60: SKIP (warmup guard — see below)
+  4. IF activeTime < warmup: SKIP (warmup guard — see below)
   5. IF flux > fluxAvg * threshold AND timeSinceLastTrigger > cooldown:
      a. Call effect.trigger() — resets the animation cycle (e.g., shockwave time=0)
      b. Reset timeSinceLastTrigger = 0
@@ -105,7 +105,7 @@ FOR EACH region with audioReactive.trigger:
 
 The `threshold` multiplier means "trigger when flux exceeds the average flux by this factor." A threshold of 3.0 = "3x the typical frame-to-frame change." The `cooldown` prevents rapid re-triggering within a minimum interval.
 
-**Warmup guard (step 4):** When the analysis audio first starts, energy jumps from 0 to a high value in one frame, producing a massive flux spike. The `activeFrames` counter tracks frames where energy > 0.01. Until 60 such frames have passed (~1 second of audio at 60fps), all triggers are suppressed. This gives the flux running average time to stabilize so the threshold comparison is meaningful.
+**Warmup guard (step 4):** The `activeTime` counter accumulates elapsed time during frames where energy > 0.01. Until `activeTime` exceeds the configurable `warmup` duration (seconds), all triggers are suppressed. This serves two purposes: (1) prevents false triggers from the initial energy jump when audio first arrives, and (2) delays triggers during the audio cue's fade-in period. The analysis `<audio>` element has no fade — it plays at full volume through the AnalyserNode immediately — so FFT data shows full-energy audio while the user still hears the Howler cue fading in. Setting `warmup` ≥ the cue's `fadeIn` duration ensures triggers only fire once the audible audio has reached target volume.
 
 Trigger and continuous modulation run in the same frame. Continuous modulation sets the parameter value (e.g., amplitude), then trigger fires a new cycle if a beat is detected. Combined: each beat fires a shockwave whose intensity matches the hit strength.
 
@@ -193,7 +193,8 @@ With optional onset trigger (composable with continuous modulation above):
     "smoothing": 0.3,        // lower = more responsive to transients
     "trigger": {             // onset detection via spectral flux (optional)
       "threshold": 3.0,      // fire when flux > fluxAvg * 3.0
-      "cooldown": 0.08       // min 80ms between triggers (~12/sec max)
+      "cooldown": 0.08,      // min 80ms between triggers (~12/sec max)
+      "warmup": 4.0          // seconds of audio before triggers activate
     }
   }
 }

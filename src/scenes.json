@@ -1343,7 +1343,8 @@
               "smoothing": 0.3,
               "trigger": {
                 "threshold": 3.0,
-                "cooldown": 0.08
+                "cooldown": 0.08,
+                "warmup": 4.0
               }
             }
           },
