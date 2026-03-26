@@ -460,20 +460,20 @@ These are scoped implementation choices, not architectural decisions. The ADR's 
 ## Action Items
 
 1. [ ] Design and author mask images for all scenes (Ashley)
-2. ~~done~~ Add pixi.js v8.17.1 (pinned) to package.json — no particle emitter package needed
-3. ~~done~~ Implement effect factory registry in effects.js (water, heat, dust, glow, shockwave)
-4. ~~done~~ Refactor effects-canvas.js with PixiJS lifecycle (init, loadScene, clearAll, pause/resume)
-5. ~~done~~ Implement water displacement (DisplacementFilter + scrolling noise sprite + mask)
-6. ~~done~~ Implement heat displacement (DisplacementFilter, upward, large scale)
-7. ~~done~~ Implement dust displacement (DisplacementFilter, multi-directional slow drift)
-8. ~~done~~ Update app.js showFrame() to use new effects API
+2. [x] Add pixi.js v8.17.1 (pinned) to package.json — no particle emitter package needed
+3. [x] Implement effect factory registry in effects.js (water, heat, dust, glow, shockwave)
+4. [x] Refactor effects-canvas.js with PixiJS lifecycle (init, loadScene, clearAll, pause/resume)
+5. [x] Implement water displacement (DisplacementFilter + scrolling noise sprite + mask)
+6. [x] Implement heat displacement (DisplacementFilter, upward, large scale)
+7. [x] Implement dust displacement (DisplacementFilter, multi-directional slow drift)
+8. [x] Update app.js showFrame() to use new effects API
 9. [ ] ~~Add mask preloading to loader.js pipeline~~ Masks loaded lazily via `new Image()` + `Texture.from()` inside loadScene(). No loader.js changes needed.
-10. ~~done~~ Update scenes.json schema for all 12 frames
-11. ~~done~~ WebGL fallback: detect unavailability, degrade to static + context loss recovery (re-init on next loadScene)
-12. ~~done~~ Error boundary: try/catch around init(), webglAvailable flag, loadScene() no-op on failure
+10. [x] Update scenes.json schema for all 12 frames
+11. [x] WebGL fallback: detect unavailability, degrade to static + context loss recovery (re-init on next loadScene)
+12. [x] Error boundary: try/catch around init(), webglAvailable flag, loadScene() no-op on failure
 13. [ ] Performance profiling — verify <2ms per frame on baseline hardware (see profiling gates)
-14. [ ] Update v5 spec §3, §4, §17
-15. ~~done~~ Audio-reactive implementation — see ADR-008 action items
-16. ~~done~~ Add request-generation guard in loadScene() — increment a generation counter on each call, check on async image/mask load resolve, discard stale results if counter has changed (prevents race when user navigates mid-load)
-17. ~~done~~ Resize active effect/mask bounds — ResizeObserver tracks screen-sized sprites (maskSprite, effectSprite) and updates their dimensions on resize. Noise sprites use scale.set() with repeat addressing (viewport-independent).
-18. ~~done~~ Texture lifecycle cleanup in clearAll() — disposableTextures array tracks per-scene mask, noise, and scene textures. Destroyed with .destroy(false) to avoid BindGroup corruption; TextureSources left for GCSystem reclamation. Sprites destroyed via child.destroy({ children: true, texture: false }).
+14. [x] Update v5 spec §3, §4, §17
+15. [x] Audio-reactive implementation — see ADR-008 action items
+16. [x] Add request-generation guard in loadScene() — increment a generation counter on each call, check on async image/mask load resolve, discard stale results if counter has changed (prevents race when user navigates mid-load)
+17. [x] Resize active effect/mask bounds — ResizeObserver tracks screen-sized sprites (maskSprite, effectSprite) and updates their dimensions on resize. Noise sprites use scale.set() with repeat addressing (viewport-independent).
+18. [x] Texture lifecycle cleanup in clearAll() — disposableTextures array tracks per-scene mask, noise, and scene textures. Destroyed with .destroy(false) to avoid BindGroup corruption; TextureSources left for GCSystem reclamation. Sprites destroyed via child.destroy({ children: true, texture: false }).
