@@ -229,6 +229,13 @@ function resolveAnalyserCueEnter(frame, cue, audioDurations) {
   if (cue.enter?.ref) {
     const refCue = frame.audioCues?.find((c) => c.id === cue.enter.ref);
     if (!refCue) return null;
+    if (typeof refCue.enter !== 'number') {
+      // Multi-hop anchor refs are not supported — only single-level numeric refs are resolved.
+      // If refCue also uses a ref-based enter, fall back to 0 and warn so the issue is visible.
+      console.warn(
+        `[effects] analyserCueEnter: ref "${cue.enter.ref}" has non-numeric enter — falling back to 0`,
+      );
+    }
     const refEnter = typeof refCue.enter === 'number' ? refCue.enter : 0;
 
     // Tier 1: metadata duration from preloader
@@ -380,18 +387,34 @@ function prebufferNextScene(app, index) {
 function wireAnalysisAudio(app, frame, analyser) {
   if (!frame.effects.analyserCueId) return;
   const cue = frame.audioCues?.find((c) => c.id === frame.effects.analyserCueId);
-  if (!cue?.src) return;
+  if (!cue?.src) {
+    console.warn(
+      `[effects] analyserCueId "${frame.effects.analyserCueId}" not found in frame audioCues — analysis audio inactive`,
+    );
+    return;
+  }
 
   connectEffectsAnalysisAudio(cue.src, analyser);
   const enterDelay = resolveAnalyserCueEnter(frame, cue, app.audioDurations);
   if (enterDelay === null) return; // anchor unresolvable — analysis stays inert
-  if (enterDelay > 0) {
-    app.analysisStartTimer = new PausableTimer(() => {
-      app.analysisStartTimer = null;
-      startEffectsAnalysisPlayback();
-    }, enterDelay);
-  } else {
+
+  const wireGeneration = app.generation;
+  const wireIndex = app.currentIndex;
+  const startAnalysisIfCurrent = () => {
+    // Ignore stale timers from superseded showFrame calls.
+    if (wireGeneration !== app.generation || wireIndex !== app.currentIndex) return;
+    app.analysisStartTimer = null;
     startEffectsAnalysisPlayback();
+  };
+
+  // When paused, never start analysis playback immediately. Queue it on a
+  // timer and pause that timer so resume() controls when playback starts.
+  const shouldDeferStart = enterDelay > 0 || app.paused;
+  if (shouldDeferStart) {
+    app.analysisStartTimer = new PausableTimer(startAnalysisIfCurrent, Math.max(0, enterDelay));
+    if (app.paused) app.analysisStartTimer.pause();
+  } else {
+    startAnalysisIfCurrent();
   }
 }
 
@@ -402,8 +425,14 @@ function showFrame(app, index) {
   clearNarrationLayer(app.els.narrationLayer);
 
   if (frame.effects?.regions?.length) {
+    const showGeneration = app.generation;
+    const showIndex = index;
     app.effectsReady = loadEffectsScene(frame.effects, frame.image)
-      .then(() => {
+      .then((loaded) => {
+        // loadScene can resolve false when superseded, unavailable, or failed.
+        if (!loaded) return;
+        // Ignore stale completions from old showFrame calls.
+        if (showGeneration !== app.generation || showIndex !== app.currentIndex) return;
         // Wire audio-reactive bridge after effects are loaded (ADR-008).
         // setAnalyser must run after loadScene so it isn't cleared by clearAll().
         if (frame.effects.regions.some((r) => r.audioReactive)) {

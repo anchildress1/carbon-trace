@@ -57,7 +57,7 @@ vi.mock('../../src/text.js', () => ({
 
 vi.mock('../../src/effects-canvas.js', () => ({
   init: vi.fn().mockResolvedValue(undefined),
-  loadScene: vi.fn().mockResolvedValue(undefined),
+  loadScene: vi.fn().mockResolvedValue(true),
   clearAll: vi.fn(),
   cancelPendingLoad: vi.fn(),
   pause: vi.fn(),
@@ -160,6 +160,35 @@ vi.mock('../../src/scenes.json', () => ({
 
       },
       {
+        // Frame for testing missing analyserCueId warn path
+        id: 'scene-bad-cue',
+        frameType: 'scene',
+        holdAfterNarration: 2000,
+        image: 'scene-bad.webp',
+        narration: { lines: null, captions: null },
+        audioCues: [
+          { id: 'narration', type: 'narration', src: 'bad-narration.mp3', enter: 0, volume: 1, loop: false, fadeIn: 0, fadeOut: 0 },
+        ],
+        // analyserCueId 'missing-cue' has no matching audioCue — triggers warn
+        effects: { regions: [{ type: 'shockwave', mask: 'bad.png', audioReactive: { band: 'bass' } }], analyserCueId: 'missing-cue' },
+        transition: { type: 'fade', duration: 400 },
+      },
+      {
+        // Frame for testing multi-hop anchor ref warn path
+        id: 'scene-multihop',
+        frameType: 'scene',
+        holdAfterNarration: 2000,
+        image: 'scene-multihop.webp',
+        narration: { lines: null, captions: null },
+        audioCues: [
+          // narration.enter is a non-numeric ref — triggers warn in resolveAnalyserCueEnter
+          { id: 'narration', type: 'narration', src: 'multihop-narration.mp3', enter: { ref: 'ambient', offset: 0 }, volume: 1, loop: false, fadeIn: 0, fadeOut: 0 },
+          { id: 'end-song-ref', type: 'ambient', src: 'multihop-music.mp3', enter: { ref: 'narration', offset: -1000 }, volume: 0.5, loop: true, fadeIn: 0, fadeOut: null },
+        ],
+        effects: { regions: [{ type: 'shockwave', mask: 'multihop.png', audioReactive: { band: 'bass' } }], analyserCueId: 'end-song-ref' },
+        transition: { type: 'fade', duration: 400 },
+      },
+      {
         id: 'credits',
         frameType: 'credits',
 
@@ -190,11 +219,7 @@ import {
   pauseAudioCues,
   resumeAudioCues,
   cueAudioCues,
-  cancelCue,
-  restartNarrationCue,
-  reCueCue,
   onNarrationBufferChange,
-  wrapOnNarrationEndWithBoost,
   getAnalyserNode,
 } from '../../src/audio.js';
 import { buildNarrationTimeline } from '../../src/text.js';
@@ -258,6 +283,7 @@ describe('app.js', () => {
     vi.useFakeTimers();
     vi.clearAllMocks();
     buildDOM();
+    loadEffectsScene.mockResolvedValue(true);
     loadImage.mockResolvedValue(new Image());
     globalThis.matchMedia = vi.fn().mockReturnValue({ matches: false });
 
@@ -315,7 +341,11 @@ describe('app.js', () => {
       await flush();
       app.advance(); // scene-01 → scene-02
       await flush();
-      app.advance(); // scene-02 → credits
+      app.advance(); // scene-02 → scene-bad-cue
+      await flush();
+      app.advance(); // scene-bad-cue → scene-multihop
+      await flush();
+      app.advance(); // scene-multihop → credits
       await flush();
 
       expect(app.getState()).toBe('CREDITS');
@@ -1935,6 +1965,85 @@ describe('app.js', () => {
       expect(connectEffectsAnalysisAudio).not.toHaveBeenCalled();
     });
 
+    it('does not wire analysis audio when effects load is unavailable', async () => {
+      const mockAnalyser = { frequencyBinCount: 1024 };
+      getAnalyserNode.mockReturnValue(mockAnalyser);
+      loadEffectsScene.mockResolvedValueOnce(false);
+
+      app.advance(); // title → scene-01
+      await flush();
+
+      expect(setEffectsAnalyser).not.toHaveBeenCalled();
+      expect(connectEffectsAnalysisAudio).not.toHaveBeenCalled();
+    });
+
+    it('ignores stale async effects completion from superseded scene', async () => {
+      const mockAnalyser = { frequencyBinCount: 1024 };
+      getAnalyserNode.mockReturnValue(mockAnalyser);
+      globalThis.matchMedia.mockReturnValue({ matches: true });
+
+      let resolveSceneLoad;
+      loadEffectsScene.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveSceneLoad = resolve;
+          }),
+      );
+
+      app.advance(); // title → scene-01 (effects load pending)
+      await flush();
+      app.advance(); // scene-01 → scene-02 (cleanup increments generation)
+      await flush();
+
+      resolveSceneLoad(true);
+      await flush();
+
+      expect(setEffectsAnalyser).not.toHaveBeenCalled();
+      expect(connectEffectsAnalysisAudio).not.toHaveBeenCalled();
+    });
+
+    it('warns when analyserCueId does not match any audioCue', async () => {
+      const mockAnalyser = { frequencyBinCount: 1024 };
+      getAnalyserNode.mockReturnValue(mockAnalyser);
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      // Navigate to scene-bad-cue (index 3) — has analyserCueId: 'missing-cue' with no matching audioCue
+      app.advance(); // title → scene-01
+      await flush();
+      app.advance(); // scene-01 → scene-02
+      await flush();
+      vi.clearAllMocks(); // reset call counts before the frame under test
+      app.advance(); // scene-02 → scene-bad-cue
+      await flush();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('missing-cue'),
+      );
+      expect(connectEffectsAnalysisAudio).not.toHaveBeenCalled();
+      warnSpy.mockRestore();
+    });
+
+    it('warns when analyser ref target has non-numeric enter (multi-hop ref)', async () => {
+      const mockAnalyser = { frequencyBinCount: 1024 };
+      getAnalyserNode.mockReturnValue(mockAnalyser);
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      // Navigate to scene-multihop (index 4) — narration cue has non-numeric enter (a ref object)
+      app.advance(); // title → scene-01
+      await flush();
+      app.advance(); // scene-01 → scene-02
+      await flush();
+      app.advance(); // scene-02 → scene-bad-cue
+      await flush();
+      app.advance(); // scene-bad-cue → scene-multihop
+      await flush();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('non-numeric enter'),
+      );
+      warnSpy.mockRestore();
+    });
+
     it('cleanupCurrentScene cancels analysisStartTimer', async () => {
       const mockAnalyser = { frequencyBinCount: 1024 };
       getAnalyserNode.mockReturnValue(mockAnalyser);
@@ -1963,6 +2072,27 @@ describe('app.js', () => {
       // (it fired immediately since delay was 0)
       app.togglePause();
       expect(pauseEffects).toHaveBeenCalled();
+    });
+
+    it('keeps analysis timer paused when created during paused hard-jump', async () => {
+      const mockAnalyser = { frequencyBinCount: 1024 };
+      getAnalyserNode.mockReturnValue(mockAnalyser);
+
+      app.togglePause(); // pause on title
+      vi.clearAllMocks();
+
+      app.advance(); // paused hard-jump: title → scene-01
+      await flush();
+
+      // Timer exists but is paused; playback must not start while paused.
+      vi.advanceTimersByTime(2000);
+      expect(startEffectsAnalysisPlayback).not.toHaveBeenCalled();
+
+      app.togglePause(); // resume
+      expect(startEffectsAnalysisPlayback).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(1500);
+      expect(startEffectsAnalysisPlayback).toHaveBeenCalledTimes(1);
     });
 
     it('doResume resumes analysisStartTimer', async () => {
