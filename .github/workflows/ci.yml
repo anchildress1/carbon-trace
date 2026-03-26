@@ -52,7 +52,7 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: make install
+        run: pnpm install --ignore-scripts
 
       - name: Cache Playwright Browsers
         uses: actions/cache@v5
