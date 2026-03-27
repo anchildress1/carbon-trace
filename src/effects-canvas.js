@@ -153,10 +153,12 @@ async function loadLuminanceMask(url) {
   }
   const source = await sourcePromise;
 
-  // Clone so each scene owns a disposable Texture wrapper while sharing the
-  // already-processed source resource from the mask cache.
-  const texture = Texture.from(source);
-  return texture.clone();
+  // Create a disposable Texture wrapper that shares the cached TextureSource.
+  // PixiJS v8 removed Texture.clone() — construct a new Texture from the
+  // shared source instead. destroy(false) on the wrapper leaves the source
+  // alive for reuse by the next scene load.
+  const base = Texture.from(source);
+  return new Texture({ source: base.source, frame: base.frame });
 }
 
 function handleContextLost(e) {

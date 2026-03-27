@@ -71,21 +71,22 @@ vi.mock('pixi.js', () => ({
     this.y = 0;
     this.scale = { set: vi.fn() };
   }),
-  Texture: {
-    from: vi.fn((img) => {
-      const texture = {
-        _source: img,
-        source: { style: {} },
-        destroy: vi.fn(),
-      };
-      texture.clone = vi.fn(() => ({
-        _source: img,
-        source: { style: {} },
-        destroy: vi.fn(),
-      }));
-      return texture;
+  Texture: Object.assign(
+    vi.fn(function (opts) {
+      this._source = opts?.source;
+      this.source = opts?.source ?? { style: {} };
+      this.frame = opts?.frame ?? null;
+      this.destroy = vi.fn();
     }),
-  },
+    {
+      from: vi.fn((img) => ({
+        _source: img,
+        source: { style: {} },
+        frame: null,
+        destroy: vi.fn(),
+      })),
+    },
+  ),
 }));
 
 vi.mock('../../src/effects.js', () => ({
