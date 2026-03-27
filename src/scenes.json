@@ -1331,7 +1331,7 @@
             "centerX": 0.46,
             "centerY": 0.47,
             "autoRepeat": false,
-            "cycleDuration": 2.0,
+            "cycleDuration": 1.8,
             "cyclePause": 0,
             "speed": 400,
             "amplitude": 20,
@@ -1344,7 +1344,7 @@
               "trigger": {
                 "threshold": 3.0,
                 "cooldown": 0.08,
-                "minEnergy": 0.8
+                "minEnergy": 0.815
               }
             }
           },
