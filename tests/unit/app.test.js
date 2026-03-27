@@ -212,7 +212,7 @@ vi.mock('../../src/scenes.json', () => ({
         effects: {
           analyserCueId: 'end-song',
           regions: [
-            { type: 'shockwave', mask: 'credits-shockwave.png', centerX: 0.46, centerY: 0.47, audioReactive: { band: 'bass', target: 'amplitude', range: [10, 30], trigger: { threshold: 3.0, cooldown: 0.08, minEnergy: 0.8 } } },
+            { type: 'shockwave', mask: 'credits-shockwave.png', centerX: 0.46, centerY: 0.47, audioReactive: { band: 'bass', target: 'amplitude', range: [10, 30], trigger: { threshold: 3, cooldown: 0.08, minEnergy: 0.8 } } },
             { type: 'glow', mask: 'credits-diamond.png' },
           ],
         },
@@ -241,10 +241,9 @@ import {
   onNarrationBufferChange,
   getAnalyserNode,
   wrapOnNarrationEndWithBoost,
-  restartNarrationCue,
   disconnectAnalyserSource,
 } from '../../src/audio.js';
-import { buildNarrationTimeline, clearNarrationLayer } from '../../src/text.js';
+import { buildNarrationTimeline } from '../../src/text.js';
 import {
   clearAll as clearEffects,
   cancelPendingLoad,
@@ -295,6 +294,15 @@ function buildDOM() {
     if (id === 'overlay-controls') el.hidden = true;
     if (id === 'transition-loader') el.hidden = true;
     root.appendChild(el);
+  }
+}
+
+// Helper: navigate from title (index 0) to credits (index 5) via advance
+async function navigateToCredits(appInstance) {
+  appInstance.togglePause(); // unpause → first play
+  for (let i = 0; i < 5; i++) {
+    appInstance.advance();
+    await flush();
   }
 }
 
@@ -2542,11 +2550,7 @@ describe('app.js', () => {
       });
 
       const { gsap } = await import('gsap');
-      let storedOnComplete = null;
-      gsap.to.mockImplementation((_target, opts) => {
-        storedOnComplete = opts.onComplete;
-        return { kill: vi.fn() };
-      });
+      gsap.to.mockImplementation(() => ({ kill: vi.fn() }));
 
       app = createApp();
       await flush();
@@ -2590,15 +2594,6 @@ describe('app.js', () => {
   // ── Credits frame ────────────────────────────────────────────────
 
   describe('credits frame', () => {
-    // Helper: navigate from title (index 0) to credits (index 5) via advance
-    async function navigateToCredits(appInstance) {
-      appInstance.togglePause(); // unpause → first play
-      for (let i = 0; i < 5; i++) {
-        appInstance.advance();
-        await flush();
-      }
-    }
-
     beforeEach(async () => {
       app = createApp();
       await flush();
@@ -2688,7 +2683,7 @@ describe('app.js', () => {
       expect(effectsConfig.regions).toHaveLength(2);
       expect(effectsConfig.regions[0].type).toBe('shockwave');
       expect(effectsConfig.regions[0].audioReactive.band).toBe('bass');
-      expect(effectsConfig.regions[0].audioReactive.trigger.threshold).toBe(3.0);
+      expect(effectsConfig.regions[0].audioReactive.trigger.threshold).toBe(3);
       expect(effectsConfig.regions[1].type).toBe('glow');
       expect(imageSrc).toBe('credits.webp');
     });
