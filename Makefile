@@ -67,11 +67,13 @@ secret-scan:
 	@echo "Scanning for secrets..."
 	@set -eu; \
 	TMP_BASELINE=".secrets.baseline.tmp"; \
+	TMP_BASELINE_CHECK=".secrets.baseline.check.tmp"; \
 	PY_SCAN_ENV=""; \
-	cleanup_py_env() { \
+	cleanup_scan_env() { \
+		rm -f "$$TMP_BASELINE" "$$TMP_BASELINE_CHECK"; \
 		if [ -n "$$PY_SCAN_ENV" ] && [ -d "$$PY_SCAN_ENV" ]; then rm -rf "$$PY_SCAN_ENV"; fi; \
 	}; \
-	trap cleanup_py_env EXIT INT TERM; \
+	trap cleanup_scan_env EXIT INT TERM; \
 	run_detect_secrets() { \
 		if command -v uvx >/dev/null; then \
 			uvx --from detect-secrets==1.5.0 detect-secrets "$$@"; \
@@ -90,19 +92,43 @@ secret-scan:
 			return 127; \
 		fi; \
 	}; \
-	run_detect_secrets scan --exclude-files 'node_modules|dist|.secrets.baseline|.secrets.baseline.tmp' > "$$TMP_BASELINE" 2>&1 || true; \
-	if [ ! -f "$$TMP_BASELINE" ]; then \
-		echo "detect-secrets scan did not produce output. Skipping."; \
-		exit 0; \
+	SCAN_EXIT=0; \
+	run_detect_secrets scan --exclude-files 'node_modules|dist|.secrets.baseline|.secrets.baseline.tmp|.secrets.baseline.check.tmp' > "$$TMP_BASELINE" 2>&1 || SCAN_EXIT=$$?; \
+	if [ "$$SCAN_EXIT" -ne 0 ]; then \
+		echo "detect-secrets scan failed with exit $$SCAN_EXIT." >&2; \
+		cat "$$TMP_BASELINE" >&2; \
+		exit "$$SCAN_EXIT"; \
+	fi; \
+	if [ ! -s "$$TMP_BASELINE" ]; then \
+		echo "detect-secrets scan did not produce output." >&2; \
+		exit 1; \
+	fi; \
+	if ! jq -e '.results != null' "$$TMP_BASELINE" >/dev/null 2>&1; then \
+		echo "detect-secrets scan output is not valid JSON." >&2; \
+		cat "$$TMP_BASELINE" >&2; \
+		exit 1; \
 	fi; \
 	if [ -f .secrets.baseline ]; then \
 		echo "Checking against baseline..."; \
-		NEW_SECRETS=$$(run_detect_secrets scan --baseline .secrets.baseline --exclude-files 'node_modules|dist' | jq '.results | length' 2>/dev/null || echo 0); \
-		if [ "$${NEW_SECRETS:-0}" -gt 0 ]; then \
-			echo "New secrets found! Run 'detect-secrets audit .secrets.baseline' to review."; \
-			run_detect_secrets scan --baseline .secrets.baseline --exclude-files 'node_modules|dist' | jq '.results'; \
-			rm -f "$$TMP_BASELINE"; \
-			exit 1; \
+		BASELINE_SCAN_EXIT=0; \
+		run_detect_secrets scan --baseline .secrets.baseline --exclude-files 'node_modules|dist' > "$$TMP_BASELINE_CHECK" 2>&1 || BASELINE_SCAN_EXIT=$$?; \
+		if [ "$$BASELINE_SCAN_EXIT" -ne 0 ]; then \
+			echo "detect-secrets baseline diff scan failed with exit $$BASELINE_SCAN_EXIT." >&2; \
+			cat "$$TMP_BASELINE_CHECK" >&2; \
+			exit "$$BASELINE_SCAN_EXIT"; \
+		fi; \
+		if [ -s "$$TMP_BASELINE_CHECK" ]; then \
+			if ! jq -e '.results != null' "$$TMP_BASELINE_CHECK" >/dev/null 2>&1; then \
+				echo "detect-secrets baseline diff output is not valid JSON." >&2; \
+				cat "$$TMP_BASELINE_CHECK" >&2; \
+				exit 1; \
+			fi; \
+			NEW_SECRETS=$$(jq '[.results[]? | length] | add // 0' "$$TMP_BASELINE_CHECK"); \
+			if [ "$${NEW_SECRETS:-0}" -gt 0 ]; then \
+				echo "New secrets found! Run 'detect-secrets audit .secrets.baseline' to review."; \
+				jq '.results' "$$TMP_BASELINE_CHECK"; \
+				exit 1; \
+			fi; \
 		fi; \
 		echo "No new secrets found. Updating baseline timestamp."; \
 		mv "$$TMP_BASELINE" .secrets.baseline; \
