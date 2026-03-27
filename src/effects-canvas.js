@@ -155,8 +155,8 @@ async function loadLuminanceMask(url) {
 
   // Clone so each scene owns a disposable Texture wrapper while sharing the
   // already-processed source resource from the mask cache.
-  const baseTexture = Texture.from(source);
-  return baseTexture.clone();
+  const texture = Texture.from(source);
+  return texture.clone();
 }
 
 function handleContextLost(e) {
