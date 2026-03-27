@@ -1281,40 +1281,40 @@ describe('audio.js — crossfade cleanup and ambient sweep', () => {
     expect(oldHowl.unload).toHaveBeenCalledTimes(1);
   });
 
-  it('sweeps stranded ambient cues not in incoming cue set', () => {
+  it('does not sweep stranded ambient cues not in incoming cue set', () => {
     // Schedule two ambient cues
     const cue1 = makeCue({ type: 'ambient', id: 'ambient-1', src: 'bg1.mp3', enter: 0 });
     const cue2 = makeCue({ type: 'ambient', id: 'ambient-2', src: 'bg2.mp3', enter: 0 });
     scheduleAudioCues([cue1, cue2]);
-    vi.clearAllMocks();
 
-    // Schedule new set with only ambient-1 → ambient-2 should be swept
-    const newCue1 = makeCue({ type: 'ambient', id: 'ambient-1', src: 'bg1-new.mp3', enter: 0 });
-    scheduleAudioCues([newCue1]);
-
-    // ambient-2's Howl should have been faded out
+    // Capture before clearing mocks — clearAllMocks wipes Howl.mock.results
     const ambient2Howl = Howl.mock.results.find(
       (r, i) => Howl.mock.calls[i]?.[0]?.src?.[0] === 'bg2.mp3',
     )?.value;
-    if (ambient2Howl) {
-      expect(ambient2Howl.fade).toHaveBeenCalled();
-    }
+    vi.clearAllMocks();
+
+    // Schedule new set with only ambient-1; scheduleAudioCues does not sweep ambient-2
+    const newCue1 = makeCue({ type: 'ambient', id: 'ambient-1', src: 'bg1-new.mp3', enter: 0 });
+    scheduleAudioCues([newCue1]);
+
+    // ambient-2's Howl should NOT have been faded or unloaded by scheduleAudioCues
+    expect(ambient2Howl.fade).not.toHaveBeenCalled();
+    expect(ambient2Howl.unload).not.toHaveBeenCalled();
   });
 
-  it('cancelAudioCues with preserveAmbient keeps ambient entries', () => {
+  it('cancelAudioCues cancels narration and ambient entries', () => {
     const narCue = makeCue({ id: 'narration', type: 'narration', src: 'nar.m4a' });
     const ambCue = makeCue({ type: 'ambient', id: 'ambient-1', src: 'bg.mp3', enter: 0 });
     scheduleAudioCues([narCue, ambCue]);
 
     const narHowl = Howl.mock.results[0].value;
+    const ambHowl = Howl.mock.results[1].value;
     vi.clearAllMocks();
 
-    cancelAudioCues({ preserveAmbient: true });
+    cancelAudioCues();
 
     expect(narHowl.unload).toHaveBeenCalled();
-    // Ambient should still be alive (not unloaded)
-    // getNarrationCue should return null since narration was cleaned up
-    expect(getNarrationCue()).toBeNull();
+    expect(ambHowl.unload).toHaveBeenCalled();
   });
 
   it('cancelAudioCues drains crossfade cleanup on non-ambient entries', () => {
