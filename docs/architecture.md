@@ -1,6 +1,8 @@
-# Architecture
+# Architecture 🏛️
 
-## Module Graph
+One orchestrator. Flat modules. Config as data. Every scene shares the same schema shape — same keys, same types. `null` means "skip this feature." Scene differences live in `scenes.json`, not in `if`-blocks. The orchestrator (`app.js`) is the only module that knows frame ordering. Everything else receives config objects and does its one job.
+
+## Module Graph 🕸️
 
 ```mermaid
 graph TD
@@ -20,7 +22,7 @@ graph TD
     text -.->|GSAP| gsap["gsap"]
 ```
 
-## State Machine
+## State Machine 🎰
 
 ```mermaid
 stateDiagram-v2
@@ -40,7 +42,7 @@ stateDiagram-v2
     CREDITS --> TRANSITIONING : retreat()
 ```
 
-## Frame Lifecycle
+## Frame Lifecycle 🔄
 
 When a frame becomes active, `showFrame(index)` runs this sequence:
 
@@ -73,7 +75,7 @@ Music scheduling is handled separately in `showFrame`, not inside
 enter/exit timing — it starts when configured, fades as configured,
 and plays until configured end. Replay does not restart music.
 
-## Modules
+## Modules 🧩
 
 ### app.js (orchestrator)
 
@@ -83,6 +85,7 @@ pause/resume, the GSAP text timeline, and DOM element references. Every user
 interaction (click, keyboard, button) routes through `app.js` functions.
 
 Key responsibilities:
+
 - Asset preloading (first-frame blocking, background sequential).
 - Scene transitions with GSAP two-phase fade and error boundary.
 - Pause/resume: saves elapsed time for every active timer, pauses text
@@ -102,17 +105,23 @@ narration layer with timed entrance and exit animations. Supports custom
 viewport positioning (`x`/`y` in vw/vh) and alignment. Falls back to simple
 opacity fade when `prefers-reduced-motion` is active.
 
-### effects.js (visual effects)
+### effects.js (PixiJS effect factory) 🦾
 
-Registry of named effect functions. Currently a no-op skeleton — all scene
-effect references (`dust-drift`, `heat-pulse`, etc.) are declared in
-`scenes.json` but resolve to no-ops until canvas-based implementations are
-added. The API surface (`effectExists`, `runEffect`, `clearEffects`) is stable;
-`app.js` does not change when effects are wired in.
+Registry of named effect types, each backed by a factory function that creates
+a PixiJS filter and an update callback. `effects-canvas.js` calls `createEffect()`
+to instantiate filters per scene.
 
-Frames declare `effects.idle` (persistent) and `effects.entry` (triggered on
-scene entry or replay). Effects will receive the effects canvas and scene canvas
-elements; see `effects-canvas.js` for the render loop.
+Five built-in effect types:
+
+- **Displacement-based** (`water`, `heat`, `dust`) — use PixiJS `DisplacementFilter`
+  with a noise sprite. Each produces per-region pixel displacement at 60fps on the GPU.
+- **Extension effects** (`glow`, `shockwave`) — use `GlowFilter` and `ShockwaveFilter`
+  from `pixi-filters`. No noise sprite required.
+
+Frames declare effect regions in `scenes.json` with mask images, direction, speed,
+intensity, and scale. The effects canvas composites these as a transparent overlay
+on top of the Canvas 2D scene image — only the masked regions show effects. Everything
+outside the masks is transparent, so the static painted image shows through underneath.
 
 ### captions.js (timed subtitles)
 
@@ -138,7 +147,7 @@ Clicking a dot navigates to that scene. The dot group uses roving tabindex
 (single Tab stop, arrow keys move focus between dots, Enter/Space activates).
 The control bar contains prev, pause, mute, captions, replay, and next buttons.
 
-## scenes.json Schema
+## scenes.json Schema 📜
 
 ```
 meta:
@@ -161,7 +170,7 @@ frames[]:
   transition: { type, duration }
 ```
 
-## Deployment
+## Deployment 🚀
 
 ```mermaid
 flowchart LR
@@ -180,7 +189,6 @@ flowchart LR
     subgraph Scheduled["Scheduled / On-demand"]
         I[security-audit.yml] -->|Trivy repo scan| J[SARIF → code-scanning]
         K[codeql.yml] -->|CodeQL JS analysis| J
-        L[sonar.yml] -->|SonarCloud on main push| M[SonarCloud dashboard]
     end
 
     subgraph Release["Release"]
@@ -188,21 +196,20 @@ flowchart LR
     end
 ```
 
-### Workflows
+### Workflows 🏗️
 
-| Workflow | Triggers | Purpose |
-|----------|----------|---------|
-| `ci.yml` | PR (non-draft) | Format check, lint, unit tests + coverage, build, E2E (chromium), Lighthouse, SonarCloud scan |
-| `deploy.yml` | Push to `main`, manual | Cloud Build → Artifact Registry → Cloud Run deploy + smoke test |
-| `sonar.yml` | Push to `main`, manual | SonarCloud analysis on merged code with coverage |
-| `security-audit.yml` | PR, schedule (twice monthly), manual | Trivy repo scan for misconfig/secrets/licenses (HIGH+CRITICAL) |
-| `codeql.yml` | PR, schedule, manual | GitHub CodeQL JavaScript analysis |
-| `release-please.yml` | Push to `main` | Automated release PR and CHANGELOG from Conventional Commits |
+| Workflow             | Triggers                             | Purpose                                                                                       |
+| -------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------- |
+| `ci.yml`             | PR (non-draft)                       | Format check, lint, unit tests + coverage, build, E2E (chromium), Lighthouse, SonarCloud scan |
+| `deploy.yml`         | Push to `main`, manual               | Cloud Build → Artifact Registry → Cloud Run deploy + smoke test                               |
+| `security-audit.yml` | PR, schedule (twice monthly), manual | Trivy repo scan for misconfig/secrets/licenses (HIGH+CRITICAL)                                |
+| `codeql.yml`         | PR, schedule, manual                 | GitHub CodeQL JavaScript analysis                                                             |
+| `release-please.yml` | Push to `main`                       | Automated release PR and CHANGELOG from Conventional Commits                                  |
 
-### Docker Build
+### Docker Build 🐳
 
 Multi-stage Dockerfile: `node:22-alpine` builder runs `pnpm build`, then `nginx:1-alpine` serves `dist/` on port 8080 with HEALTHCHECK and non-root `nginx` user. Cloud Build runs the Docker build via `gcloud builds submit`.
 
-### Cloud Run
+### Cloud Run ☁️
 
 Deployed via `gcloud run deploy` with `--allow-unauthenticated` and `--cpu-boost`. Authentication uses a GCP service account key (`GCP_SA_KEY` secret) scoped to the `deploy` GitHub environment.
