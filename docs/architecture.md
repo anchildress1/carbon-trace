@@ -212,4 +212,4 @@ Multi-stage Dockerfile: `node:22-alpine` builder runs `pnpm build`, then `nginx:
 
 ### Cloud Run ☁️
 
-Deployed via `gcloud run deploy` with `--allow-unauthenticated` and `--cpu-boost`. Authentication uses a GCP service account key (`GCP_SA_KEY` secret) scoped to the `deploy` GitHub environment.
+Deployed via `gcloud run deploy` with `--allow-unauthenticated` and `--cpu-boost`. Authentication uses Workload Identity Federation (OIDC) via the `deploy` GitHub environment — no long-lived service account keys.
