@@ -1326,8 +1326,10 @@ describe('audio.js — crossfade cleanup and ambient sweep', () => {
     const newCue = makeCue({ type: 'ambient', id: 'ambient-1', src: 'new.mp3' });
     scheduleAudioCues([newCue]);
 
+    const newHowl = Howl.mock.results[0].value;
     cancelAudioCues();
-    // No errors should occur
+
+    expect(newHowl.unload).toHaveBeenCalled();
   });
 
   it('existing non-ambient entry with same id is unloaded when replaced', () => {

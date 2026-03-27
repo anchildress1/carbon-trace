@@ -2067,9 +2067,13 @@ describe('effects-canvas.js — clearAll with masked children', () => {
       'scene.png',
     );
 
-    // clearAll should null out child.mask for each child
+    const { Container } = await import('pixi.js');
+    const container = Container.mock.instances[0];
+
+    // clearAll should remove all stage children and destroy them
     clearAll();
-    // No error means the mask cleanup path was exercised
+
+    expect(container.destroy).toHaveBeenCalledWith({ children: true, texture: false });
   });
 });
 
