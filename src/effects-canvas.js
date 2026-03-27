@@ -23,6 +23,7 @@ let pixiApp = null;
 let canvasEl = null;
 let observer = null;
 let motionQuery = null;
+let reducedMotionEnabled = false;
 let webglAvailable = true;
 let needsReinit = false;
 let activeEffects = [];
@@ -43,12 +44,26 @@ let analysisElement = null;
 let analysisSource = null;
 let analysisSilentGain = null;
 let analysisAnalyserRef = null; // tracks which analyserNode is wired into the analysis graph for cleanup
+const maskSourceCache = new Map(); // Map<maskUrl, Promise<ImageBitmap | HTMLCanvasElement>>
+const releasableMaskSources = new Set(); // ImageBitmaps need explicit close() on destroy()
+
+const REDUCED_MOTION_MEDIA_QUERY = '(prefers-reduced-motion: reduce)';
+
+function getMotionQuery() {
+  if (motionQuery) return motionQuery;
+  if (typeof globalThis.matchMedia !== 'function') return null;
+  motionQuery = globalThis.matchMedia(REDUCED_MOTION_MEDIA_QUERY);
+  reducedMotionEnabled = motionQuery.matches;
+  return motionQuery;
+}
 
 function reducedMotion() {
-  return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  getMotionQuery();
+  return reducedMotionEnabled;
 }
 
 function handleMotionChange(e) {
+  reducedMotionEnabled = e.matches;
   if (!pixiApp) return;
   if (e.matches) {
     pixiApp.ticker.stop();
@@ -81,7 +96,7 @@ function loadTexture(url) {
  * scene loads. ImageBitmap provides a GPU-ready resource that uploads
  * reliably across scene transitions.
  */
-async function loadLuminanceMask(url) {
+async function createLuminanceMaskSource(url) {
   const img = new Image();
   img.crossOrigin = 'anonymous';
   await new Promise((resolve, reject) => {
@@ -113,8 +128,35 @@ async function loadLuminanceMask(url) {
   }
   ctx.putImageData(imageData, 0, 0);
 
-  const bitmap = await createImageBitmap(canvas, { premultiplyAlpha: 'none' });
-  return Texture.from(bitmap);
+  if (typeof createImageBitmap === 'function') {
+    try {
+      const bitmap = await createImageBitmap(canvas, { premultiplyAlpha: 'none' });
+      releasableMaskSources.add(bitmap);
+      return bitmap;
+    } catch (err) {
+      console.warn(`createImageBitmap failed for ${url}:`, err.message);
+    }
+  }
+
+  // Fallback source for test/browser environments without createImageBitmap.
+  return canvas;
+}
+
+async function loadLuminanceMask(url) {
+  let sourcePromise = maskSourceCache.get(url);
+  if (!sourcePromise) {
+    sourcePromise = createLuminanceMaskSource(url).catch((err) => {
+      maskSourceCache.delete(url);
+      throw err;
+    });
+    maskSourceCache.set(url, sourcePromise);
+  }
+  const source = await sourcePromise;
+
+  // Clone so each scene owns a disposable Texture wrapper while sharing the
+  // already-processed source resource from the mask cache.
+  const baseTexture = Texture.from(source);
+  return baseTexture.clone();
 }
 
 function handleContextLost(e) {
@@ -389,8 +431,8 @@ async function doInit(el) {
     el.addEventListener('webglcontextlost', handleContextLost);
     el.addEventListener('webglcontextrestored', handleContextRestored);
 
-    motionQuery = globalThis.matchMedia('(prefers-reduced-motion: reduce)');
-    motionQuery.addEventListener('change', handleMotionChange);
+    const query = getMotionQuery();
+    query?.addEventListener?.('change', handleMotionChange);
 
     observer = new ResizeObserver(() => {
       if (pixiApp?.renderer) {
@@ -742,9 +784,20 @@ export function destroy() {
   }
 
   if (motionQuery) {
-    motionQuery.removeEventListener('change', handleMotionChange);
+    motionQuery.removeEventListener?.('change', handleMotionChange);
     motionQuery = null;
   }
+  reducedMotionEnabled = false;
+
+  for (const source of releasableMaskSources) {
+    try {
+      source.close?.();
+    } catch {
+      /* already closed */
+    }
+  }
+  releasableMaskSources.clear();
+  maskSourceCache.clear();
 
   if (observer) {
     observer.disconnect();

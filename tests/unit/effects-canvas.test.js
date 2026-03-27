@@ -72,11 +72,19 @@ vi.mock('pixi.js', () => ({
     this.scale = { set: vi.fn() };
   }),
   Texture: {
-    from: vi.fn((img) => ({
-      _source: img,
-      source: { style: {} },
-      destroy: vi.fn(),
-    })),
+    from: vi.fn((img) => {
+      const texture = {
+        _source: img,
+        source: { style: {} },
+        destroy: vi.fn(),
+      };
+      texture.clone = vi.fn(() => ({
+        _source: img,
+        source: { style: {} },
+        destroy: vi.fn(),
+      }));
+      return texture;
+    }),
   },
 }));
 
@@ -1192,6 +1200,13 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
   });
 
   it('audio-reactive is skipped when reducedMotion is true', async () => {
+    const matchMediaSpy = vi.spyOn(globalThis, 'matchMedia');
+    matchMediaSpy.mockReturnValue({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    });
+
     const canvas = createMockCanvas();
     await init(canvas);
 
@@ -1211,14 +1226,6 @@ describe('effects-canvas — audio-reactive modulation (ADR-008)', () => {
 
     // Set analyser AFTER loadScene (matches real app.js wiring order)
     setAnalyser(analyser);
-
-    // Mock reduced motion AFTER loadScene so it doesn't affect loading
-    const matchMediaSpy = vi.spyOn(globalThis, 'matchMedia');
-    matchMediaSpy.mockReturnValue({
-      matches: true,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-    });
 
     const { Application } = await import('pixi.js');
     const instance = Application.mock.instances[Application.mock.instances.length - 1];
