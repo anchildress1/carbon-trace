@@ -1,6 +1,8 @@
-# Accessibility
+# Accessibility ♿
 
-## Screen Reader Support
+The entire visual experience runs on a `<canvas>`. Canvas is invisible to assistive technology — it's a bitmap, not a DOM tree. That's the tradeoff for pixel-level effects. So the accessibility strategy is architectural, not bolt-on: a DOM overlay sits on top of the canvas and carries all semantic content. Screen readers see the overlay. The canvas doesn't exist to them. Every narration line, every button, every navigation dot lives in the DOM layer. The visual art is for eyes; the DOM is for everything else.
+
+## Screen Reader Support 🗣️
 
 ```mermaid
 flowchart LR
@@ -17,15 +19,15 @@ The ghost-drift narration layer and caption layer are both marked
 `aria-hidden="true"` because they are visual-only presentations of the same
 content that `#accessible-narration` provides to assistive technology.
 
-## Keyboard Navigation
+## Keyboard Navigation ⌨️
 
-| Key | Action |
-|-----|--------|
-| `Space` | Toggle play/pause |
-| `Enter` / `ArrowRight` | Advance to next scene |
-| `ArrowLeft` | Return to previous scene |
-| `Escape` | Pause (one-directional — never resumes) |
-| `Tab` | Navigate between controls |
+| Key                    | Action                                  |
+| ---------------------- | --------------------------------------- |
+| `Space`                | Toggle play/pause                       |
+| `Enter` / `ArrowRight` | Advance to next scene                   |
+| `ArrowLeft`            | Return to previous scene                |
+| `Escape`               | Pause (one-directional — never resumes) |
+| `Tab`                  | Navigate between controls               |
 
 Space toggles play/pause (not advance). Enter and ArrowRight advance to the
 next scene. Escape always pauses; Space resumes. All control buttons (prev,
@@ -39,7 +41,7 @@ Keyboard shortcuts are defined declaratively in `keyboard.js` via a key-action
 map. The module exports `handleKeydown` (pure function for testing) and
 `initKeyboard` (document listener registration with cleanup).
 
-## Focus Management
+## Focus Management 🎯
 
 - All interactive elements have visible focus indicators: 2px white outline at
   -2px offset.
@@ -51,7 +53,7 @@ map. The module exports `handleKeydown` (pure function for testing) and
   browsing. Pointer-initiated navigation (button/dot clicks) redirects focus
   to the active dot.
 
-### Progress Dots — Roving Tabindex
+### Progress Dots — Roving Tabindex 🔘
 
 The progress dot group is a composite widget following the WAI-ARIA toolbar
 pattern:
@@ -68,22 +70,22 @@ pattern:
   state (filled dot indicating the current scene) are independent. A user can
   arrow-focus to any dot and press Enter to jump there.
 
-## ARIA Attributes
+## ARIA Attributes 🏷️
 
-| Element | Attribute | Purpose |
-|---------|-----------|---------|
-| `#app` | `role="application"` | Declares app-managed keyboard handling |
-| `#accessible-narration` | `aria-live="polite"` | Announces narration text |
-| `#narration-layer` | `aria-hidden="true"` | Hides decorative ghost-drift text |
-| `#caption-layer` | `aria-hidden="true"` | Hides visual captions (content in live region) |
-| `#btn-pause` | `aria-pressed` | Toggle state for pause/play |
-| `#btn-captions` | `aria-pressed` | Toggle state for captions on/off |
-| `#btn-mute` | `aria-label` | Updates between "Mute audio" / "Unmute audio" |
-| `#btn-mute` | `aria-disabled` | Disabled until audio is available |
-| `#scene-stage` | `aria-label` | Scene description from `frame.description` |
-| progress dots | `aria-current="step"` | Identifies the current scene dot |
+| Element                 | Attribute             | Purpose                                        |
+| ----------------------- | --------------------- | ---------------------------------------------- |
+| `#app`                  | `role="application"`  | Declares app-managed keyboard handling         |
+| `#accessible-narration` | `aria-live="polite"`  | Announces narration text                       |
+| `#narration-layer`      | `aria-hidden="true"`  | Hides decorative ghost-drift text              |
+| `#caption-layer`        | `aria-hidden="true"`  | Hides visual captions (content in live region) |
+| `#btn-pause`            | `aria-pressed`        | Toggle state for pause/play                    |
+| `#btn-captions`         | `aria-pressed`        | Toggle state for captions on/off               |
+| `#btn-mute`             | `aria-label`          | Updates between "Mute audio" / "Unmute audio"  |
+| `#btn-mute`             | `aria-disabled`       | Disabled until audio is available              |
+| `#scene-stage`          | `aria-label`          | Scene description from `frame.description`     |
+| progress dots           | `aria-current="step"` | Identifies the current scene dot               |
 
-## Reduced Motion
+## Reduced Motion 🧘
 
 When `prefers-reduced-motion: reduce` is active:
 
@@ -101,17 +103,17 @@ flowchart TD
     C --> J["Effects: particles, pulses, etc."]
 ```
 
-| Feature | Normal | Reduced Motion |
-|---------|--------|----------------|
-| Ghost-drift text | Blur + y offset + opacity (1.2s in, 0.9s out) | Opacity only (0.3s) |
-| Scene transitions | Two-phase GSAP fade | Instant swap |
-| Visual effects | Full displacement + particle effects | Static: no displacement, no animation (ADR-007) |
-| Audio-reactive modulation | Effect parameters driven by music FFT data | Ignored — base parameter values used, no modulation (ADR-008) |
+| Feature                   | Normal                                        | Reduced Motion                                                |
+| ------------------------- | --------------------------------------------- | ------------------------------------------------------------- |
+| Ghost-drift text          | Blur + y offset + opacity (1.2s in, 0.9s out) | Opacity only (0.3s)                                           |
+| Scene transitions         | Two-phase GSAP fade                           | Instant swap                                                  |
+| Visual effects            | Full displacement + particle effects          | Static: no displacement, no animation (ADR-007)               |
+| Audio-reactive modulation | Effect parameters driven by music FFT data    | Ignored — base parameter values used, no modulation (ADR-008) |
 
 The `prefersReducedMotion()` check is evaluated at the point of use (not
 cached), so it responds to runtime changes in the user's system preference.
 
-## Caption System
+## Caption System 💬
 
 ```mermaid
 sequenceDiagram
@@ -152,7 +154,7 @@ timeline position.
 The caption preference is persisted in `localStorage` under the key
 `carbon-trace-captions-enabled`.
 
-## Content Security Policy
+## Content Security Policy 🔐
 
 The CSP meta tag restricts resource loading:
 
@@ -171,7 +173,7 @@ base-uri    'self'
 `connect-src` is relaxed to `'self' ws:` during development to allow Vite HMR
 WebSocket connections (handled by the `relax-csp-dev` Vite plugin).
 
-## Progressive Enhancement
+## Progressive Enhancement 🌱
 
 The Google Fonts stylesheet is loaded via `<link rel="preload" as="style">`
 and activated by JavaScript in `main.js`. A `<noscript>` fallback ensures the
