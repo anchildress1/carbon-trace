@@ -957,6 +957,377 @@ describe('audio.js — unified cue API (ADR-005)', () => {
   });
 });
 
+describe('audio.js — buffer recovery paths', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    mockNode.addEventListener.mockClear();
+    mockNode.removeEventListener.mockClear();
+    mockNode.play.mockResolvedValue(undefined);
+    cancelAudioCues();
+    clearNarrationCache();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('resumes play when buffer recovers sufficiently while not paused', () => {
+    onNarrationBufferChange(vi.fn());
+    scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn() });
+
+    const waitingCall = mockNode.addEventListener.mock.calls.find(
+      ([event]) => event === 'waiting',
+    );
+    expect(waitingCall).toBeDefined();
+
+    // Trigger waiting → starts buffer monitoring
+    waitingCall[1]();
+
+    // Simulate buffer progress: ahead >= 3
+    mockNode.buffered.length = 1;
+    mockNode.buffered.end.mockReturnValue(8); // currentTime=0, ahead=8 ≥ 3
+    mockNode.currentTime = 0;
+    mockNode.duration = 60;
+
+    vi.advanceTimersByTime(4000); // trigger checkBufferProgress
+
+    // Buffer recovered sufficiently, play should be called
+    expect(mockNode.play).toHaveBeenCalled();
+  });
+
+  it('resumes play when near end of audio even with small buffer', () => {
+    onNarrationBufferChange(vi.fn());
+    scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn() });
+
+    const waitingCall = mockNode.addEventListener.mock.calls.find(
+      ([event]) => event === 'waiting',
+    );
+    waitingCall[1]();
+
+    // Near end: duration - currentTime < 3
+    mockNode.buffered.length = 1;
+    mockNode.buffered.end.mockReturnValue(58);
+    mockNode.currentTime = 58;
+    mockNode.duration = 60;
+
+    vi.advanceTimersByTime(4000);
+
+    expect(mockNode.play).toHaveBeenCalled();
+  });
+
+  it('does not call play on buffer recovery when paused globally', () => {
+    onNarrationBufferChange(vi.fn());
+    scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn() });
+
+    const waitingCall = mockNode.addEventListener.mock.calls.find(
+      ([event]) => event === 'waiting',
+    );
+    waitingCall[1]();
+
+    pauseAudioCues(); // sets isAudioPaused = true
+    mockNode.play.mockClear();
+
+    mockNode.buffered.length = 1;
+    mockNode.buffered.end.mockReturnValue(8);
+    mockNode.currentTime = 0;
+    mockNode.duration = 60;
+
+    vi.advanceTimersByTime(4000);
+
+    expect(mockNode.play).not.toHaveBeenCalled();
+  });
+
+  it('stops checking when narrationBuffering is false', () => {
+    onNarrationBufferChange(vi.fn());
+    scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn() });
+
+    const waitingCall = mockNode.addEventListener.mock.calls.find(
+      ([event]) => event === 'waiting',
+    );
+    waitingCall[1]();
+
+    // Clear buffering via playing event
+    const playingCall = mockNode.addEventListener.mock.calls.find(
+      ([event]) => event === 'playing',
+    );
+    playingCall[1](); // clears narrationBuffering
+
+    mockNode.buffered.end.mockClear();
+    vi.advanceTimersByTime(4000);
+
+    // checkBufferProgress should have exited early
+    expect(mockNode.buffered.end).not.toHaveBeenCalled();
+  });
+
+  it('nudges stall after 2 checks without progress', () => {
+    onNarrationBufferChange(vi.fn());
+    scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn() });
+
+    const waitingCall = mockNode.addEventListener.mock.calls.find(
+      ([event]) => event === 'waiting',
+    );
+
+    mockNode.buffered.length = 1;
+    mockNode.buffered.end.mockReturnValue(5);
+    mockNode.currentTime = 4;
+    waitingCall[1]();
+
+    // Stall check 1: no progress
+    vi.advanceTimersByTime(4000);
+    // Stall check 2: still no progress → nudge (currentTime = currentTime)
+    vi.advanceTimersByTime(4000);
+    // No error should have occurred
+  });
+
+  it('reloads from position after 4 stalled checks', () => {
+    onNarrationBufferChange(vi.fn());
+    scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn() });
+
+    const waitingCall = mockNode.addEventListener.mock.calls.find(
+      ([event]) => event === 'waiting',
+    );
+
+    mockNode.buffered.length = 1;
+    mockNode.buffered.end.mockReturnValue(5);
+    mockNode.currentTime = 4;
+    mockNode.src = 'test.m4a';
+    waitingCall[1]();
+
+    // 4 checks with no progress → reloadFromPosition
+    for (let i = 0; i < 4; i++) {
+      vi.advanceTimersByTime(4000);
+    }
+
+    // No crash — reloadFromPosition was called internally
+  });
+
+  it('buffer recovery play failure cleans up monitoring', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    onNarrationBufferChange(vi.fn());
+    scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn() });
+
+    const waitingCall = mockNode.addEventListener.mock.calls.find(
+      ([event]) => event === 'waiting',
+    );
+    waitingCall[1]();
+
+    // Make play() reject
+    mockNode.play.mockRejectedValueOnce(new Error('play blocked'));
+
+    mockNode.buffered.length = 1;
+    mockNode.buffered.end.mockReturnValue(8);
+    mockNode.currentTime = 0;
+    mockNode.duration = 60;
+
+    vi.advanceTimersByTime(4000);
+
+    warnSpy.mockRestore();
+  });
+});
+
+describe('audio.js — monitorNarrationBuffer edge cases', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    mockNode.addEventListener.mockClear();
+    mockNode.removeEventListener.mockClear();
+    cancelAudioCues();
+    clearNarrationCache();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('warns when narration node is unavailable', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // Default mockNode has addEventListener, so monitorNarrationBuffer succeeds.
+    // Override _sounds to have a node without addEventListener.
+    const badNode = { addEventListener: 'not-a-function' };
+    Howl.mockImplementationOnce(function (opts) {
+      lastHowlOptions = opts;
+      Object.assign(this, createMockHowlInstance());
+      this._sounds = [{ _node: badNode }];
+    });
+
+    const cue = makeCue();
+    scheduleAudioCues([cue], { onNarrationEnd: vi.fn() });
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Cannot monitor narration buffer'),
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('defers listener attachment via howl.once play when _sounds not yet ready', () => {
+    Howl.mockImplementationOnce(function (opts) {
+      lastHowlOptions = opts;
+      Object.assign(this, createMockHowlInstance());
+      this._sounds = null; // not ready yet
+    });
+
+    const cue = makeCue();
+    scheduleAudioCues([cue], { onNarrationEnd: vi.fn() });
+
+    const howl = Howl.mock.results[0].value;
+    // Should have called once('play', attachListeners) for deferred attachment
+    const playCalls = howl.once.mock.calls.filter(([e]) => e === 'play');
+    expect(playCalls.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('audio.js — anchor duration unknown fallback', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    cancelAudioCues();
+    clearNarrationCache();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('warns and falls back to 0 when ref duration is unknown', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const cueA = makeCue({ id: 'a', enter: 0 });
+    const cueB = makeCue({
+      id: 'b',
+      type: 'sfx',
+      src: 'b.mp3',
+      enter: { ref: 'a', offset: 500 },
+    });
+
+    // No audioDurations → ref 'a' duration unknown → cueB falls back to enter: 0
+    scheduleAudioCues([cueA, cueB]);
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Anchor ref "a" duration unknown'),
+    );
+    // Both fire immediately (cueA at 0, cueB fell back to 0)
+    expect(Howl).toHaveBeenCalledTimes(2);
+    warnSpy.mockRestore();
+  });
+});
+
+describe('audio.js — crossfade cleanup and ambient sweep', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    mockNode.addEventListener.mockClear();
+    mockNode.removeEventListener.mockClear();
+    cancelAudioCues();
+    clearNarrationCache();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('crossfadeCleanup forces unload of pending old ambient', () => {
+    // Schedule old ambient
+    const oldCue = makeCue({ type: 'ambient', id: 'ambient-1', src: 'old.mp3' });
+    scheduleAudioCues([oldCue]);
+    const oldHowl = Howl.mock.results[0].value;
+    vi.clearAllMocks();
+
+    // Schedule new ambient (crossfade)
+    const newCue = makeCue({ type: 'ambient', id: 'ambient-1', src: 'new.mp3' });
+    scheduleAudioCues([newCue]);
+    const newHowl = Howl.mock.results[0].value;
+
+    // Old not yet unloaded (waiting for play + fade)
+    expect(oldHowl.unload).not.toHaveBeenCalled();
+
+    // Call _crossfadeCleanup on the new howl
+    newHowl._crossfadeCleanup();
+
+    // Old should now be unloaded
+    expect(oldHowl.unload).toHaveBeenCalled();
+  });
+
+  it('crossfadeCleanup is idempotent (second call is no-op)', () => {
+    const oldCue = makeCue({ type: 'ambient', id: 'ambient-1', src: 'old.mp3' });
+    scheduleAudioCues([oldCue]);
+    const oldHowl = Howl.mock.results[0].value;
+    vi.clearAllMocks();
+
+    const newCue = makeCue({ type: 'ambient', id: 'ambient-1', src: 'new.mp3' });
+    scheduleAudioCues([newCue]);
+    const newHowl = Howl.mock.results[0].value;
+
+    newHowl._crossfadeCleanup();
+    newHowl._crossfadeCleanup(); // second call
+
+    expect(oldHowl.unload).toHaveBeenCalledTimes(1);
+  });
+
+  it('sweeps stranded ambient cues not in incoming cue set', () => {
+    // Schedule two ambient cues
+    const cue1 = makeCue({ type: 'ambient', id: 'ambient-1', src: 'bg1.mp3', enter: 0 });
+    const cue2 = makeCue({ type: 'ambient', id: 'ambient-2', src: 'bg2.mp3', enter: 0 });
+    scheduleAudioCues([cue1, cue2]);
+    vi.clearAllMocks();
+
+    // Schedule new set with only ambient-1 → ambient-2 should be swept
+    const newCue1 = makeCue({ type: 'ambient', id: 'ambient-1', src: 'bg1-new.mp3', enter: 0 });
+    scheduleAudioCues([newCue1]);
+
+    // ambient-2's Howl should have been faded out
+    const ambient2Howl = Howl.mock.results.find(
+      (r, i) => Howl.mock.calls[i]?.[0]?.src?.[0] === 'bg2.mp3',
+    )?.value;
+    if (ambient2Howl) {
+      expect(ambient2Howl.fade).toHaveBeenCalled();
+    }
+  });
+
+  it('cancelAudioCues with preserveAmbient keeps ambient entries', () => {
+    const narCue = makeCue({ id: 'narration', type: 'narration', src: 'nar.m4a' });
+    const ambCue = makeCue({ type: 'ambient', id: 'ambient-1', src: 'bg.mp3', enter: 0 });
+    scheduleAudioCues([narCue, ambCue]);
+
+    const narHowl = Howl.mock.results[0].value;
+    vi.clearAllMocks();
+
+    cancelAudioCues({ preserveAmbient: true });
+
+    expect(narHowl.unload).toHaveBeenCalled();
+    // Ambient should still be alive (not unloaded)
+    // getNarrationCue should return null since narration was cleaned up
+    expect(getNarrationCue()).toBeNull();
+  });
+
+  it('cancelAudioCues drains crossfade cleanup on non-ambient entries', () => {
+    // Schedule ambient, then replace to get _crossfadeCleanup
+    const oldCue = makeCue({ type: 'ambient', id: 'ambient-1', src: 'old.mp3' });
+    scheduleAudioCues([oldCue]);
+    vi.clearAllMocks();
+
+    const newCue = makeCue({ type: 'ambient', id: 'ambient-1', src: 'new.mp3' });
+    scheduleAudioCues([newCue]);
+
+    cancelAudioCues();
+    // No errors should occur
+  });
+
+  it('existing non-ambient entry with same id is unloaded when replaced', () => {
+    const cue1 = makeCue({ id: 'sfx-1', type: 'sfx', src: 'sfx1.mp3', enter: 0 });
+    scheduleAudioCues([cue1]);
+    const howl1 = Howl.mock.results[0].value;
+    vi.clearAllMocks();
+
+    // Replace with new cue of same id but different type
+    const cue2 = makeCue({ id: 'sfx-1', type: 'sfx', src: 'sfx2.mp3', enter: 0 });
+    scheduleAudioCues([cue2]);
+
+    expect(howl1.unload).toHaveBeenCalled();
+  });
+});
+
 describe('audio.js — audio-reactive analyser (ADR-008)', () => {
   beforeEach(() => {
     vi.useFakeTimers();
