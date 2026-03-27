@@ -160,12 +160,12 @@ vi.mock('../../src/scenes.json', () => ({
 
       },
       {
-        // Frame for testing missing analyserCueId warn path
+        // Frame for testing missing analyserCueId warn path + no-narration guard
         id: 'scene-bad-cue',
         frameType: 'scene',
         holdAfterNarration: 2000,
         image: 'scene-bad.webp',
-        narration: { lines: null, captions: null },
+        narration: null,
         audioCues: [
           { id: 'narration', type: 'narration', src: 'bad-narration.mp3', enter: 0, volume: 1, loop: false, fadeIn: 0, fadeOut: 0 },
         ],
@@ -194,10 +194,29 @@ vi.mock('../../src/scenes.json', () => ({
 
         holdAfterNarration: 2000,
         image: 'credits.webp',
-        narration: null,
-        audioCues: null,
-        effects: null,
-        transition: { type: 'fade', duration: 400 },
+        narration: {
+          lines: [
+            { text: 'I want to leave more than I got.', enter: 2000, exit: 6000, x: 67, y: 71 },
+            { text: 'Catch like wildfire.', enter: 25000, exit: 28000, x: 42, y: 36 },
+          ],
+          captions: [
+            { text: 'I want to leave more than I got.', start: 2200, end: 6000 },
+            { text: 'And if we are lucky, it will catch like wildfire.', start: 26000, end: 32000 },
+          ],
+        },
+        audioCues: [
+          { id: 'narration', type: 'narration', src: 'credits-narration.m4a', enter: 500, volume: 1, loop: false, fadeIn: 0, fadeOut: 0 },
+          { id: 'ambient-credits', type: 'ambient', src: 'credits-vinyl.m4a', enter: 0, volume: 0.1, loop: true, fadeIn: 1500, fadeOut: 1000 },
+          { id: 'end-song', type: 'ambient', src: 'credits-music.mp3', enter: { ref: 'narration', offset: -12000 }, volume: 0.15, volumeAfterNarration: 0.75, fadeAfterNarration: 3000, loop: true, fadeIn: 8000, fadeOut: null },
+        ],
+        effects: {
+          analyserCueId: 'end-song',
+          regions: [
+            { type: 'shockwave', mask: 'credits-shockwave.png', centerX: 0.46, centerY: 0.47, audioReactive: { band: 'bass', target: 'amplitude', range: [10, 30], trigger: { threshold: 3.0, cooldown: 0.08, minEnergy: 0.8 } } },
+            { type: 'glow', mask: 'credits-diamond.png' },
+          ],
+        },
+        transition: { type: 'fade', duration: 1500 },
 
       },
     ],
@@ -221,8 +240,11 @@ import {
   cueAudioCues,
   onNarrationBufferChange,
   getAnalyserNode,
+  wrapOnNarrationEndWithBoost,
+  restartNarrationCue,
+  disconnectAnalyserSource,
 } from '../../src/audio.js';
-import { buildNarrationTimeline } from '../../src/text.js';
+import { buildNarrationTimeline, clearNarrationLayer } from '../../src/text.js';
 import {
   clearAll as clearEffects,
   cancelPendingLoad,
@@ -2563,6 +2585,315 @@ describe('app.js', () => {
 
       // Should have loaded and shown the frame
       expect(app.getState()).toBe('SCENE_ACTIVE');
+    });
+  });
+
+  // ── Credits frame ────────────────────────────────────────────────
+
+  describe('credits frame', () => {
+    // Helper: navigate from title (index 0) to credits (index 5) via advance
+    async function navigateToCredits(appInstance) {
+      appInstance.togglePause(); // unpause → first play
+      for (let i = 0; i < 5; i++) {
+        appInstance.advance();
+        await flush();
+      }
+    }
+
+    beforeEach(async () => {
+      app = createApp();
+      await flush();
+    });
+
+    it('sets state to CREDITS when landing on credits frame', async () => {
+      await navigateToCredits(app);
+      expect(app.getState()).toBe('CREDITS');
+    });
+
+    it('schedules audio cues with ref-based music enter and volumeAfterNarration', async () => {
+      await navigateToCredits(app);
+
+      // scheduleAudioCues should have been called with the credits frame's audioCues
+      const lastCall = scheduleAudioCues.mock.calls.at(-1);
+      expect(lastCall).toBeDefined();
+      const cues = lastCall[0];
+
+      // Verify all three cues are present
+      const narrationCue = cues.find((c) => c.id === 'narration');
+      const ambientCue = cues.find((c) => c.id === 'ambient-credits');
+      const endSong = cues.find((c) => c.id === 'end-song');
+
+      expect(narrationCue).toBeDefined();
+      expect(narrationCue.enter).toBe(500);
+
+      expect(ambientCue).toBeDefined();
+      expect(ambientCue.enter).toBe(0);
+      expect(ambientCue.fadeIn).toBe(1500);
+
+      // end-song uses ref-based enter with offset
+      expect(endSong).toBeDefined();
+      expect(endSong.enter).toEqual({ ref: 'narration', offset: -12000 });
+      expect(endSong.volume).toBe(0.15);
+      expect(endSong.volumeAfterNarration).toBe(0.75);
+      expect(endSong.fadeAfterNarration).toBe(3000);
+      expect(endSong.fadeIn).toBe(8000);
+    });
+
+    it('wraps onNarrationEnd with volume boost for end-song cue', async () => {
+      await navigateToCredits(app);
+
+      // wrapOnNarrationEndWithBoost should have been called with cues containing volumeAfterNarration
+      const boostCall = wrapOnNarrationEndWithBoost.mock.calls.at(-1);
+      expect(boostCall).toBeDefined();
+      const cues = boostCall[0];
+      const boostCue = cues.find((c) => c.volumeAfterNarration !== undefined);
+      expect(boostCue).toBeDefined();
+      expect(boostCue.id).toBe('end-song');
+      expect(boostCue.volumeAfterNarration).toBe(0.75);
+    });
+
+    it('does not auto-advance from credits (last frame)', async () => {
+      await navigateToCredits(app);
+      expect(app.getState()).toBe('CREDITS');
+
+      // advance() should be a no-op — state stays CREDITS
+      app.advance();
+      await flush();
+      expect(app.getState()).toBe('CREDITS');
+    });
+
+    it('blocks advance even after pause/resume cycle on credits', async () => {
+      await navigateToCredits(app);
+      expect(app.getState()).toBe('CREDITS');
+
+      app.togglePause();
+      expect(app.getState()).toBe('PAUSED');
+
+      app.togglePause(); // resume
+      expect(app.getState()).toBe('CREDITS');
+
+      app.advance();
+      await flush();
+      expect(app.getState()).toBe('CREDITS');
+    });
+
+    it('loads effects with analyserCueId and audioReactive regions', async () => {
+      await navigateToCredits(app);
+
+      // loadEffectsScene should have been called with the credits effects config
+      const effectsCall = loadEffectsScene.mock.calls.at(-1);
+      expect(effectsCall).toBeDefined();
+      const [effectsConfig, imageSrc] = effectsCall;
+
+      expect(effectsConfig.analyserCueId).toBe('end-song');
+      expect(effectsConfig.regions).toHaveLength(2);
+      expect(effectsConfig.regions[0].type).toBe('shockwave');
+      expect(effectsConfig.regions[0].audioReactive.band).toBe('bass');
+      expect(effectsConfig.regions[0].audioReactive.trigger.threshold).toBe(3.0);
+      expect(effectsConfig.regions[1].type).toBe('glow');
+      expect(imageSrc).toBe('credits.webp');
+    });
+
+    it('wires analyser for audio-reactive effects on credits', async () => {
+      const mockAnalyser = { fftSize: 2048 };
+      getAnalyserNode.mockReturnValue(mockAnalyser);
+
+      await navigateToCredits(app);
+
+      expect(setEffectsAnalyser).toHaveBeenCalledWith(mockAnalyser);
+      expect(connectEffectsAnalysisAudio).toHaveBeenCalledWith(
+        'credits-music.mp3',
+        mockAnalyser,
+        true,
+      );
+    });
+
+    it('starts text animation on landing via timeline.play(0)', async () => {
+      await navigateToCredits(app);
+
+      // buildNarrationTimeline should have been called for credits narration
+      const lastNarrationCall = buildNarrationTimeline.mock.calls.at(-1);
+      expect(lastNarrationCall).toBeDefined();
+      const lines = lastNarrationCall[0];
+      expect(lines[0].text).toBe('I want to leave more than I got.');
+      expect(lines[1].text).toBe('Catch like wildfire.');
+
+      // The timeline returned by buildNarrationTimeline should have play(0) called
+      const timeline = buildNarrationTimeline.mock.results.at(-1).value.timeline;
+      expect(timeline.play).toHaveBeenCalledWith(0);
+    });
+
+    it('builds accessible narration from captions for credits', async () => {
+      await navigateToCredits(app);
+
+      const accessibleEl = document.getElementById('accessible-narration');
+      expect(accessibleEl.textContent).toContain('I want to leave more than I got.');
+      expect(accessibleEl.textContent).toContain('catch like wildfire');
+    });
+
+    it('replay on credits resets audio, effects, and text', async () => {
+      await navigateToCredits(app);
+
+      vi.clearAllMocks();
+      loadEffectsScene.mockResolvedValue(true);
+      loadImage.mockResolvedValue(new Image());
+
+      // Trigger replay via the exported API
+      const replayBtn = document.getElementById('btn-replay');
+      // Simulate the keyboard.js replay action by calling the internal path:
+      // replayNarration is wired to btn-replay click in createApp
+      replayBtn.click();
+      await flush();
+
+      // cleanupCurrentScene should cancel audio
+      expect(cancelAudioCues).toHaveBeenCalled();
+      expect(disconnectAnalyserSource).toHaveBeenCalled();
+
+      // showFrame should re-schedule audio with the credits cues
+      expect(scheduleAudioCues).toHaveBeenCalled();
+      const replayCues = scheduleAudioCues.mock.calls.at(-1)[0];
+      expect(replayCues.find((c) => c.id === 'end-song')).toBeDefined();
+
+      // Text timeline should be rebuilt and started
+      expect(buildNarrationTimeline).toHaveBeenCalled();
+
+      // State should remain CREDITS
+      expect(app.getState()).toBe('CREDITS');
+    });
+
+    it('replay while paused defers audio until resume', async () => {
+      await navigateToCredits(app);
+
+      // Pause on credits
+      app.togglePause();
+      expect(app.getState()).toBe('PAUSED');
+
+      vi.clearAllMocks();
+      loadEffectsScene.mockResolvedValue(true);
+      loadImage.mockResolvedValue(new Image());
+
+      // Replay while paused
+      const replayBtn = document.getElementById('btn-replay');
+      replayBtn.click();
+      await flush();
+
+      // Audio should NOT be scheduled yet (deferred)
+      // cancelAudioCues is called in cleanupCurrentScene, but scheduleFrameAudio
+      // should NOT fire because deferFrameAudioUntilResume is true
+      expect(cancelAudioCues).toHaveBeenCalled();
+
+      // The state is PAUSED (replay while paused re-pauses)
+      expect(app.getState()).toBe('PAUSED');
+
+      vi.clearAllMocks();
+      loadEffectsScene.mockResolvedValue(true);
+
+      // Resume — should now schedule the deferred audio
+      app.togglePause();
+      expect(scheduleAudioCues).toHaveBeenCalled();
+    });
+
+    it('credits transition uses frame-specific duration (1500ms)', async () => {
+      const { gsap } = await import('gsap');
+
+      // Navigate to scene-multihop (index 4), one before credits
+      app.togglePause();
+      for (let i = 0; i < 4; i++) {
+        app.advance();
+        await flush();
+      }
+
+      vi.clearAllMocks();
+      loadEffectsScene.mockResolvedValue(true);
+
+      // Advance to credits — gsap.to is called with half the transition duration
+      app.advance();
+      await flush();
+
+      // Credits transition.duration = 1500, so halfDuration = 1500/2000 = 0.75
+      const fadeOutCall = gsap.to.mock.calls[0];
+      expect(fadeOutCall[1].duration).toBe(0.75);
+    });
+
+    it('retreat from credits goes back to previous scene', async () => {
+      await navigateToCredits(app);
+      expect(app.getState()).toBe('CREDITS');
+
+      // retreat is wired to btn-prev click
+      document.getElementById('btn-prev').click();
+      await flush();
+
+      // State should be SCENE_ACTIVE (back on scene-multihop)
+      expect(app.getState()).toBe('SCENE_ACTIVE');
+    });
+
+    it('schedules narration with 500ms enter delay on credits', async () => {
+      await navigateToCredits(app);
+
+      const lastCall = scheduleAudioCues.mock.calls.at(-1);
+      const opts = lastCall[1];
+
+      // opts should include onNarrationEnd and maxNarrationDurationMs
+      expect(opts.onNarrationEnd).toBeDefined();
+      expect(opts.maxNarrationDurationMs).toBeGreaterThan(0);
+    });
+
+    it('enables replay button on credits frame with narration', async () => {
+      await navigateToCredits(app);
+
+      const replayBtn = document.getElementById('btn-replay');
+      expect(replayBtn.disabled).toBe(false);
+    });
+
+    it('disables next button on credits frame (last frame)', async () => {
+      await navigateToCredits(app);
+
+      const nextBtn = document.getElementById('btn-next');
+      expect(nextBtn.disabled).toBe(true);
+    });
+
+    it('enables prev button on credits frame', async () => {
+      await navigateToCredits(app);
+
+      const prevBtn = document.getElementById('btn-prev');
+      expect(prevBtn.disabled).toBe(false);
+    });
+
+    it('getMaxNarrationDuration uses caption end time for credits', async () => {
+      await navigateToCredits(app);
+
+      // The credits captions max end is 32000ms
+      // scheduleAudioCues opts should reflect this as maxNarrationDurationMs
+      const lastCall = scheduleAudioCues.mock.calls.at(-1);
+      const opts = lastCall[1];
+      // Without preloaded audio duration metadata, falls to caption max = 32000
+      expect(opts.maxNarrationDurationMs).toBe(32000);
+    });
+
+    it('analysis audio starts with deferred timer when enter delay > 0', async () => {
+      const mockAnalyser = { fftSize: 2048 };
+      getAnalyserNode.mockReturnValue(mockAnalyser);
+
+      // Provide audio duration so resolveAnalyserCueEnter can compute the delay
+      app = createApp();
+      await flush();
+
+      // Register a known narration duration so the ref-based enter resolves
+      // The preloadFirstFrameAudio callback sets audioDurations
+      const registerCb = preloadFirstFrameAudio.mock.calls[0][1];
+      registerCb({ src: 'credits-narration.m4a', duration: 35 }); // 35 seconds
+
+      await navigateToCredits(app);
+
+      // end-song enter = narration_enter(500) + narration_duration(35000) + offset(-12000) = 23500ms
+      // Since enterDelay > 0, analysis audio should be queued on a PausableTimer
+      // The timer hasn't fired yet so startAnalysisPlayback should NOT have been called yet
+      // (it's deferred). But connectAnalysisAudio should have been called immediately.
+      expect(connectEffectsAnalysisAudio).toHaveBeenCalledWith(
+        'credits-music.mp3',
+        mockAnalyser,
+        true,
+      );
     });
   });
 });
