@@ -56,8 +56,9 @@ browser begins downloading the file in the background. When `playNarration()`
 is called, it checks the cache first and reuses the pre-created Howl if
 available.
 
-The cache is cleared on every scene transition (`clearNarrationCache()`), then
-the next scene's audio is queued.
+On each scene transition, cache entries are trimmed to keep only the current
+scene narration and the prebuffered next-scene narration. This preserves
+instant resume after paused navigation while preventing unbounded cache growth.
 
 ## Buffer Monitoring & Stall Recovery 🩺
 

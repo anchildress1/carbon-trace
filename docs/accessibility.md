@@ -161,20 +161,23 @@ The CSP meta tag restricts resource loading:
 ```
 default-src 'self'
 script-src  'self'
-style-src   'self' 'unsafe-inline' https://fonts.googleapis.com
+style-src   'self' 'unsafe-inline'
 img-src     'self'
-media-src   'self' data:
-font-src    'self' https://fonts.gstatic.com
+media-src   'self'
+font-src    'self'
 connect-src 'none'
 object-src  'none'
 base-uri    'self'
 ```
+
+`style-src` keeps `'unsafe-inline'` because narration positioning is applied via
+runtime style attributes in `text.js` (for per-line x/y placement).
 
 `connect-src` is relaxed to `'self' ws:` during development to allow Vite HMR
 WebSocket connections (handled by the `relax-csp-dev` Vite plugin).
 
 ## Progressive Enhancement 🌱
 
-The Google Fonts stylesheet is loaded via `<link rel="preload" as="style">`
-and activated by JavaScript in `main.js`. A `<noscript>` fallback ensures the
-Lora font loads even when JavaScript is disabled.
+Lora is self-hosted under `/assets/fonts/` and loaded via `@font-face` in
+`src/styles.css`. This removes third-party font dependencies while preserving
+typography under strict CSP.

@@ -742,10 +742,13 @@ See `Dockerfile` and `nginx.conf` at repo root for the canonical deployment conf
 
 CSP in `index.html`:
 ```
-default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-img-src 'self'; media-src 'self' data:; font-src 'self' https://fonts.gstatic.com;
+default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';
+img-src 'self'; media-src 'self'; font-src 'self';
 connect-src 'none'; object-src 'none'; base-uri 'self'
 ```
+
+`style-src` keeps `'unsafe-inline'` because narration positioning is set through
+runtime style attributes in `text.js` (per-line x/y coordinates).
 
 **Note:** `connect-src: 'none'` is safe because Howler uses `html5: true` mode (streaming via `<audio>` elements → `media-src`), not XHR/fetch (`connect-src`). Verify across Safari/Chrome/Firefox.
 

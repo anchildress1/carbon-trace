@@ -36,6 +36,13 @@ vi.mock('../../src/audio.js', () => ({
   isNarrationBuffering: vi.fn().mockReturnValue(false),
   preloadNarrationAhead: vi.fn(),
   clearNarrationCache: vi.fn(),
+  trimNarrationCache: vi.fn(),
+  resolveCueEnters: vi.fn((cues = []) =>
+    cues.map((cue) => ({
+      ...cue,
+      resolvedEnter: typeof cue.enter === 'number' ? cue.enter : 0,
+    })),
+  ),
   wrapOnNarrationEndWithBoost: vi.fn((_cues, cb) => cb),
   getAnalyserNode: vi.fn(() => null),
   disconnectAnalyserSource: vi.fn(),
@@ -240,6 +247,7 @@ import {
   cueAudioCues,
   onNarrationBufferChange,
   getAnalyserNode,
+  resolveCueEnters,
   wrapOnNarrationEndWithBoost,
   disconnectAnalyserSource,
 } from '../../src/audio.js';
@@ -780,6 +788,32 @@ describe('app.js', () => {
       await flush();
       // Ambient crossfade is now handled by scheduleAudioCues with crossfadeDurationMs opt
       expect(scheduleAudioCues).toHaveBeenCalled();
+    });
+
+    it('preserves outgoing ambient during playing transitions into ambient scenes', async () => {
+      app = createApp();
+      await flush();
+      app.togglePause(); // start playback from title
+      vi.clearAllMocks();
+
+      app.advance(); // title -> scene-01 (has ambient)
+      await flush();
+
+      expect(cancelAudioCues).toHaveBeenCalledWith(expect.objectContaining({ preserveAmbient: true }));
+    });
+
+    it('fully cancels audio when target scene has no ambient cue', async () => {
+      app = createApp();
+      await flush();
+      app.togglePause();
+      app.advance(); // title -> scene-01
+      await flush();
+      vi.clearAllMocks();
+
+      app.advance(); // scene-01 -> credits (audioCues: null)
+      await flush();
+
+      expect(cancelAudioCues).toHaveBeenCalledWith(expect.objectContaining({ preserveAmbient: false }));
     });
   });
 
@@ -1771,6 +1805,29 @@ describe('app.js', () => {
       );
     });
 
+    it('uses resolved anchor enter time for captionDelay when narration is anchored', async () => {
+      app = createApp();
+      await flush();
+      const defaultResolve = resolveCueEnters.getMockImplementation();
+      resolveCueEnters.mockImplementation((cues = []) =>
+        cues.map((cue) => ({
+          ...cue,
+          resolvedEnter: cue.id === 'narration' ? 2200 : 0,
+        })),
+      );
+      app.togglePause();
+      vi.clearAllMocks();
+      app.advance(); // title -> scene-01
+      await flush();
+
+      expect(buildNarrationTimeline).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.any(HTMLElement),
+        expect.objectContaining({ captionDelay: 2200 }),
+      );
+      resolveCueEnters.mockImplementation(defaultResolve);
+    });
+
     it('passes captions array to buildNarrationTimeline when frame has captions', async () => {
       app = createApp();
       await flush();
@@ -2518,10 +2575,10 @@ describe('app.js', () => {
     });
   });
 
-  // ── edge: prebufferNextScene skips when deferred ────────────────────
+  // ── edge: deferred frame-audio scheduling ───────────────────────────
 
-  describe('prebufferNextScene edge cases', () => {
-    it('does not prebuffer when deferFrameAudioUntilResume is true', async () => {
+  describe('deferred frame-audio edge cases', () => {
+    it('skips frame-audio scheduling when deferFrameAudioUntilResume is true', async () => {
       app = createApp();
       await flush();
       app.togglePause(); // resume
@@ -2532,10 +2589,11 @@ describe('app.js', () => {
       app.advance();
       await flush();
 
-      const { clearNarrationCache: clearCacheMock } = await import('../../src/audio.js');
-      // prebufferNextScene always calls clearNarrationCache as its first action;
-      // deferFrameAudioUntilResume only gates scheduleFrameAudio, not prebuffering
-      expect(clearCacheMock).toHaveBeenCalledTimes(1);
+      const { trimNarrationCache: trimCacheMock } = await import('../../src/audio.js');
+      // deferFrameAudioUntilResume gates scheduleFrameAudio only. Navigation while
+      // paused should still trim cache for current/next narration prebuffering.
+      expect(scheduleAudioCues).not.toHaveBeenCalled();
+      expect(trimCacheMock).toHaveBeenCalledTimes(1);
       expect(app.getState()).toBe('PAUSED');
     });
   });
