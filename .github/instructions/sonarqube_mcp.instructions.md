@@ -8,7 +8,7 @@ These are some guidelines when using the SonarQube MCP server.
 
 ## Proactive analysis
 
-- **IMPORTANT**: After modifying any source files, you MUST call `analyze_code_snippet`
+- **IMPORTANT**: After modifying any source files, you may call `analyze_code_snippet`
   with the full file content to scan for new issues before committing. Fix any issues found.
 - Use `search_sonar_issues_in_projects` with the `pullRequestId` parameter to check for
   open issues on the current PR branch.

@@ -1,31 +1,30 @@
-# Audio System
+# Audio System 🎧
 
-## Channels
+The narration is the pacing clock. When narration ends, the scene advances. When narration stalls, everything waits. Two audio cue types run concurrently — ambient and narration — and the system's job is to make sure none of them fail silently. If audio breaks, the experience should degrade gracefully (advance anyway), not hang forever on a scene that'll never fire its `end` event.
+
+## Channels 🎛️
 
 ```mermaid
 graph LR
     subgraph audio.js
         A[Ambient<br/>looping background]
         N[Narration<br/>spoken word per scene]
-        M[Music<br/>scheduled with enter/exit]
     end
 
     A -->|crossfade| A
     N -->|buffer monitor| BM[Buffer Monitor]
-    M -->|fade in/out| M
 ```
 
-Three independent Howler.js channels run concurrently:
+Two Howler.js cue types per scene:
 
-| Channel | Behavior | Format | Loop |
-|---------|----------|--------|------|
-| **Ambient** | Crossfades between scenes (600–800ms) | mp3 | yes |
-| **Narration** | One-shot per scene, supports delay | m4a (html5) | no |
-| **Music** | Scheduled start/exit with volume crescendo | mp3 | yes |
+| Cue type      | Behavior                                                                | Format                    | Loop |
+| ------------- | ----------------------------------------------------------------------- | ------------------------- | ---- |
+| **Ambient**   | Fades in over cue `fadeIn` duration; prior ambient fades out over 800ms | m4a (mp3 for music cues)  | yes  |
+| **Narration** | One-shot per scene, supports delay                                      | m4a (html5)               | no   |
 
 All channels respect a global mute flag. Mute state is per-session (not persisted).
 
-## Narration Lifecycle
+## Narration Lifecycle 🎙️
 
 ```mermaid
 sequenceDiagram
@@ -60,7 +59,7 @@ available.
 The cache is cleared on every scene transition (`clearNarrationCache()`), then
 the next scene's audio is queued.
 
-## Buffer Monitoring & Stall Recovery
+## Buffer Monitoring & Stall Recovery 🩺
 
 ```mermaid
 flowchart TD
@@ -102,57 +101,55 @@ flowchart TD
 ### Buffering ↔ Pause Interaction
 
 When `app.buffering` is true and the user has not manually paused:
+
 - Text timeline is paused.
 - Captions are paused (offset tracking preserved).
 
 When the user manually pauses during buffering:
+
 - Audio channels pause.
 - The buffering spinner remains visible.
 - On resume, text and captions only resume if buffering has cleared.
 
-## Music Scheduling
+## Music Scheduling 🎵
+
+Music has no dedicated cue type — it is modeled as an `ambient` cue. The scene
+data uses `type: "ambient"` with an anchor-based `enter` that schedules
+playback relative to another cue's end time.
 
 ```mermaid
 sequenceDiagram
     participant App as app.js
     participant Audio as audio.js
 
-    Note over App: showFrame detects frame.music
-    App->>App: scheduleMusic(music)
-    App->>App: clearMusicTimer + stopMusic
+    Note over App: showFrame(n)
+    App->>Audio: scheduleAudioCues(cues)
+    Note over Audio: resolveAnchors —<br/>enter: {ref: "narration", offset: -12000}<br/>→ absolute ms from scene start
+    Audio->>Audio: setTimeout(playCue, resolvedEnter)
+    Audio->>Audio: playCue → Howl at volume 0
+    Audio->>Audio: howl.fade(0, volume, fadeIn)
 
-    alt music.enter > 0
-        App->>App: setTimeout(startPlayback, enter)
-    else immediate
-        App->>Audio: playMusic(src, startVolume)
-    end
-
-    Audio-->>App: music playing
-    App->>Audio: fadeMusic(fullVolume, crescendoMs)
-
-    alt music.exit defined
-        App->>App: setTimeout(fadeOut, exit - enter)
-        App->>Audio: fadeMusic(0, 2000)
-    end
+    Note over Audio: narration ends
+    Audio->>Audio: wrapOnNarrationEndWithBoost
+    Audio->>Audio: howl.fade(volume, volumeAfterNarration, fadeAfterNarration)
 ```
 
-Music is an independent audio track, separate from narration. It is scheduled
-in `showFrame` (not `applyNarration`), so replaying narration does not restart
-music. Music starts at the configured `enter` time, fades in over
-`crescendoMs`, and plays until the configured `exit` time (or indefinitely if
-`exit` is null).
+`resolveAnchors` computes the absolute start time by summing the referenced
+cue's start time, its expected duration, and the offset. For example,
+`enter: { ref: "narration", offset: -12000 }` starts the cue 12 seconds before
+narration ends.
 
-Music supports:
-- **Delayed start** (`enter` ms): Timer saved/restored on pause/resume.
-- **Volume crescendo**: Starts at `startVolume`, fades to `fullVolume` over
-  `crescendoMs`.
-- **Scheduled exit** (`exit` ms): Triggers a 2-second fade to silence. The exit
-  timer is independently tracked for pause/resume.
-- **Independence from narration**: Music does not restart on replay. It
-  functions like a narrated track — it starts when configured and runs on
-  its own timeline.
+Music cue properties:
 
-## Ambient Crossfade
+- **`enter`**: Anchor-based or absolute ms delay. Anchor form:
+  `{ ref: "<cue-id>", offset: <ms> }`.
+- **`fadeIn`**: Duration of the fade from 0 to `volume`.
+- **`volumeAfterNarration`**: Volume to fade to once narration ends, handled by
+  `wrapOnNarrationEndWithBoost`.
+- **`fadeAfterNarration`**: Duration of the post-narration volume fade.
+- **`loop: true`**: Loops indefinitely until the scene transitions.
+
+## Ambient Crossfade 🌊
 
 When transitioning between scenes while playing, ambient audio crossfades:
 
@@ -161,13 +158,12 @@ When transitioning between scenes while playing, ambient audio crossfades:
 3. Old ambient fades from current volume to 0 over the same duration.
 4. Old Howl unloaded after fade completes (+100ms buffer).
 
-When navigating while paused (hard cut), `cueAmbient` creates the Howl with
-`preload: true` but does not call `play()`. The ambient starts when the user
-resumes via `resumeAmbient()`. Same pattern applies to music via `cueMusic`.
-This satisfies ADR-002's hard rule: no transient playback during paused
-navigation.
+When navigating while paused (hard cut), `cueAudioCues` creates Howls with
+`preload: true` but does not call `play()`. They start when the user resumes
+via `resumeAudioCues()`. This satisfies ADR-002's hard rule: no transient
+playback during paused navigation.
 
-## Pause/Resume Timer Math
+## Pause/Resume Timer Math ⏱️
 
 All scheduled timers (narration delay, music enter, music exit, auto-advance)
 use the same pattern:
@@ -189,9 +185,10 @@ On resume:
 On scene transition, all remaining values are reset to `null` to prevent
 cross-scene timer leaks.
 
-## Error Handling
+## Error Handling 🪤
 
 Every Howl instance has `onloaderror` and `onplayerror` callbacks that:
+
 - Log warnings to the console.
 - Nullify the channel reference if the failed Howl is still current.
 
