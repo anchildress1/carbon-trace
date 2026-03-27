@@ -1,6 +1,8 @@
-# Audio System
+# Audio System 🎧
 
-## Channels
+The narration is the pacing clock. When narration ends, the scene advances. When narration stalls, everything waits. Three independent audio channels run concurrently — ambient texture, spoken narration, and music — and the system's job is to make sure none of them fail silently. If audio breaks, the experience should degrade gracefully (advance anyway), not hang forever on a scene that'll never fire its `end` event.
+
+## Channels 🎛️
 
 ```mermaid
 graph LR
@@ -17,15 +19,15 @@ graph LR
 
 Three independent Howler.js channels run concurrently:
 
-| Channel | Behavior | Format | Loop |
-|---------|----------|--------|------|
-| **Ambient** | Crossfades between scenes (600–800ms) | mp3 | yes |
-| **Narration** | One-shot per scene, supports delay | m4a (html5) | no |
-| **Music** | Scheduled start/exit with volume crescendo | mp3 | yes |
+| Channel       | Behavior                                   | Format      | Loop |
+| ------------- | ------------------------------------------ | ----------- | ---- |
+| **Ambient**   | Crossfades between scenes (600–800ms)      | mp3         | yes  |
+| **Narration** | One-shot per scene, supports delay         | m4a (html5) | no   |
+| **Music**     | Scheduled start/exit with volume crescendo | mp3         | yes  |
 
 All channels respect a global mute flag. Mute state is per-session (not persisted).
 
-## Narration Lifecycle
+## Narration Lifecycle 🎙️
 
 ```mermaid
 sequenceDiagram
@@ -60,7 +62,7 @@ available.
 The cache is cleared on every scene transition (`clearNarrationCache()`), then
 the next scene's audio is queued.
 
-## Buffer Monitoring & Stall Recovery
+## Buffer Monitoring & Stall Recovery 🩺
 
 ```mermaid
 flowchart TD
@@ -102,15 +104,17 @@ flowchart TD
 ### Buffering ↔ Pause Interaction
 
 When `app.buffering` is true and the user has not manually paused:
+
 - Text timeline is paused.
 - Captions are paused (offset tracking preserved).
 
 When the user manually pauses during buffering:
+
 - Audio channels pause.
 - The buffering spinner remains visible.
 - On resume, text and captions only resume if buffering has cleared.
 
-## Music Scheduling
+## Music Scheduling 🎵
 
 ```mermaid
 sequenceDiagram
@@ -143,6 +147,7 @@ music. Music starts at the configured `enter` time, fades in over
 `exit` is null).
 
 Music supports:
+
 - **Delayed start** (`enter` ms): Timer saved/restored on pause/resume.
 - **Volume crescendo**: Starts at `startVolume`, fades to `fullVolume` over
   `crescendoMs`.
@@ -152,7 +157,7 @@ Music supports:
   functions like a narrated track — it starts when configured and runs on
   its own timeline.
 
-## Ambient Crossfade
+## Ambient Crossfade 🌊
 
 When transitioning between scenes while playing, ambient audio crossfades:
 
@@ -167,7 +172,7 @@ resumes via `resumeAmbient()`. Same pattern applies to music via `cueMusic`.
 This satisfies ADR-002's hard rule: no transient playback during paused
 navigation.
 
-## Pause/Resume Timer Math
+## Pause/Resume Timer Math ⏱️
 
 All scheduled timers (narration delay, music enter, music exit, auto-advance)
 use the same pattern:
@@ -189,9 +194,10 @@ On resume:
 On scene transition, all remaining values are reset to `null` to prevent
 cross-scene timer leaks.
 
-## Error Handling
+## Error Handling 🪤
 
 Every Howl instance has `onloaderror` and `onplayerror` callbacks that:
+
 - Log warnings to the console.
 - Nullify the channel reference if the failed Howl is still current.
 
