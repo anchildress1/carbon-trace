@@ -65,36 +65,50 @@ test: build
 # Scan for secrets
 secret-scan:
 	@echo "Scanning for secrets..."
-	@_run_scan() { \
-		SCANNER="$$1"; \
-		$$SCANNER scan --exclude-files 'node_modules|dist|.secrets.baseline|.secrets.baseline.tmp' > .secrets.baseline.tmp 2>&1 || true; \
-		if [ ! -f .secrets.baseline.tmp ]; then \
-			echo "detect-secrets scan did not produce output. Skipping."; \
-			return 0; \
-		fi; \
-		if [ -f .secrets.baseline ]; then \
-			echo "Checking against baseline..."; \
-			NEW_SECRETS=$$($$SCANNER scan --baseline .secrets.baseline --exclude-files 'node_modules|dist' | jq '.results | length' 2>/dev/null || echo 0); \
-			if [ "$${NEW_SECRETS:-0}" -gt 0 ]; then \
-				echo "New secrets found! Run 'detect-secrets audit .secrets.baseline' to review."; \
-				$$SCANNER scan --baseline .secrets.baseline --exclude-files 'node_modules|dist' | jq '.results'; \
-				rm -f .secrets.baseline.tmp; \
-				return 1; \
-			else \
-				echo "No new secrets found. Updating baseline timestamp."; \
-				[ -f .secrets.baseline.tmp ] && mv .secrets.baseline.tmp .secrets.baseline || true; \
+	@set -eu; \
+	TMP_BASELINE=".secrets.baseline.tmp"; \
+	PY_SCAN_ENV=""; \
+	cleanup_py_env() { \
+		if [ -n "$$PY_SCAN_ENV" ] && [ -d "$$PY_SCAN_ENV" ]; then rm -rf "$$PY_SCAN_ENV"; fi; \
+	}; \
+	trap cleanup_py_env EXIT INT TERM; \
+	run_detect_secrets() { \
+		if command -v uvx >/dev/null; then \
+			uvx --from detect-secrets==1.5.0 detect-secrets "$$@"; \
+		elif command -v detect-secrets >/dev/null; then \
+			detect-secrets "$$@"; \
+		elif command -v python3 >/dev/null; then \
+			if [ -z "$$PY_SCAN_ENV" ]; then \
+				PY_SCAN_ENV="$$(mktemp -d "$${TMPDIR:-/tmp}/detect-secrets.XXXXXX")"; \
+				python3 -m venv "$$PY_SCAN_ENV"; \
+				"$$PY_SCAN_ENV/bin/pip" install --quiet --upgrade pip >/dev/null; \
+				"$$PY_SCAN_ENV/bin/pip" install --quiet detect-secrets==1.5.0 >/dev/null; \
 			fi; \
+			"$$PY_SCAN_ENV/bin/detect-secrets" "$$@"; \
 		else \
-			[ -f .secrets.baseline.tmp ] && mv .secrets.baseline.tmp .secrets.baseline && echo "Secrets baseline created at .secrets.baseline" || echo "Could not create baseline."; \
+			echo "No supported detect-secrets runner found (requires uvx, detect-secrets, or python3)."; \
+			return 127; \
 		fi; \
 	}; \
-	if command -v uvx > /dev/null; then \
-		_run_scan "uvx --from detect-secrets==1.5.0 detect-secrets" || exit 1; \
-	elif command -v detect-secrets > /dev/null; then \
-		_run_scan "detect-secrets" || exit 1; \
+	run_detect_secrets scan --exclude-files 'node_modules|dist|.secrets.baseline|.secrets.baseline.tmp' > "$$TMP_BASELINE" 2>&1 || true; \
+	if [ ! -f "$$TMP_BASELINE" ]; then \
+		echo "detect-secrets scan did not produce output. Skipping."; \
+		exit 0; \
+	fi; \
+	if [ -f .secrets.baseline ]; then \
+		echo "Checking against baseline..."; \
+		NEW_SECRETS=$$(run_detect_secrets scan --baseline .secrets.baseline --exclude-files 'node_modules|dist' | jq '.results | length' 2>/dev/null || echo 0); \
+		if [ "$${NEW_SECRETS:-0}" -gt 0 ]; then \
+			echo "New secrets found! Run 'detect-secrets audit .secrets.baseline' to review."; \
+			run_detect_secrets scan --baseline .secrets.baseline --exclude-files 'node_modules|dist' | jq '.results'; \
+			rm -f "$$TMP_BASELINE"; \
+			exit 1; \
+		fi; \
+		echo "No new secrets found. Updating baseline timestamp."; \
+		mv "$$TMP_BASELINE" .secrets.baseline; \
 	else \
-		echo "detect-secrets not found. Install via 'uv tool install detect-secrets' or 'pipx install detect-secrets'."; \
-		exit 1; \
+		mv "$$TMP_BASELINE" .secrets.baseline; \
+		echo "Secrets baseline created at .secrets.baseline"; \
 	fi
 
 # Deploy to Cloud Run
