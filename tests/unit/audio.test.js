@@ -77,6 +77,7 @@ import {
   isNarrationBuffering,
   preloadNarrationAhead,
   clearNarrationCache,
+  trimNarrationCache,
   wrapOnNarrationEndWithBoost,
   getAnalyserNode,
   disconnectAnalyserSource,
@@ -322,6 +323,21 @@ describe('audio.js — unified cue API (ADR-005)', () => {
     it('handles empty state gracefully', () => {
       expect(() => cancelAudioCues()).not.toThrow();
     });
+
+    it('preserves playing ambient when preserveAmbient is true', () => {
+      const ambientCue = makeCue({ id: 'ambient-1', type: 'ambient', src: 'ambient.mp3' });
+      const narrationCue = makeCue({ id: 'narration', type: 'narration', src: 'narration.m4a' });
+      scheduleAudioCues([ambientCue, narrationCue]);
+
+      const ambientHowl = Howl.mock.results[0].value;
+      const narrationHowl = Howl.mock.results[1].value;
+      vi.clearAllMocks();
+
+      cancelAudioCues({ preserveAmbient: true });
+
+      expect(ambientHowl.unload).not.toHaveBeenCalled();
+      expect(narrationHowl.unload).toHaveBeenCalled();
+    });
   });
 
   describe('pauseAudioCues / resumeAudioCues', () => {
@@ -465,6 +481,31 @@ describe('audio.js — unified cue API (ADR-005)', () => {
 
       expect(newHowl.fade).toHaveBeenCalledWith(0.15, 0, 800);
       expect(oldHowl.fade).not.toHaveBeenCalled();
+    });
+
+    it('pauses and resumes fading-out ambient during global pause', () => {
+      const oldCue = makeCue({ type: 'ambient', id: 'ambient-1', src: 'old.mp3' });
+      scheduleAudioCues([oldCue]);
+      const oldHowl = Howl.mock.results[0].value;
+      vi.clearAllMocks();
+
+      const newCue = makeCue({ type: 'ambient', id: 'ambient-2', src: 'new.mp3' });
+      scheduleAudioCues([newCue]);
+      const newHowl = Howl.mock.results[0].value;
+      const playHandler = newHowl.once.mock.calls.find(([e]) => e === 'play')[1];
+      playHandler();
+
+      vi.clearAllMocks();
+      pauseAudioCues();
+      expect(oldHowl.pause).toHaveBeenCalled();
+      expect(newHowl.pause).toHaveBeenCalled();
+
+      resumeAudioCues();
+      expect(oldHowl.play).toHaveBeenCalled();
+      expect(newHowl.play).toHaveBeenCalled();
+
+      vi.advanceTimersByTime(900);
+      expect(oldHowl.unload).toHaveBeenCalled();
     });
   });
 
@@ -823,6 +864,18 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       clearNarrationCache();
       expect(howl1.unload).toHaveBeenCalled();
       expect(howl2.unload).toHaveBeenCalled();
+    });
+
+    it('trimNarrationCache keeps only requested src entries', () => {
+      preloadNarrationAhead('keep.m4a');
+      preloadNarrationAhead('drop.m4a');
+      const keepHowl = Howl.mock.results[0].value;
+      const dropHowl = Howl.mock.results[1].value;
+
+      trimNarrationCache(['keep.m4a']);
+
+      expect(keepHowl.unload).not.toHaveBeenCalled();
+      expect(dropHowl.unload).toHaveBeenCalled();
     });
 
     it('scheduleAudioCues uses cached narration Howl', () => {

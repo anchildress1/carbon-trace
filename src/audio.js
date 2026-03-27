@@ -183,10 +183,19 @@ export function preloadNarrationAhead(src) {
 }
 
 export function clearNarrationCache() {
-  for (const howl of narrationCache.values()) {
+  for (const [src, howl] of narrationCache.entries()) {
     howl.unload();
+    narrationCache.delete(src);
   }
-  narrationCache.clear();
+}
+
+export function trimNarrationCache(keepSrcs = []) {
+  const keep = new Set(keepSrcs.filter(Boolean));
+  for (const [src, howl] of narrationCache.entries()) {
+    if (keep.has(src)) continue;
+    howl.unload();
+    narrationCache.delete(src);
+  }
 }
 
 // --- Anchor resolution ---
@@ -222,7 +231,7 @@ function tryResolveAnchor(cue, resolvedEnters, durations) {
   return true;
 }
 
-function resolveAnchors(cues, opts) {
+export function resolveCueEnters(cues, opts) {
   const durations = buildCueDurations(cues, opts);
   const resolvedEnters = new Map();
 
@@ -310,15 +319,15 @@ function crossfadeAmbientCue(cue, crossfadeDurationMs) {
   });
 
   let unloaded = false;
-  let fadeOutTimerId = null;
+  let fadeOutTimer = null;
 
   // Unload old ONLY after new confirms playback
   newHowl.once('play', () => {
     if (oldHowl && !unloaded) {
       oldEntry.state = 'fading-out';
       oldHowl.fade(oldHowl.volume(), 0, crossfadeDurationMs);
-      fadeOutTimerId = setTimeout(() => {
-        fadeOutTimerId = null;
+      fadeOutTimer = new PausableTimer(() => {
+        fadeOutTimer = null;
         oldHowl.unload();
         unloaded = true;
         removeEntryIfCurrent(oldEntry);
@@ -346,14 +355,26 @@ function crossfadeAmbientCue(cue, crossfadeDurationMs) {
 
   // Store cleanup hook so cancelAudioCues can drain the deferred unload
   newHowl._crossfadeCleanup = () => {
-    if (fadeOutTimerId) {
-      clearTimeout(fadeOutTimerId);
-      fadeOutTimerId = null;
+    if (fadeOutTimer) {
+      fadeOutTimer.cancel();
+      fadeOutTimer = null;
     }
     if (oldHowl && !unloaded) {
       oldHowl.unload();
       unloaded = true;
       removeEntryIfCurrent(oldEntry);
+    }
+  };
+  newHowl._crossfadePause = () => {
+    fadeOutTimer?.pause();
+    if (oldHowl && !unloaded && activeCues.get(oldEntry?.id) !== oldEntry) {
+      oldHowl.pause();
+    }
+  };
+  newHowl._crossfadeResume = () => {
+    fadeOutTimer?.resume();
+    if (oldHowl && !unloaded && activeCues.get(oldEntry?.id) !== oldEntry) {
+      oldHowl.play();
     }
   };
 
@@ -472,7 +493,7 @@ export function scheduleAudioCues(cues, opts = {}) {
   if (!cues || cues.length === 0) return;
 
   const crossfadeDurationMs = opts.crossfadeDurationMs ?? 800;
-  const resolved = resolveAnchors(cues, opts);
+  const resolved = resolveCueEnters(cues, opts);
 
   for (const cue of resolved) {
     // Defensive: clean up any pre-existing entry with the same ID.
@@ -514,15 +535,25 @@ export function scheduleAudioCues(cues, opts = {}) {
   }
 }
 
-export function cancelAudioCues() {
+export function cancelAudioCues(opts = {}) {
+  const preserveAmbient = opts.preserveAmbient === true;
   isAudioPaused = false;
   disconnectAnalyserSource();
-  for (const [, entry] of activeCues) {
+  for (const [id, entry] of activeCues.entries()) {
     entry.timer?.cancel();
+    const keepAmbient =
+      preserveAmbient &&
+      entry.type === 'ambient' &&
+      entry.howl &&
+      (entry.state === 'playing' || entry.state === 'fading-out');
+    if (keepAmbient) {
+      entry.timer = null;
+      continue;
+    }
     entry.howl?._crossfadeCleanup?.();
     entry.howl?.unload();
+    activeCues.delete(id);
   }
-  activeCues.clear();
   cleanupBufferMonitoring();
 }
 
@@ -530,7 +561,10 @@ export function pauseAudioCues() {
   isAudioPaused = true;
   for (const [, entry] of activeCues) {
     entry.timer?.pause();
-    if (entry.howl && entry.state === 'playing') entry.howl.pause();
+    entry.howl?._crossfadePause?.();
+    if (entry.howl && (entry.state === 'playing' || entry.state === 'fading-out')) {
+      entry.howl.pause();
+    }
   }
 }
 
@@ -538,7 +572,10 @@ export function resumeAudioCues() {
   isAudioPaused = false;
   for (const [, entry] of activeCues) {
     entry.timer?.resume();
-    if (entry.howl && entry.state === 'playing') entry.howl.play();
+    entry.howl?._crossfadeResume?.();
+    if (entry.howl && (entry.state === 'playing' || entry.state === 'fading-out')) {
+      entry.howl.play();
+    }
   }
 }
 

@@ -8,10 +8,11 @@ import {
   setMuted,
   onNarrationBufferChange,
   preloadNarrationAhead,
-  clearNarrationCache,
+  trimNarrationCache,
   wrapOnNarrationEndWithBoost,
   getAnalyserNode,
   disconnectAnalyserSource,
+  resolveCueEnters,
 } from './audio.js';
 import { PausableTimer } from './pausable-timer.js';
 import { buildNarrationTimeline, clearNarrationLayer } from './text.js';
@@ -181,8 +182,7 @@ function setupAutoAdvance(app) {
     // Full scene timer: narration enter delay + max duration + hold.
     // onNarrationEnd shortens this when narration ends normally (ADR-009).
     const maxMs = getMaxNarrationDuration(frame, app.audioDurations, app.projectMaxCaptionMs);
-    const narrationCue = getNarrationCueFromFrame(frame);
-    const enterDelay = typeof narrationCue?.enter === 'number' ? narrationCue.enter : 0;
+    const enterDelay = getNarrationEnterDelay(frame, app.audioDurations, maxMs);
     scheduleAutoAdvance(app, enterDelay + maxMs + holdAfterNarration);
   } else {
     scheduleAutoAdvance(app, holdAfterNarration);
@@ -212,6 +212,16 @@ function getMaxNarrationDuration(frame, audioDurations, projectMaxCaptionMs) {
 
   // Tier 4: absolute floor
   return DEFAULT_MAX_NARRATION_MS;
+}
+
+function getNarrationEnterDelay(frame, audioDurations, maxNarrationDurationMs) {
+  const narrationCue = getNarrationCueFromFrame(frame);
+  if (!narrationCue) return 0;
+  const resolvedEnters = resolveCueEnters(frame.audioCues || [], {
+    audioDurations,
+    maxNarrationDurationMs,
+  });
+  return resolvedEnters.find((cue) => cue.id === narrationCue.id)?.resolvedEnter ?? 0;
 }
 
 function makeNarrationEndCallback(app, frame, holdAfterNarration) {
@@ -306,8 +316,11 @@ function buildNarration(app, frame) {
   const hasLines = Array.isArray(frame.narration.lines) && frame.narration.lines.length > 0;
   const hasCaptions =
     Array.isArray(frame.narration.captions) && frame.narration.captions.length > 0;
-  const narrationCue = getNarrationCueFromFrame(frame);
-  const captionDelay = typeof narrationCue?.enter === 'number' ? narrationCue.enter : 0;
+  const captionDelay = getNarrationEnterDelay(
+    frame,
+    app.audioDurations,
+    getMaxNarrationDuration(frame, app.audioDurations, app.projectMaxCaptionMs),
+  );
 
   if (hasLines) {
     const result = buildNarrationTimeline(frame.narration.lines, app.els.narrationLayer, {
@@ -332,6 +345,7 @@ function buildNarration(app, frame) {
     app.els.accessibleNarration.textContent = '';
   }
 
+  const narrationCue = getNarrationCueFromFrame(frame);
   app.els.btnReplay.disabled = !(hasLines || narrationCue);
 }
 
@@ -366,8 +380,16 @@ function renderSceneImage(app, frame) {
 }
 
 function prebufferNextScene(app, index) {
-  clearNarrationCache();
+  const currentFrame = app.frames[index];
   const nextFrame = app.frames[index + 1];
+  const currentNarrationCue = getNarrationCueFromFrame(currentFrame || {});
+  const nextNarrationCue = getNarrationCueFromFrame(nextFrame || {});
+
+  // Keep only the current and next narration buffers warm across navigation.
+  // This avoids evicting a paused scene's ready-to-play narration while still
+  // bounding cache growth during long sessions.
+  trimNarrationCache([currentNarrationCue?.src, nextNarrationCue?.src]);
+
   if (nextFrame?.image && !app.imageCache.has(nextFrame.image)) {
     loadImage(nextFrame.image).then((img) => {
       if (img) app.imageCache.set(nextFrame.image, img);
@@ -377,7 +399,6 @@ function prebufferNextScene(app, index) {
   // HTML5 Audio pool is empty until the browser unlocks audio on first
   // gesture, so early Howl creation triggers "pool exhausted" warnings.
   if (app.userHasInteracted) {
-    const nextNarrationCue = getNarrationCueFromFrame(nextFrame || {});
     if (nextNarrationCue?.src) {
       preloadNarrationAhead(nextNarrationCue.src);
     }
@@ -531,12 +552,13 @@ function completePendingNav(app) {
   }
 }
 
-function cleanupCurrentScene(app) {
+function cleanupCurrentScene(app, opts = {}) {
+  const preserveAmbient = opts.preserveAmbient === true;
   app.generation++;
   clearAutoAdvance(app);
   cancelPendingLoad();
   disconnectAnalyserSource();
-  cancelAudioCues();
+  cancelAudioCues({ preserveAmbient });
 
   if (app.analysisStartTimer) {
     app.analysisStartTimer.cancel();
@@ -580,6 +602,8 @@ function transition(app, toIndex) {
 
   app.pendingNavIndex = null;
   const wasPaused = app.paused;
+  const toFrame = app.frames[toIndex];
+  const targetHasAmbientCue = toFrame.audioCues?.some((cue) => cue.type === 'ambient');
 
   if (app.paused) {
     clearPauseState(app);
@@ -590,9 +614,9 @@ function transition(app, toIndex) {
   app.els.sceneStage.classList.remove('buffering');
   app.els.loadingScreen.hidden = true;
 
-  cleanupCurrentScene(app);
-
-  const toFrame = app.frames[toIndex];
+  cleanupCurrentScene(app, {
+    preserveAmbient: !wasPaused && targetHasAmbientCue,
+  });
 
   // Hard jump: instant cut when navigating while paused.
   // No fade animation — swap frame and re-pause immediately.

@@ -36,6 +36,13 @@ vi.mock('../../src/audio.js', () => ({
   isNarrationBuffering: vi.fn().mockReturnValue(false),
   preloadNarrationAhead: vi.fn(),
   clearNarrationCache: vi.fn(),
+  trimNarrationCache: vi.fn(),
+  resolveCueEnters: vi.fn((cues = []) =>
+    cues.map((cue) => ({
+      ...cue,
+      resolvedEnter: typeof cue.enter === 'number' ? cue.enter : 0,
+    })),
+  ),
   wrapOnNarrationEndWithBoost: vi.fn((_cues, cb) => cb),
   getAnalyserNode: vi.fn(() => null),
   disconnectAnalyserSource: vi.fn(),
@@ -221,6 +228,7 @@ import {
   cueAudioCues,
   onNarrationBufferChange,
   getAnalyserNode,
+  resolveCueEnters,
 } from '../../src/audio.js';
 import { buildNarrationTimeline } from '../../src/text.js';
 import {
@@ -750,6 +758,32 @@ describe('app.js', () => {
       await flush();
       // Ambient crossfade is now handled by scheduleAudioCues with crossfadeDurationMs opt
       expect(scheduleAudioCues).toHaveBeenCalled();
+    });
+
+    it('preserves outgoing ambient during playing transitions into ambient scenes', async () => {
+      app = createApp();
+      await flush();
+      app.togglePause(); // start playback from title
+      vi.clearAllMocks();
+
+      app.advance(); // title -> scene-01 (has ambient)
+      await flush();
+
+      expect(cancelAudioCues).toHaveBeenCalledWith(expect.objectContaining({ preserveAmbient: true }));
+    });
+
+    it('fully cancels audio when target scene has no ambient cue', async () => {
+      app = createApp();
+      await flush();
+      app.togglePause();
+      app.advance(); // title -> scene-01
+      await flush();
+      vi.clearAllMocks();
+
+      app.advance(); // scene-01 -> credits (audioCues: null)
+      await flush();
+
+      expect(cancelAudioCues).toHaveBeenCalledWith(expect.objectContaining({ preserveAmbient: false }));
     });
   });
 
@@ -1739,6 +1773,29 @@ describe('app.js', () => {
         expect.any(HTMLElement),
         expect.objectContaining({ captionDelay: 500 }),
       );
+    });
+
+    it('uses resolved anchor enter time for captionDelay when narration is anchored', async () => {
+      app = createApp();
+      await flush();
+      const defaultResolve = resolveCueEnters.getMockImplementation();
+      resolveCueEnters.mockImplementation((cues = []) =>
+        cues.map((cue) => ({
+          ...cue,
+          resolvedEnter: cue.id === 'narration' ? 2200 : 0,
+        })),
+      );
+      app.togglePause();
+      vi.clearAllMocks();
+      app.advance(); // title -> scene-01
+      await flush();
+
+      expect(buildNarrationTimeline).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.any(HTMLElement),
+        expect.objectContaining({ captionDelay: 2200 }),
+      );
+      resolveCueEnters.mockImplementation(defaultResolve);
     });
 
     it('passes captions array to buildNarrationTimeline when frame has captions', async () => {
