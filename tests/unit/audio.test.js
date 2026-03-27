@@ -469,7 +469,11 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       const newHowl = Howl.mock.results[1].value;
       const newPlayHandler = newHowl.once.mock.calls.find(([e]) => e === 'play');
       newPlayHandler[1]();
-      vi.advanceTimersByTime(900);
+
+      // Simulate old ambient fade completing so it is removed from activeCues
+      const oldFadeHandler = oldHowl.once.mock.calls.find(([e]) => e === 'fade');
+      expect(oldFadeHandler).toBeDefined();
+      oldFadeHandler[1]();
 
       vi.clearAllMocks();
 
