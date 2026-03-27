@@ -1671,7 +1671,7 @@ describe('effects-canvas — dedicated analysis element (ADR-008 Approach B)', (
     expect(createdEl.play).not.toHaveBeenCalled();
   });
 
-  it('startAnalysisPlayback catches play rejection', () => {
+  it('startAnalysisPlayback catches play rejection', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { analyser, ctx } = createMockAnalyserWithContext();
 
@@ -1682,12 +1682,16 @@ describe('effects-canvas — dedicated analysis element (ADR-008 Approach B)', (
 
     startAnalysisPlayback();
     expect(createdEl.play).toHaveBeenCalled();
+    await Promise.resolve(); // flush microtask so .catch() handler runs
+    expect(warnSpy).toHaveBeenCalledWith('Analysis audio play failed:', 'autoplay blocked');
     warnSpy.mockRestore();
   });
 });
 
 describe('effects-canvas.js — mask validation errors', () => {
   let originalGetContext;
+  let originalImage;
+  let originalCreateImageBitmap;
 
   beforeEach(() => {
     destroy();
@@ -1705,11 +1709,15 @@ describe('effects-canvas.js — mask validation errors', () => {
     });
 
     originalGetContext = HTMLCanvasElement.prototype.getContext;
+    originalImage = globalThis.Image;
+    originalCreateImageBitmap = globalThis.createImageBitmap;
   });
 
   afterEach(() => {
     destroy();
     HTMLCanvasElement.prototype.getContext = originalGetContext;
+    globalThis.Image = originalImage;
+    globalThis.createImageBitmap = originalCreateImageBitmap;
     vi.restoreAllMocks();
   });
 

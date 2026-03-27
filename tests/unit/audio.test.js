@@ -1061,6 +1061,16 @@ describe('audio.js — buffer recovery paths', () => {
   });
 
   it('nudges stall after 2 checks without progress', () => {
+    let currentTimeValue = 4;
+    const currentTimeSetter = vi.fn((v) => { currentTimeValue = v; });
+    const originalDescriptor = Object.getOwnPropertyDescriptor(mockNode, 'currentTime');
+    Object.defineProperty(mockNode, 'currentTime', {
+      get: () => currentTimeValue,
+      set: currentTimeSetter,
+      configurable: true,
+      enumerable: true,
+    });
+
     onNarrationBufferChange(vi.fn());
     scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn() });
 
@@ -1070,14 +1080,16 @@ describe('audio.js — buffer recovery paths', () => {
 
     mockNode.buffered.length = 1;
     mockNode.buffered.end.mockReturnValue(5);
-    mockNode.currentTime = 4;
     waitingCall[1]();
 
     // Stall check 1: no progress
     vi.advanceTimersByTime(4000);
     // Stall check 2: still no progress → nudge (currentTime = currentTime)
     vi.advanceTimersByTime(4000);
-    // No error should have occurred
+
+    expect(currentTimeSetter).toHaveBeenCalledWith(4);
+
+    Object.defineProperty(mockNode, 'currentTime', originalDescriptor);
   });
 
   it('reloads from position after 4 stalled checks', () => {
@@ -1099,10 +1111,11 @@ describe('audio.js — buffer recovery paths', () => {
       vi.advanceTimersByTime(4000);
     }
 
-    // No crash — reloadFromPosition was called internally
+    // reloadFromPosition calls node.play() to restart after reset
+    expect(mockNode.play).toHaveBeenCalled();
   });
 
-  it('buffer recovery play failure cleans up monitoring', () => {
+  it('buffer recovery play failure cleans up monitoring', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     onNarrationBufferChange(vi.fn());
     scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn() });
@@ -1121,7 +1134,10 @@ describe('audio.js — buffer recovery paths', () => {
     mockNode.duration = 60;
 
     vi.advanceTimersByTime(4000);
+    await Promise.resolve(); // flush microtask so .catch() handler runs
 
+    expect(warnSpy).toHaveBeenCalledWith('Buffer recovery play() failed:', 'play blocked');
+    expect(mockNode.removeEventListener).toHaveBeenCalled();
     warnSpy.mockRestore();
   });
 });

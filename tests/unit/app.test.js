@@ -2524,11 +2524,10 @@ describe('app.js', () => {
       app.advance();
       await flush();
 
-      // prebufferNextScene should have returned early — no clearNarrationCache call
       const { clearNarrationCache: clearCacheMock } = await import('../../src/audio.js');
-      // The clearNarrationCache in cleanupCurrentScene IS called,
-      // but prebufferNextScene's own clearNarrationCache should NOT be
-      // (it short-circuits before reaching that line)
+      // prebufferNextScene always calls clearNarrationCache as its first action;
+      // deferFrameAudioUntilResume only gates scheduleFrameAudio, not prebuffering
+      expect(clearCacheMock).toHaveBeenCalledTimes(1);
       expect(app.getState()).toBe('PAUSED');
     });
   });
@@ -2567,7 +2566,7 @@ describe('app.js', () => {
 
   describe('reduced motion transition with uncached image', () => {
     it('waits for image before showing frame under reduced motion', async () => {
-      globalThis.matchMedia.mockReturnValue({ matches: true });
+      globalThis.matchMedia.mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() });
       loadImage.mockResolvedValue(null);
 
       app = createApp();
