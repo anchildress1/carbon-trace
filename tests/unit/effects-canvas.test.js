@@ -1670,4 +1670,469 @@ describe('effects-canvas — dedicated analysis element (ADR-008 Approach B)', (
     resume();
     expect(createdEl.play).not.toHaveBeenCalled();
   });
+
+  it('startAnalysisPlayback catches play rejection', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { analyser, ctx } = createMockAnalyserWithContext();
+
+    connectAnalysisAudio('test-song.mp3', analyser);
+
+    const createdEl = ctx.createMediaElementSource.mock.calls[0][0];
+    createdEl.play = vi.fn().mockRejectedValue(new Error('autoplay blocked'));
+
+    startAnalysisPlayback();
+    expect(createdEl.play).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+});
+
+describe('effects-canvas.js — mask validation errors', () => {
+  let originalGetContext;
+
+  beforeEach(() => {
+    destroy();
+    vi.clearAllMocks();
+
+    globalThis.ResizeObserver = vi.fn(function () {
+      this.observe = vi.fn();
+      this.disconnect = vi.fn();
+    });
+
+    globalThis.matchMedia = vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    });
+
+    originalGetContext = HTMLCanvasElement.prototype.getContext;
+  });
+
+  afterEach(() => {
+    destroy();
+    HTMLCanvasElement.prototype.getContext = originalGetContext;
+    vi.restoreAllMocks();
+  });
+
+  it('skips region when mask image has zero dimensions', async () => {
+    // First Image (scene texture) loads fine, second (mask) has zero dims
+    let imgCount = 0;
+    globalThis.Image = vi.fn(function () {
+      imgCount++;
+      if (imgCount <= 1) {
+        // Scene texture load — normal
+        this.width = 256;
+        this.height = 256;
+        this.naturalWidth = 256;
+        this.naturalHeight = 256;
+      } else {
+        // Mask load — zero dimensions
+        this.width = 0;
+        this.height = 0;
+        this.naturalWidth = 0;
+        this.naturalHeight = 0;
+      }
+      Object.defineProperty(this, 'src', {
+        set: () => { this.onload?.(); },
+      });
+    });
+    globalThis.createImageBitmap = vi.fn().mockResolvedValue({ width: 256, height: 256 });
+
+    HTMLCanvasElement.prototype.getContext = function (type) {
+      if (type === '2d') {
+        return {
+          drawImage: vi.fn(),
+          getImageData: vi.fn(() => ({
+            data: new Uint8ClampedArray(4),
+          })),
+          putImageData: vi.fn(),
+        };
+      }
+      return originalGetContext?.call(this, type);
+    };
+
+    const canvas = createMockCanvas();
+    await init(canvas);
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const result = await loadScene(
+      { regions: [{ type: 'glow', mask: 'zero-dim.png' }] },
+      'scene.png',
+    );
+
+    // Per-region error caught by loadRegionEffects → console.warn
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Skipping effect region'),
+      expect.stringContaining('zero dimensions'),
+    );
+    // loadScene still returns true (region skipped, not fatal)
+    expect(result).toBe(true);
+    warnSpy.mockRestore();
+  });
+
+  it('skips region when 2D context creation fails for mask processing', async () => {
+    // First Image (scene texture) succeeds, second (mask) needs 2D context
+    let imgCount = 0;
+    globalThis.Image = vi.fn(function () {
+      imgCount++;
+      this.width = 256;
+      this.height = 256;
+      this.naturalWidth = 256;
+      this.naturalHeight = 256;
+      Object.defineProperty(this, 'src', {
+        set: () => { this.onload?.(); },
+      });
+    });
+    globalThis.createImageBitmap = vi.fn().mockResolvedValue({ width: 256, height: 256 });
+
+    // Make getContext('2d') return null for mask canvas creation
+    HTMLCanvasElement.prototype.getContext = function () {
+      return null;
+    };
+
+    const canvas = createMockCanvas();
+    await init(canvas);
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const result = await loadScene(
+      { regions: [{ type: 'glow', mask: 'mask.png' }] },
+      'scene.png',
+    );
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Skipping effect region'),
+      expect.stringContaining('2D context'),
+    );
+    expect(result).toBe(true);
+    warnSpy.mockRestore();
+  });
+});
+
+describe('effects-canvas.js — effect creation failure', () => {
+  let originalGetContext;
+
+  beforeEach(() => {
+    destroy();
+    vi.clearAllMocks();
+
+    globalThis.ResizeObserver = vi.fn(function () {
+      this.observe = vi.fn();
+      this.disconnect = vi.fn();
+    });
+
+    globalThis.matchMedia = vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    });
+    setupImageMock();
+
+    originalGetContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type) {
+      if (type === '2d') {
+        return {
+          drawImage: vi.fn(),
+          getImageData: vi.fn(() => ({
+            data: new Uint8ClampedArray(this.width * this.height * 4),
+          })),
+          putImageData: vi.fn(),
+        };
+      }
+      return originalGetContext?.call(this, type);
+    };
+  });
+
+  afterEach(() => {
+    destroy();
+    HTMLCanvasElement.prototype.getContext = originalGetContext;
+    vi.restoreAllMocks();
+  });
+
+  it('handles createEffect returning null (factory declined)', async () => {
+    const { createEffect } = await import('../../src/effects.js');
+    createEffect.mockReturnValueOnce(null);
+
+    const canvas = createMockCanvas();
+    await init(canvas);
+
+    // water type requires noise sprite — createEffect returns null → noise sprite cleaned up
+    const result = await loadScene(
+      { regions: [{ type: 'water', mask: 'mask.png' }] },
+      'scene.png',
+    );
+
+    // Should succeed (region is skipped, but loadScene still returns true)
+    expect(result).toBe(true);
+  });
+
+  it('handles centered effect with centerX/centerY', async () => {
+    const canvas = createMockCanvas();
+    await init(canvas);
+
+    // Load scene with centered shockwave effect
+    const result = await loadScene(
+      {
+        regions: [{
+          type: 'shockwave',
+          mask: 'mask.png',
+          centerX: 0.5,
+          centerY: 0.3,
+        }],
+      },
+      'scene.png',
+    );
+
+    expect(result).toBe(true);
+  });
+
+  it('resize updates centered effect positions', async () => {
+    const canvas = createMockCanvas();
+    await init(canvas);
+
+    await loadScene(
+      {
+        regions: [{
+          type: 'shockwave',
+          mask: 'mask.png',
+          centerX: 0.5,
+          centerY: 0.3,
+        }],
+      },
+      'scene.png',
+    );
+
+    // Trigger resize observer
+    const ResizeObserverCb = globalThis.ResizeObserver.mock.calls[0][0];
+    const { Application } = await import('pixi.js');
+    const instance = Application.mock.instances[0];
+    instance.screen.width = 1280;
+    instance.screen.height = 720;
+    ResizeObserverCb();
+
+    // No errors during resize with centered effects
+    expect(instance.renderer.resize).toHaveBeenCalled();
+  });
+});
+
+describe('effects-canvas.js — tickerUpdate error handling', () => {
+  let originalGetContext;
+
+  beforeEach(() => {
+    destroy();
+    vi.clearAllMocks();
+
+    globalThis.ResizeObserver = vi.fn(function () {
+      this.observe = vi.fn();
+      this.disconnect = vi.fn();
+    });
+
+    globalThis.matchMedia = vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    });
+    setupImageMock();
+
+    originalGetContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type) {
+      if (type === '2d') {
+        return {
+          drawImage: vi.fn(),
+          getImageData: vi.fn(() => ({
+            data: new Uint8ClampedArray(this.width * this.height * 4),
+          })),
+          putImageData: vi.fn(),
+        };
+      }
+      return originalGetContext?.call(this, type);
+    };
+  });
+
+  afterEach(() => {
+    destroy();
+    HTMLCanvasElement.prototype.getContext = originalGetContext;
+    vi.restoreAllMocks();
+  });
+
+  it('catches effect.update error without crashing ticker', async () => {
+    const { createEffect } = await import('../../src/effects.js');
+    createEffect.mockReturnValueOnce({
+      filter: { enabled: true },
+      update: vi.fn(() => { throw new Error('Shader explosion'); }),
+    });
+
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const canvas = createMockCanvas();
+    await init(canvas);
+
+    await loadScene(
+      { regions: [{ type: 'glow', mask: 'mask.png' }] },
+      'scene.png',
+    );
+
+    const { Application } = await import('pixi.js');
+    const instance = Application.mock.instances[0];
+    const tickerCb = instance.ticker.add.mock.calls[0][0];
+
+    // Invoke ticker — should catch error, not crash
+    expect(() => tickerCb({ deltaMS: 16.67 })).not.toThrow();
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      'Effect update failed:',
+      expect.any(Error),
+    );
+    errorSpy.mockRestore();
+  });
+
+  it('catches audio-reactive modulation error', async () => {
+    const { analyser, tickerCallback } = await setupTriggerScene({
+      band: 'bass',
+      trigger: { threshold: 1.5, cooldown: 0.08 },
+    });
+
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    // Make getByteFrequencyData throw
+    analyser.getByteFrequencyData.mockImplementation(() => {
+      throw new Error('FFT failed');
+    });
+
+    expect(() => tickerCallback({ deltaMS: 16.67 })).not.toThrow();
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      'Audio-reactive modulation failed:',
+      expect.any(Error),
+    );
+    errorSpy.mockRestore();
+  });
+});
+
+describe('effects-canvas.js — clearAll with masked children', () => {
+  let originalGetContext;
+
+  beforeEach(() => {
+    destroy();
+    vi.clearAllMocks();
+
+    globalThis.ResizeObserver = vi.fn(function () {
+      this.observe = vi.fn();
+      this.disconnect = vi.fn();
+    });
+
+    globalThis.matchMedia = vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    });
+    setupImageMock();
+
+    originalGetContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type) {
+      if (type === '2d') {
+        return {
+          drawImage: vi.fn(),
+          getImageData: vi.fn(() => ({
+            data: new Uint8ClampedArray(this.width * this.height * 4),
+          })),
+          putImageData: vi.fn(),
+        };
+      }
+      return originalGetContext?.call(this, type);
+    };
+  });
+
+  afterEach(() => {
+    destroy();
+    HTMLCanvasElement.prototype.getContext = originalGetContext;
+    vi.restoreAllMocks();
+  });
+
+  it('clears mask on children during clearAll', async () => {
+    const canvas = createMockCanvas();
+    await init(canvas);
+
+    // Load a water region which creates masked containers
+    await loadScene(
+      { regions: [{ type: 'water', mask: 'mask.png' }] },
+      'scene.png',
+    );
+
+    // clearAll should null out child.mask for each child
+    clearAll();
+    // No error means the mask cleanup path was exercised
+  });
+});
+
+describe('effects-canvas.js — reinit failure', () => {
+  let originalGetContext;
+
+  beforeEach(() => {
+    destroy();
+    vi.clearAllMocks();
+
+    globalThis.ResizeObserver = vi.fn(function () {
+      this.observe = vi.fn();
+      this.disconnect = vi.fn();
+    });
+
+    globalThis.matchMedia = vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    });
+    setupImageMock();
+
+    originalGetContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type) {
+      if (type === '2d') {
+        return {
+          drawImage: vi.fn(),
+          getImageData: vi.fn(() => ({
+            data: new Uint8ClampedArray(this.width * this.height * 4),
+          })),
+          putImageData: vi.fn(),
+        };
+      }
+      return originalGetContext?.call(this, type);
+    };
+  });
+
+  afterEach(() => {
+    destroy();
+    HTMLCanvasElement.prototype.getContext = originalGetContext;
+    vi.restoreAllMocks();
+  });
+
+  it('returns false and disables webgl when reinit fails', async () => {
+    const canvas = createMockCanvas();
+    await init(canvas);
+
+    // Simulate context loss
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const event = new Event('webglcontextlost');
+    event.preventDefault = vi.fn();
+    canvas.dispatchEvent(event);
+    errorSpy.mockRestore();
+
+    // Make the next Application.init fail to simulate reinit failure
+    const { Application } = await import('pixi.js');
+    Application.mockImplementationOnce(function () {
+      this.init = vi.fn().mockRejectedValue(new Error('GPU gone'));
+      this.ticker = { add: vi.fn(), stop: vi.fn(), start: vi.fn() };
+      this.destroy = vi.fn();
+    });
+
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const result = await loadScene(
+      { regions: [{ type: 'glow', mask: 'mask.png' }] },
+      'scene.png',
+    );
+
+    // reinit failed → webglAvailable becomes false → returns false
+    expect(result).toBe(false);
+    errSpy.mockRestore();
+  });
 });
