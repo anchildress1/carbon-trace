@@ -594,8 +594,8 @@ function manageFocusAfterTransition(app) {
     }
   } else if (app.lastNavSource !== 'keyboard') {
     // Pointer/dot-click nav: focus btn-pause so Space immediately toggles pause
-    // without being swallowed by the allowOnButton guard on a dot button.
-    // Keyboard nav: leave focus where it is so arrow keys continue to navigate.
+    // via native button activation (allowOnButton: false defers Space to the
+    // focused button — btn-pause natively activates togglePause).
     app.els.btnPause.focus();
   }
   app.lastNavSource = null;
