@@ -66,6 +66,18 @@ make install
 make dev
 ```
 
+## Updating Assets
+
+All files in `public/assets/` carry an 8-char SHA-256 content hash in the filename for cache busting ([ADR-010](docs/ADRs/ADR-010-asset-content-hashing.md)). When you update an image, mask, audio file, or font:
+
+```bash
+# Generate the hash
+shasum -a 256 <file> | cut -c1-8
+
+# Rename with the new hash (replace the old hash suffix)
+# Then update references in src/scenes.json, src/styles.css, etc.
+```
+
 ## Available Commands 🪄
 
 | Command            | Description                       |

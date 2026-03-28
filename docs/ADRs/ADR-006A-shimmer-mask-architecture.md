@@ -282,9 +282,13 @@ The pixel-walking approach emerged from the authoring model. Once geometry is de
 2. Create new layer over the scene image
 3. Paint circuit trace lines in dark strokes on light/transparent background
 4. Export as PNG mask (e.g., `mask-09-return-circuit.png`)
-5. Place in `public/assets/masks/`
-6. Reference in scenes.json: `"mask": "assets/masks/mask-09-return-circuit.png"`
-7. Tune `opacity` and optional `color` / `dotCount` values in browser
+5. Generate a content hash: `shasum -a 256 <file> | cut -c1-8`
+6. Rename with the hash suffix (e.g., `mask-09-return-circuit-b386abec.png`)
+7. Place in `public/assets/masks/`
+8. Reference in scenes.json with the hashed filename
+9. Tune `opacity` and optional `color` / `dotCount` values in browser
+
+**When updating an existing mask:** regenerate the hash, rename the file, and update the reference in `scenes.json`. The hash suffix is a cache buster — without it, browsers and CDN edge nodes serve stale copies for up to 30 days. See ADR-010 for details.
 
 No coordinate authoring. No vertex arrays. No phase offsets. The image editor IS the authoring tool — Ashley paints directly where she sees traces in the scene. shimmer.js pixel-reads the result at runtime.
 

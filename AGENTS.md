@@ -122,6 +122,10 @@ Full system design: `docs/design/carbon-trace-system-design.md` and `docs/ADRs/*
 
 - **Targets** (enforced in `.lighthouserc.json`): ≥90% performance, ≥95% accessibility, ≥95% best-practices, ≥90% SEO.
 - Images are WebP, 16:9, 2x resolution. Total asset budget <35MB.
+- All asset filenames in `public/assets/` carry an 8-char SHA-256 content
+  hash suffix for cache busting (ADR-010). When adding or updating any asset,
+  generate the hash (`shasum -a 256 <file> | cut -c1-8`), include it in the
+  filename, and update all references (`scenes.json`, `styles.css`, etc.).
 - Background preloading uses `Promise.all` to parallelize image and audio streams; within each stream, assets load sequentially. Audio metadata preloading uses native `Audio` elements; Howler handles actual playback.
 - Canvas render target: 60fps during effects (rAF loop).
 

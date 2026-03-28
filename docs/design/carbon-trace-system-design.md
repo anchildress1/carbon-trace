@@ -49,6 +49,10 @@ carbon-trace/
 │       ├── audio/narration/    # Per-scene narration (.m4a)
 │       ├── audio/sfx/          # End song
 │       └── fonts/
+│   # All asset filenames carry an 8-char SHA-256 content hash
+│   # suffix for cache busting (ADR-010). When updating any asset:
+│   #   shasum -a 256 <file> | cut -c1-8
+│   # Rename file, update references in scenes.json / styles.css.
 ├── Dockerfile
 ├── nginx.conf
 └── .github/workflows/deploy.yml
