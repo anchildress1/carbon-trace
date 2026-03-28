@@ -81,6 +81,10 @@ const STATE_BY_FRAME_TYPE = {
   credits: State.CREDITS,
 };
 
+function frameState(frame) {
+  return STATE_BY_FRAME_TYPE[frame.frameType] || State.SCENE_ACTIVE;
+}
+
 const DEFAULT_MAX_NARRATION_MS = 60000;
 
 function applyFrameDefaults(scenesJson) {
@@ -291,7 +295,12 @@ function resumeDeferredFrameAudio(app, { cancelExisting = false } = {}) {
   if (cancelExisting) {
     cancelAudioCues();
   }
-  scheduleFrameAudio(app, app.frames[app.currentIndex]);
+  const frame = app.frames[app.currentIndex];
+  scheduleFrameAudio(app, frame);
+  if (frame.effects?.analyserCueId) {
+    const analyser = getAnalyserNode();
+    if (analyser) wireAnalysisAudio(app, frame, analyser);
+  }
   return true;
 }
 
@@ -455,14 +464,12 @@ function showFrame(app, index) {
         if (!loaded) return;
         // Ignore stale completions from old showFrame calls.
         if (showGeneration !== app.generation || showIndex !== app.currentIndex) return;
-        // Wire audio-reactive bridge after effects are loaded (ADR-008).
-        // setAnalyser must run after loadScene so it isn't cleared by clearAll().
+        // setAnalyser must run after loadScene — buildAudioReactiveState() inside
+        // loadScene populates the state that setAnalyser reads. clearAll() would
+        // wipe it if called before this resolves.
         if (frame.effects.regions.some((r) => r.audioReactive)) {
           const analyser = getAnalyserNode();
-          if (analyser) {
-            setEffectsAnalyser(analyser);
-            wireAnalysisAudio(app, frame, analyser);
-          }
+          if (analyser) setEffectsAnalyser(analyser);
         }
       })
       .catch((err) => console.error('Effects load failed:', err.message));
@@ -484,6 +491,10 @@ function showFrame(app, index) {
   if (!app.deferFrameAudioUntilResume) {
     if (app.userHasInteracted) {
       scheduleFrameAudio(app, frame);
+      if (frame.effects?.analyserCueId) {
+        const analyser = getAnalyserNode();
+        if (analyser) wireAnalysisAudio(app, frame, analyser);
+      }
     } else {
       app.els.btnReplay.disabled = true;
     }
@@ -586,12 +597,92 @@ function manageFocusAfterTransition(app) {
       document.activeElement.blur();
     }
   } else if (app.lastNavSource !== 'keyboard') {
-    // Pointer/dot-click nav: move focus to active dot.
-    // Keyboard nav: leave focus where it is so arrow keys
-    // continue to navigate scenes (not roving-tabindex dots).
-    focusActiveDot();
+    // Pointer/dot-click nav: focus btn-pause so Space immediately toggles pause
+    // via native button activation (allowOnButton: false defers Space to the
+    // focused button — btn-pause natively activates togglePause).
+    app.els.btnPause.focus();
   }
   app.lastNavSource = null;
+}
+
+function doHardJump(app, toIndex, toFrame) {
+  const prevIndex = app.currentIndex;
+  const prevFrame = app.frames[prevIndex];
+  app.currentIndex = toIndex;
+  app.deferFrameAudioUntilResume = true;
+  try {
+    showFrame(app, toIndex);
+    app.state = frameState(toFrame);
+  } catch (err) {
+    console.error('Error during scene transition:', err);
+    app.currentIndex = prevIndex;
+    app.state = frameState(prevFrame);
+  }
+  doPause(app);
+  manageFocusAfterTransition(app);
+  completePendingNav(app);
+}
+
+function doClickJump(app, toIndex, toFrame, prevFrame) {
+  const prevIndex = app.currentIndex;
+  app.currentIndex = toIndex;
+  try {
+    showFrame(app, toIndex);
+    app.state = frameState(toFrame);
+  } catch (err) {
+    console.error('Error during scene transition:', err);
+    app.currentIndex = prevIndex;
+    app.state = frameState(prevFrame);
+    return;
+  }
+  if (app.pendingPause) {
+    app.pendingPause = false;
+    doPause(app);
+  } else {
+    app.textTimeline?.play(0);
+    setupAutoAdvance(app);
+  }
+  manageFocusAfterTransition(app);
+  completePendingNav(app);
+}
+
+// Calls fn() immediately if the frame's image is cached, otherwise waits for it.
+function whenImageReady(app, frame, fn) {
+  if (frame.image && !app.imageCache.has(frame.image)) {
+    waitForImage(app, frame.image).then(fn);
+  } else {
+    fn();
+  }
+}
+
+// Advances currentIndex to toIndex, renders the frame, and returns true on success.
+// On showFrame failure, reverts currentIndex and state to preserve consistency.
+function proceedWithFrame(app, toIndex) {
+  const prevIndex = app.currentIndex;
+  app.currentIndex = toIndex;
+  try {
+    showFrame(app, toIndex);
+  } catch (err) {
+    console.error('Error during scene transition:', err);
+    app.currentIndex = prevIndex;
+    app.state = frameState(app.frames[prevIndex]);
+    return false;
+  }
+  return true;
+}
+
+// Completes landing on toFrame after a successful proceedWithFrame.
+function landOnFrame(app, toFrame) {
+  app.state = frameState(toFrame);
+  if (app.pendingPause) {
+    app.pendingPause = false;
+    doPause(app);
+  } else {
+    app.textTimeline?.play(0);
+    setupAutoAdvance(app);
+  }
+  manageFocusAfterTransition(app);
+  completePendingNav(app);
 }
 
 function transition(app, toIndex) {
@@ -621,77 +712,24 @@ function transition(app, toIndex) {
   // Hard jump: instant cut when navigating while paused.
   // No fade animation — swap frame and re-pause immediately.
   if (wasPaused) {
-    const doHardJump = () => {
-      const prevIndex = app.currentIndex;
-      const prevFrame = app.frames[prevIndex];
-      app.currentIndex = toIndex;
-      app.deferFrameAudioUntilResume = true;
-      try {
-        showFrame(app, toIndex);
-        app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
-      } catch (err) {
-        console.error('Error during scene transition:', err);
-        app.currentIndex = prevIndex;
-        app.state = STATE_BY_FRAME_TYPE[prevFrame.frameType] || State.SCENE_ACTIVE;
-      }
-      doPause(app);
-      manageFocusAfterTransition(app);
-      completePendingNav(app);
-    };
-
-    if (toFrame.image && !app.imageCache.has(toFrame.image)) {
-      waitForImage(app, toFrame.image).then(doHardJump);
-    } else {
-      doHardJump();
-    }
+    whenImageReady(app, toFrame, doHardJump.bind(null, app, toIndex, toFrame));
     return;
   }
 
-  // Animated transition: fade out → swap frame → fade in → land playing.
-  // On showFrame failure, revert both the frame index and the state to the
-  // previous frame's values to keep the state machine consistent.
-  const prevFrame = app.frames[app.currentIndex];
-  const proceedWithFrame = () => {
-    const prevIndex = app.currentIndex;
-    app.currentIndex = toIndex;
-    try {
-      showFrame(app, toIndex);
-    } catch (err) {
-      console.error('Error during scene transition:', err);
-      app.currentIndex = prevIndex;
-      app.state = STATE_BY_FRAME_TYPE[prevFrame.frameType] || State.SCENE_ACTIVE;
-      return false;
-    }
-    return true;
-  };
-
-  const landOnFrame = () => {
-    app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
-    if (app.pendingPause) {
-      app.pendingPause = false;
-      doPause(app);
-    } else {
-      if (app.textTimeline) {
-        app.textTimeline.play(0);
-      }
-      setupAutoAdvance(app);
-    }
-    manageFocusAfterTransition(app);
-    completePendingNav(app);
-  };
+  // Hard jump for explicit click navigation: instant cut, no fade animation.
+  // Keyboard nav and auto-advance still use the animated path for cinematic feel.
+  if (app.lastNavSource === 'click') {
+    const prevFrame = app.frames[app.currentIndex];
+    whenImageReady(app, toFrame, doClickJump.bind(null, app, toIndex, toFrame, prevFrame));
+    return;
+  }
 
   if (prefersReducedMotion()) {
-    const readyThen = () => {
-      if (!proceedWithFrame()) return;
-      landOnFrame();
-    };
-
     // Re-check at execution time — image may have been cached by preload-ahead
-    if (toFrame.image && !app.imageCache.has(toFrame.image)) {
-      waitForImage(app, toFrame.image).then(readyThen);
-    } else {
-      readyThen();
-    }
+    whenImageReady(app, toFrame, () => {
+      if (!proceedWithFrame(app, toIndex)) return;
+      landOnFrame(app, toFrame);
+    });
     return;
   }
 
@@ -705,7 +743,7 @@ function transition(app, toIndex) {
     onComplete: () => {
       const fadeIn = async () => {
         try {
-          if (!proceedWithFrame()) {
+          if (!proceedWithFrame(app, toIndex)) {
             gsap.set(app.els.sceneStage, { opacity: 1 });
             completePendingNav(app);
             return;
@@ -720,21 +758,17 @@ function transition(app, toIndex) {
             opacity: 1,
             duration: halfDuration,
             ease: 'power2.inOut',
-            onComplete: landOnFrame,
+            onComplete: landOnFrame.bind(null, app, toFrame),
           });
         } catch (err) {
           console.error('Unhandled error in transition onComplete:', err);
           gsap.set(app.els.sceneStage, { opacity: 1 });
-          landOnFrame();
+          landOnFrame(app, toFrame);
         }
       };
 
       // Re-check — image may have been cached by preload-ahead during fade-out
-      if (toFrame.image && !app.imageCache.has(toFrame.image)) {
-        waitForImage(app, toFrame.image).then(fadeIn);
-      } else {
-        fadeIn();
-      }
+      whenImageReady(app, toFrame, fadeIn);
     },
   });
 }
@@ -863,7 +897,7 @@ function replayNarration(app) {
     app.deferFrameAudioUntilResume = true;
     showFrame(app, app.currentIndex);
     const frame = app.frames[app.currentIndex];
-    app.state = STATE_BY_FRAME_TYPE[frame.frameType] || State.SCENE_ACTIVE;
+    app.state = frameState(frame);
     doPause(app);
   } else {
     showFrame(app, app.currentIndex);
@@ -959,10 +993,12 @@ function initApp(app) {
       });
       app.els.btnPrev.addEventListener('click', (e) => {
         e.stopPropagation();
+        app.lastNavSource = 'click';
         retreat(app);
       });
       app.els.btnNext.addEventListener('click', (e) => {
         e.stopPropagation();
+        app.lastNavSource = 'click';
         advance(app);
       });
       app.els.btnMute.addEventListener('click', (e) => {
@@ -1073,6 +1109,7 @@ export function createApp() {
     const frameIndex = app.sceneMap.byScene.get(sceneIndex);
     if (frameIndex !== undefined && frameIndex !== app.currentIndex) {
       app.userHasInteracted = true;
+      app.lastNavSource = 'click';
       transition(app, frameIndex);
     }
   });

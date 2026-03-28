@@ -388,27 +388,21 @@ describe('audio.js — unified cue API (ADR-005)', () => {
   });
 
   describe('crossfade ambient', () => {
-    it('defers old ambient unload until new confirms play', () => {
+    it('starts old ambient fade-out immediately on new ambient schedule', () => {
       // Setup old ambient
       const oldCue = makeCue({ type: 'ambient', id: 'ambient-1', src: 'old.mp3' });
       scheduleAudioCues([oldCue]);
       const oldHowl = Howl.mock.results[0].value;
       vi.clearAllMocks();
 
-      // Schedule new ambient
+      // Schedule new ambient — fade-out starts immediately, no play-event gate
       const newCue = makeCue({ type: 'ambient', id: 'ambient-1', src: 'new.mp3' });
       scheduleAudioCues([newCue]);
-      const newHowl = Howl.mock.results[0].value;
 
-      // Old ambient NOT unloaded yet
-      expect(oldHowl.unload).not.toHaveBeenCalled();
-
-      // Trigger new ambient's play event
-      const playHandler = newHowl.once.mock.calls.find(([e]) => e === 'play');
-      playHandler[1]();
-
-      // Now old should fade out and get unloaded after duration
+      // Old ambient fade starts at schedule time, not deferred to play event
       expect(oldHowl.fade).toHaveBeenCalledWith(0.15, 0, 800);
+      // Unload deferred until fade duration elapses
+      expect(oldHowl.unload).not.toHaveBeenCalled();
       vi.advanceTimersByTime(900);
       expect(oldHowl.unload).toHaveBeenCalled();
     });
@@ -464,23 +458,20 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       scheduleAudioCues([oldCue]);
       const oldHowl = Howl.mock.results[0].value;
 
+      // Scheduling ambient-2 immediately fades out ambient-1
       const newCue = makeCue({ type: 'ambient', id: 'ambient-2', src: 'new.mp3' });
       scheduleAudioCues([newCue]);
       const newHowl = Howl.mock.results[1].value;
-      const newPlayHandler = newHowl.once.mock.calls.find(([e]) => e === 'play');
-      newPlayHandler[1]();
-      vi.advanceTimersByTime(900);
+      vi.advanceTimersByTime(900); // complete ambient-1 unload
 
       vi.clearAllMocks();
 
+      // Scheduling ambient-3 immediately fades out ambient-2 (now the active ambient)
       const finalCue = makeCue({ type: 'ambient', id: 'ambient-3', src: 'final.mp3' });
       scheduleAudioCues([finalCue]);
-      const finalHowl = Howl.mock.results[0].value;
-      const finalPlayHandler = finalHowl.once.mock.calls.find(([e]) => e === 'play');
-      finalPlayHandler[1]();
 
       expect(newHowl.fade).toHaveBeenCalledWith(0.15, 0, 800);
-      expect(oldHowl.fade).not.toHaveBeenCalled();
+      expect(oldHowl.fade).not.toHaveBeenCalled(); // already unloaded, not the active ambient
     });
 
     it('pauses and resumes fading-out ambient during global pause', () => {
@@ -489,11 +480,10 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       const oldHowl = Howl.mock.results[0].value;
       vi.clearAllMocks();
 
+      // Scheduling new ambient immediately starts fading out old — no play-event needed
       const newCue = makeCue({ type: 'ambient', id: 'ambient-2', src: 'new.mp3' });
       scheduleAudioCues([newCue]);
       const newHowl = Howl.mock.results[0].value;
-      const playHandler = newHowl.once.mock.calls.find(([e]) => e === 'play')[1];
-      playHandler();
 
       vi.clearAllMocks();
       pauseAudioCues();
@@ -1334,8 +1324,8 @@ describe('audio.js — crossfade cleanup and ambient sweep', () => {
     expect(oldHowl.unload).toHaveBeenCalledTimes(1);
   });
 
-  it('does not sweep stranded ambient cues not in incoming cue set', () => {
-    // Schedule two ambient cues
+  it('fades out the currently active ambient when a new ambient is scheduled', () => {
+    // Schedule two sequential ambients — ambient-2 becomes active after fading ambient-1
     const cue1 = makeCue({ type: 'ambient', id: 'ambient-1', src: 'bg1.mp3', enter: 0 });
     const cue2 = makeCue({ type: 'ambient', id: 'ambient-2', src: 'bg2.mp3', enter: 0 });
     scheduleAudioCues([cue1, cue2]);
@@ -1346,13 +1336,12 @@ describe('audio.js — crossfade cleanup and ambient sweep', () => {
     )?.value;
     vi.clearAllMocks();
 
-    // Schedule new set with only ambient-1; scheduleAudioCues does not sweep ambient-2
+    // Scheduling a new ambient immediately fades out ambient-2 (the current active one)
     const newCue1 = makeCue({ type: 'ambient', id: 'ambient-1', src: 'bg1-new.mp3', enter: 0 });
     scheduleAudioCues([newCue1]);
 
-    // ambient-2's Howl should NOT have been faded or unloaded by scheduleAudioCues
-    expect(ambient2Howl.fade).not.toHaveBeenCalled();
-    expect(ambient2Howl.unload).not.toHaveBeenCalled();
+    expect(ambient2Howl.fade).toHaveBeenCalledWith(0.15, 0, 800);
+    expect(ambient2Howl.unload).not.toHaveBeenCalled(); // unload deferred until fade completes
   });
 
   it('cancelAudioCues cancels narration and ambient entries', () => {
