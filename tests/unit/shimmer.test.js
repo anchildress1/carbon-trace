@@ -364,14 +364,14 @@ describe('shimmer.js', () => {
       shimmer.init(mockCanvas);
       await expect(
         shimmer.loadScene({ mask: 'test.png', opacity: 0.5, dotCount: 2.5 }),
-      ).rejects.toThrow('dotCount must be a positive integer');
+      ).rejects.toThrow('dotCount must be a non-negative integer');
     });
 
-    it('rejects zero dotCount', async () => {
+    it('rejects negative dotCount', async () => {
       shimmer.init(mockCanvas);
       await expect(
-        shimmer.loadScene({ mask: 'test.png', opacity: 0.5, dotCount: 0 }),
-      ).rejects.toThrow('dotCount must be a positive integer');
+        shimmer.loadScene({ mask: 'test.png', opacity: 0.5, dotCount: -1 }),
+      ).rejects.toThrow('dotCount must be a non-negative integer');
     });
   });
 

@@ -24,6 +24,7 @@ let motionQuery = null;
 let reducedMotion = false;
 let traceImage = null;
 let activeColor = [232, 200, 120]; // current scene's glow color
+let activeDotSpeed = 0.8; // current scene's dot speed
 let loadGeneration = 0; // monotonic counter — guards against stale async loads
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
@@ -193,6 +194,7 @@ function findBestDirection(x, y, curDx, curDy) {
  * and spawning one dot per populated cell.
  */
 function spawnDistributed(count) {
+  if (count === 0) return [];
   const cols = Math.ceil(Math.sqrt(count * (mapW / mapH)));
   const rows = Math.ceil(count / cols);
   const cellW = mapW / cols;
@@ -220,7 +222,7 @@ function spawnDistributed(count) {
       if (!found) continue;
 
       const dir = findBestDirection(found.x, found.y);
-      const speed = DOT_SPEED * (0.5 + Math.random() * 1.0);
+      const speed = activeDotSpeed * (0.5 + Math.random() * 1.0);
 
       spawned.push({
         x: found.x,
@@ -246,7 +248,7 @@ function spawnDistributed(count) {
       y: pos.y,
       dx: dir ? dir.dx : DIRS_NORM[0].dx,
       dy: dir ? dir.dy : DIRS_NORM[0].dy,
-      speed: DOT_SPEED * (0.5 + Math.random() * 1.0),
+      speed: activeDotSpeed * (0.5 + Math.random() * 1.0),
       phase: Math.random() * Math.PI * 2,
       life: 0,
       maxLife: 800 + Math.random() * 1200,
@@ -305,7 +307,7 @@ function stepDot(dot) {
       dot.y = pos.y;
       dot.dx = dir ? dir.dx : DIRS_NORM[0].dx;
       dot.dy = dir ? dir.dy : DIRS_NORM[0].dy;
-      dot.speed = DOT_SPEED * (0.5 + Math.random() * 1.0);
+      dot.speed = activeDotSpeed * (0.5 + Math.random() * 1.0);
       dot.phase = Math.random() * Math.PI * 2;
       dot.life = 0;
       dot.maxLife = 800 + Math.random() * 1200;
@@ -418,8 +420,13 @@ function validateConfig(config) {
     }
   }
   if (config.dotCount !== undefined) {
-    if (!Number.isInteger(config.dotCount) || config.dotCount < 1) {
-      throw new Error(`shimmer: dotCount must be a positive integer, got ${config.dotCount}`);
+    if (!Number.isInteger(config.dotCount) || config.dotCount < 0) {
+      throw new Error(`shimmer: dotCount must be a non-negative integer, got ${config.dotCount}`);
+    }
+  }
+  if (config.dotSpeed !== undefined) {
+    if (typeof config.dotSpeed !== 'number' || config.dotSpeed <= 0) {
+      throw new Error(`shimmer: dotSpeed must be a positive number, got ${config.dotSpeed}`);
     }
   }
 }
@@ -458,6 +465,7 @@ export async function loadScene(config) {
 
   opacity = config.opacity;
   activeColor = config.color ?? DEFAULT_COLOR;
+  activeDotSpeed = config.dotSpeed ?? DOT_SPEED;
   handleResize();
 
   const img = new Image();
@@ -493,7 +501,7 @@ export function pause() {
 
 export function resume() {
   paused = false;
-  if (walkMap && dots.length > 0) {
+  if (walkMap) {
     rafId = requestAnimationFrame(tick);
   }
 }

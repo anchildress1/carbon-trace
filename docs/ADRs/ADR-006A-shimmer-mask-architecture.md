@@ -73,7 +73,8 @@ The `traceOverlay` key references a mask image instead of containing inline path
   "opacity": 0.05,
   "mask": "assets/masks/mask-01-seam-circuit.png",
   "color": [180, 155, 100],
-  "dotCount": 15
+  "dotCount": 15,
+  "dotSpeed": 0.5
 }
 ```
 
@@ -82,7 +83,8 @@ The `traceOverlay` key references a mask image instead of containing inline path
 | `opacity`  | float 0–1    | yes      | —                 | Scene intensity (scales trace image and dot alpha)|
 | `mask`     | string       | yes      | —                 | Relative URL to mask PNG in `assets/masks/`       |
 | `color`    | `[r, g, b]`  | no       | `[232, 200, 120]` | Per-scene glow color (trace tint + dot fill)      |
-| `dotCount` | integer      | no       | `DOT_COUNT` (15)  | Number of walking dots for this scene             |
+| `dotCount` | integer ≥ 0  | no       | `DOT_COUNT` (15)  | Number of walking dots for this scene (0 = static trace only) |
+| `dotSpeed` | float > 0    | no       | `DOT_SPEED` (0.8) | Base dot speed in pixels/frame for this scene     |
 
 `paths` is removed entirely. `mask` references a dark-on-light PNG where dark pixels (luminance < 128) define circuit trace geometry. `color` enables per-scene warm palette variation — most scenes use amber, but scene 03 (reach/coke oven) uses red-orange `[220, 110, 50]`.
 
@@ -107,7 +109,8 @@ DO:
   ✓ opacity is a float 0.0 – 1.0
   ✓ mask is a relative URL to a PNG in assets/masks/
   ✓ color is optional [r, g, b] — warm palette only (amber through red-orange)
-  ✓ dotCount is optional integer override for per-scene dot density
+  ✓ dotCount is optional integer (≥ 0) override for per-scene dot density
+  ✓ dotSpeed is optional positive float override for per-scene dot speed
 
 DON'T:
   ✗ inline path coordinates (use mask images)
@@ -161,6 +164,7 @@ let rafId = null;          // for cancelAnimationFrame on destroy
 let paused = false;        // true when app is paused
 let motionQuery;           // MediaQueryList for prefers-reduced-motion
 let reducedMotion = false; // true when reduced motion is active
+let activeDotSpeed = 0.8;  // current scene's dot speed (from config.dotSpeed ?? DOT_SPEED)
 let loadGeneration = 0;    // monotonic counter — guards against stale async loads
 ```
 
@@ -170,7 +174,7 @@ let loadGeneration = 0;    // monotonic counter — guards against stale async l
 {
   x, y,           // current position in mask-space pixels
   dx, dy,         // normalized direction vector (from DIRS_NORM)
-  speed,          // DOT_SPEED × random(0.5–1.5) — per-dot speed variation
+  speed,          // activeDotSpeed × random(0.5–1.5) — per-dot speed variation
   phase,          // random 0–2π — desynchronizes sin() pulse per dot
   life,           // frames since spawn (incremented by stepDot)
   maxLife,        // 800–2000 frames — dot respawns when life ≥ maxLife
@@ -193,7 +197,7 @@ shimmer.destroy()               — cancelAnimationFrame, disconnect observer
 
 **Breaking change from ADR-006:** `loadScene()` is now **async** because it loads an external PNG image. ADR-006 specified synchronous `loadScene()` because all data was inline JSON. The call site in `showFrame()` stores the returned promise (`app.shimmerReady`) and the transition gates on it (alongside `app.effectsReady`) before fading in. A monotonic generation counter inside `loadScene()` guards against stale async completions — if a newer `loadScene()` is called while an older mask is still loading, the older load's post-await work is silently discarded.
 
-**Config validation:** When config is non-null, `loadScene()` validates per §06A.3.3: `opacity` is required (float 0–1), `mask` is required (string), `color` must be warm-toned (R dominant, B < 0.65 × R), `dotCount` must be a positive integer. Invalid config throws — no silent degradation.
+**Config validation:** When config is non-null, `loadScene()` validates per §06A.3.3: `opacity` is required (float 0–1), `mask` is required (string), `color` must be warm-toned (R dominant, B < 0.65 × R), `dotCount` must be a non-negative integer, `dotSpeed` must be a positive number. Invalid config throws — no silent degradation.
 
 ### 06A.4.4 Rendering — Two Layers (supersedes §06.4.4)
 
@@ -207,7 +211,7 @@ The mask PNG is loaded, then each dark pixel (walkable) is redrawn with the scen
 
 Autonomous dots spawn at walkable positions on the mask and navigate using 8-compass direction pixel lookups against the binary walk map. Spawning uses a pre-built index of all walkable pixel coordinates (built during `buildWalkMap`) for O(1) position lookup — this guarantees spawning succeeds regardless of mask density (critical for early-scene masks with <0.1% walkable pixels). Grid-distributed spawning is attempted first for even spatial coverage; remaining slots are filled from the indexed positions. Each dot:
 
-- Moves at `DOT_SPEED` pixels per frame
+- Moves at `activeDotSpeed` pixels per frame (from `config.dotSpeed` or `DOT_SPEED` default)
 - Uses `LOOKAHEAD` pixels of forward scanning to pick valid directions
 - Chooses from the 8 cardinal + diagonal compass directions
 - Checks `WALK_RADIUS` pixels around its position for walkability
@@ -417,15 +421,17 @@ loadScene         │ valid config with mask, null config, missing mask URL,
                   │ mid-frame swap (generation counter discards stale load),
                   │ async cancellation on rapid navigation, validation rejects
                   │ missing opacity / out-of-range opacity / cool-toned color /
-                  │ non-integer dotCount
+                  │ non-integer dotCount / negative dotCount / non-positive dotSpeed
 pause/resume      │ rAF stops on pause, resumes on resume, dots freeze
                   │ in place (no position drift on resume)
 reduced motion    │ static trace image at scene opacity, dots frozen at 0.6α
 resize            │ canvas dimensions update; rendering scales via drawImage
                   │ (walk map and trace image stay at mask resolution)
 dots              │ spawn at walkable positions, respect WALK_RADIUS,
-                  │ respawn when stuck, DOT_COUNT honored, individual
-                  │ pulse phase offsets produce desynchronized breathing
+                  │ respawn when stuck, DOT_COUNT honored, dotCount 0
+                  │ produces no dots (static trace only), per-scene
+                  │ dotSpeed applied, individual pulse phase offsets
+                  │ produce desynchronized breathing
 walk map          │ binary threshold correct, non-walkable pixels rejected,
                   │ 8-compass directions resolve correctly at edges
 opacity boundary  │ opacity 0 → early exit (no drawImage, no dots),
