@@ -119,9 +119,13 @@ body {
   fill: rgba(245, 230, 200, 0.6);
   opacity: 0;
   filter: drop-shadow(0 0 3px rgba(255, 240, 200, 0.4));
+  offset-path: path(
+    'M 10,20 H 55 L 59,12 L 63,20 H 100 L 104,28 L 108,20 H 140 L 144,12 L 148,20 H 190'
+  );
   animation:
     node-appear 0.6s ease 1.4s forwards,
-    node-glow 2.4s ease-in-out 2s infinite;
+    node-glow 2.4s ease-in-out 2s infinite,
+    node-travel 4s ease-in-out 2s infinite alternate;
 }
 
 .loading-title {
@@ -194,6 +198,15 @@ body {
   50% {
     fill: rgba(255, 245, 220, 0.8);
     filter: drop-shadow(0 0 6px rgba(255, 240, 200, 0.6));
+  }
+}
+
+@keyframes node-travel {
+  from {
+    offset-distance: 0%;
+  }
+  to {
+    offset-distance: 100%;
   }
 }
 
@@ -499,6 +512,7 @@ body {
   .trace-node {
     opacity: 1;
     animation: none;
+    offset-distance: 50%;
   }
 
   .loading-title,
