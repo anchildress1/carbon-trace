@@ -485,11 +485,13 @@ function showFrame(app, index) {
     app.effectsReady = null;
   }
 
-  // Shimmer trace overlay — load circuit mask if one exists for this scene
-  const circuitMask = frame.traceOverlay?.mask ?? null;
-  loadShimmerScene(
-    circuitMask ? { mask: circuitMask, opacity: frame.traceOverlay.opacity } : null,
-  ).catch((err) => console.error('Shimmer load failed:', err));
+  // Shimmer trace overlay — load circuit mask if one exists for this scene.
+  // Pass the full traceOverlay config (mask, opacity, color, dotCount).
+  app.shimmerReady = frame.traceOverlay?.mask
+    ? loadShimmerScene(frame.traceOverlay).catch((err) => {
+        console.error('Shimmer load failed:', err);
+      })
+    : loadShimmerScene(null);
 
   const sceneIdx = app.sceneMap.byFrame.get(index);
   if (sceneIdx !== undefined) {
@@ -538,15 +540,16 @@ function handleBufferChange(app, isBuffering) {
   }
 }
 
-function waitForEffectsReady(app, timeoutMs = 800) {
-  if (!app.effectsReady) return Promise.resolve();
+function waitForOverlaysReady(app, timeoutMs = 800) {
+  const pending = [app.effectsReady, app.shimmerReady].filter(Boolean);
+  if (pending.length === 0) return Promise.resolve();
 
   let timeoutId;
   const timeout = new Promise((resolve) => {
     timeoutId = setTimeout(resolve, timeoutMs);
   });
 
-  return Promise.race([app.effectsReady.finally(() => clearTimeout(timeoutId)), timeout]);
+  return Promise.race([Promise.all(pending).finally(() => clearTimeout(timeoutId)), timeout]);
 }
 
 function waitForImage(app, src) {
@@ -761,10 +764,10 @@ function transition(app, toIndex) {
             return;
           }
 
-          // Wait for effects textures to finish loading so they are
-          // visible when the stage fades back in. The timeout prevents
-          // the screen from staying at opacity 0 on very slow loads.
-          await waitForEffectsReady(app);
+          // Wait for effects textures and shimmer mask to finish loading
+          // so they are visible when the stage fades back in. The timeout
+          // prevents the screen from staying at opacity 0 on very slow loads.
+          await waitForOverlaysReady(app);
 
           gsap.to(app.els.sceneStage, {
             opacity: 1,
@@ -1097,6 +1100,7 @@ export function createApp() {
     pendingPause: false,
     buffering: false,
     effectsReady: null,
+    shimmerReady: null,
     availableAudio: new Set(),
     audioDurations: new Map(),
     projectMaxCaptionMs: computeProjectMaxCaptionMs(frames),

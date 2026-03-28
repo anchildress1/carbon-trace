@@ -186,27 +186,21 @@ describe('shimmer.js', () => {
       expect(mockCtx.clearRect).toHaveBeenCalled();
     });
 
-    it('clears canvas when config has no mask', async () => {
-      shimmer.init(mockCanvas);
-      await shimmer.loadScene({ opacity: 0.5 });
-      expect(mockCtx.clearRect).toHaveBeenCalled();
-    });
-
     it('loads mask and starts rAF loop', async () => {
       shimmer.init(mockCanvas);
       await shimmer.loadScene({ mask: 'test.png', opacity: 0.5 });
       expect(requestAnimationFrame).toHaveBeenCalled();
     });
 
-    it('uses default opacity when not provided', async () => {
+    it('accepts custom warm color', async () => {
       shimmer.init(mockCanvas);
-      await shimmer.loadScene({ mask: 'test.png' });
+      await shimmer.loadScene({ mask: 'test.png', opacity: 0.5, color: [220, 110, 50] });
       expect(requestAnimationFrame).toHaveBeenCalled();
     });
 
-    it('accepts custom color', async () => {
+    it('accepts custom dotCount', async () => {
       shimmer.init(mockCanvas);
-      await shimmer.loadScene({ mask: 'test.png', opacity: 0.5, color: [255, 0, 0] });
+      await shimmer.loadScene({ mask: 'test.png', opacity: 0.5, dotCount: 8 });
       expect(requestAnimationFrame).toHaveBeenCalled();
     });
 
@@ -316,11 +310,122 @@ describe('shimmer.js', () => {
     });
   });
 
+  describe('config validation', () => {
+    it('rejects config without opacity', async () => {
+      shimmer.init(mockCanvas);
+      await expect(
+        shimmer.loadScene({ mask: 'test.png' }),
+      ).rejects.toThrow('opacity is required');
+    });
+
+    it('rejects config without mask', async () => {
+      shimmer.init(mockCanvas);
+      await expect(
+        shimmer.loadScene({ opacity: 0.5 }),
+      ).rejects.toThrow('mask is required');
+    });
+
+    it('rejects opacity outside 0–1 range', async () => {
+      shimmer.init(mockCanvas);
+      await expect(
+        shimmer.loadScene({ mask: 'test.png', opacity: 1.5 }),
+      ).rejects.toThrow('opacity must be a number 0–1');
+    });
+
+    it('rejects negative opacity', async () => {
+      shimmer.init(mockCanvas);
+      await expect(
+        shimmer.loadScene({ mask: 'test.png', opacity: -0.1 }),
+      ).rejects.toThrow('opacity must be a number 0–1');
+    });
+
+    it('rejects cool-toned color', async () => {
+      shimmer.init(mockCanvas);
+      await expect(
+        shimmer.loadScene({ mask: 'test.png', opacity: 0.5, color: [50, 100, 200] }),
+      ).rejects.toThrow('warm-toned');
+    });
+
+    it('rejects white color', async () => {
+      shimmer.init(mockCanvas);
+      await expect(
+        shimmer.loadScene({ mask: 'test.png', opacity: 0.5, color: [255, 255, 255] }),
+      ).rejects.toThrow('warm-toned');
+    });
+
+    it('rejects malformed color array', async () => {
+      shimmer.init(mockCanvas);
+      await expect(
+        shimmer.loadScene({ mask: 'test.png', opacity: 0.5, color: [255, 128] }),
+      ).rejects.toThrow('color must be [r, g, b]');
+    });
+
+    it('rejects non-integer dotCount', async () => {
+      shimmer.init(mockCanvas);
+      await expect(
+        shimmer.loadScene({ mask: 'test.png', opacity: 0.5, dotCount: 2.5 }),
+      ).rejects.toThrow('dotCount must be a positive integer');
+    });
+
+    it('rejects zero dotCount', async () => {
+      shimmer.init(mockCanvas);
+      await expect(
+        shimmer.loadScene({ mask: 'test.png', opacity: 0.5, dotCount: 0 }),
+      ).rejects.toThrow('dotCount must be a positive integer');
+    });
+  });
+
+  describe('generation guard', () => {
+    it('stale load is discarded when newer loadScene is called', async () => {
+      // Use a controllable Image mock that doesn't auto-resolve
+      let resolveFirst;
+      let resolveSecond;
+      let callCount = 0;
+
+      const DelayedImage = class {
+        constructor() {
+          this.naturalWidth = 10;
+          this.naturalHeight = 10;
+          this.width = 10;
+          this.height = 10;
+          this.crossOrigin = '';
+        }
+        set src(_val) {
+          callCount++;
+          const current = callCount;
+          if (current === 1) {
+            resolveFirst = () => Promise.resolve().then(() => this.onload?.());
+          } else {
+            resolveSecond = () => Promise.resolve().then(() => this.onload?.());
+          }
+        }
+      };
+      vi.stubGlobal('Image', DelayedImage);
+
+      shimmer.init(mockCanvas);
+
+      // Start first load (will not auto-resolve)
+      const first = shimmer.loadScene({ mask: 'first.png', opacity: 0.3 });
+      // Start second load before first resolves
+      const second = shimmer.loadScene({ mask: 'second.png', opacity: 0.7 });
+
+      // Resolve first load — it should be discarded (stale generation)
+      await resolveFirst();
+      // Resolve second load — this should apply
+      await resolveSecond();
+
+      await Promise.allSettled([first, second]);
+
+      // rAF should only have been called once (from the second load)
+      // The first load's post-await code was skipped by the generation guard
+      expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('edge cases', () => {
     it('handles zero-dimension canvas gracefully', () => {
       mockCanvas.getBoundingClientRect = vi.fn(() => ({ width: 0, height: 0 }));
       shimmer.init(mockCanvas);
-      // Should not throw, canvas dimensions stay as-is
     });
 
     it('handles mask load failure', async () => {

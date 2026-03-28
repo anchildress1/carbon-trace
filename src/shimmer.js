@@ -23,6 +23,7 @@ let motionQuery = null;
 let reducedMotion = false;
 let traceImage = null;
 let activeColor = [232, 200, 120]; // current scene's glow color
+let loadGeneration = 0; // monotonic counter — guards against stale async loads
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
@@ -366,6 +367,44 @@ function handleResize() {
   canvas.height = h;
 }
 
+/**
+ * Validate traceOverlay config per ADR-006A §06A.3.3.
+ * Throws on invalid config — no silent degradation.
+ */
+function validateConfig(config) {
+  if (config.opacity === undefined || config.opacity === null) {
+    throw new Error('shimmer: opacity is required when traceOverlay is present');
+  }
+  if (typeof config.opacity !== 'number' || config.opacity < 0 || config.opacity > 1) {
+    throw new Error(`shimmer: opacity must be a number 0–1, got ${config.opacity}`);
+  }
+  if (!config.mask || typeof config.mask !== 'string') {
+    throw new Error('shimmer: mask is required when traceOverlay is present');
+  }
+  if (config.color !== undefined) {
+    if (
+      !Array.isArray(config.color) ||
+      config.color.length !== 3 ||
+      !config.color.every((c) => Number.isInteger(c) && c >= 0 && c <= 255)
+    ) {
+      throw new Error(
+        `shimmer: color must be [r, g, b] integers 0–255, got ${JSON.stringify(config.color)}`,
+      );
+    }
+    const [r, g, b] = config.color;
+    if (r < g || r < b || b >= r * 0.65) {
+      throw new Error(
+        `shimmer: color must be warm-toned (amber through red-orange), got [${r}, ${g}, ${b}]`,
+      );
+    }
+  }
+  if (config.dotCount !== undefined) {
+    if (!Number.isInteger(config.dotCount) || config.dotCount < 1) {
+      throw new Error(`shimmer: dotCount must be a positive integer, got ${config.dotCount}`);
+    }
+  }
+}
+
 // --- Public API ---
 
 export function init(canvasEl) {
@@ -379,6 +418,8 @@ export function init(canvasEl) {
 }
 
 export async function loadScene(config) {
+  const gen = ++loadGeneration;
+
   if (rafId) {
     cancelAnimationFrame(rafId);
     rafId = null;
@@ -387,13 +428,15 @@ export async function loadScene(config) {
   walkMap = null;
   traceImage = null;
 
-  if (!config || !config.mask) {
+  if (!config) {
     opacity = 0;
     if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
     return;
   }
 
-  opacity = config.opacity ?? 0.85;
+  validateConfig(config);
+
+  opacity = config.opacity;
   activeColor = config.color ?? DEFAULT_COLOR;
   handleResize();
 
@@ -404,6 +447,10 @@ export async function loadScene(config) {
     img.onerror = () => reject(new Error(`Failed to load mask: ${config.mask}`));
     img.src = config.mask;
   });
+
+  // Guard: if a newer loadScene() was called while we awaited the image,
+  // this load is stale — discard results silently.
+  if (gen !== loadGeneration) return;
 
   buildWalkMap(img);
   buildTraceImage();
@@ -432,6 +479,7 @@ export function resume() {
 }
 
 export function destroy() {
+  loadGeneration++;
   if (rafId) {
     cancelAnimationFrame(rafId);
     rafId = null;

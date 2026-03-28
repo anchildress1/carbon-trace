@@ -2519,7 +2519,7 @@ describe('app.js', () => {
       });
 
       // Make effects load reject — this triggers the effectsReady.catch path
-      // AND the .finally in waitForEffectsReady. The .catch in showFrame handles
+      // AND the .finally in waitForOverlaysReady. The .catch in showFrame handles
       // the promise, so no unhandled rejection.
       const rejectedPromise = Promise.reject(new Error('GPU crash'));
       // Prevent unhandled rejection warning from the bare promise
