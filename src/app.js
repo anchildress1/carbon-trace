@@ -291,7 +291,12 @@ function resumeDeferredFrameAudio(app, { cancelExisting = false } = {}) {
   if (cancelExisting) {
     cancelAudioCues();
   }
-  scheduleFrameAudio(app, app.frames[app.currentIndex]);
+  const frame = app.frames[app.currentIndex];
+  scheduleFrameAudio(app, frame);
+  if (frame.effects?.analyserCueId) {
+    const analyser = getAnalyserNode();
+    if (analyser) wireAnalysisAudio(app, frame, analyser);
+  }
   return true;
 }
 
@@ -455,14 +460,12 @@ function showFrame(app, index) {
         if (!loaded) return;
         // Ignore stale completions from old showFrame calls.
         if (showGeneration !== app.generation || showIndex !== app.currentIndex) return;
-        // Wire audio-reactive bridge after effects are loaded (ADR-008).
-        // setAnalyser must run after loadScene so it isn't cleared by clearAll().
+        // setAnalyser must run after loadScene — buildAudioReactiveState() inside
+        // loadScene populates the state that setAnalyser reads. clearAll() would
+        // wipe it if called before this resolves.
         if (frame.effects.regions.some((r) => r.audioReactive)) {
           const analyser = getAnalyserNode();
-          if (analyser) {
-            setEffectsAnalyser(analyser);
-            wireAnalysisAudio(app, frame, analyser);
-          }
+          if (analyser) setEffectsAnalyser(analyser);
         }
       })
       .catch((err) => console.error('Effects load failed:', err.message));
@@ -484,6 +487,10 @@ function showFrame(app, index) {
   if (!app.deferFrameAudioUntilResume) {
     if (app.userHasInteracted) {
       scheduleFrameAudio(app, frame);
+      if (frame.effects?.analyserCueId) {
+        const analyser = getAnalyserNode();
+        if (analyser) wireAnalysisAudio(app, frame, analyser);
+      }
     } else {
       app.els.btnReplay.disabled = true;
     }
@@ -586,10 +593,10 @@ function manageFocusAfterTransition(app) {
       document.activeElement.blur();
     }
   } else if (app.lastNavSource !== 'keyboard') {
-    // Pointer/dot-click nav: move focus to active dot.
-    // Keyboard nav: leave focus where it is so arrow keys
-    // continue to navigate scenes (not roving-tabindex dots).
-    focusActiveDot();
+    // Pointer/dot-click nav: focus btn-pause so Space immediately toggles pause
+    // without being swallowed by the allowOnButton guard on a dot button.
+    // Keyboard nav: leave focus where it is so arrow keys continue to navigate.
+    app.els.btnPause.focus();
   }
   app.lastNavSource = null;
 }
@@ -643,6 +650,41 @@ function transition(app, toIndex) {
       waitForImage(app, toFrame.image).then(doHardJump);
     } else {
       doHardJump();
+    }
+    return;
+  }
+
+  // Hard jump for explicit click navigation: instant cut, no fade animation.
+  // Keyboard nav and auto-advance still use the animated path for cinematic feel.
+  if (app.lastNavSource === 'click') {
+    const prevFrame = app.frames[app.currentIndex];
+    const doClickJump = () => {
+      const prevIndex = app.currentIndex;
+      app.currentIndex = toIndex;
+      try {
+        showFrame(app, toIndex);
+        app.state = STATE_BY_FRAME_TYPE[toFrame.frameType] || State.SCENE_ACTIVE;
+      } catch (err) {
+        console.error('Error during scene transition:', err);
+        app.currentIndex = prevIndex;
+        app.state = STATE_BY_FRAME_TYPE[prevFrame.frameType] || State.SCENE_ACTIVE;
+        return;
+      }
+      if (app.pendingPause) {
+        app.pendingPause = false;
+        doPause(app);
+      } else {
+        if (app.textTimeline) app.textTimeline.play(0);
+        setupAutoAdvance(app);
+      }
+      manageFocusAfterTransition(app);
+      completePendingNav(app);
+    };
+
+    if (toFrame.image && !app.imageCache.has(toFrame.image)) {
+      waitForImage(app, toFrame.image).then(doClickJump);
+    } else {
+      doClickJump();
     }
     return;
   }
@@ -959,10 +1001,12 @@ function initApp(app) {
       });
       app.els.btnPrev.addEventListener('click', (e) => {
         e.stopPropagation();
+        app.lastNavSource = 'click';
         retreat(app);
       });
       app.els.btnNext.addEventListener('click', (e) => {
         e.stopPropagation();
+        app.lastNavSource = 'click';
         advance(app);
       });
       app.els.btnMute.addEventListener('click', (e) => {
@@ -1073,6 +1117,7 @@ export function createApp() {
     const frameIndex = app.sceneMap.byScene.get(sceneIndex);
     if (frameIndex !== undefined && frameIndex !== app.currentIndex) {
       app.userHasInteracted = true;
+      app.lastNavSource = 'click';
       transition(app, frameIndex);
     }
   });
