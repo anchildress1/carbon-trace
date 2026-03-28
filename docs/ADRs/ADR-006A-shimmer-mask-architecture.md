@@ -205,16 +205,17 @@ The mask PNG is loaded, then each dark pixel (walkable) is redrawn with the scen
 
 **Layer 2 — Pixel-walking dots**
 
-Autonomous dots spawn at random walkable positions on the mask and navigate using 8-compass direction pixel lookups against the binary walk map. Each dot:
+Autonomous dots spawn at walkable positions on the mask and navigate using 8-compass direction pixel lookups against the binary walk map. Spawning uses a pre-built index of all walkable pixel coordinates (built during `buildWalkMap`) for O(1) position lookup — this guarantees spawning succeeds regardless of mask density (critical for early-scene masks with <0.1% walkable pixels). Grid-distributed spawning is attempted first for even spatial coverage; remaining slots are filled from the indexed positions. Each dot:
 
 - Moves at `DOT_SPEED` pixels per frame
 - Uses `LOOKAHEAD` pixels of forward scanning to pick valid directions
 - Chooses from the 8 cardinal + diagonal compass directions
 - Checks `WALK_RADIUS` pixels around its position for walkability
 - Has individual phase-offset pulsing via `sin(time + dot.phase)`
-- Has a finite lifespan (`maxLife` = 800–2000 frames); respawns at a new random walkable position on expiry
+- Has a finite lifespan (`maxLife` = 800–2000 frames); respawns at a new walkable position on expiry (O(1) via indexed positions)
 - Respawns immediately when stuck (no direction has 4+ pixels of runway)
-- Uses grid-distributed spawning (`spawnDistributed`) to ensure even coverage across the mask
+- Uses grid-distributed spawning (`spawnDistributed`) with indexed-position fallback to ensure even coverage across the mask
+- Dot brightness is decoupled from trace brightness via `DOT_ALPHA_BOOST` — dots render visibly brighter than the static trace lines to create perceptible shimmer
 
 This is fundamentally different from ADR-006's parametric polyline walking. Dots are particles — they spawn, move, make local navigation decisions, and die/respawn. They don't follow authored geometry parametrically; they explore the mask stochastically.
 
@@ -247,14 +248,15 @@ Each dot is rendered as two overlapping radial gradients: a large soft glow halo
 CONSTANT       │ VALUE            │ WHY
 ───────────────┼──────────────────┼──────────────────────────────────
 DOT_COUNT      │ 15               │ Default simultaneous walking dots
-DOT_RADIUS     │ 4                │ Base radius for glow halo (×7) and core (×2)
+DOT_RADIUS     │ 6                │ Base radius for glow halo (×7) and core (×2) (raised from 4 for visibility on thin masks)
 DOT_SPEED      │ 0.8              │ Base pixels per frame (×random 0.5–1.5 per dot)
 DEFAULT_COLOR  │ [232, 200, 120]  │ Fallback amber tint when scene has no color
-TRACE_ALPHA    │ 0.12             │ Alpha for static trace image pixels
+TRACE_ALPHA    │ 0.25             │ Alpha for static trace image pixels (lowered to let dots dominate shimmer)
+DOT_ALPHA_BOOST│ 2.5              │ Dot alpha = min(1, opacity × boost) × pulse — decouples dot brightness from trace
 PULSE_FREQ     │ 0.0015           │ sin() frequency for dot brightness (~4.2s cycle)
 WALK_RADIUS    │ 3                │ Pixel tolerance for staying on thin 1-2px lines
 LOOKAHEAD      │ 25               │ Forward scan distance for direction picking
-SPAWN_ATTEMPTS │ 500              │ Max random tries to find a walkable spawn position
+SPAWN_ATTEMPTS │ (removed)        │ No longer needed — indexed walkPositions array guarantees O(1) spawn
 ```
 
 **Removed from ADR-006:** `HIGHLIGHT_SPEED`, `SHADOW_BLUR`, `STROKE_WIDTHS`, `STROKE_ALPHAS`, `HIGHLIGHT_COLOR`, `HIGHLIGHT_RADIUS`, `FREQ`. These belonged to the polyline + layered-stroke model.

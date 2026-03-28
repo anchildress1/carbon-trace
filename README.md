@@ -1,4 +1,4 @@
-![Banner](./public/assets/images/carbon-trace-banner-gh.webp)
+![Banner](./public/assets/images/carbon-trace-banner-gh-e897ebe7.webp)
 
 # Carbon Trace: An Immersive Art Experience
 

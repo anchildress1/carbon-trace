@@ -15,6 +15,7 @@ let observer = null;
 let rafId = null;
 let paused = false;
 let walkMap = null; // Uint8Array — 1 = walkable dark pixel
+let walkPositions = []; // [{x,y}] — indexed walkable coords for O(1) spawn
 let mapW = 0;
 let mapH = 0;
 let dots = [];
@@ -29,14 +30,14 @@ const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
 // Tuning constants
 const DOT_COUNT = 15;
-const DOT_RADIUS = 4;
+const DOT_RADIUS = 6;
 const DOT_SPEED = 0.8;
 const DEFAULT_COLOR = [232, 200, 120];
-const TRACE_ALPHA = 0.12;
+const TRACE_ALPHA = 0.25;
+const DOT_ALPHA_BOOST = 2.5; // dots render brighter than trace lines for visible shimmer
 const PULSE_FREQ = 0.0015; // ~4.2s full cycle
 const WALK_RADIUS = 3; // pixels — tolerance for staying on thin lines
 const LOOKAHEAD = 25; // how far ahead to scan for runway
-const SPAWN_ATTEMPTS = 500;
 
 function checkReducedMotion() {
   if (typeof globalThis.matchMedia !== 'function') return false;
@@ -62,6 +63,7 @@ function buildWalkMap(img) {
   mapW = width;
   mapH = height;
   walkMap = new Uint8Array(width * height);
+  walkPositions = [];
 
   const threshold = 128;
   for (let i = 0; i < width * height; i++) {
@@ -70,7 +72,10 @@ function buildWalkMap(img) {
     const b = data[i * 4 + 2];
     const a = data[i * 4 + 3];
     const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-    walkMap[i] = lum < threshold && a > 128 ? 1 : 0;
+    if (lum < threshold && a > 128) {
+      walkMap[i] = 1;
+      walkPositions.push({ x: i % width, y: Math.floor(i / width) });
+    }
   }
 }
 
@@ -118,12 +123,8 @@ function isNearWalkable(x, y) {
 }
 
 function findRandomWalkable() {
-  for (let i = 0; i < SPAWN_ATTEMPTS; i++) {
-    const x = Math.floor(Math.random() * mapW);
-    const y = Math.floor(Math.random() * mapH);
-    if (isWalkableExact(x, y)) return { x, y };
-  }
-  return null;
+  if (walkPositions.length === 0) return null;
+  return walkPositions[Math.floor(Math.random() * walkPositions.length)];
 }
 
 const DIRS_8 = [
@@ -235,6 +236,24 @@ function spawnDistributed(count) {
     }
   }
 
+  // Fill remaining count from indexed walkable positions (handles sparse masks)
+  while (spawned.length < count) {
+    const pos = findRandomWalkable();
+    if (!pos) break;
+    const dir = findBestDirection(pos.x, pos.y);
+    spawned.push({
+      x: pos.x,
+      y: pos.y,
+      dx: dir ? dir.dx : DIRS_NORM[0].dx,
+      dy: dir ? dir.dy : DIRS_NORM[0].dy,
+      speed: DOT_SPEED * (0.5 + Math.random() * 1.0),
+      phase: Math.random() * Math.PI * 2,
+      life: 0,
+      maxLife: 800 + Math.random() * 1200,
+      stuckCount: 0,
+    });
+  }
+
   return spawned;
 }
 
@@ -328,7 +347,7 @@ function render(time) {
     // Strong pulse: oscillates between dim (0.1) and bright (1.0)
     const wave = 0.5 + 0.5 * Math.sin(time * PULSE_FREQ + dot.phase);
     const pulse = reducedMotion ? 0.6 : 0.1 + 0.9 * wave;
-    const alpha = opacity * pulse;
+    const alpha = Math.min(1, opacity * DOT_ALPHA_BOOST) * pulse;
 
     // Glow halo
     const glowRadius = DOT_RADIUS * 7 * scale;
@@ -426,6 +445,7 @@ export async function loadScene(config) {
   }
   dots = [];
   walkMap = null;
+  walkPositions = [];
   traceImage = null;
 
   if (!config) {
@@ -489,6 +509,7 @@ export function destroy() {
     observer = null;
   }
   walkMap = null;
+  walkPositions = [];
   traceImage = null;
   dots = [];
   canvas = null;
