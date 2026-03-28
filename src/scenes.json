@@ -99,10 +99,10 @@
       "image": "assets/images/scene-01-seam-48263be1.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-01-seam-circuit-41940702.png",
-        "opacity": 0.3,
+        "opacity": 0.15,
         "color": [180, 155, 100],
         "dotCount": 0,
-        "dotSpeed": 0.3
+        "dotSpeed": 0
       },
       "narration": {
         "lines": [
@@ -249,8 +249,8 @@
         "mask": "assets/masks/mask-02-travel-circuit-995e4c36.png",
         "opacity": 0.3,
         "color": [195, 165, 95],
-        "dotCount": 2,
-        "dotSpeed": 0.3
+        "dotCount": 1,
+        "dotSpeed": 0.15
       },
       "narration": {
         "lines": [
@@ -411,7 +411,7 @@
         "opacity": 0.35,
         "color": [220, 110, 50],
         "dotCount": 3,
-        "dotSpeed": 0.4
+        "dotSpeed": 0.25
       },
       "narration": {
         "lines": [
@@ -570,8 +570,8 @@
         "mask": "assets/masks/mask-04-pocket-circuit-c96ade27.png",
         "opacity": 0.12,
         "color": [200, 165, 85],
-        "dotCount": 2,
-        "dotSpeed": 0.5
+        "dotCount": 6,
+        "dotSpeed": 0.35
       },
       "narration": {
         "lines": [
@@ -736,8 +736,8 @@
         "mask": "assets/masks/mask-05-rinse-circuit-8907135c.png",
         "opacity": 0.3,
         "color": [200, 175, 110],
-        "dotCount": 4,
-        "dotSpeed": 0.5
+        "dotCount": 10,
+        "dotSpeed": 0.45
       },
       "narration": {
         "lines": [
@@ -906,8 +906,8 @@
         "mask": "assets/masks/mask-06-storage-circuit-0a620c4a.png",
         "opacity": 0.4,
         "color": [230, 190, 100],
-        "dotCount": 6,
-        "dotSpeed": 0.6
+        "dotCount": 18,
+        "dotSpeed": 0.55
       },
       "narration": {
         "lines": [
@@ -1065,8 +1065,8 @@
         "mask": "assets/masks/mask-07-missing-circuit-2f460aee.png",
         "opacity": 0.5,
         "color": [235, 180, 80],
-        "dotCount": 8,
-        "dotSpeed": 0.7
+        "dotCount": 24,
+        "dotSpeed": 0.65
       },
       "narration": {
         "lines": [
@@ -1196,7 +1196,8 @@
         "mask": "assets/masks/mask-08-empty-circuit-cf0a79ad.png",
         "opacity": 0.6,
         "color": [232, 195, 110],
-        "dotCount": 12
+        "dotCount": 30,
+        "dotSpeed": 0.7
       },
       "narration": {
         "lines": [
@@ -1251,8 +1252,8 @@
         "mask": "assets/masks/mask-09-return-circuit-b386abec.png",
         "opacity": 0.75,
         "color": [232, 200, 115],
-        "dotCount": 18,
-        "dotSpeed": 0.9
+        "dotCount": 40,
+        "dotSpeed": 0.8
       },
       "narration": {
         "lines": [
@@ -1392,10 +1393,10 @@
       "description": "Woman kneeling, soldering components on a wood frame, diamond glowing on floor, circuit traces on walls — carbon activated into something new",
       "image": "assets/images/scene-10-building-d464d608.webp",
       "traceOverlay": {
-        "mask": "assets/masks/mask-10-building-circuit-477d0259.png",
+        "mask": "assets/masks/mask-10-building-circuit-7f523f64.png",
         "opacity": 0.88,
         "color": [232, 195, 105],
-        "dotCount": 25,
+        "dotCount": 60,
         "dotSpeed": 1.0
       },
       "narration": {
@@ -1531,8 +1532,8 @@
       "traceOverlay": {
         "mask": "assets/masks/mask-11-music-circuit-0ae69818.png",
         "opacity": 1.0,
-        "dotCount": 35,
-        "dotSpeed": 1.1
+        "dotCount": 80,
+        "dotSpeed": 1.25
       },
       "narration": {
         "lines": [
