@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.5](https://github.com/anchildress1/carbon-trace/compare/carbon-trace-v0.0.4...carbon-trace-v0.0.5) (2026-03-28)
+
+
+### Bug Fixes
+
+* ci security deps ([#35](https://github.com/anchildress1/carbon-trace/issues/35)) ([189cf3e](https://github.com/anchildress1/carbon-trace/commit/189cf3e368ffaebc2fc4786b492cffafad293612))
+* remediation pass ([#36](https://github.com/anchildress1/carbon-trace/issues/36)) ([bea0581](https://github.com/anchildress1/carbon-trace/commit/bea05819a926c9d2deb54d4da90c9b2dcc735674))
+
 ## [0.0.4](https://github.com/anchildress1/carbon-trace/compare/carbon-trace-v0.0.3...carbon-trace-v0.0.4) (2026-03-26)
 
 
