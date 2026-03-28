@@ -3,7 +3,7 @@
 **Supersedes:** §4.5 (Circuit Trace Overlay Progression), §13 v2 bullet "Circuit traces baked in images + canvas shimmer" of `carbon-trace-system-design-v3-final.md`, v5 §5.4 line 594 (`<div id="trace-overlay">`), v5 §4.1 line 239 (opacity-only traceOverlay schema)
 **Date:** March 19, 2026
 **Author:** Ashley Childress (@anchildress1)
-**Status:** Deferred — architecture and engine spec are normative but implementation is deferred post-v1. Runtime code was removed from the codebase; this ADR preserves the design for future implementation.
+**Status:** Superseded by ADR-006A — the polyline engine described here was replaced by a mask-based pixel-walking engine. See ADR-006A for the implemented architecture. Layer stack, module isolation, transition behavior, and reduced-motion principles from this ADR remain normative via ADR-006A.
 **Decision:** Promote canvas shimmer overlay from v2 to v1; define shimmer engine architecture
 
 ---

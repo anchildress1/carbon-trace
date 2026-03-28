@@ -1,12 +1,12 @@
-# carbon-trace — System Design v5
+# carbon-trace — System Design
 
 **Project:** WeCoded 2026 Frontend Art Entry
 **Author:** Ashley Childress (@anchildress1)
 **Deadline:** April 5, 2026 @ 11:59 PM PDT
-**Supersedes:** v4 — reconciled with implementation as of PR #8 (feat/canvas-effects)
+**Supersedes:** v5 — resolved ADR-006 governance conflict (shimmer is active, not deferred)
 **Spec convention:** This document describes the target architecture. Sections annotated with `(ADR-007)` reflect accepted ADR decisions that are not yet implemented in code. See each ADR's "Implementation Status" section for the code delta.
 **Implementation gap:** "Accepted" = architecture decision is final. "Accepted" ≠ code matches docs. Current codebase diverges from this spec in: effects-canvas.js context type, effects.js module, scenes.json schema shape, and index.html DOM structure. Do not assume code reflects this document until ADR action items are complete.
-**Deferred:** ADR-006 (trace shimmer overlay) is deferred post-v1. The runtime code was removed from the codebase but the ADR preserves the design for future implementation.
+**Active ADRs:** ADR-006 (trace shimmer overlay, mask-based architecture per ADR-006A) is implemented in v1. See ADR-006A for the authoritative shimmer engine specification.
 
 ---
 

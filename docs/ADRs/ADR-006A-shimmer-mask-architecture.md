@@ -135,7 +135,8 @@ shimmer.js DOES:
   • pulse dot brightness individually via sin()
   • scale all drawing by scene opacity
   • pause/resume rAF loop (WCAG 2.2.2 compliance)
-  • handle resize (rebuild walk map and trace image from mask)
+  • handle resize (update canvas dimensions; walk map and trace image are
+    at mask resolution and scale via drawImage — no rebuild needed)
 
 shimmer.js DOES NOT:
   • know what frame number is showing
@@ -160,6 +161,7 @@ let rafId = null;          // for cancelAnimationFrame on destroy
 let paused = false;        // true when app is paused
 let motionQuery;           // MediaQueryList for prefers-reduced-motion
 let reducedMotion = false; // true when reduced motion is active
+let loadGeneration = 0;    // monotonic counter — guards against stale async loads
 ```
 
 **Dot state shape:**
@@ -189,7 +191,9 @@ shimmer.resume()                — restart rAF loop
 shimmer.destroy()               — cancelAnimationFrame, disconnect observer
 ```
 
-**Breaking change from ADR-006:** `loadScene()` is now **async** because it loads an external PNG image. ADR-006 specified synchronous `loadScene()` because all data was inline JSON. The call site in `showFrame()` must await or fire-and-forget. This is safe because the GSAP container fade hides the transition — the shimmer appears when the fade-in reveals the new scene.
+**Breaking change from ADR-006:** `loadScene()` is now **async** because it loads an external PNG image. ADR-006 specified synchronous `loadScene()` because all data was inline JSON. The call site in `showFrame()` stores the returned promise (`app.shimmerReady`) and the transition gates on it (alongside `app.effectsReady`) before fading in. A monotonic generation counter inside `loadScene()` guards against stale async completions — if a newer `loadScene()` is called while an older mask is still loading, the older load's post-await work is silently discarded.
+
+**Config validation:** When config is non-null, `loadScene()` validates per §06A.3.3: `opacity` is required (float 0–1), `mask` is required (string), `color` must be warm-toned (R dominant, B < 0.65 × R), `dotCount` must be a positive integer. Invalid config throws — no silent degradation.
 
 ### 06A.4.4 Rendering — Two Layers (supersedes §06.4.4)
 
@@ -403,13 +407,16 @@ CATEGORY          │ CASES
 ──────────────────┼────────────────────────────────────────────
 init/destroy      │ acquires context, starts rAF, cleanup cancels rAF,
                   │ disposes walk map and trace image
-loadScene         │ valid config with mask, null config, missing mask
-                  │ URL, mid-frame swap (generation counter), async
-                  │ cancellation on rapid navigation
+loadScene         │ valid config with mask, null config, missing mask URL,
+                  │ mid-frame swap (generation counter discards stale load),
+                  │ async cancellation on rapid navigation, validation rejects
+                  │ missing opacity / out-of-range opacity / cool-toned color /
+                  │ non-integer dotCount
 pause/resume      │ rAF stops on pause, resumes on resume, dots freeze
                   │ in place (no position drift on resume)
 reduced motion    │ static trace image at scene opacity, dots frozen at 0.6α
-resize            │ walk map and trace image rebuild from mask
+resize            │ canvas dimensions update; rendering scales via drawImage
+                  │ (walk map and trace image stay at mask resolution)
 dots              │ spawn at walkable positions, respect WALK_RADIUS,
                   │ respawn when stuck, DOT_COUNT honored, individual
                   │ pulse phase offsets produce desynchronized breathing
