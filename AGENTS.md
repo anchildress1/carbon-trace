@@ -109,6 +109,7 @@ Full system design: `docs/design/carbon-trace-system-design-v5.md` and `docs/ADR
 - Prettier for formatting, ESLint for linting.
 - No class hierarchies — flat modules with focused functions.
 - One orchestrator (`app.js`) manages state; other modules are pure utilities.
+- `src/scenes.json` narration text is written in Appalachian dialect — never correct spelling, grammar, or phrasing in this file.
 
 ## Test Standards
 
