@@ -247,7 +247,7 @@
       "image": "assets/images/scene-02-travel-54a3db62.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-02-travel-circuit-995e4c36.png",
-        "opacity": 0.15,
+        "opacity": 0.16,
         "color": [195, 165, 95],
         "dotCount": 1,
         "dotSpeed": 0.15
@@ -408,9 +408,9 @@
       "image": "assets/images/scene-03-reach-4e663fd3.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-03-reach-circuit-8b6d55f3.png",
-        "opacity": 0.2,
+        "opacity": 0.17,
         "color": [220, 110, 50],
-        "dotCount": 3,
+        "dotCount": 2,
         "dotSpeed": 0.25
       },
       "narration": {
@@ -568,9 +568,9 @@
       "image": "assets/images/scene-04-pocket-88d6304f.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-04-pocket-circuit-c96ade27.png",
-        "opacity": 0.25,
+        "opacity": 0.24,
         "color": [200, 165, 85],
-        "dotCount": 6,
+        "dotCount": 4,
         "dotSpeed": 0.35
       },
       "narration": {
@@ -734,9 +734,9 @@
       "image": "assets/images/scene-05-rinse-1a364a77.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-05-rinse-circuit-8907135c.png",
-        "opacity": 0.3,
+        "opacity": 0.27,
         "color": [200, 175, 110],
-        "dotCount": 10,
+        "dotCount": 6,
         "dotSpeed": 0.45
       },
       "narration": {
@@ -904,9 +904,9 @@
       "image": "assets/images/scene-06-storage-c40adb37.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-06-storage-circuit-0a620c4a.png",
-        "opacity": 0.35,
+        "opacity": 0.3,
         "color": [230, 190, 100],
-        "dotCount": 18,
+        "dotCount": 9,
         "dotSpeed": 0.55
       },
       "narration": {
@@ -1063,9 +1063,9 @@
       "image": "assets/images/scene-07-missing-f1bd7c69.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-07-missing-circuit-2f460aee.png",
-        "opacity": 0.4,
+        "opacity": 0.35,
         "color": [235, 180, 80],
-        "dotCount": 24,
+        "dotCount": 14,
         "dotSpeed": 0.65
       },
       "narration": {
@@ -1193,10 +1193,10 @@
       "description": "Sparse room with tin on wall shelf, circuitry glowing on walls, bright window — a space where someone should be but isn't",
       "image": "assets/images/scene-08-empty-3584464f.webp",
       "traceOverlay": {
-        "mask": "assets/masks/mask-08-empty-circuit-cf0a79ad.png",
-        "opacity": 0.5,
+        "mask": "assets/masks/mask-08-empty-circuit-569268f8.png",
+        "opacity": 0.42,
         "color": [232, 195, 110],
-        "dotCount": 30,
+        "dotCount": 21,
         "dotSpeed": 0.7
       },
       "narration": {
@@ -1250,9 +1250,9 @@
       "image": "assets/images/scene-09-return-07176bf3.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-09-return-circuit-b386abec.png",
-        "opacity": 0.75,
+        "opacity": 0.52,
         "color": [232, 200, 115],
-        "dotCount": 40,
+        "dotCount": 30,
         "dotSpeed": 0.8
       },
       "narration": {
@@ -1394,9 +1394,9 @@
       "image": "assets/images/scene-10-building-d464d608.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-10-building-circuit-7f523f64.png",
-        "opacity": 0.83,
+        "opacity": 0.66,
         "color": [232, 195, 105],
-        "dotCount": 60,
+        "dotCount": 42,
         "dotSpeed": 1.0
       },
       "narration": {
@@ -1531,8 +1531,8 @@
       "image": "assets/images/scene-11-music-f089c2e4.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-11-music-circuit-0ae69818.png",
-        "opacity": 0.9,
-        "dotCount": 80,
+        "opacity": 0.85,
+        "dotCount": 60,
         "dotSpeed": 1.25
       },
       "narration": {
