@@ -99,7 +99,7 @@
       "image": "assets/images/scene-01-seam-48263be1.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-01-seam-circuit-41940702.png",
-        "opacity": 0.15,
+        "opacity": 0.2,
         "color": [180, 155, 100],
         "dotCount": 0,
         "dotSpeed": 0
@@ -247,7 +247,7 @@
       "image": "assets/images/scene-02-travel-54a3db62.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-02-travel-circuit-995e4c36.png",
-        "opacity": 0.16,
+        "opacity": 0.2,
         "color": [195, 165, 95],
         "dotCount": 1,
         "dotSpeed": 0.15
@@ -408,10 +408,10 @@
       "image": "assets/images/scene-03-reach-4e663fd3.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-03-reach-circuit-8b6d55f3.png",
-        "opacity": 0.17,
+        "opacity": 0.21,
         "color": [220, 110, 50],
         "dotCount": 2,
-        "dotSpeed": 0.25
+        "dotSpeed": 0.17
       },
       "narration": {
         "lines": [
@@ -568,10 +568,10 @@
       "image": "assets/images/scene-04-pocket-88d6304f.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-04-pocket-circuit-c96ade27.png",
-        "opacity": 0.24,
+        "opacity": 0.27,
         "color": [200, 165, 85],
         "dotCount": 4,
-        "dotSpeed": 0.35
+        "dotSpeed": 0.19
       },
       "narration": {
         "lines": [
@@ -734,10 +734,10 @@
       "image": "assets/images/scene-05-rinse-1a364a77.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-05-rinse-circuit-8907135c.png",
-        "opacity": 0.27,
+        "opacity": 0.28,
         "color": [200, 175, 110],
         "dotCount": 6,
-        "dotSpeed": 0.45
+        "dotSpeed": 0.23
       },
       "narration": {
         "lines": [
@@ -859,7 +859,7 @@
           },
           {
             "type": "glow",
-            "mask": "assets/masks/mask-05-rinse-diamond-b39d654a.png",
+            "mask": "assets/masks/mask-05-rinse-diamond-99a0ae66.png",
             "color": 16642996,
             "glowAlpha": 0.15,
             "distance": 12,
@@ -907,7 +907,7 @@
         "opacity": 0.3,
         "color": [230, 190, 100],
         "dotCount": 9,
-        "dotSpeed": 0.55
+        "dotSpeed": 0.27
       },
       "narration": {
         "lines": [
@@ -1063,10 +1063,10 @@
       "image": "assets/images/scene-07-missing-f1bd7c69.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-07-missing-circuit-2f460aee.png",
-        "opacity": 0.35,
+        "opacity": 0.33,
         "color": [235, 180, 80],
         "dotCount": 14,
-        "dotSpeed": 0.65
+        "dotSpeed": 0.34
       },
       "narration": {
         "lines": [
@@ -1194,10 +1194,10 @@
       "image": "assets/images/scene-08-empty-3584464f.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-08-empty-circuit-569268f8.png",
-        "opacity": 0.42,
+        "opacity": 0.37,
         "color": [232, 195, 110],
         "dotCount": 21,
-        "dotSpeed": 0.7
+        "dotSpeed": 0.43
       },
       "narration": {
         "lines": [
@@ -1250,10 +1250,10 @@
       "image": "assets/images/scene-09-return-07176bf3.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-09-return-circuit-b386abec.png",
-        "opacity": 0.52,
+        "opacity": 0.42,
         "color": [232, 200, 115],
         "dotCount": 30,
-        "dotSpeed": 0.8
+        "dotSpeed": 0.56
       },
       "narration": {
         "lines": [
@@ -1394,10 +1394,10 @@
       "image": "assets/images/scene-10-building-d464d608.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-10-building-circuit-7f523f64.png",
-        "opacity": 0.66,
+        "opacity": 0.5,
         "color": [232, 195, 105],
         "dotCount": 42,
-        "dotSpeed": 1.0
+        "dotSpeed": 0.74
       },
       "narration": {
         "lines": [
@@ -1531,9 +1531,9 @@
       "image": "assets/images/scene-11-music-f089c2e4.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-11-music-circuit-0ae69818.png",
-        "opacity": 0.85,
+        "opacity": 0.6,
         "dotCount": 60,
-        "dotSpeed": 1.25
+        "dotSpeed": 1.0
       },
       "narration": {
         "lines": [
