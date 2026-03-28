@@ -2052,7 +2052,7 @@ describe('app.js', () => {
       expect(connectEffectsAnalysisAudio).not.toHaveBeenCalled();
     });
 
-    it('does not wire analysis audio when effects load is unavailable', async () => {
+    it('does not set effects analyser when effects load is unavailable', async () => {
       const mockAnalyser = { frequencyBinCount: 1024 };
       getAnalyserNode.mockReturnValue(mockAnalyser);
       loadEffectsScene.mockResolvedValueOnce(false);
@@ -2060,8 +2060,10 @@ describe('app.js', () => {
       app.advance(); // title → scene-01
       await flush();
 
+      // Analysis audio connects immediately (decoupled from effects load).
+      expect(connectEffectsAnalysisAudio).toHaveBeenCalledWith('credits-music.mp3', mockAnalyser, true);
+      // setEffectsAnalyser is gated on effects load success — not called when false.
       expect(setEffectsAnalyser).not.toHaveBeenCalled();
-      expect(connectEffectsAnalysisAudio).not.toHaveBeenCalled();
     });
 
     it('ignores stale async effects completion from superseded scene', async () => {
@@ -2085,8 +2087,8 @@ describe('app.js', () => {
       resolveSceneLoad(true);
       await flush();
 
+      // Stale .then() — generation mismatch prevents setEffectsAnalyser.
       expect(setEffectsAnalyser).not.toHaveBeenCalled();
-      expect(connectEffectsAnalysisAudio).not.toHaveBeenCalled();
     });
 
     it('warns when analyserCueId does not match any audioCue', async () => {

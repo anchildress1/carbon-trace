@@ -1,6 +1,6 @@
-import { readFileSync } from 'fs';
-import { dirname, resolve } from 'path';
-import { fileURLToPath } from 'url';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { test, expect } from '@playwright/test';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -108,18 +108,18 @@ test.describe('keyboard focus management', () => {
     expect(focused).toBe(false);
   });
 
-  test('button click moves focus to the active dot', async ({ page }) => {
+  test('button click moves focus to btn-pause', async ({ page }) => {
     await dismissLoadingScreen(page);
 
     await page.click('#btn-next');
     const stage = page.locator('#scene-stage');
     await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
 
-    const focused = await page.evaluate(() => document.activeElement?.classList.contains('progress-dot'));
-    expect(focused).toBe(true);
+    const focusedId = await page.evaluate(() => document.activeElement?.id);
+    expect(focusedId).toBe('btn-pause');
   });
 
-  test('dot click moves focus to the active dot after navigation', async ({ page }) => {
+  test('dot click moves focus to btn-pause after navigation', async ({ page }) => {
     await dismissLoadingScreen(page);
 
     const secondDot = page.locator('.progress-dot').nth(1);
@@ -127,27 +127,27 @@ test.describe('keyboard focus management', () => {
     const stage = page.locator('#scene-stage');
     await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
 
-    const focused = await page.evaluate(() => document.activeElement?.classList.contains('progress-dot'));
-    expect(focused).toBe(true);
+    const focusedId = await page.evaluate(() => document.activeElement?.id);
+    expect(focusedId).toBe('btn-pause');
   });
 
-  test('Space then btn-next click still moves focus to active dot', async ({ page }) => {
+  test('Space then btn-next click still moves focus to btn-pause', async ({ page }) => {
     await dismissLoadingScreen(page);
 
     // Space toggles pause — must NOT taint lastNavSource for subsequent pointer nav
     await page.keyboard.press('Space');
     await page.keyboard.press('Space');
 
-    // Pointer-initiated navigation should move focus to the active dot
+    // Pointer-initiated navigation should move focus to btn-pause
     await page.click('#btn-next');
     const stage = page.locator('#scene-stage');
     await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
 
-    const focused = await page.evaluate(() => document.activeElement?.classList.contains('progress-dot'));
-    expect(focused).toBe(true);
+    const focusedId = await page.evaluate(() => document.activeElement?.id);
+    expect(focusedId).toBe('btn-pause');
   });
 
-  test('Escape then btn-next click still moves focus to active dot', async ({ page }) => {
+  test('Escape then btn-next click still moves focus to btn-pause', async ({ page }) => {
     await dismissLoadingScreen(page);
 
     // Escape pauses — must NOT taint lastNavSource for subsequent pointer nav
@@ -157,8 +157,8 @@ test.describe('keyboard focus management', () => {
     const stage = page.locator('#scene-stage');
     await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
 
-    const focused = await page.evaluate(() => document.activeElement?.classList.contains('progress-dot'));
-    expect(focused).toBe(true);
+    const focusedId = await page.evaluate(() => document.activeElement?.id);
+    expect(focusedId).toBe('btn-pause');
   });
 
   test('sequential keyboard advances do not redirect focus', async ({ page }) => {
@@ -917,7 +917,7 @@ test.describe('roving tabindex on progress dots', () => {
 
   test('clicking current dot syncs roving index for subsequent arrow nav', async ({ page }) => {
     // Navigate to scene 2 via keyboard (roving index stays at 0)
-    await advanceByKeyboard(page, 2);
+    await advanceByKeyboard(page, 1);
 
     // Click the current dot (scene 2 = dotElements[1]) — no transition fires
     const dot2 = page.locator('.progress-dot').nth(1);

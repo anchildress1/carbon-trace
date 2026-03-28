@@ -6,21 +6,22 @@
     <meta name="description" content="carbon-trace — an immersive visual narrative" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; media-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; media-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'self'"
     />
     <title>carbon-trace</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
-    <div id="app" role="application" aria-label="carbon-trace visual narrative">
+    <div id="app" role="application" aria-label="Carbon Trace visual narrative">
       <button
         class="loading-screen"
         id="loading-screen"
         aria-label="carbon-trace, begin experience"
       >
         <span class="loading-trace">
-          <span class="loading-title">carbon-trace</span>
+          <span class="loading-title loading-title--main">Carbon Trace</span>
+          <span class="loading-title loading-title--byline">By Ashley Childress</span>
           <svg class="loading-svg" viewBox="0 0 200 40" aria-hidden="true">
             <path
               class="trace-glow"

@@ -321,24 +321,28 @@ function crossfadeAmbientCue(cue, crossfadeDurationMs) {
   let unloaded = false;
   let fadeOutTimer = null;
 
-  // Unload old ONLY after new confirms playback
-  newHowl.once('play', () => {
-    if (oldHowl && !unloaded) {
-      oldEntry.state = 'fading-out';
-      oldHowl.fade(oldHowl.volume(), 0, crossfadeDurationMs);
-      fadeOutTimer = new PausableTimer(() => {
-        fadeOutTimer = null;
-        oldHowl.unload();
-        unloaded = true;
-        removeEntryIfCurrent(oldEntry);
-      }, crossfadeDurationMs + 100);
-    }
-  });
+  // Start outgoing fade immediately — tied to scene transition, not to when
+  // the incoming file finishes buffering. Error handler cancels the timer and
+  // restores the old ambient if the new one fails to load or play.
+  if (oldHowl) {
+    oldEntry.state = 'fading-out';
+    oldHowl.fade(oldHowl.volume(), 0, crossfadeDurationMs);
+    fadeOutTimer = new PausableTimer(() => {
+      fadeOutTimer = null;
+      oldHowl.unload();
+      unloaded = true;
+      removeEntryIfCurrent(oldEntry);
+    }, crossfadeDurationMs + 100);
+  }
 
   const handleError = (label, _id, err) => {
     console.warn(`Ambient ${label} failed: ${cue.src}`, err);
     newHowl.unload();
     if (oldHowl && !unloaded) {
+      if (fadeOutTimer) {
+        fadeOutTimer.cancel();
+        fadeOutTimer = null;
+      }
       oldEntry.state = 'playing';
       oldHowl.fade(oldHowl.volume(), oldVolume, 200);
     }
