@@ -246,7 +246,7 @@
       "description": "Mine tunnel with coal cart and miner walking with headlamp, diamond glowing in the coal — carbon in transit through the earth",
       "image": "assets/images/scene-02-travel-54a3db62.webp",
       "traceOverlay": {
-        "mask": "assets/masks/mask-02-travel-circuit-80a7eb4e.png",
+        "mask": "assets/masks/mask-02-travel-circuit-995e4c36.png",
         "opacity": 0.3,
         "color": [195, 165, 95],
         "dotCount": 2,
