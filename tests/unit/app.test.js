@@ -74,6 +74,14 @@ vi.mock('../../src/effects-canvas.js', () => ({
   startAnalysisPlayback: vi.fn(),
 }));
 
+vi.mock('../../src/shimmer.js', () => ({
+  init: vi.fn(),
+  loadScene: vi.fn().mockResolvedValue(undefined),
+  pause: vi.fn(),
+  resume: vi.fn(),
+  destroy: vi.fn(),
+}));
+
 vi.mock('../../src/overlay.js', () => ({
   initOverlay: vi.fn(),
   updateProgress: vi.fn(),
@@ -272,7 +280,7 @@ function buildDOM() {
 
   const ids = [
     'loading-screen', 'scene-stage', 'scene-canvas',
-    'effects-canvas', 'narration-layer', 'caption-layer', 'accessible-narration',
+    'effects-canvas', 'trace-overlay', 'narration-layer', 'caption-layer', 'accessible-narration',
     'overlay-controls', 'progress-dots', 'btn-prev', 'btn-next',
     'btn-replay', 'btn-mute', 'btn-pause', 'btn-captions',
     'loading-prompt', 'transition-loader',
@@ -284,7 +292,7 @@ function buildDOM() {
 
   for (const id of ids) {
     let el;
-    if (id === 'scene-canvas' || id === 'effects-canvas') {
+    if (id === 'scene-canvas' || id === 'effects-canvas' || id === 'trace-overlay') {
       el = document.createElement('canvas');
       el.getContext = vi.fn(() => ({
         clearRect: vi.fn(),
