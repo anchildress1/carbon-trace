@@ -22,6 +22,7 @@ let opacity = 0;
 let motionQuery = null;
 let reducedMotion = false;
 let traceImage = null;
+let activeColor = [232, 200, 120]; // current scene's glow color
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
@@ -29,7 +30,7 @@ const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 const DOT_COUNT = 15;
 const DOT_RADIUS = 4;
 const DOT_SPEED = 0.8;
-const GLOW_COLOR = [232, 200, 120];
+const DEFAULT_COLOR = [232, 200, 120];
 const TRACE_ALPHA = 0.12;
 const PULSE_FREQ = 0.0015; // ~4.2s full cycle
 const WALK_RADIUS = 3; // pixels — tolerance for staying on thin lines
@@ -79,7 +80,7 @@ function buildTraceImage() {
   const offCtx = off.getContext('2d');
   const imageData = offCtx.createImageData(mapW, mapH);
   const { data } = imageData;
-  const [cr, cg, cb] = GLOW_COLOR;
+  const [cr, cg, cb] = activeColor;
 
   for (let i = 0; i < mapW * mapH; i++) {
     if (walkMap[i]) {
@@ -313,7 +314,7 @@ function render(time) {
   const sx = cw / mapW;
   const sy = ch / mapH;
   const scale = Math.max(sx, sy);
-  const [cr, cg, cb] = GLOW_COLOR;
+  const [cr, cg, cb] = activeColor;
 
   for (const dot of dots) {
     if (!reducedMotion) {
@@ -393,6 +394,7 @@ export async function loadScene(config) {
   }
 
   opacity = config.opacity ?? 0.85;
+  activeColor = config.color ?? DEFAULT_COLOR;
   handleResize();
 
   const img = new Image();
