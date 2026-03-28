@@ -33,6 +33,12 @@ import {
   clearCaptionElements,
 } from './captions.js';
 import { initKeyboard } from './keyboard.js';
+import {
+  init as initShimmer,
+  loadScene as loadShimmerScene,
+  pause as pauseShimmer,
+  resume as resumeShimmer,
+} from './shimmer.js';
 
 // Lazy-load pixi.js effects to keep it off the critical rendering path.
 // The dynamic import starts immediately but doesn't block initial paint,
@@ -479,6 +485,12 @@ function showFrame(app, index) {
     app.effectsReady = null;
   }
 
+  // Shimmer trace overlay — load circuit mask if one exists for this scene
+  const circuitMask = frame.traceOverlay?.mask ?? null;
+  loadShimmerScene(
+    circuitMask ? { mask: circuitMask, opacity: frame.traceOverlay.opacity } : null,
+  ).catch((err) => console.error('Shimmer load failed:', err));
+
   const sceneIdx = app.sceneMap.byFrame.get(index);
   if (sceneIdx !== undefined) {
     updateProgress(sceneIdx);
@@ -834,6 +846,7 @@ function doResume(app) {
   }
 
   resumeEffects();
+  resumeShimmer();
 
   if (app.autoAdvanceTimer) {
     app.autoAdvanceTimer.resume();
@@ -859,6 +872,7 @@ function doPause(app) {
   }
 
   pauseEffects();
+  pauseShimmer();
 
   app.autoAdvanceTimer?.pause();
   app.analysisStartTimer?.pause();
@@ -933,6 +947,7 @@ function initApp(app) {
   initEffectsCanvas(app.els.effectsCanvas).catch((err) =>
     console.error('Effects canvas init failed:', err.message),
   );
+  initShimmer(app.els.traceOverlay);
 
   preloadFirstFrameAudio(app.frames, (result) => registerAudio(app, result));
   onNarrationBufferChange((isBuffering) => handleBufferChange(app, isBuffering));
@@ -1037,6 +1052,7 @@ export function createApp() {
     'scene-stage',
     'scene-canvas',
     'effects-canvas',
+    'trace-overlay',
     'narration-layer',
     'caption-layer',
     'accessible-narration',
@@ -1090,6 +1106,7 @@ export function createApp() {
       sceneStage: document.getElementById('scene-stage'),
       sceneCanvas: document.getElementById('scene-canvas'),
       effectsCanvas: document.getElementById('effects-canvas'),
+      traceOverlay: document.getElementById('trace-overlay'),
       narrationLayer: document.getElementById('narration-layer'),
       captionLayer: document.getElementById('caption-layer'),
       accessibleNarration: document.getElementById('accessible-narration'),

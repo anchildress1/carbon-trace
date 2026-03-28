@@ -1459,6 +1459,10 @@
       "holdAfterNarration": 2000,
       "description": "Woman standing before record player on wooden table with diamond glowing, circuit traces and sparkles filling the bright room — the finale",
       "image": "assets/images/scene-11-music.webp",
+      "traceOverlay": {
+        "mask": "assets/masks/mask-11-music-circuit.png",
+        "opacity": 0.85
+      },
       "narration": {
         "lines": [
           {
