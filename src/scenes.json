@@ -247,7 +247,7 @@
       "image": "assets/images/scene-02-travel-54a3db62.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-02-travel-circuit-995e4c36.png",
-        "opacity": 0.3,
+        "opacity": 0.15,
         "color": [195, 165, 95],
         "dotCount": 1,
         "dotSpeed": 0.15
@@ -407,8 +407,8 @@
       "description": "Hand reaching toward diamond in a pile of burning coals, intense fire behind — carbon released as heat at the threshold of use",
       "image": "assets/images/scene-03-reach-4e663fd3.webp",
       "traceOverlay": {
-        "mask": "assets/masks/mask-03-reach-circuit-f5eb3d24.png",
-        "opacity": 0.35,
+        "mask": "assets/masks/mask-03-reach-circuit-8b6d55f3.png",
+        "opacity": 0.2,
         "color": [220, 110, 50],
         "dotCount": 3,
         "dotSpeed": 0.25
@@ -568,7 +568,7 @@
       "image": "assets/images/scene-04-pocket-88d6304f.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-04-pocket-circuit-c96ade27.png",
-        "opacity": 0.12,
+        "opacity": 0.25,
         "color": [200, 165, 85],
         "dotCount": 6,
         "dotSpeed": 0.35
@@ -904,7 +904,7 @@
       "image": "assets/images/scene-06-storage-c40adb37.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-06-storage-circuit-0a620c4a.png",
-        "opacity": 0.4,
+        "opacity": 0.35,
         "color": [230, 190, 100],
         "dotCount": 18,
         "dotSpeed": 0.55
@@ -1063,7 +1063,7 @@
       "image": "assets/images/scene-07-missing-f1bd7c69.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-07-missing-circuit-2f460aee.png",
-        "opacity": 0.5,
+        "opacity": 0.4,
         "color": [235, 180, 80],
         "dotCount": 24,
         "dotSpeed": 0.65
@@ -1194,7 +1194,7 @@
       "image": "assets/images/scene-08-empty-3584464f.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-08-empty-circuit-cf0a79ad.png",
-        "opacity": 0.6,
+        "opacity": 0.5,
         "color": [232, 195, 110],
         "dotCount": 30,
         "dotSpeed": 0.7
@@ -1394,7 +1394,7 @@
       "image": "assets/images/scene-10-building-d464d608.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-10-building-circuit-7f523f64.png",
-        "opacity": 0.88,
+        "opacity": 0.83,
         "color": [232, 195, 105],
         "dotCount": 60,
         "dotSpeed": 1.0
@@ -1531,7 +1531,7 @@
       "image": "assets/images/scene-11-music-f089c2e4.webp",
       "traceOverlay": {
         "mask": "assets/masks/mask-11-music-circuit-0ae69818.png",
-        "opacity": 1.0,
+        "opacity": 0.9,
         "dotCount": 80,
         "dotSpeed": 1.25
       },
