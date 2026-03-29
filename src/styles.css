@@ -506,9 +506,6 @@ body {
 #credits-panel {
   position: absolute;
   inset: 8% 12%;
-  backdrop-filter: blur(16px) saturate(1.2);
-  -webkit-backdrop-filter: blur(16px) saturate(1.2);
-  background: rgba(0, 0, 0, 0.5);
   overflow: hidden;
   opacity: 0;
   mask-image: linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%);
@@ -522,6 +519,18 @@ body {
   z-index: 7;
   border-radius: 12px;
   border: 1px solid rgba(232, 200, 120, 0.08);
+}
+
+/* Backdrop lives in a child element so it's composited within #credits-panel's
+   opacity stacking context. This prevents backdrop-filter from rendering visibly
+   while the panel is at opacity:0 — a known compositing bug in Safari and some
+   Chrome versions where backdrop-filter leaks through at zero opacity. */
+#credits-backdrop {
+  position: absolute;
+  inset: 0;
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  background: rgba(0, 0, 0, 0.5);
 }
 
 #credits-scroll-content {
@@ -597,6 +606,14 @@ body {
   outline: 2px solid rgba(232, 200, 120, 0.5);
   outline-offset: 3px;
   border-radius: 2px;
+}
+
+/* Desktop: larger control button icons */
+@media (min-width: 768px) {
+  .control-buttons button svg {
+    width: 19px;
+    height: 19px;
+  }
 }
 
 /* Reduced motion */
