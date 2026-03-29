@@ -1,4 +1,4 @@
-![Banner](https://raw.githubusercontent.com/anchildress1/carbon-trace/3af0fd53d604abf1bfaaa768b8c1119f5adab5a3/public/assets/images/carbon-trace-banner-gh-e897ebe7.webp)
+![Banner](public/assets/images/carbon-trace-banner-gh-e897ebe7.webp)
 
 # Carbon Trace: An Immersive Art Experience
 

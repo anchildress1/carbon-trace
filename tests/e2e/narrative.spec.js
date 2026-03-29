@@ -62,8 +62,10 @@ async function dispatchNarrationEnded(page) {
     const after = globalThis.__ctE2EApp._debugCreditsState?.() ?? 'no debug';
     return { before, after };
   });
-  // eslint-disable-next-line no-console
-  console.log('[E2E] dispatchNarrationEnded state:', JSON.stringify(beforeState));
+  if (process.env.DEBUG_E2E) {
+    // eslint-disable-next-line no-console
+    console.log('[E2E] dispatchNarrationEnded state:', JSON.stringify(beforeState));
+  }
 }
 
 async function waitForCreditsVisible(page, panel, timeout = 6000) {

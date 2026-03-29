@@ -322,6 +322,25 @@ describe('credits.js', () => {
         expect(removeSpy).toHaveBeenCalledWith(type, handler);
       }
     });
+
+    it('is safe to call multiple times', () => {
+      cleanupCredits(panel);
+      cleanupCredits(panel);
+      expect(panel.hidden).toBe(true);
+    });
+
+    it('cancels pending resume timer', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+
+      const wheelEvent = new Event('wheel', { bubbles: true });
+      wheelEvent.deltaY = 100;
+      wheelEvent.preventDefault = vi.fn();
+      panel.dispatchEvent(wheelEvent);
+
+      cleanupCredits(panel);
+      // Timer was cancelled — advancing time must not throw
+      expect(() => vi.advanceTimersByTime(5000)).not.toThrow();
+    });
   });
 
   // -- pauseCreditsScroll / resumeCreditsScroll --
@@ -608,36 +627,6 @@ describe('credits.js', () => {
       textEl.dispatchEvent(new Event('pointerover', { bubbles: true }));
 
       expect(scrollTl.pause).not.toHaveBeenCalled();
-    });
-  });
-
-  // -- cleanupCredits --
-
-  describe('cleanupCredits', () => {
-    it('performs full teardown', () => {
-      revealCreditsPanel(panel, scrollContent, defaultConfig);
-      cleanupCredits(panel);
-      expect(panel.hidden).toBe(true);
-      expect(panel.style.opacity).toBe('0');
-    });
-
-    it('is safe to call multiple times', () => {
-      cleanupCredits(panel);
-      cleanupCredits(panel);
-      expect(panel.hidden).toBe(true);
-    });
-
-    it('cancels pending resume timer', () => {
-      revealCreditsPanel(panel, scrollContent, defaultConfig);
-
-      const wheelEvent = new Event('wheel', { bubbles: true });
-      wheelEvent.deltaY = 100;
-      wheelEvent.preventDefault = vi.fn();
-      panel.dispatchEvent(wheelEvent);
-
-      cleanupCredits(panel);
-      // Timer was cancelled — advancing time must not throw
-      expect(() => vi.advanceTimersByTime(5000)).not.toThrow();
     });
   });
 

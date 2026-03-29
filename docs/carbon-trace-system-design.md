@@ -706,6 +706,7 @@ Auto-advance       │ (internal)           │ (internal)         │ advance(c
     <div id="narration-layer" aria-hidden="true"></div>
     <div id="caption-layer" aria-hidden="true"></div>
     <section id="credits-panel" hidden aria-label="Credits">  <!-- ADR-011, z-index 7 -->
+      <div id="credits-backdrop" aria-hidden="true"></div>
       <div id="credits-scroll-content"></div>
     </section>
   </div>
