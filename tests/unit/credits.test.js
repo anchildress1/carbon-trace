@@ -407,6 +407,85 @@ describe('credits.js', () => {
     });
   });
 
+  // -- touch drag scroll override --
+
+  describe('touch drag scroll override', () => {
+    function makeTouchEvent(type, clientY) {
+      const e = new Event(type, { bubbles: true });
+      e.touches = [{ clientY }];
+      e.preventDefault = vi.fn();
+      return e;
+    }
+
+    it('pauses timeline on touchmove', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      const scrollTl = gsapMockState.lastTimeline;
+
+      panel.dispatchEvent(makeTouchEvent('touchstart', 300));
+      panel.dispatchEvent(makeTouchEvent('touchmove', 250));
+
+      expect(scrollTl.pause).toHaveBeenCalled();
+    });
+
+    it('scrubs timeline position proportionally to drag delta', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      const scrollTl = gsapMockState.lastTimeline;
+      scrollTl.time.mockReturnValue(10);
+
+      panel.dispatchEvent(makeTouchEvent('touchstart', 300));
+      panel.dispatchEvent(makeTouchEvent('touchmove', 200));
+
+      // deltaY = 300 - 200 = 100 (drag up); scrubDelta = (100 / 2000) * 60 = 3
+      expect(scrollTl.time).toHaveBeenCalledWith(13);
+    });
+
+    it('prevents default on touchmove to block native scroll', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+
+      panel.dispatchEvent(makeTouchEvent('touchstart', 300));
+      const moveEvent = makeTouchEvent('touchmove', 250);
+      panel.dispatchEvent(moveEvent);
+
+      expect(moveEvent.preventDefault).toHaveBeenCalled();
+    });
+
+    it('schedules resume timer after touch drag', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      const scrollTl = gsapMockState.lastTimeline;
+
+      panel.dispatchEvent(makeTouchEvent('touchstart', 300));
+      panel.dispatchEvent(makeTouchEvent('touchmove', 250));
+      panel.dispatchEvent(new Event('touchend', { bubbles: true }));
+
+      scrollTl.play.mockClear();
+      vi.advanceTimersByTime(2000);
+      expect(scrollTl.play).toHaveBeenCalled();
+    });
+
+    it('ignores touchmove without prior touchstart', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      const scrollTl = gsapMockState.lastTimeline;
+
+      // touchmove without touchstart — lastTouchY is null
+      panel.dispatchEvent(makeTouchEvent('touchmove', 250));
+
+      expect(scrollTl.pause).not.toHaveBeenCalled();
+    });
+
+    it('resets touch tracking on touchend', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      const scrollTl = gsapMockState.lastTimeline;
+
+      panel.dispatchEvent(makeTouchEvent('touchstart', 300));
+      panel.dispatchEvent(new Event('touchend', { bubbles: true }));
+
+      // After touchend, a new touchmove without touchstart should be ignored
+      scrollTl.pause.mockClear();
+      panel.dispatchEvent(makeTouchEvent('touchmove', 250));
+      expect(scrollTl.pause).not.toHaveBeenCalled();
+    });
+  });
+
   // -- focus/hover pause (WCAG 2.4.3) --
 
   describe('focus/hover pause (WCAG 2.4.3)', () => {
@@ -478,6 +557,28 @@ describe('credits.js', () => {
       link.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
       vi.advanceTimersByTime(2000);
       expect(scrollTl.play).toHaveBeenCalled();
+    });
+
+    it('ignores focusin on non-interactive elements', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      const scrollTl = gsapMockState.lastTimeline;
+      scrollTl.pause.mockClear();
+
+      const textEl = scrollContent.querySelector('.credits-text');
+      textEl.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+
+      expect(scrollTl.pause).not.toHaveBeenCalled();
+    });
+
+    it('ignores pointerover on non-interactive elements', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      const scrollTl = gsapMockState.lastTimeline;
+      scrollTl.pause.mockClear();
+
+      const textEl = scrollContent.querySelector('.credits-text');
+      textEl.dispatchEvent(new Event('pointerover', { bubbles: true }));
+
+      expect(scrollTl.pause).not.toHaveBeenCalled();
     });
   });
 
@@ -615,6 +716,23 @@ describe('credits.js', () => {
         scrollContent,
         expect.objectContaining({ clearProps: 'y' }),
       );
+
+      vi.restoreAllMocks();
+    });
+
+    it('removes matchMedia listener on cleanup', () => {
+      const mockQuery = {
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      };
+      vi.spyOn(globalThis, 'matchMedia').mockReturnValue(mockQuery);
+
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      expect(mockQuery.addEventListener).toHaveBeenCalledWith('change', expect.any(Function));
+
+      cleanupCredits(panel);
+      expect(mockQuery.removeEventListener).toHaveBeenCalledWith('change', expect.any(Function));
 
       vi.restoreAllMocks();
     });
