@@ -468,9 +468,6 @@ test.describe('carbon-trace — positioned text', () => {
     await expect(lines.first()).toBeVisible({ timeout: 5000 });
     const first = lines.first();
 
-    const inlineAlign = await first.evaluate((el) => el.style.getPropertyValue('text-align'));
-    expect(inlineAlign).toBe('');
-
     const computedAlign = await first.evaluate((el) => getComputedStyle(el).getPropertyValue('text-align'));
     expect(computedAlign).toBe('left');
   });

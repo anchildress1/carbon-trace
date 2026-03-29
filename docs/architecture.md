@@ -103,9 +103,9 @@ See [audio-system.md](audio-system.md) for full details.
 ### text.js (ghost-drift animation)
 
 Builds a GSAP timeline from narration lines. Each line is a `<p>` in the
-narration layer with timed entrance and exit animations. Supports custom
-viewport positioning (`x`/`y` in vw/vh) and alignment. Falls back to simple
-opacity fade when `prefers-reduced-motion` is active.
+narration layer with timed entrance and exit animations. Supports precise
+viewport-relative positioning (`x`/`y` in %) with fixed alignment handled by
+CSS. Falls back to simple opacity fade when `prefers-reduced-motion` is active.
 
 ### effects.js (PixiJS effect factory) 🦾
 
@@ -162,7 +162,7 @@ frames[]:
   id, frameType ("title" | "scene" | "credits"), description, image
   holdAfterNarration: ms after narration ends before auto-advance
   narration:
-    lines[]: { text, enter (ms), exit (ms), x? (vw), y? (vh), align? ("left"|"center"|"right") }
+    lines[]: { text, enter (ms), exit (ms), x? (%), y? (%) }
     captions[]: { text, start (ms), end (ms) }
   audioCues[]: (ADR-003/ADR-005)
     { id, type ("narration"|"ambient"|"sfx"), src, enter (ms | anchor), volume, loop, fadeIn, fadeOut }

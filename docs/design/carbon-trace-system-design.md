@@ -174,7 +174,7 @@ function clearNarrationLayer(container) {
 }
 ```
 
-Lines are absolutely positioned via `x` (%), `y` (%) relative to the narration layer. All positioned lines use left text alignment. Ghost-drift animation: blur(4px) + y:18 → clear + y:0 on enter; blur(3px) + y:-10 → gone on exit. Reduced motion: simple opacity fade, no spatial movement.
+Lines are absolutely positioned via `x` (%), `y` (%) relative to the narration layer. Positioned lines are left-aligned via CSS class, not per-line config. Ghost-drift animation: blur(4px) + y:18 → clear + y:0 on enter; blur(3px) + y:-10 → gone on exit. Reduced motion: simple opacity fade, no spatial movement.
 
 Caption entries are GSAP `tl.call()` callbacks at `startSec`/`endSec` that create/remove caption DOM elements. `isCaptionEnabled` function is checked at callback time, enabling mid-scene caption toggle.
 
@@ -297,7 +297,7 @@ Every frame has identical shape via `meta.frameDefaults` merge. `null` = feature
 ```
 FIELD    │ TYPE            │ DESCRIPTION
 ─────────┼─────────────────┼──────────────────────────────────────
-lines    │ array           │ Ghost-drift text lines with enter/exit/x/y/align
+lines    │ array           │ Ghost-drift text lines with enter/exit/x/y
 captions │ array           │ Timed caption entries with text/start/end (ms)
 ```
 

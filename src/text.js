@@ -12,7 +12,6 @@ export function createLineElement(text, container, options = {}) {
     el.style.position = 'absolute';
     el.style.left = `${x}%`;
     el.style.top = `${y}%`;
-    el.style.textAlign = 'left';
     el.style.transform = 'translateY(-50%)';
   }
 
@@ -42,7 +41,6 @@ export function buildNarrationTimeline(lines, container, opts = {}) {
     const el = createLineElement(line.text, container, {
       x: line.x,
       y: line.y,
-      align: line.align,
     });
 
     if (reducedMotion) {

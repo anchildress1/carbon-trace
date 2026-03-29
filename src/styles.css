@@ -287,6 +287,10 @@ body {
   text-align: center;
 }
 
+.narration-line--positioned {
+  text-align: left;
+}
+
 .narration-line {
   font-family: 'Lora', Georgia, serif;
   font-style: italic;
