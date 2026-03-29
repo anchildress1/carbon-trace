@@ -27,7 +27,7 @@ Canonical instruction source for this repository. Treat this file as authoritati
 
 ### Spec compliance
 
-- All implementation MUST follow `docs/design/carbon-trace-system-design-v5.md` and
+- All implementation MUST follow `docs/design/carbon-trace-system-design.md` and
   `docs/ADRs/*.md` as the authoritative source of truth.
 - If a deviation from the spec is warranted, you MUST:
   1. Stop implementation.
@@ -66,7 +66,7 @@ Canvas 2D rendering, GSAP text/transition animation, and Howler.js audio. 12 fra
 (title + 10 scenes + credits) with ghost-drift text, per-scene visual effects, ambient
 audio, and recorded narration. Deployed via Cloud Run + nginx.
 
-Full system design: `docs/design/carbon-trace-system-design-v5.md` and `docs/ADRs/*.md`
+Full system design: `docs/design/carbon-trace-system-design.md` and `docs/ADRs/*.md`
 
 ## Architecture: two rendering layers
 
@@ -79,19 +79,20 @@ Full system design: `docs/design/carbon-trace-system-design-v5.md` and `docs/ADR
 
 ### Module responsibilities
 
-| Module              | Job                                                            | Does NOT know about   |
-| ------------------- | -------------------------------------------------------------- | --------------------- |
-| `app.js`            | State machine, orchestrator                                    | Pixel rendering       |
-| `canvas.js`         | Canvas 2D — image drawing, cover-fit, resize                   | Frame ordering, audio |
-| `effects-canvas.js` | PixiJS WebGL effects overlay, render loop (imports effects.js) | Frame ordering, audio |
-| `effects.js`        | Effect factory registry, `registerEffect`/`createEffect` API   | Canvas internals      |
-| `audio.js`          | Howler — ambient crossfade, narration, buffer monitoring       | DOM, canvas           |
-| `text.js`           | Ghost-drift GSAP timelines from config                         | Audio, canvas         |
-| `captions.js`       | Timed captions, localStorage persistence                       | Audio, canvas         |
-| `keyboard.js`       | Declarative key-action map, document listener, button guard    | App state, DOM, audio |
-| `overlay.js`        | DOM controls — dot bar, roving-tabindex dots, progress         | Canvas, audio         |
-| `loader.js`         | Audio metadata preloading, frame-aware sequencing              | DOM, app state        |
-| `pausable-timer.js` | Pause-aware timer — used by audio.js and app.js                | Everything else       |
+| Module              | Job                                                              | Does NOT know about   |
+| ------------------- | ---------------------------------------------------------------- | --------------------- |
+| `app.js`            | State machine, orchestrator                                      | Pixel rendering       |
+| `canvas.js`         | Canvas 2D — image drawing, cover-fit, resize                     | Frame ordering, audio |
+| `effects-canvas.js` | PixiJS WebGL effects overlay, render loop (imports effects.js)   | Frame ordering, audio |
+| `effects.js`        | Effect factory registry, `registerEffect`/`createEffect` API     | Canvas internals      |
+| `audio.js`          | Howler — ambient crossfade, narration, buffer monitoring         | DOM, canvas           |
+| `text.js`           | Ghost-drift GSAP timelines from config                           | Audio, canvas         |
+| `captions.js`       | Timed captions, localStorage persistence                         | Audio, canvas         |
+| `keyboard.js`       | Declarative key-action map, document listener, button guard      | App state, DOM, audio |
+| `overlay.js`        | DOM controls — dot bar, roving-tabindex dots, progress           | Canvas, audio         |
+| `loader.js`         | Audio metadata preloading, frame-aware sequencing                | DOM, app state        |
+| `shimmer.js`        | Trace shimmer overlay — mask-based pixel-walking dots (ADR-006A) | Frame ordering, audio |
+| `pausable-timer.js` | Pause-aware timer — used by audio.js and app.js                  | Everything else       |
 
 ### Rules
 
@@ -109,6 +110,7 @@ Full system design: `docs/design/carbon-trace-system-design-v5.md` and `docs/ADR
 - Prettier for formatting, ESLint for linting.
 - No class hierarchies — flat modules with focused functions.
 - One orchestrator (`app.js`) manages state; other modules are pure utilities.
+- `src/scenes.json` narration text is written in Appalachian dialect — never correct spelling, grammar, or phrasing in this file.
 
 ## Test Standards
 
@@ -121,6 +123,10 @@ Full system design: `docs/design/carbon-trace-system-design-v5.md` and `docs/ADR
 
 - **Targets** (enforced in `.lighthouserc.json`): ≥90% performance, ≥95% accessibility, ≥95% best-practices, ≥90% SEO.
 - Images are WebP, 16:9, 2x resolution. Total asset budget <35MB.
+- All asset filenames in `public/assets/` carry an 8-char SHA-256 content
+  hash suffix for cache busting (ADR-010). When adding or updating any asset,
+  generate the hash (`shasum -a 256 <file> | cut -c1-8`), include it in the
+  filename, and update all references (`scenes.json`, `styles.css`, etc.).
 - Background preloading uses `Promise.all` to parallelize image and audio streams; within each stream, assets load sequentially. Audio metadata preloading uses native `Audio` elements; Howler handles actual playback.
 - Canvas render target: 60fps during effects (rAF loop).
 
@@ -138,7 +144,7 @@ Full system design: `docs/design/carbon-trace-system-design-v5.md` and `docs/ADR
 
 - Keep docs in `docs/` aligned with the codebase — update them whenever code changes affect architecture, audio system, or accessibility behavior.
 - Prefer Mermaid diagrams whenever a visual would clarify architecture, data flow, or state machines.
-- System design docs are authoritative for architectural decisions: `docs/design/carbon-trace-system-design-v5.md` and `docs/ADRs/*.md`
+- System design docs are authoritative for architectural decisions: `docs/design/carbon-trace-system-design.md` and `docs/ADRs/*.md`
 
 ## Security
 

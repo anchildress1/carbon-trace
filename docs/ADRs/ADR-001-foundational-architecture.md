@@ -106,3 +106,28 @@ Circuit traces baked into Leonardo AI images at scene-appropriate visibility.
 - If v2 effects need GPU acceleration, Canvas 2D → WebGL migration becomes real cost
 - If ambient audio library grows large, lazy-loading audio becomes necessary
 - If frame count exceeds ~20, preload-all strategy needs progressive loading
+
+---
+
+## Addendum: Remove Narration Alignment Parameter (March 2026)
+
+**Status:** Accepted
+
+### Motivation
+
+The narration schema carried alignment noise (`align`) that did
+not add real expressive power. Each line already has exact placement control
+through viewport-relative `x`/`y` percentages, so per-line alignment input is
+redundant and increases configuration surface area without benefit.
+
+### Change
+
+- Remove alignment parameter plumbing from narration line creation.
+- Remove `align` from narration schema documentation.
+- Keep positioned-line visual behavior deterministic via CSS
+  (`.narration-line--positioned { text-align: left; }`).
+
+### Consequence
+
+Narration line placement remains precise and predictable, while the config
+model is simpler: position drives layout; alignment is fixed presentation.

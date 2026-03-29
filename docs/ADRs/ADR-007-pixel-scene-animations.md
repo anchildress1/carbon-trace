@@ -189,7 +189,7 @@ Replaces the current `effects: { idle: "dust-drift", entry: "fade-in" }` structu
 - Format: grayscale PNG, same aspect ratio as scene images (16:9)
 - Resolution: can be lower than scene images (e.g., 768×432) — scaled up on load. Soft edges are fine and desirable.
 - White = full effect. Black = no effect. Gray = partial (used for edge falloff and dust density).
-- Stored in `public/assets/masks/`
+- Stored in `public/assets/masks/` with a content hash suffix for cache busting (see ADR-010). When updating a mask, regenerate the hash (`shasum -a 256 <file> | cut -c1-8`), rename the file, and update `scenes.json`.
 - **Loaded via `new Image()` + `Texture.from()` inside `loadScene()`** — not preloaded ahead of time. Masks are small (~330KB each) and load behind the GSAP fade during transitions. No changes to loader.js. If profiling shows transition jank from mask loading, promote to browser cache warming in loader.js. **CSP note:** `new Image()` falls under `img-src 'self'`, preserving `connect-src 'none'`. `Assets.load()` is NOT used because some PixiJS code paths use `fetch()` internally, which is blocked by `connect-src 'none'`.
 
 ### CSP impact

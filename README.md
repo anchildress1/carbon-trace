@@ -1,12 +1,12 @@
-![Banner](./public/assets/images/carbon-trace-banner-gh.webp)
+![Banner](./public/assets/images/carbon-trace-banner-gh-e897ebe7.webp)
 
 # Carbon Trace: An Immersive Art Experience
 
-[![CI](https://github.com/anchildress1/carbon-trace/actions/workflows/ci.yml/badge.svg)](https://github.com/anchildress1/carbon-trace/actions/workflows/ci.yml) [![License: Polyform Shield](https://img.shields.io/badge/license-Polyform%20Shield-blue)](LICENSE) [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=anchildress1_carbon-trace&metric=alert_status)](https://sonarcloud.io/project/overview?id=anchildress1_carbon-trace) [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=anchildress1_carbon-trace&metric=coverage)](https://sonarcloud.io/project/overview?id=anchildress1_carbon-trace)
+[![CI](https://github.com/anchildress1/carbon-trace/actions/workflows/ci.yml/badge.svg)](https://github.com/anchildress1/carbon-trace/actions/workflows/ci.yml) [![License: Polyform Shield](https://img.shields.io/badge/license-Polyform%20Shield-blue)](LICENSE) [![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=anchildress1_carbon-trace&metric=alert_status)](https://sonarcloud.io/project/overview?id=anchildress1_carbon-trace) [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=anchildress1_carbon-trace&metric=coverage)](https://sonarcloud.io/project/overview?id=anchildress1_carbon-trace) [![Accessibility](https://img.shields.io/badge/accessibility-95%25%2B%20Lighthouse-brightgreen)](https://developer.chrome.com/docs/lighthouse/accessibility)
 
 An immersive visual narrative told from the awareness of a diamond trapped in a coal seam — 12 painted scenes with ghost-drift text, narrated audio, and pixel-level visual effects. Built for [WeCoded 2026 DEV Challenge](https://dev.to/devteam/join-the-2026-wecoded-challenge-and-celebrate-underrepresented-voices-in-tech-through-writing--4828) Frontend Art.
 
-**[Experience it live](http://carbon-trace.anchildress1.dev)**
+**Experience it live: [https://carbon-trace.anchildress1.dev](https://carbon-trace.anchildress1.dev)**
 
 ## The Story 💎
 
@@ -64,6 +64,18 @@ make install
 
 # Start development server
 make dev
+```
+
+## Updating Assets
+
+All files in `public/assets/` carry an 8-char SHA-256 content hash in the filename for cache busting ([ADR-010](docs/ADRs/ADR-010-asset-content-hashing.md)). When you update an image, mask, audio file, or font:
+
+```bash
+# Generate the hash
+shasum -a 256 <file> | cut -c1-8
+
+# Rename with the new hash (replace the old hash suffix)
+# Then update references in src/scenes.json, src/styles.css, etc.
 ```
 
 ## Available Commands 🪄

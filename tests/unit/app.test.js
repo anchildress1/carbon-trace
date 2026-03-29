@@ -1,10 +1,23 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+const { gsapMockState } = vi.hoisted(() => ({
+  gsapMockState: {
+    autoComplete: true,
+    pendingOnCompletes: [],
+  },
+}));
+
 // --- Mock leaf modules ---
 vi.mock('gsap', () => {
   const set = vi.fn();
   const to = vi.fn((_target, opts) => {
-    if (opts.onComplete) opts.onComplete();
+    if (opts?.onComplete) {
+      if (gsapMockState.autoComplete) {
+        opts.onComplete();
+      } else {
+        gsapMockState.pendingOnCompletes.push(opts.onComplete);
+      }
+    }
     return { kill: vi.fn() };
   });
   const timeline = vi.fn(() => ({
@@ -74,6 +87,14 @@ vi.mock('../../src/effects-canvas.js', () => ({
   startAnalysisPlayback: vi.fn(),
 }));
 
+vi.mock('../../src/shimmer.js', () => ({
+  init: vi.fn(),
+  loadScene: vi.fn().mockResolvedValue(undefined),
+  pause: vi.fn(),
+  resume: vi.fn(),
+  destroy: vi.fn(),
+}));
+
 vi.mock('../../src/overlay.js', () => ({
   initOverlay: vi.fn(),
   updateProgress: vi.fn(),
@@ -129,6 +150,7 @@ vi.mock('../../src/scenes.json', () => ({
           { id: 'narration', type: 'narration', src: 'title-narration.m4a', enter: 0, volume: 1, loop: false, fadeIn: 0, fadeOut: 0 },
         ],
         effects: null,
+        traceOverlay: null,
         transition: { type: 'fade', duration: 400 },
 
       },
@@ -138,6 +160,7 @@ vi.mock('../../src/scenes.json', () => ({
 
         holdAfterNarration: 2000,
         image: 'scene-01.webp',
+        traceOverlay: { mask: 'mask-01.png', opacity: 0.3, color: [232, 200, 120], dotCount: 10, dotSpeed: 0.8 },
         narration: {
           lines: [{ text: 'Hello', enter: 0, exit: 2000 }],
           captions: [{ text: 'Hello', start: 0, end: 2000 }],
@@ -238,6 +261,11 @@ async function flush() {
   await vi.advanceTimersByTimeAsync(0);
 }
 
+function runNextGsapCompletion() {
+  const callback = gsapMockState.pendingOnCompletes.shift();
+  if (callback) callback();
+}
+
 import { createApp } from '../../src/app.js';
 import {
   scheduleAudioCues,
@@ -266,13 +294,19 @@ import { clearScene, drawFallback, loadImage } from '../../src/canvas.js';
 import { setCaptionsEnabled, areCaptionsEnabled, syncCaptionsToTime, clearCaptionElements } from '../../src/captions.js';
 import { initOverlay, focusActiveDot } from '../../src/overlay.js';
 import { preloadFirstFrameAudio } from '../../src/loader.js';
+import {
+  init as initShimmer,
+  loadScene as loadShimmerScene,
+  pause as pauseShimmer,
+  resume as resumeShimmer,
+} from '../../src/shimmer.js';
 
 function buildDOM() {
   document.body.replaceChildren();
 
   const ids = [
     'loading-screen', 'scene-stage', 'scene-canvas',
-    'effects-canvas', 'narration-layer', 'caption-layer', 'accessible-narration',
+    'effects-canvas', 'trace-overlay', 'narration-layer', 'caption-layer', 'accessible-narration',
     'overlay-controls', 'progress-dots', 'btn-prev', 'btn-next',
     'btn-replay', 'btn-mute', 'btn-pause', 'btn-captions',
     'loading-prompt', 'transition-loader',
@@ -284,7 +318,7 @@ function buildDOM() {
 
   for (const id of ids) {
     let el;
-    if (id === 'scene-canvas' || id === 'effects-canvas') {
+    if (id === 'scene-canvas' || id === 'effects-canvas' || id === 'trace-overlay') {
       el = document.createElement('canvas');
       el.getContext = vi.fn(() => ({
         clearRect: vi.fn(),
@@ -320,15 +354,23 @@ describe('app.js', () => {
   beforeEach(async () => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    gsapMockState.autoComplete = true;
+    gsapMockState.pendingOnCompletes = [];
     buildDOM();
     loadEffectsScene.mockResolvedValue(true);
     loadImage.mockResolvedValue(new Image());
     globalThis.matchMedia = vi.fn().mockReturnValue({ matches: false });
 
-    // Restore gsap.to to synchronous onComplete (tests like pendingPause override this)
+    // Reset any per-test override back to the shared controllable implementation.
     const { gsap } = await import('gsap');
     gsap.to.mockImplementation((_target, opts) => {
-      if (opts.onComplete) opts.onComplete();
+      if (opts?.onComplete) {
+        if (gsapMockState.autoComplete) {
+          opts.onComplete();
+        } else {
+          gsapMockState.pendingOnCompletes.push(opts.onComplete);
+        }
+      }
       return { kill: vi.fn() };
     });
   });
@@ -470,17 +512,11 @@ describe('app.js', () => {
       expect(app.getState()).toBe('PAUSED');
     });
 
-    it('calls cancelAudioCues for cleanup', async () => {
+    it('cancels audio and defers new audio during hard cut', async () => {
       vi.clearAllMocks();
       app.advance();
       await flush();
       expect(cancelAudioCues).toHaveBeenCalled();
-    });
-
-    it('defers frame audio during hard cut', async () => {
-      vi.clearAllMocks();
-      app.advance();
-      await flush();
       expect(cueAudioCues).not.toHaveBeenCalled();
       expect(scheduleAudioCues).not.toHaveBeenCalled();
     });
@@ -490,14 +526,6 @@ describe('app.js', () => {
       app.advance(); // to scene-01 which has effects regions
       await flush();
       expect(loadEffectsScene).toHaveBeenCalled();
-    });
-
-    it('does not start ambient during hard cut', async () => {
-      vi.clearAllMocks();
-      app.advance();
-      await flush();
-      expect(cueAudioCues).not.toHaveBeenCalled();
-      expect(scheduleAudioCues).not.toHaveBeenCalled();
     });
 
     it('schedules fresh frame audio on resume after hard cut', async () => {
@@ -581,6 +609,34 @@ describe('app.js', () => {
     });
   });
 
+  // ── transition lifecycle ───────────────────────────────────────────
+
+  describe('transition lifecycle', () => {
+    beforeEach(async () => {
+      app = createApp();
+      await flush();
+      app.togglePause();
+    });
+
+    it('remains in TRANSITIONING until gsap completions run', async () => {
+      gsapMockState.autoComplete = false;
+
+      app.advance();
+      expect(app.getState()).toBe('TRANSITIONING');
+      expect(gsapMockState.pendingOnCompletes.length).toBeGreaterThan(0);
+
+      // Complete fade-out; fade-in tween is queued, but landing is not done yet.
+      runNextGsapCompletion();
+      await flush();
+      expect(app.getState()).toBe('TRANSITIONING');
+
+      // Complete fade-in; transition can now land on the next frame.
+      runNextGsapCompletion();
+      await flush();
+      expect(app.getState()).toBe('SCENE_ACTIVE');
+    });
+  });
+
   // ── keyboard handling ──────────────────────────────────────────────
 
   describe('keyboard handling', () => {
@@ -596,18 +652,21 @@ describe('app.js', () => {
       expect(app.getState()).toBe('SCENE_ACTIVE');
     });
 
-    it('ArrowRight advances when playing', async () => {
+    it('ArrowRight advances to next frame', async () => {
       app.togglePause();
       vi.clearAllMocks();
       const stage = document.getElementById('scene-stage');
       stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
       await flush();
       expect(cancelAudioCues).toHaveBeenCalled();
+      // Verify we moved to scene-01 by checking accessible narration text
+      const region = document.getElementById('accessible-narration');
+      expect(region.textContent).toBe('Hello');
     });
 
-    it('ArrowLeft retreats when on scene-01', async () => {
+    it('ArrowLeft retreats to previous frame', async () => {
       app.togglePause();
-      app.advance();
+      app.advance(); // to scene-01
       await flush();
 
       vi.clearAllMocks();
@@ -615,6 +674,9 @@ describe('app.js', () => {
       stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
       await flush();
       expect(cancelAudioCues).toHaveBeenCalled();
+      // Verify we moved back to title by checking accessible narration text
+      const region = document.getElementById('accessible-narration');
+      expect(region.textContent).toBe('Opening line');
     });
 
     it('keyboard advance does not steal focus to dot (preserves global nav mode)', async () => {
@@ -1091,12 +1153,19 @@ describe('app.js', () => {
       document.getElementById('btn-prev').click();
       await flush();
       expect(cancelAudioCues).toHaveBeenCalled();
+      // Was on scene-01, retreated to title
+      const region = document.getElementById('accessible-narration');
+      expect(region.textContent).toBe('Opening line');
     });
 
-    it('btn-next advances to next frame', () => {
+    it('btn-next advances to next frame', async () => {
       vi.clearAllMocks();
       document.getElementById('btn-next').click();
+      await flush();
       expect(cancelAudioCues).toHaveBeenCalled();
+      // Was on scene-01, advanced to scene-02
+      const region = document.getElementById('accessible-narration');
+      expect(region.textContent).toBe('');
     });
 
     it('btn-pause toggles pause via listener', () => {
@@ -2511,7 +2580,7 @@ describe('app.js', () => {
       });
 
       // Make effects load reject — this triggers the effectsReady.catch path
-      // AND the .finally in waitForEffectsReady. The .catch in showFrame handles
+      // AND the .finally in waitForOverlaysReady. The .catch in showFrame handles
       // the promise, so no unhandled rejection.
       const rejectedPromise = Promise.reject(new Error('GPU crash'));
       // Prevent unhandled rejection warning from the bare promise
@@ -2948,6 +3017,96 @@ describe('app.js', () => {
         mockAnalyser,
         true,
       );
+    });
+  });
+
+  // ── shimmer integration ───────────────────────────────────────────
+
+  describe('shimmer integration', () => {
+    it('initializes shimmer with trace-overlay canvas on createApp', async () => {
+      app = createApp();
+      await flush();
+      const traceCanvas = document.getElementById('trace-overlay');
+      expect(initShimmer).toHaveBeenCalledWith(traceCanvas);
+    });
+
+    it('calls loadShimmerScene with traceOverlay config on scene transition', async () => {
+      app = createApp();
+      await flush();
+      app.togglePause(); // play
+      vi.clearAllMocks();
+      app.advance(); // to scene-01 which has traceOverlay
+      await flush();
+      expect(loadShimmerScene).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mask: 'mask-01.png',
+          opacity: 0.3,
+          color: [232, 200, 120],
+          dotCount: 10,
+          dotSpeed: 0.8,
+        }),
+      );
+    });
+
+    it('calls loadShimmerScene(null) for frames without traceOverlay', async () => {
+      app = createApp();
+      await flush();
+      // Title frame has traceOverlay: null
+      expect(loadShimmerScene).toHaveBeenCalledWith(null);
+    });
+
+    it('pauses shimmer when experience is paused', async () => {
+      app = createApp();
+      await flush();
+      app.togglePause(); // play
+      vi.clearAllMocks();
+      app.togglePause(); // pause
+      expect(pauseShimmer).toHaveBeenCalled();
+    });
+
+    it('resumes shimmer when experience is resumed', async () => {
+      app = createApp();
+      await flush();
+      app.togglePause(); // play
+      app.togglePause(); // pause
+      vi.clearAllMocks();
+      app.togglePause(); // resume
+      expect(resumeShimmer).toHaveBeenCalled();
+    });
+
+    it('logs error and continues when initShimmer throws', async () => {
+      initShimmer.mockImplementationOnce(() => {
+        throw new TypeError('shimmer: init() requires an HTMLCanvasElement');
+      });
+      const consoleSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      app = createApp();
+      await flush();
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Shimmer init failed:',
+        'shimmer: init() requires an HTMLCanvasElement',
+      );
+      // App continues to function despite shimmer init failure
+      expect(app.getState()).toBeTruthy();
+      consoleSpy.mockRestore();
+    });
+
+    it('recovers gracefully when loadShimmerScene rejects', async () => {
+      loadShimmerScene.mockRejectedValueOnce(new Error('mask load failed'));
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      app = createApp();
+      await flush();
+      app.togglePause();
+      app.advance(); // to scene-01 with traceOverlay
+      await flush();
+
+      // App should not crash — state remains SCENE_ACTIVE
+      expect(app.getState()).toBe('SCENE_ACTIVE');
+      consoleSpy.mockRestore();
     });
   });
 });

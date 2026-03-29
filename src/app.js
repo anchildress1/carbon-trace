@@ -33,6 +33,12 @@ import {
   clearCaptionElements,
 } from './captions.js';
 import { initKeyboard } from './keyboard.js';
+import {
+  init as initShimmer,
+  loadScene as loadShimmerScene,
+  pause as pauseShimmer,
+  resume as resumeShimmer,
+} from './shimmer.js';
 
 // Lazy-load pixi.js effects to keep it off the critical rendering path.
 // The dynamic import starts immediately but doesn't block initial paint,
@@ -479,6 +485,14 @@ function showFrame(app, index) {
     app.effectsReady = null;
   }
 
+  // Shimmer trace overlay — load circuit mask if one exists for this scene.
+  // Pass the full traceOverlay config (mask, opacity, color, dotCount).
+  app.shimmerReady = frame.traceOverlay
+    ? loadShimmerScene(frame.traceOverlay).catch((err) => {
+        console.error('Shimmer load failed:', err);
+      })
+    : loadShimmerScene(null);
+
   const sceneIdx = app.sceneMap.byFrame.get(index);
   if (sceneIdx !== undefined) {
     updateProgress(sceneIdx);
@@ -526,15 +540,16 @@ function handleBufferChange(app, isBuffering) {
   }
 }
 
-function waitForEffectsReady(app, timeoutMs = 800) {
-  if (!app.effectsReady) return Promise.resolve();
+function waitForOverlaysReady(app, timeoutMs = 800) {
+  const pending = [app.effectsReady, app.shimmerReady].filter(Boolean);
+  if (pending.length === 0) return Promise.resolve();
 
   let timeoutId;
   const timeout = new Promise((resolve) => {
     timeoutId = setTimeout(resolve, timeoutMs);
   });
 
-  return Promise.race([app.effectsReady.finally(() => clearTimeout(timeoutId)), timeout]);
+  return Promise.race([Promise.all(pending).finally(() => clearTimeout(timeoutId)), timeout]);
 }
 
 function waitForImage(app, src) {
@@ -749,10 +764,10 @@ function transition(app, toIndex) {
             return;
           }
 
-          // Wait for effects textures to finish loading so they are
-          // visible when the stage fades back in. The timeout prevents
-          // the screen from staying at opacity 0 on very slow loads.
-          await waitForEffectsReady(app);
+          // Wait for effects textures and shimmer mask to finish loading
+          // so they are visible when the stage fades back in. The timeout
+          // prevents the screen from staying at opacity 0 on very slow loads.
+          await waitForOverlaysReady(app);
 
           gsap.to(app.els.sceneStage, {
             opacity: 1,
@@ -834,6 +849,7 @@ function doResume(app) {
   }
 
   resumeEffects();
+  resumeShimmer();
 
   if (app.autoAdvanceTimer) {
     app.autoAdvanceTimer.resume();
@@ -859,6 +875,7 @@ function doPause(app) {
   }
 
   pauseEffects();
+  pauseShimmer();
 
   app.autoAdvanceTimer?.pause();
   app.analysisStartTimer?.pause();
@@ -933,6 +950,11 @@ function initApp(app) {
   initEffectsCanvas(app.els.effectsCanvas).catch((err) =>
     console.error('Effects canvas init failed:', err.message),
   );
+  try {
+    initShimmer(app.els.traceOverlay);
+  } catch (err) {
+    console.error('Shimmer init failed:', err.message);
+  }
 
   preloadFirstFrameAudio(app.frames, (result) => registerAudio(app, result));
   onNarrationBufferChange((isBuffering) => handleBufferChange(app, isBuffering));
@@ -1037,6 +1059,7 @@ export function createApp() {
     'scene-stage',
     'scene-canvas',
     'effects-canvas',
+    'trace-overlay',
     'narration-layer',
     'caption-layer',
     'accessible-narration',
@@ -1081,6 +1104,7 @@ export function createApp() {
     pendingPause: false,
     buffering: false,
     effectsReady: null,
+    shimmerReady: null,
     availableAudio: new Set(),
     audioDurations: new Map(),
     projectMaxCaptionMs: computeProjectMaxCaptionMs(frames),
@@ -1090,6 +1114,7 @@ export function createApp() {
       sceneStage: document.getElementById('scene-stage'),
       sceneCanvas: document.getElementById('scene-canvas'),
       effectsCanvas: document.getElementById('effects-canvas'),
+      traceOverlay: document.getElementById('trace-overlay'),
       narrationLayer: document.getElementById('narration-layer'),
       captionLayer: document.getElementById('caption-layer'),
       accessibleNarration: document.getElementById('accessible-narration'),

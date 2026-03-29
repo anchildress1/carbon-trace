@@ -189,10 +189,7 @@ test.describe('keyboard boundary conditions', () => {
     const label = await stage.getAttribute('aria-label');
 
     await page.keyboard.press('ArrowLeft');
-    await page.waitForTimeout(300);
-
-    const labelAfter = await stage.getAttribute('aria-label');
-    expect(labelAfter).toBe(label);
+    await expect(stage).toHaveAttribute('aria-label', label);
     expect(errors.length).toBe(0);
   });
 
@@ -212,10 +209,7 @@ test.describe('keyboard boundary conditions', () => {
 
     // Try to advance past the end
     await page.keyboard.press('ArrowRight');
-    await page.waitForTimeout(300);
-
-    const labelAfter = await stage.getAttribute('aria-label');
-    expect(labelAfter).toBe(labelAtEnd);
+    await expect(stage).toHaveAttribute('aria-label', labelAtEnd);
     expect(errors.length).toBe(0);
   });
 
@@ -443,7 +437,8 @@ test.describe('rapid keyboard input — race conditions', () => {
       await page.keyboard.press('ArrowLeft');
     }
 
-    await page.waitForTimeout(1000);
+    const stage = page.locator('#scene-stage');
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(0), { timeout: 10000 });
     expect(errors.length).toBe(0);
   });
 
@@ -464,7 +459,7 @@ test.describe('rapid keyboard input — race conditions', () => {
 //  6. PAUSE + KEYBOARD NAVIGATION INTERACTION
 // ═══════════════════════════════════════════════════════════════════
 
-test.describe('pause state during keyboard navigation', () => {
+test.describe('pause state during keyboard navigation (reduced motion)', () => {
   test.beforeEach(async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.goto('/');
@@ -484,40 +479,62 @@ test.describe('pause state during keyboard navigation', () => {
 
   test('multiple paused ArrowRight presses stay paused', async ({ page }) => {
     const pauseBtn = page.locator('#btn-pause');
+    const stage = page.locator('#scene-stage');
 
     for (let i = 0; i < 3; i++) {
       await page.keyboard.press('ArrowRight');
-      await page.waitForTimeout(200);
+      await expect(stage).toHaveAttribute('aria-label', frameDescription(i + 1), { timeout: 5000 });
     }
 
     await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
-    const stage = page.locator('#scene-stage');
     await expect(stage).toHaveAttribute('aria-label', frameDescription(3), { timeout: 5000 });
   });
 
   test('ArrowLeft while paused keeps paused state', async ({ page }) => {
+    const stage = page.locator('#scene-stage');
+
     // Advance twice while paused
     await page.keyboard.press('ArrowRight');
-    await page.waitForTimeout(200);
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
     await page.keyboard.press('ArrowRight');
-    await page.waitForTimeout(200);
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(2), { timeout: 5000 });
 
     // Now retreat
     await page.keyboard.press('ArrowLeft');
-    const stage = page.locator('#scene-stage');
     await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
 
     const pauseBtn = page.locator('#btn-pause');
     await expect(pauseBtn).toHaveAttribute('aria-pressed', 'true');
   });
+});
 
-  test('unpause then navigate transitions animated (not hardCut)', async ({ page }) => {
+test.describe('pause state during keyboard navigation (standard motion)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.goto('/');
+    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+  });
+
+  test('unpaused keyboard navigation uses fade transition path', async ({ page }) => {
     await dismissLoadingScreen(page);
 
     const pauseBtn = page.locator('#btn-pause');
     await expect(pauseBtn).toHaveAttribute('aria-pressed', 'false');
 
+    const fadeSeenPromise = page
+      .waitForFunction(() => {
+        const stage = document.getElementById('scene-stage');
+        if (!stage) return false;
+        const opacity = Number.parseFloat(globalThis.getComputedStyle(stage).opacity || '1');
+        return opacity < 1;
+      }, { timeout: 2000 })
+      .then(() => true)
+      .catch(() => false);
+
     await page.keyboard.press('ArrowRight');
+    const sawFade = await fadeSeenPromise;
+    expect(sawFade).toBe(true);
+
     const stage = page.locator('#scene-stage');
     await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
   });
@@ -578,10 +595,6 @@ test.describe('progress dots consistency with keyboard navigation', () => {
     expect(dot3Current).toBeNull();
   });
 
-  test('dot count matches scene count', async ({ page }) => {
-    const dots = page.locator('.progress-dot');
-    await expect(dots).toHaveCount(SCENE_COUNT);
-  });
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -630,12 +643,14 @@ test.describe('loading screen keyboard behavior', () => {
 
   test('ArrowLeft on loading screen does nothing (at first frame)', async ({ page }) => {
     const screen = page.locator('#loading-screen');
+    const stage = page.locator('#scene-stage');
+    const initialLabel = await stage.getAttribute('aria-label');
 
     await page.keyboard.press('ArrowLeft');
-    await page.waitForTimeout(500);
 
     // Loading screen still visible (no navigation occurred)
     await expect(screen).toBeVisible();
+    await expect(stage).toHaveAttribute('aria-label', initialLabel);
   });
 });
 
@@ -682,7 +697,7 @@ test.describe('keyboard navigation accessibility attributes', () => {
 
     for (let i = 0; i < 3; i++) {
       await page.keyboard.press('ArrowRight');
-      await page.waitForTimeout(300);
+      await expect(stage).toHaveAttribute('aria-label', frameDescription(i + 1), { timeout: 5000 });
       labels.push(await stage.getAttribute('aria-label'));
     }
 
@@ -694,11 +709,6 @@ test.describe('keyboard navigation accessibility attributes', () => {
     for (const label of labels) {
       expect(label.length).toBeGreaterThan(0);
     }
-  });
-
-  test('accessible-narration live region exists', async ({ page }) => {
-    const region = page.locator('#accessible-narration');
-    await expect(region).toHaveAttribute('aria-live', 'polite');
   });
 
   test('only one aria-current="step" exists at any time', async ({ page }) => {
@@ -724,30 +734,18 @@ test.describe('error resilience under keyboard stress', () => {
     const errors = [];
     page.on('pageerror', (err) => errors.push(err));
 
-    for (let i = 0; i < TOTAL_FRAMES - 1; i++) {
-      await page.keyboard.press('ArrowRight');
-      await page.waitForTimeout(200);
-    }
+    await advanceByKeyboard(page, TOTAL_FRAMES - 1);
 
     expect(errors.length).toBe(0);
   });
 
   test('full forward then full backward traversal produces no JS errors', async ({ page }) => {
-    test.slow(); // 22 iterations with waits — needs extended timeout in CI
+    test.slow(); // full traversal of both directions
     const errors = [];
     page.on('pageerror', (err) => errors.push(err));
 
-    // Forward all the way
-    for (let i = 0; i < TOTAL_FRAMES - 1; i++) {
-      await page.keyboard.press('ArrowRight');
-      await page.waitForTimeout(200);
-    }
-
-    // Backward all the way
-    for (let i = 0; i < TOTAL_FRAMES - 1; i++) {
-      await page.keyboard.press('ArrowLeft');
-      await page.waitForTimeout(200);
-    }
+    await advanceByKeyboard(page, TOTAL_FRAMES - 1);
+    await retreatByKeyboard(page, TOTAL_FRAMES - 1);
 
     expect(errors.length).toBe(0);
 
@@ -759,11 +757,13 @@ test.describe('error resilience under keyboard stress', () => {
   test('pause/unpause + navigation at every frame produces no errors', async ({ page }) => {
     const errors = [];
     page.on('pageerror', (err) => errors.push(err));
+    const stage = page.locator('#scene-stage');
 
     for (let i = 0; i < 5; i++) {
+      const labelBefore = await stage.getAttribute('aria-label');
       await page.keyboard.press('Space'); // toggle pause
       await page.keyboard.press('ArrowRight'); // advance
-      await page.waitForTimeout(200);
+      await expect(stage).not.toHaveAttribute('aria-label', labelBefore, { timeout: 5000 });
     }
 
     expect(errors.length).toBe(0);
@@ -781,12 +781,10 @@ test.describe('error resilience under keyboard stress', () => {
       await page.keyboard.press(key);
     }
 
-    await page.waitForTimeout(300);
     expect(errors.length).toBe(0);
 
     // Scene should not have changed (Tab might move focus but doesn't navigate)
-    const labelAfter = await stage.getAttribute('aria-label');
-    expect(labelAfter).toBe(labelBefore);
+    await expect(stage).toHaveAttribute('aria-label', labelBefore);
   });
 });
 

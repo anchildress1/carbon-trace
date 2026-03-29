@@ -12,16 +12,22 @@ const mockNode = {
   src: '',
 };
 
-function createMockHowlInstance() {
+function createMockHowlInstance(initialVolume = 1) {
+  let currentVolume = initialVolume;
   const volume = vi.fn((value) => {
-    if (value === undefined) return 0.15;
-    return undefined;
+    if (value === undefined) return currentVolume;
+    currentVolume = value;
+    return currentVolume;
+  });
+
+  const fade = vi.fn((_from, to) => {
+    currentVolume = to;
   });
 
   return {
     play: vi.fn(),
     stop: vi.fn(),
-    fade: vi.fn(),
+    fade,
     mute: vi.fn(),
     pause: vi.fn(),
     unload: vi.fn(),
@@ -57,7 +63,7 @@ const { mockHowlerCtx } = vi.hoisted(() => {
 vi.mock('howler', () => ({
   Howl: vi.fn(function (opts) {
     lastHowlOptions = opts;
-    Object.assign(this, createMockHowlInstance());
+    Object.assign(this, createMockHowlInstance(opts?.volume ?? 1));
   }),
   Howler: { ctx: mockHowlerCtx },
 }));
@@ -102,9 +108,14 @@ describe('audio.js — unified cue API (ADR-005)', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    lastHowlOptions = null;
     mockNode.addEventListener.mockClear();
     mockNode.removeEventListener.mockClear();
     mockNode.play.mockResolvedValue(undefined);
+    mockNode.buffered.length = 0;
+    mockNode.currentTime = 0;
+    mockNode.duration = 60;
+    mockNode.src = '';
     cancelAudioCues();
     clearNarrationCache();
   });
@@ -393,6 +404,7 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       const oldCue = makeCue({ type: 'ambient', id: 'ambient-1', src: 'old.mp3' });
       scheduleAudioCues([oldCue]);
       const oldHowl = Howl.mock.results[0].value;
+      const oldVolume = oldHowl.volume();
       vi.clearAllMocks();
 
       // Schedule new ambient — fade-out starts immediately, no play-event gate
@@ -400,7 +412,7 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       scheduleAudioCues([newCue]);
 
       // Old ambient fade starts at schedule time, not deferred to play event
-      expect(oldHowl.fade).toHaveBeenCalledWith(0.15, 0, 800);
+      expect(oldHowl.fade).toHaveBeenCalledWith(oldVolume, 0, 800);
       // Unload deferred until fade duration elapses
       expect(oldHowl.unload).not.toHaveBeenCalled();
       vi.advanceTimersByTime(900);
@@ -413,6 +425,7 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       const oldCue = makeCue({ type: 'ambient', id: 'ambient-1', src: 'old.mp3' });
       scheduleAudioCues([oldCue]);
       const oldHowl = Howl.mock.results[0].value;
+      const oldVolume = oldHowl.volume();
       vi.clearAllMocks();
 
       const newCue = makeCue({ type: 'ambient', id: 'ambient-1', src: 'bad.mp3' });
@@ -423,8 +436,8 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       const errorHandler = newHowl.once.mock.calls.find(([e]) => e === 'loaderror');
       errorHandler[1](1, 'network');
 
-      // Old ambient restored to original volume (0.15 from mockHowlInstance.volume())
-      expect(oldHowl.fade).toHaveBeenCalledWith(0.15, 0.15, 200);
+      // Old ambient restored to its pre-crossfade volume.
+      expect(oldHowl.fade).toHaveBeenCalledWith(0, oldVolume, 200);
       warnSpy.mockRestore();
     });
 
@@ -434,6 +447,7 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       const oldCue = makeCue({ type: 'ambient', id: 'ambient-1', src: 'old.mp3' });
       scheduleAudioCues([oldCue]);
       const oldHowl = Howl.mock.results[0].value;
+      const oldVolume = oldHowl.volume();
       vi.clearAllMocks();
 
       const newCue = makeCue({ type: 'ambient', id: 'ambient-1', src: 'bad.mp3' });
@@ -444,7 +458,7 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       const errorHandler = newHowl.once.mock.calls.find(([e]) => e === 'playerror');
       errorHandler[1](1, 'blocked');
 
-      expect(oldHowl.fade).toHaveBeenCalledWith(0.15, 0.15, 200);
+      expect(oldHowl.fade).toHaveBeenCalledWith(0, oldVolume, 200);
       warnSpy.mockRestore();
     });
 
@@ -463,6 +477,7 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       scheduleAudioCues([newCue]);
       const newHowl = Howl.mock.results[1].value;
       vi.advanceTimersByTime(900); // complete ambient-1 unload
+      const newVolume = newHowl.volume();
 
       vi.clearAllMocks();
 
@@ -470,7 +485,7 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       const finalCue = makeCue({ type: 'ambient', id: 'ambient-3', src: 'final.mp3' });
       scheduleAudioCues([finalCue]);
 
-      expect(newHowl.fade).toHaveBeenCalledWith(0.15, 0, 800);
+      expect(newHowl.fade).toHaveBeenCalledWith(newVolume, 0, 800);
       expect(oldHowl.fade).not.toHaveBeenCalled(); // already unloaded, not the active ambient
     });
 
@@ -596,13 +611,14 @@ describe('audio.js — unified cue API (ADR-005)', () => {
 
       // Trigger narration end
       const narrationHowl = Howl.mock.results[0].value;
+      const songHowl = Howl.mock.results[1].value;
+      const songVolumeBefore = songHowl.volume();
       const endHandler = narrationHowl.once.mock.calls.find(([e]) => e === 'end');
       endHandler[1]();
 
       // The song howl should have been faded to 0.75 over 4000ms
-      const songHowl = Howl.mock.results[1].value;
       expect(songHowl.fade).toHaveBeenCalledWith(
-        songHowl.volume(),
+        songVolumeBefore,
         0.75,
         4000,
       );
@@ -644,11 +660,12 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       // Schedule the ambient cue so it's in activeCues
       scheduleAudioCues([song]);
       const songHowl = Howl.mock.results[0].value;
+      const songVolumeBefore = songHowl.volume();
 
       const wrapped = wrapOnNarrationEndWithBoost([song], cb);
       wrapped();
 
-      expect(songHowl.fade).toHaveBeenCalledWith(songHowl.volume(), 0.75, 3000);
+      expect(songHowl.fade).toHaveBeenCalledWith(songVolumeBefore, 0.75, 3000);
       expect(cb).toHaveBeenCalledOnce();
     });
 
@@ -667,11 +684,12 @@ describe('audio.js — unified cue API (ADR-005)', () => {
 
       scheduleAudioCues([song]);
       const songHowl = Howl.mock.results[0].value;
+      const songVolumeBefore = songHowl.volume();
 
       const wrapped = wrapOnNarrationEndWithBoost([song], cb);
       wrapped();
 
-      expect(songHowl.fade).toHaveBeenCalledWith(songHowl.volume(), 0.75, 3000);
+      expect(songHowl.fade).toHaveBeenCalledWith(songVolumeBefore, 0.75, 3000);
     });
   });
 
@@ -1004,9 +1022,14 @@ describe('audio.js — buffer recovery paths', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    lastHowlOptions = null;
     mockNode.addEventListener.mockClear();
     mockNode.removeEventListener.mockClear();
     mockNode.play.mockResolvedValue(undefined);
+    mockNode.buffered.length = 0;
+    mockNode.currentTime = 0;
+    mockNode.duration = 60;
+    mockNode.src = '';
     cancelAudioCues();
     clearNarrationCache();
   });
@@ -1189,8 +1212,13 @@ describe('audio.js — monitorNarrationBuffer edge cases', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    lastHowlOptions = null;
     mockNode.addEventListener.mockClear();
     mockNode.removeEventListener.mockClear();
+    mockNode.buffered.length = 0;
+    mockNode.currentTime = 0;
+    mockNode.duration = 60;
+    mockNode.src = '';
     cancelAudioCues();
     clearNarrationCache();
   });
@@ -1241,6 +1269,7 @@ describe('audio.js — anchor duration unknown fallback', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    lastHowlOptions = null;
     cancelAudioCues();
     clearNarrationCache();
   });
@@ -1276,8 +1305,13 @@ describe('audio.js — crossfade cleanup and ambient sweep', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    lastHowlOptions = null;
     mockNode.addEventListener.mockClear();
     mockNode.removeEventListener.mockClear();
+    mockNode.buffered.length = 0;
+    mockNode.currentTime = 0;
+    mockNode.duration = 60;
+    mockNode.src = '';
     cancelAudioCues();
     clearNarrationCache();
   });
@@ -1334,13 +1368,14 @@ describe('audio.js — crossfade cleanup and ambient sweep', () => {
     const ambient2Howl = Howl.mock.results.find(
       (r, i) => Howl.mock.calls[i]?.[0]?.src?.[0] === 'bg2.mp3',
     )?.value;
+    const ambient2Volume = ambient2Howl.volume();
     vi.clearAllMocks();
 
     // Scheduling a new ambient immediately fades out ambient-2 (the current active one)
     const newCue1 = makeCue({ type: 'ambient', id: 'ambient-1', src: 'bg1-new.mp3', enter: 0 });
     scheduleAudioCues([newCue1]);
 
-    expect(ambient2Howl.fade).toHaveBeenCalledWith(0.15, 0, 800);
+    expect(ambient2Howl.fade).toHaveBeenCalledWith(ambient2Volume, 0, 800);
     expect(ambient2Howl.unload).not.toHaveBeenCalled(); // unload deferred until fade completes
   });
 
@@ -1392,8 +1427,13 @@ describe('audio.js — audio-reactive analyser (ADR-008)', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    lastHowlOptions = null;
     mockNode.addEventListener.mockClear();
     mockNode.removeEventListener.mockClear();
+    mockNode.buffered.length = 0;
+    mockNode.currentTime = 0;
+    mockNode.duration = 60;
+    mockNode.src = '';
     cancelAudioCues();
     disconnectAnalyserSource();
   });

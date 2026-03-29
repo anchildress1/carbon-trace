@@ -11,7 +11,7 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
-    command: 'pnpm preview',
+    command: 'BROWSER=none pnpm exec vite preview --host localhost --port 4173 --strictPort',
     port: 4173,
     reuseExistingServer: !process.env.CI,
   },

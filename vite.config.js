@@ -32,4 +32,7 @@ export default defineConfig({
       'Cache-Control': 'no-store',
     },
   },
+  preview: {
+    open: false,
+  },
 });

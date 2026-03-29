@@ -1,12 +1,11 @@
-# carbon-trace — System Design v5
+# carbon-trace — System Design
 
 **Project:** WeCoded 2026 Frontend Art Entry
 **Author:** Ashley Childress (@anchildress1)
 **Deadline:** April 5, 2026 @ 11:59 PM PDT
-**Supersedes:** v4 — reconciled with implementation as of PR #8 (feat/canvas-effects)
-**Spec convention:** This document describes the target architecture. Sections annotated with `(ADR-007)` reflect accepted ADR decisions that are not yet implemented in code. See each ADR's "Implementation Status" section for the code delta.
-**Implementation gap:** "Accepted" = architecture decision is final. "Accepted" ≠ code matches docs. Current codebase diverges from this spec in: effects-canvas.js context type, effects.js module, scenes.json schema shape, and index.html DOM structure. Do not assume code reflects this document until ADR action items are complete.
-**Deferred:** ADR-006 (trace shimmer overlay) is deferred post-v1. The runtime code was removed from the codebase but the ADR preserves the design for future implementation.
+**Supersedes:** v6 — docs aligned with implemented codebase (effects, shimmer, audio-reactive all shipped)
+**Spec convention:** This document describes the implemented architecture. All ADR decisions through ADR-010 are reflected in code.
+**Active ADRs:** ADR-006/006A (trace shimmer overlay, mask-based), ADR-007 (PixiJS effects), ADR-008 (audio-reactive modulation) are all implemented in v1. See individual ADRs for specifications.
 
 ---
 
@@ -39,6 +38,7 @@ carbon-trace/
 │   ├── text.js                 # Ghost-drift text + caption entries — GSAP timelines
 │   ├── captions.js             # Timed captions, localStorage persistence
 │   ├── effects.js              # Effect factory registry — water, heat, dust, glow, shockwave (ADR-007)
+│   ├── shimmer.js              # Trace shimmer overlay — mask-based pixel-walking dots (ADR-006A)
 │   ├── overlay.js              # DOM controls — progress dots, buttons
 │   ├── loader.js               # Audio metadata preloading (sequential by scene)
 │   └── pausable-timer.js      # Pausable/cancelable timer utility
@@ -49,6 +49,10 @@ carbon-trace/
 │       ├── audio/narration/    # Per-scene narration (.m4a)
 │       ├── audio/sfx/          # End song
 │       └── fonts/
+│   # All asset filenames carry an 8-char SHA-256 content hash
+│   # suffix for cache busting (ADR-010). When updating any asset:
+│   #   shasum -a 256 <file> | cut -c1-8
+│   # Rename file, update references in scenes.json / styles.css.
 ├── Dockerfile
 ├── nginx.conf
 └── .github/workflows/deploy.yml
@@ -60,7 +64,7 @@ carbon-trace/
 
 ```
 app.js → canvas, effects-canvas, effects, audio, text,
-         captions, overlay, loader, pausable-timer, scenes.json
+         captions, shimmer, overlay, loader, pausable-timer, scenes.json
 
 audio.js → pausable-timer
 
@@ -170,7 +174,7 @@ function clearNarrationLayer(container) {
 }
 ```
 
-Lines are absolutely positioned via `x` (%), `y` (%) relative to the narration layer. All positioned lines use left text alignment. Ghost-drift animation: blur(4px) + y:18 → clear + y:0 on enter; blur(3px) + y:-10 → gone on exit. Reduced motion: simple opacity fade, no spatial movement.
+Lines are absolutely positioned via `x` (%), `y` (%) relative to the narration layer. Positioned lines are left-aligned via CSS class, not per-line config. Ghost-drift animation: blur(4px) + y:18 → clear + y:0 on enter; blur(3px) + y:-10 → gone on exit. Reduced motion: simple opacity fade, no spatial movement.
 
 Caption entries are GSAP `tl.call()` callbacks at `startSec`/`endSec` that create/remove caption DOM elements. `isCaptionEnabled` function is checked at callback time, enabling mid-scene caption toggle.
 
@@ -214,13 +218,24 @@ preloadBackgroundAudio(frames, onLoaded) → sequential by scene, skips first fr
 
 Uses native `Audio()` elements with `preload: 'metadata'` — lightweight, no Howler overhead. Returns `{ src, duration }` where duration is from `audio.duration` after `loadedmetadata` (used as Tier 1 in narration safety timeout fallback chain). Timeout prevents stalled loads from blocking the pipeline.
 
+### shimmer.js (ADR-006A — mask-based trace overlay)
+
+```
+init(canvasEl)              → setup dedicated <canvas> + ResizeObserver + rAF loop
+loadScene(config)           → async: load mask PNG, build walkMap, spawn dots
+pause() / resume()          → stop/start rAF loop
+destroy()                   → cleanup canvas, observer, animation frame
+```
+
+Renders visible circuit traces with traveling glow dots on a dedicated `<canvas id="trace-overlay">` layered above effects-canvas. Loads a per-scene mask image (dark pixels = walkable), builds a binary `walkMap` Uint8Array, and spawns autonomous pixel-walking dots that follow 8-compass pathfinding along circuit lines. Dots pulse via `sin()` for shimmer effect. `prefers-reduced-motion`: dots freeze at 0.6α, no movement. Generation counter guards stale async loads. See ADR-006A for the full mask-based architecture specification.
+
 ---
 
 ## 4. Frame Configuration
 
 ### 4.1 Schema
 
-Every frame has identical shape via `meta.frameDefaults` merge. `null` = feature not active on this frame. Applies uniformly to all optional keys: `narration: null`, `audioCues: null`, `effects: null`.
+Every frame has identical shape via `meta.frameDefaults` merge. `null` = feature not active on this frame. Applies uniformly to all optional keys: `narration: null`, `audioCues: null`, `traceOverlay: null`, `effects: null`.
 
 ```jsonc
 {
@@ -240,7 +255,14 @@ Every frame has identical shape via `meta.frameDefaults` merge. `null` = feature
       "frameType": "scene",
       "holdAfterNarration": 2000,
       "description": "Coal seam wall, lamp upper left — carbon buried under pressure",
-      "image": "assets/images/scene-01-seam.webp",
+      "image": "assets/images/scene-01-seam-48263be1.webp",
+      "traceOverlay": {
+        "mask": "assets/masks/mask-01-seam-circuit-41940702.png",
+        "opacity": 0.2,
+        "color": [180, 155, 100],
+        "dotCount": 0,
+        "dotSpeed": 0
+      },
       "narration": {
         "lines": [
           { "text": "...", "enter": 2000, "exit": 5000, "x": 10, "y": 70 }
@@ -250,13 +272,13 @@ Every frame has identical shape via `meta.frameDefaults` merge. `null` = feature
         ]
       },
       "audioCues": [
-        { "id": "narration", "type": "narration", "src": "assets/audio/narration/01-seam.m4a", "enter": 500, "volume": 1.0, "loop": false, "fadeIn": 0, "fadeOut": null }
+        { "id": "narration", "type": "narration", "src": "assets/audio/narration/01-seam-a1b2c3d4.m4a", "enter": 500, "volume": 1.0, "loop": false, "fadeIn": 0, "fadeOut": null }
       ],
       "effects": {
         "regions": [
           {
             "type": "water",
-            "mask": "assets/masks/01-seam-dust.png",
+            "mask": "assets/masks/mask-01-seam-dust-e5f6g7h8.png",
             "direction": 90,
             "speed": 0.3,
             "intensity": 4,
@@ -275,15 +297,29 @@ Every frame has identical shape via `meta.frameDefaults` merge. `null` = feature
 ```
 FIELD    │ TYPE            │ DESCRIPTION
 ─────────┼─────────────────┼──────────────────────────────────────
-lines    │ array           │ Ghost-drift text lines with enter/exit/x/y/align
+lines    │ array           │ Ghost-drift text lines with enter/exit/x/y
 captions │ array           │ Timed caption entries with text/start/end (ms)
 ```
 
 `narration: null` = no narration at all (no text, no captions).
 
-`narration` with `lines`/`captions` but no narration cue in `audioCues` = text + captions but no audio (Scene 8: silence with ghost-drift text).
+`narration` with `lines`/`captions` but no narration cue in `audioCues` = text + captions but no audio (Scene 8: ghost-drift text with ambient audio only, no narration).
 
-### 4.3 audioCues Array (ADR-003/ADR-005)
+### 4.3 traceOverlay Object (ADR-006A)
+
+```
+FIELD    │ TYPE                │ DESCRIPTION
+─────────┼─────────────────────┼──────────────────────────────────────
+mask     │ string              │ Path to circuit mask PNG (dark pixels = walkable)
+opacity  │ number              │ Base trace line opacity (0.0–1.0)
+color    │ [r, g, b]           │ RGB glow color for trace lines and dots
+dotCount │ number              │ Number of traveling dots (0 = static traces only)
+dotSpeed │ number              │ Dot movement speed multiplier
+```
+
+`traceOverlay: null` = no trace overlay on this frame. Rendered by `shimmer.js` on the dedicated `#trace-overlay` canvas.
+
+### 4.4 audioCues Array (ADR-003/ADR-005)
 
 Replaces the former `ambient`, `music`, and `narration.audio`/`narration.delay` slots.
 
@@ -321,8 +357,8 @@ FRAME                │ holdAfterNarration
 04 Pocket            │ 2000
 05 Rinse             │ 2500
 06 Storage           │ 2000
-07 Empty             │ 2000
-08 Stillness         │ 8000
+07 Missing           │ 2000
+08 Empty             │ 16000
 09 Return            │ 2000
 10 Building          │ 3000
 11 Music (credits)   │ n/a (last frame, no advance)
@@ -620,6 +656,7 @@ Auto-advance       │ (internal)           │ (internal)         │ advance(c
   <div id="scene-stage" hidden>
     <canvas id="scene-canvas" aria-hidden="true"></canvas>
     <canvas id="effects-canvas" aria-hidden="true"></canvas>   <!-- PixiJS/WebGL — ADR-007 -->
+    <canvas id="trace-overlay" aria-hidden="true"></canvas>    <!-- shimmer dots — ADR-006A -->
     <div id="narration-layer" aria-hidden="true"></div>
     <div id="caption-layer" aria-hidden="true"></div>
   </div>
@@ -676,7 +713,7 @@ line 3:  ░░░░░░░░░░░░░░░▓▓▓▓▓▓▓▓�
 - Exit: clear → blur(3px) + y:-10 (0.9s, power2.in)
 - Lines enter/exit independently, overlap allowed
 - If user navigates mid-drift: kill timeline, transition. Interrupt, not queue
-- Scene 8: text only, no audio — auto-advances after holdAfterNarration (8000ms)
+- Scene 8: ghost-drift text with ambient audio (no narration) — auto-advances after holdAfterNarration (16000ms)
 - Reduced motion: simple opacity fade (0.3s), no spatial movement, no blur
 - `aria-live="polite"` region mirrors caption text for screen readers
 
@@ -743,7 +780,7 @@ See `Dockerfile` and `nginx.conf` at repo root for the canonical deployment conf
 CSP in `index.html`:
 ```
 default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';
-img-src 'self'; media-src 'self'; font-src 'self';
+img-src 'self'; media-src 'self' data:; font-src 'self';
 connect-src 'none'; object-src 'none'; base-uri 'self'
 ```
 
@@ -756,7 +793,7 @@ runtime style attributes in `text.js` (per-line x/y coordinates).
 
 ## 13. Accessibility
 
-- Canvas: `aria-hidden="true"` on both scene and effects canvases
+- Canvas: `aria-hidden="true"` on all three canvases (scene, effects, trace-overlay)
 - DOM: `aria-live="polite"` narration region populated from caption text
 - Keyboard: Arrow ←/→ navigate, Space toggle pause, Enter advance, Tab to controls
 - Play/pause button satisfies WCAG 2.2.2 (Pause, Stop, Hide)
@@ -852,14 +889,15 @@ Progressive loading: first frame blocks, background assets load sequentially by 
 - Timed captions with localStorage persistence and mid-scene toggle
 - Play-gate for mobile audio context unlock
 - Progress dots + forward/back + keyboard navigation
-- Scene 8: holdAfterNarration (8s), ghost-drift text, no audio
+- Scene 8: holdAfterNarration (16s), ghost-drift text, ambient audio (no narration)
 - Replay-while-paused: hard jump reset, stay paused (ADR-004)
 - Narration buffer stall detection and recovery
 - Accessibility: aria-live, reduced-motion, keyboard, WCAG 2.2.2, captions
 - Cloud Run deploy with CI/CD
 - Effects registry active: water, heat, dust, glow, shockwave via PixiJS DisplacementFilter (ADR-007)
 - End song on Scene 11 using type: ambient with anchor-based entry and 45s crescendo
-- **Deferred:** Audio-reactive effect modulation on Scene 11 (ADR-008 accepted, not yet implemented)
+- Audio-reactive effect modulation on Scene 11 shockwave (ADR-008) — bass-driven amplitude
+- Trace shimmer overlays with pixel-walking dots on circuit masks (ADR-006A)
 
 ---
 
@@ -929,14 +967,13 @@ PRE-SHIP CHECKLIST:
   ☑ Generation counter guards stale narration 'end' events
   ☑ Per-image error handling with fallback solid color frame
   ☑ Audio load failures degrade gracefully (onend still fires)
-  □ Verify Vite content-hashes assets, or drop "immutable"
-    from nginx cache for public/ assets during iteration
-  □ Test connect-src: 'none' CSP with Howler html5 streaming
-    across Safari, Chrome, Firefox
-  □ Suppress or remove unimplemented effect warnings before submission
-  □ Verify WebGL fallback — effects degrade to static, no crash (ADR-007)
-  □ Profile effects <2ms/frame on baseline hardware (ADR-007)
-  □ Verify PixiJS bundle size after tree-shake (target ~150KB gzipped) (ADR-007)
-  □ Confirm mask assets present for all scenes with effects (ADR-007)
-  □ Verify PixiJS Assets.load() for PNG textures does NOT use fetch/XHR under connect-src: 'none' (ADR-007)
+  ☑ Vite content-hashes assets; nginx serves hashed assets with immutable 1y cache
+  ☑ connect-src: 'none' CSP verified — Howler html5:true uses <audio> (media-src),
+    E2E test asserts CSP header present
+  ☑ All 5 effect types registered (water, heat, dust, glow, shockwave) — no unimplemented warnings
+  ☑ WebGL fallback — webglAvailable flag + try/catch; effects degrade to static, no crash
+  □ Profile effects <2ms/frame on baseline hardware (manual verification needed)
+  □ Verify PixiJS bundle size after tree-shake (target ~150KB gzipped — manual gzip check needed)
+  ☑ All 23 mask assets present for scenes with effects — no broken refs
+  ☑ Textures loaded via new Image() + Texture.from(), not Assets.load() — CSP-safe
 ```
