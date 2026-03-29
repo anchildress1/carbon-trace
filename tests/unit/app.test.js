@@ -95,6 +95,14 @@ vi.mock('../../src/shimmer.js', () => ({
   destroy: vi.fn(),
 }));
 
+vi.mock('../../src/credits.js', () => ({
+  revealCreditsPanel: vi.fn(),
+  hideCreditsPanel: vi.fn(),
+  pauseCreditsScroll: vi.fn(),
+  resumeCreditsScroll: vi.fn(),
+  cleanupCredits: vi.fn(),
+}));
+
 vi.mock('../../src/overlay.js', () => ({
   initOverlay: vi.fn(),
   updateProgress: vi.fn(),
@@ -224,6 +232,12 @@ vi.mock('../../src/scenes.json', () => ({
 
         holdAfterNarration: 2000,
         image: 'credits.webp',
+        credits: {
+          scrollDuration: 60000,
+          resumeDelay: 2000,
+          fadeInDuration: 800,
+          repeatDelay: 3000,
+        },
         narration: {
           lines: [
             { text: 'I want to leave more than I got.', enter: 2000, exit: 6000, x: 67, y: 71 },
@@ -310,6 +324,7 @@ function buildDOM() {
     'overlay-controls', 'progress-dots', 'btn-prev', 'btn-next',
     'btn-replay', 'btn-mute', 'btn-pause', 'btn-captions',
     'loading-prompt', 'transition-loader',
+    'credits-panel', 'credits-scroll-content',
   ];
 
   const root = document.createElement('div');

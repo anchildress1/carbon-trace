@@ -185,6 +185,8 @@ export function hideCreditsPanel(panelEl) {
   focusedLink = null;
   hoveredLink = false;
 
+  contentInitialized = false;
+
   removeScrollListeners(panelEl);
 
   panelEl.hidden = true;
