@@ -14,7 +14,7 @@ export default defineConfig({
     command:
       'VITE_E2E=1 pnpm exec vite build && BROWSER=none pnpm exec vite preview --host localhost --port 4173 --strictPort',
     port: 4173,
-    reuseExistingServer: false,
+    reuseExistingServer: !process.env.VITE_E2E && !process.env.CI,
   },
   projects: [
     {
