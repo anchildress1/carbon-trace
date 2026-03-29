@@ -32,8 +32,20 @@ vi.mock('gsap', () => {
     }
     return tl;
   });
+  const fromTo = vi.fn((_target, _from, toOpts) => {
+    const tl = mockTimeline();
+    gsapMockState.lastTimeline = tl;
+    if (toOpts?.onComplete) {
+      if (gsapMockState.autoComplete) {
+        toOpts.onComplete();
+      } else {
+        gsapMockState.pendingOnCompletes.push(toOpts.onComplete);
+      }
+    }
+    return tl;
+  });
 
-  return { gsap: { to, set }, default: { to, set } };
+  return { gsap: { to, set, fromTo }, default: { to, set, fromTo } };
 });
 
 // SAFE: Test mock — hardcoded string, not user input.
@@ -136,6 +148,23 @@ describe('credits.js', () => {
       expect(scrollContent.textContent).toContain('Test Credit');
     });
 
+    it('positions content off-screen before fade-in to prevent flash', () => {
+      gsapMockState.autoComplete = false;
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+
+      // gsap.set must be called BEFORE gsap.to (fade-in)
+      // to prevent a flash of all text at natural position during fade
+      expect(gsap.set).toHaveBeenCalledWith(
+        scrollContent,
+        expect.objectContaining({ y: 400 }), // panelHeight
+      );
+
+      // set() was called before to() — verify call order
+      const setCallOrder = gsap.set.mock.invocationCallOrder[0];
+      const toCallOrder = gsap.to.mock.invocationCallOrder[0];
+      expect(setCallOrder).toBeLessThan(toCallOrder);
+    });
+
     it('starts GSAP fade-in with correct duration', () => {
       revealCreditsPanel(panel, scrollContent, defaultConfig);
 
@@ -149,7 +178,7 @@ describe('credits.js', () => {
       );
     });
 
-    it('creates scroll timeline after fade-in completes', () => {
+    it('creates scroll timeline with gsap.fromTo after fade-in completes', () => {
       gsapMockState.autoComplete = false;
       revealCreditsPanel(panel, scrollContent, defaultConfig);
 
@@ -157,16 +186,12 @@ describe('credits.js', () => {
 
       runNextGsapCompletion();
 
-      expect(gsap.set).toHaveBeenCalledWith(
+      // Must use fromTo (not set+to) so repeat cycle has explicit start position
+      expect(gsap.fromTo).toHaveBeenCalledWith(
         scrollContent,
-        expect.objectContaining({ y: 400 }),
-      );
-
-      expect(gsap.to).toHaveBeenCalledTimes(2);
-      expect(gsap.to).toHaveBeenLastCalledWith(
-        scrollContent,
+        { y: 400 }, // from: panelHeight
         expect.objectContaining({
-          y: -2000,
+          y: -2000, // to: -contentHeight
           duration: 60,
           ease: 'none',
           repeat: -1,
