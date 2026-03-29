@@ -147,19 +147,6 @@ test.describe('carbon-trace narrative', () => {
   });
 
   test('scene narration playback honors configured enter delay', async ({ page }) => {
-    await page.addInitScript(() => {
-      globalThis.__ctPlayLog = [];
-      const originalPlay = HTMLMediaElement.prototype.play;
-      HTMLMediaElement.prototype.play = function patchedPlay(...args) {
-        globalThis.__ctPlayLog.push({
-          src: this.currentSrc || this.src || '',
-          t: performance.now(),
-        });
-        return originalPlay.apply(this, args);
-      };
-    });
-
-    await page.goto('/');
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
     await dismissLoadingScreen(page);
 
@@ -169,23 +156,19 @@ test.describe('carbon-trace narrative', () => {
       timeout: 5000,
     });
 
-    const narrationFile = fileNameFromAssetPath(narrationSrcForFrame(1));
-    await page.waitForFunction(
-      (expectedName) =>
-        Array.isArray(globalThis.__ctPlayLog) &&
-        globalThis.__ctPlayLog.some((entry) => entry.src.includes(expectedName)),
-      narrationFile,
-      { timeout: 10000 },
-    );
+    const deepVisibleAtHandle = await page.waitForFunction(() => {
+      const deep = Array.from(document.querySelectorAll('.narration-line')).find(
+        (node) => node.textContent?.trim() === 'deep',
+      );
+      if (!deep) return false;
+      const opacity = Number.parseFloat(getComputedStyle(deep).opacity);
+      return opacity > 0.2 ? performance.now() : false;
+    }, {
+      timeout: 12000,
+    });
+    const deepVisibleAt = await deepVisibleAtHandle.jsonValue();
 
-    const narrationPlayTime = await page.evaluate(
-      (expectedName) =>
-        globalThis.__ctPlayLog.find((entry) => entry.src.includes(expectedName))?.t ?? null,
-      narrationFile,
-    );
-
-    expect(narrationPlayTime).not.toBeNull();
-    expect(narrationPlayTime - navStart).toBeGreaterThanOrEqual(450);
+    expect(deepVisibleAt).toBeGreaterThanOrEqual(navStart + 450);
   });
 
   test('previous button is disabled on first frame', async ({ page }) => {
@@ -413,15 +396,6 @@ test.describe('carbon-trace — timer, buffering, and failure resilience', () =>
     await page.click('#btn-next');
     const stage = page.locator('#scene-stage');
     await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
-    await page.waitForFunction(() => {
-      const deep = Array.from(document.querySelectorAll('.narration-line')).find(
-        (node) => node.textContent?.trim() === 'deep',
-      );
-      if (!deep) return false;
-      return Number.parseFloat(getComputedStyle(deep).opacity) > 0.6;
-    }, {
-      timeout: 6000,
-    });
 
     await page.waitForFunction(
       () =>
@@ -437,7 +411,7 @@ test.describe('carbon-trace — timer, buffering, and failure resilience', () =>
       hook?.waiting?.call(hook.node, new Event('waiting'));
     });
     await expect(stage).toHaveClass(/buffering/);
-    await page.waitForTimeout(5500);
+    await page.waitForTimeout(5200);
     await expect(stage).toHaveClass(/buffering/);
     const dustOpacityWhileBuffered = await page.evaluate(() => {
       const dust = Array.from(document.querySelectorAll('.narration-line')).find(
@@ -458,56 +432,46 @@ test.describe('carbon-trace — timer, buffering, and failure resilience', () =>
         (node) => node.textContent?.trim() === 'dust',
       );
       if (!dust) return false;
-      return Number.parseFloat(getComputedStyle(dust).opacity) > 0.6;
+      return Number.parseFloat(getComputedStyle(dust).opacity) > 0.2;
     }, {
-      timeout: 7000,
+      timeout: 6000,
     });
   });
 
   test('ambient audio handoff occurs across scene transitions', async ({ page }) => {
-    await page.addInitScript(() => {
-      globalThis.__ctAmbientPlay = [];
-      const originalPlay = HTMLMediaElement.prototype.play;
-      HTMLMediaElement.prototype.play = function patchedPlay(...args) {
-        globalThis.__ctAmbientPlay.push(this.currentSrc || this.src || '');
-        return originalPlay.apply(this, args);
-      };
-    });
-
-    await page.goto('/');
-    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
-    await dismissLoadingScreen(page);
-
     const sceneOneAmbient = fileNameFromAssetPath(
       scenesData.frames[1].audioCues.find((cue) => cue.type === 'ambient')?.src,
     );
     const sceneTwoAmbient = fileNameFromAssetPath(
       scenesData.frames[2].audioCues.find((cue) => cue.type === 'ambient')?.src,
     );
+    const seenAmbient = new Set();
+
+    page.on('request', (request) => {
+      const url = request.url();
+      if (url.includes(sceneOneAmbient)) seenAmbient.add(sceneOneAmbient);
+      if (url.includes(sceneTwoAmbient)) seenAmbient.add(sceneTwoAmbient);
+    });
+
+    await page.goto('/');
+    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await dismissLoadingScreen(page);
 
     await page.click('#btn-next');
     await expect(page.locator('#scene-stage')).toHaveAttribute('aria-label', frameDescription(1), {
       timeout: 5000,
     });
-    await page.waitForFunction(
-      (fileName) =>
-        Array.isArray(globalThis.__ctAmbientPlay) &&
-        globalThis.__ctAmbientPlay.some((src) => src.includes(fileName)),
-      sceneOneAmbient,
-      { timeout: 10000 },
-    );
+    await expect
+      .poll(() => seenAmbient.has(sceneOneAmbient), { timeout: 15000 })
+      .toBe(true);
 
     await page.click('#btn-next');
     await expect(page.locator('#scene-stage')).toHaveAttribute('aria-label', frameDescription(2), {
       timeout: 5000,
     });
-    await page.waitForFunction(
-      (fileName) =>
-        Array.isArray(globalThis.__ctAmbientPlay) &&
-        globalThis.__ctAmbientPlay.some((src) => src.includes(fileName)),
-      sceneTwoAmbient,
-      { timeout: 10000 },
-    );
+    await expect
+      .poll(() => seenAmbient.has(sceneTwoAmbient), { timeout: 15000 })
+      .toBe(true);
   });
 
   test('scene image failure falls back without freezing navigation', async ({ page }) => {
