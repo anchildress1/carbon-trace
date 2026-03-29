@@ -510,15 +510,15 @@ Nav back + return = restart?                      │ Yes
 1. [x] Ashley: author credits content (bio, thank-you, music track name, FreeSound attributions)
 2. [x] Ashley: provide website URL and Bandcamp link for Bridge City Sinners track
 3. [x] Ashley: decide open questions (all resolved — see §010.12)
-4. [ ] Implement: `#credits-panel` in index.html + CSS in styles.css
-5. [ ] Implement: `revealCreditsPanel()` — hook into setupAutoAdvance dead end
-6. [ ] Implement: GSAP scroll timeline with `repeat: -1`
-7. [ ] Implement: manual scroll override + focus/hover pause (WCAG 2.4.3)
-8. [ ] Implement: replay edge case — hide credits, replay narration, re-trigger
-9. [ ] Implement: reduced motion fallback (overflow-y: auto)
-10. [ ] Implement: pause integration — creditsTimeline.pause() in doPause()
+4. [x] Implement: `#credits-panel` in index.html + CSS in styles.css
+5. [x] Implement: `revealCreditsPanel()` — hook into makeNarrationEndCallback (corrected from setupAutoAdvance)
+6. [x] Implement: GSAP scroll timeline with `repeat: -1` (uses `gsap.fromTo` for reliable loop restart)
+7. [x] Implement: manual scroll override + focus/hover pause (WCAG 2.4.3)
+8. [x] Implement: replay edge case — hide credits, replay narration, re-trigger
+9. [x] Implement: reduced motion fallback (overflow-y: auto)
+10. [x] Implement: pause integration — isPaused flag blocks auto-resume, wheel scrub still works
 11. [ ] Test: Safari 16.2+ (mask-image + backdrop-filter compositing)
 12. [ ] Test: Pixel 3a class — 60fps with all layers + backdrop-filter
 13. [ ] Test: Tab focus through credits links during auto-scroll
 14. [ ] Test: Replay during credits scroll — clean re-entry
-15. [ ] Tune: blur radius, opacity, mask gradient, scroll speed against live scene
+15. [x] Tune: blur radius, opacity, mask gradient, scroll speed against live scene
