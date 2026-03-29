@@ -287,10 +287,6 @@ body {
   text-align: center;
 }
 
-.narration-line--positioned {
-  text-align: left;
-}
-
 .narration-line {
   font-family: 'Lora', Georgia, serif;
   font-style: italic;
@@ -306,6 +302,10 @@ body {
     0 1px 3px rgba(0, 0, 0, 0.6);
   filter: blur(0px);
   opacity: 0;
+}
+
+.narration-line--positioned {
+  text-align: left;
 }
 
 /* Transition loader — debounced spinner for slow image loads */
