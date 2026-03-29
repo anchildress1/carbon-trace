@@ -487,7 +487,7 @@ function showFrame(app, index) {
 
   // Shimmer trace overlay — load circuit mask if one exists for this scene.
   // Pass the full traceOverlay config (mask, opacity, color, dotCount).
-  app.shimmerReady = frame.traceOverlay?.mask
+  app.shimmerReady = frame.traceOverlay
     ? loadShimmerScene(frame.traceOverlay).catch((err) => {
         console.error('Shimmer load failed:', err);
       })
@@ -950,7 +950,11 @@ function initApp(app) {
   initEffectsCanvas(app.els.effectsCanvas).catch((err) =>
     console.error('Effects canvas init failed:', err.message),
   );
-  initShimmer(app.els.traceOverlay);
+  try {
+    initShimmer(app.els.traceOverlay);
+  } catch (err) {
+    console.error('Shimmer init failed:', err.message);
+  }
 
   preloadFirstFrameAudio(app.frames, (result) => registerAudio(app, result));
   onNarrationBufferChange((isBuffering) => handleBufferChange(app, isBuffering));
