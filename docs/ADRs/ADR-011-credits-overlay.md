@@ -92,7 +92,7 @@ Credits panel sits inside `#scene-stage`. `overlay-controls` is a **sibling** of
 ### 010.4.2 DOM Structure
 
 ```html
-<div id="credits-panel" hidden aria-label="Credits">
+<div id="credits-panel" role="region" hidden aria-label="Credits">
   <div id="credits-scroll-content">
     <section class="credits-section">
       <h2 class="credits-heading"><!-- section heading --></h2>
@@ -369,7 +369,7 @@ Nav back then return to credits: **restart**. `showFrame()` rebuilds everything.
 
 ## 010.9 Accessibility
 
-- `#credits-panel` has `aria-label="Credits"`
+- `#credits-panel` is a named region (`role="region" aria-label="Credits"`)
 - Links are native `<a>` with `target="_blank" rel="noopener"`
 - Headings use `<h2>` for screen reader structure
 - Auto-scroll pauses on link focus/hover (WCAG 2.4.3)
@@ -520,5 +520,5 @@ Nav back + return = restart?                      │ Yes
 11. [ ] Test: Safari 16.2+ (mask-image + backdrop-filter compositing)
 12. [ ] Test: Pixel 3a class — 60fps with all layers + backdrop-filter
 13. [x] Test: Tab focus through credits links during auto-scroll
-14. [ ] Test: Replay during credits scroll — clean re-entry
+14. [x] Test: Replay during credits scroll — clean re-entry
 15. [x] Tune: blur radius, opacity, mask gradient, scroll speed against live scene

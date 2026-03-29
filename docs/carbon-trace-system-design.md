@@ -706,7 +706,7 @@ Auto-advance       │ (internal)           │ (internal)         │ advance(c
     <canvas id="trace-overlay" aria-hidden="true"></canvas>    <!-- shimmer dots — ADR-006A -->
     <div id="narration-layer" aria-hidden="true"></div>
     <div id="caption-layer" aria-hidden="true"></div>
-    <div id="credits-panel" hidden aria-label="Credits">  <!-- ADR-011, z-index 7 -->
+    <div id="credits-panel" role="region" hidden aria-label="Credits">  <!-- ADR-011, z-index 7 -->
       <div id="credits-scroll-content"></div>
     </div>
   </div>
