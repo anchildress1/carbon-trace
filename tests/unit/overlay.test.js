@@ -16,6 +16,8 @@ describe('overlay.js', () => {
     controlsEl.id = 'overlay-controls';
     controlsEl.hidden = true;
     document.body.appendChild(controlsEl);
+
+    initOverlay(0);
   });
 
   describe('initOverlay', () => {
@@ -84,13 +86,25 @@ describe('overlay.js', () => {
       dotsContainer.remove();
 
       expect(() => initOverlay(5)).not.toThrow();
+      expect(document.querySelectorAll('.progress-dot').length).toBe(0);
     });
 
-    it('creates dots without click handler when onDotClick is omitted', () => {
+    it('creates dots without click handler when onDotClick is omitted and keeps roving state', () => {
       initOverlay(3);
 
       const dots = dotsContainer.querySelectorAll('.progress-dot');
-      expect(() => dots[0].click()).not.toThrow();
+      dots[2].click();
+      expect(dots[2].getAttribute('tabindex')).toBe('0');
+      expect(dots[0].getAttribute('tabindex')).toBe('-1');
+    });
+
+    it('re-init removes old keydown listener before adding a new one', () => {
+      const removeSpy = vi.spyOn(dotsContainer, 'removeEventListener');
+
+      initOverlay(3);
+      initOverlay(4);
+
+      expect(removeSpy).toHaveBeenCalledWith('keydown', expect.any(Function));
     });
   });
 
@@ -153,11 +167,42 @@ describe('overlay.js', () => {
       const current = dotsContainer.querySelectorAll('[aria-current]');
       expect(current.length).toBe(0);
     });
+
+    it('skips work when updateProgress receives the same scene index twice', () => {
+      initOverlay(4);
+      updateProgress(3);
+      const dots = dotsContainer.querySelectorAll('.progress-dot');
+      const toggleSpy = vi.spyOn(dots[0].classList, 'toggle');
+
+      updateProgress(3);
+
+      expect(toggleSpy).not.toHaveBeenCalled();
+    });
+
+    it('deactivates dots when navigating backward', () => {
+      initOverlay(5);
+      updateProgress(4);
+      updateProgress(2);
+
+      const dots = dotsContainer.querySelectorAll('.progress-dot');
+      expect(dots[0].classList.contains('active')).toBe(true);
+      expect(dots[1].classList.contains('active')).toBe(true);
+      expect(dots[2].classList.contains('active')).toBe(false);
+      expect(dots[3].classList.contains('active')).toBe(false);
+    });
+
+    it('ignores negative scene indexes without crashing', () => {
+      initOverlay(3);
+      expect(() => updateProgress(-2)).not.toThrow();
+      const activeDots = dotsContainer.querySelectorAll('.active');
+      expect(activeDots.length).toBe(0);
+    });
   });
 
   describe('updateProgress — edge cases', () => {
-    it('handles being called before initOverlay without throwing', () => {
+    it('handles being called before initOverlay without mutating DOM state', () => {
       expect(() => updateProgress(3)).not.toThrow();
+      expect(document.querySelectorAll('.progress-dot').length).toBe(0);
     });
 
     it('handles sceneIndex beyond total dot count', () => {
@@ -227,6 +272,16 @@ describe('overlay.js', () => {
       expect(dots[2].getAttribute('tabindex')).toBe('0');
       expect(dots[0].getAttribute('tabindex')).toBe('-1');
       expect(dots[4].getAttribute('tabindex')).toBe('-1');
+    });
+
+    it('does nothing when scene index exceeds available dots', () => {
+      initOverlay(3);
+      updateProgress(10);
+      focusActiveDot();
+
+      const dots = dotsContainer.querySelectorAll('.progress-dot');
+      expect(document.activeElement).not.toBe(dots[0]);
+      expect(document.activeElement).not.toBe(dots[2]);
     });
   });
 
@@ -363,6 +418,32 @@ describe('overlay.js', () => {
 
       expect(eSpace.stopPropagation).not.toHaveBeenCalled();
       expect(eEnter.stopPropagation).not.toHaveBeenCalled();
+    });
+
+    it('single-dot overlay keeps focus on the only dot for arrow keys', () => {
+      initOverlay(1);
+      const dot = dotsContainer.querySelectorAll('.progress-dot')[0];
+      dot.focus();
+
+      pressKey(dotsContainer, 'ArrowRight');
+      expect(document.activeElement).toBe(dot);
+      expect(dot.getAttribute('tabindex')).toBe('0');
+
+      pressKey(dotsContainer, 'ArrowLeft');
+      expect(document.activeElement).toBe(dot);
+      expect(dot.getAttribute('tabindex')).toBe('0');
+    });
+
+    it('dot click handler stops propagation', () => {
+      initOverlay(2, vi.fn());
+      const dot = dotsContainer.querySelectorAll('.progress-dot')[0];
+      const stopPropagation = vi.fn();
+      dot.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+      const customEvent = new MouseEvent('click', { bubbles: true });
+      Object.defineProperty(customEvent, 'stopPropagation', { value: stopPropagation });
+      dot.dispatchEvent(customEvent);
+      expect(stopPropagation).toHaveBeenCalled();
     });
 
     it('handles zero dots without error', () => {

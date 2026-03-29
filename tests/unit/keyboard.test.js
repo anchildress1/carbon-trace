@@ -29,6 +29,10 @@ describe('handleKeydown', () => {
     handler = vi.fn();
   });
 
+  afterEach(() => {
+    document.body.replaceChildren();
+  });
+
   // ── handled keys ───────────────────────────────────────────────────
 
   describe('handled keys from non-button focus', () => {
@@ -139,6 +143,24 @@ describe('handleKeydown', () => {
       expect(handleKeydown(e, handler)).toBe(true);
       expect(handler).toHaveBeenCalledWith('advance');
     });
+
+    it('Space still fires when target is a plain object', () => {
+      const e = makeEvent(' ', {});
+      expect(handleKeydown(e, handler)).toBe(true);
+      expect(handler).toHaveBeenCalledWith('togglePause');
+    });
+  });
+
+  describe('repeat key events', () => {
+    it('repeated ArrowRight events are handled', () => {
+      const e = new KeyboardEvent('keydown', { key: 'ArrowRight', repeat: true, bubbles: true });
+      Object.defineProperty(e, 'target', { value: document.body });
+      vi.spyOn(e, 'preventDefault');
+
+      expect(handleKeydown(e, handler)).toBe(true);
+      expect(handler).toHaveBeenCalledWith('advance');
+      expect(e.preventDefault).toHaveBeenCalled();
+    });
   });
 
   // ── unhandled keys ─────────────────────────────────────────────────
@@ -166,6 +188,8 @@ describe('initKeyboard', () => {
 
   afterEach(() => {
     if (cleanup) cleanup();
+    cleanup = null;
+    document.body.replaceChildren();
   });
 
   it('registers a document keydown listener that dispatches handled keys', () => {
@@ -186,5 +210,17 @@ describe('initKeyboard', () => {
     cleanup = null;
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
     expect(handler).not.toHaveBeenCalled();
+  });
+
+  it('re-initializing keyboard does not stack listeners', () => {
+    const firstCleanup = initKeyboard(handler);
+    cleanup = initKeyboard(handler);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    expect(handler).toHaveBeenCalledTimes(1);
+
+    firstCleanup();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    expect(handler).toHaveBeenCalledTimes(2);
   });
 });
