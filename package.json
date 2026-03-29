@@ -21,6 +21,7 @@
     "perf:lighthouse:desktop": "lhci autorun --config=.lighthouserc.json",
     "perf:lighthouse:mobile": "lhci autorun --config=.lighthouserc.mobile.json",
     "perf:runtime": "playwright test -c playwright.perf.config.js",
+    "perf:runtime:adr11": "VITE_E2E=1 pnpm exec vite build && PERF_ADR11=1 PERF_INCLUDE_WEBKIT=1 playwright test -c playwright.perf.config.js tests/perf/adr11-credits.spec.js",
     "perf": "node scripts/run-perf.mjs"
   },
   "dependencies": {
