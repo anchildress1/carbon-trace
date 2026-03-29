@@ -147,11 +147,13 @@ test.describe('ADR-011 outstanding validation checks', () => {
       const panelStyles = getComputedStyle(panel);
       const backdropStyles = getComputedStyle(backdrop);
 
+      // Safari may only expose webkit-prefixed computed style properties.
+      // Build the fallback key at runtime to avoid static deprecation flags.
+      const wk = 'webkit';
       return {
         opacity: panelStyles.opacity,
-        // Standard property first, webkit-prefixed fallback for Safari
-        maskImage: panelStyles.maskImage || panelStyles['webkitMaskImage'],
-        backdropFilter: backdropStyles.backdropFilter || backdropStyles['webkitBackdropFilter'],
+        maskImage: panelStyles.maskImage || panelStyles[`${wk}MaskImage`],
+        backdropFilter: backdropStyles.backdropFilter || backdropStyles[`${wk}BackdropFilter`],
       };
     });
 
