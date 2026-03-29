@@ -9,18 +9,25 @@ graph LR
     subgraph audio.js
         A[Ambient<br/>looping background]
         N[Narration<br/>spoken word per scene]
+        S[SFX<br/>one-shot sounds]
     end
 
     A -->|crossfade| A
     N -->|buffer monitor| BM[Buffer Monitor]
 ```
 
-Two Howler.js cue types per scene:
+All audio is scheduled via the unified `audioCues[]` array in `scenes.json`
+(ADR-003/ADR-005). The `scheduleAudioCues(cues, opts)` API replaces the
+former separate ambient/narration/music slots. Three cue types:
 
 | Cue type      | Behavior                                                                | Format                    | Loop |
 | ------------- | ----------------------------------------------------------------------- | ------------------------- | ---- |
 | **Ambient**   | Fades in over cue `fadeIn` duration; prior ambient fades out over 800ms | m4a (mp3 for music cues)  | yes  |
-| **Narration** | One-shot per scene, supports delay                                      | m4a (html5)               | no   |
+| **Narration** | One-shot per scene, fires `end` event for auto-advance                  | m4a (html5)               | no   |
+| **SFX**       | One-shot, no crossfade, no replay                                       | mp3                       | no   |
+
+Music is modeled as an ambient cue with anchor-based `enter` (e.g.,
+`{ ref: "narration", offset: -12000 }`) — no dedicated music type.
 
 All channels respect a global mute flag. Mute state is per-session (not persisted).
 
@@ -37,15 +44,16 @@ sequenceDiagram
     Cache-->>Audio: creates Howl (preload: true)
 
     Note over App: scene n plays
-    App->>Audio: playNarration(src)
-    Audio->>Cache: check cache for src
+    App->>Audio: scheduleAudioCues(cues, opts)
+    Audio->>Audio: resolveAnchors (compute absolute enter times)
+    Audio->>Cache: check cache for narration src
     alt cache hit
         Cache-->>Audio: return cached Howl
     else cache miss
         Audio->>Audio: create new Howl
     end
     Audio->>Audio: monitorNarrationBuffer(howl)
-    Audio-->>App: playing
+    Audio-->>App: playing (via activeCues Map)
 ```
 
 ### Pre-buffering
@@ -166,25 +174,29 @@ playback during paused navigation.
 
 ## Pause/Resume Timer Math ⏱️
 
-All scheduled timers (narration delay, music enter, music exit, auto-advance)
-use the same pattern:
+All scheduled timers use `PausableTimer` (ADR-005/ADR-009) — a standalone
+utility in `src/pausable-timer.js` with built-in `pause()`, `resume()`, and
+`cancel()` methods. Each audio cue in the `activeCues` Map has its own
+`PausableTimer` instance for scheduling.
 
 ```
-On pause:
-  elapsed = Date.now() - timerStart
-  remaining = max(0, timerDelay - elapsed)
-  clearTimeout(timer)
+pauseAudioCues():
+  iterate activeCues Map
+  each entry's PausableTimer.pause() — saves remaining time internally
 
-On resume:
-  if (!remaining || remaining <= 0) return
-  timerStart = Date.now()
-  timerDelay = remaining
-  timer = setTimeout(callback, remaining)
-  remaining = null
+resumeAudioCues():
+  iterate activeCues Map
+  each entry's PausableTimer.resume() — reschedules with saved remaining
+
+cancelAudioCues():
+  iterate activeCues Map
+  each entry's PausableTimer.cancel() + unload Howl
+  clear the Map
 ```
 
-On scene transition, all remaining values are reset to `null` to prevent
-cross-scene timer leaks.
+On scene transition, `cancelAudioCues()` clears all entries to prevent
+cross-scene timer leaks. Auto-advance also uses a `PausableTimer` owned
+by `app.js`.
 
 ## Error Handling 🪤
 

@@ -163,7 +163,7 @@ default-src 'self'
 script-src  'self'
 style-src   'self' 'unsafe-inline'
 img-src     'self'
-media-src   'self'
+media-src   'self' data:
 font-src    'self'
 connect-src 'none'
 object-src  'none'

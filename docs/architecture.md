@@ -12,6 +12,7 @@ graph TD
     app --> audio["audio.js<br/>(3-channel mixer)"]
     app --> text["text.js<br/>(ghost-drift timeline)"]
     app --> effects["effects.js<br/>(effect registry)"]
+    app --> shimmer["shimmer.js<br/>(trace overlay — ADR-006A)"]
     app --> keyboard["keyboard.js<br/>(key-action map)"]
     app --> overlay["overlay.js<br/>(progress dots + controls)"]
     app --> captions["captions.js<br/>(timed subtitles)"]
@@ -50,30 +51,31 @@ When a frame becomes active, `showFrame(index)` runs this sequence:
 flowchart TD
     A[showFrame] --> C[Set image + alt text]
     C --> D[clearEffects + clearNarrationLayer]
-    D --> E[Run idle effect if defined]
+    D --> E[Load effects + shimmer overlay]
     E --> E2[Resume effects canvas render loop]
     E2 --> F[Update progress dots]
     F --> G[Update nav button states]
-    G --> H[applyNarration]
-    H --> I[applyAmbient]
-    I --> J[Schedule music if configured]
-    J --> L[Pre-buffer next scene image + narration]
+    G --> H[Build narration timeline]
+    H --> I[scheduleAudioCues — narration + ambient + sfx]
+    I --> L[Pre-buffer next scene image + narration]
 ```
 
-### applyNarration
+### buildNarration
 
-1. Clear pending narration timer.
-2. Build ghost-drift text timeline from `frame.narration.lines` via
+1. Build ghost-drift text timeline from `frame.narration.lines` via
    `buildNarrationTimeline`, which also embeds caption show/hide calls
-   directly into the GSAP timeline (respects `narration.delay` offset).
-3. Populate `#accessible-narration` for screen readers (prefers captions
+   directly into the GSAP timeline.
+2. Populate `#accessible-narration` for screen readers (prefers captions
    text when available, falls back to narration lines).
-4. Schedule narration audio (with optional delay) or cue it if paused.
 
-Music scheduling is handled separately in `showFrame`, not inside
-`applyNarration`. Music is an independent audio track with its own
-enter/exit timing — it starts when configured, fades as configured,
-and plays until configured end. Replay does not restart music.
+### scheduleFrameAudio
+
+All audio for a frame is scheduled through the unified `scheduleAudioCues`
+API (ADR-005). The frame's `audioCues[]` array contains narration, ambient,
+and sfx cues — each with an `enter` time (absolute ms or anchor-based).
+Music is modeled as an ambient cue with anchor-based entry (e.g.,
+`enter: { ref: "narration", offset: -12000 }`). Replay does not restart
+music — only the narration cue is targeted.
 
 ## Modules 🧩
 
@@ -162,11 +164,13 @@ frames[]:
   narration:
     lines[]: { text, enter (ms), exit (ms), x? (vw), y? (vh), align? ("left"|"center"|"right") }
     captions[]: { text, start (ms), end (ms) }
-    audio: path to .m4a
-    delay: ms before narration starts (offsets caption timing too)
-  ambient: { src, volume, loop }
-  music: { src, startVolume, fullVolume, crescendoMs, enter, exit }
-  effects: { idle: "effect-name"|null, entry: "effect-name"|null }
+  audioCues[]: (ADR-003/ADR-005)
+    { id, type ("narration"|"ambient"|"sfx"), src, enter (ms | anchor), volume, loop, fadeIn, fadeOut }
+    anchor form: { ref: "<cue-id>", offset: <ms> }
+  traceOverlay: (ADR-006A)
+    { mask, opacity, color, dotCount, dotSpeed }
+  effects:
+    regions[]: { type, mask, direction, speed, intensity, scale, audioReactive? }
   transition: { type, duration }
 ```
 

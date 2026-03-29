@@ -79,19 +79,20 @@ Full system design: `docs/design/carbon-trace-system-design.md` and `docs/ADRs/*
 
 ### Module responsibilities
 
-| Module              | Job                                                            | Does NOT know about   |
-| ------------------- | -------------------------------------------------------------- | --------------------- |
-| `app.js`            | State machine, orchestrator                                    | Pixel rendering       |
-| `canvas.js`         | Canvas 2D — image drawing, cover-fit, resize                   | Frame ordering, audio |
-| `effects-canvas.js` | PixiJS WebGL effects overlay, render loop (imports effects.js) | Frame ordering, audio |
-| `effects.js`        | Effect factory registry, `registerEffect`/`createEffect` API   | Canvas internals      |
-| `audio.js`          | Howler — ambient crossfade, narration, buffer monitoring       | DOM, canvas           |
-| `text.js`           | Ghost-drift GSAP timelines from config                         | Audio, canvas         |
-| `captions.js`       | Timed captions, localStorage persistence                       | Audio, canvas         |
-| `keyboard.js`       | Declarative key-action map, document listener, button guard    | App state, DOM, audio |
-| `overlay.js`        | DOM controls — dot bar, roving-tabindex dots, progress         | Canvas, audio         |
-| `loader.js`         | Audio metadata preloading, frame-aware sequencing              | DOM, app state        |
-| `pausable-timer.js` | Pause-aware timer — used by audio.js and app.js                | Everything else       |
+| Module              | Job                                                              | Does NOT know about   |
+| ------------------- | ---------------------------------------------------------------- | --------------------- |
+| `app.js`            | State machine, orchestrator                                      | Pixel rendering       |
+| `canvas.js`         | Canvas 2D — image drawing, cover-fit, resize                     | Frame ordering, audio |
+| `effects-canvas.js` | PixiJS WebGL effects overlay, render loop (imports effects.js)   | Frame ordering, audio |
+| `effects.js`        | Effect factory registry, `registerEffect`/`createEffect` API     | Canvas internals      |
+| `audio.js`          | Howler — ambient crossfade, narration, buffer monitoring         | DOM, canvas           |
+| `text.js`           | Ghost-drift GSAP timelines from config                           | Audio, canvas         |
+| `captions.js`       | Timed captions, localStorage persistence                         | Audio, canvas         |
+| `keyboard.js`       | Declarative key-action map, document listener, button guard      | App state, DOM, audio |
+| `overlay.js`        | DOM controls — dot bar, roving-tabindex dots, progress           | Canvas, audio         |
+| `loader.js`         | Audio metadata preloading, frame-aware sequencing                | DOM, app state        |
+| `shimmer.js`        | Trace shimmer overlay — mask-based pixel-walking dots (ADR-006A) | Frame ordering, audio |
+| `pausable-timer.js` | Pause-aware timer — used by audio.js and app.js                  | Everything else       |
 
 ### Rules
 
