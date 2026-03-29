@@ -200,6 +200,7 @@ function attachScrollListeners(panelEl, scrollContentEl, config) {
   panelEl.addEventListener('touchstart', touchstartHandler, { passive: true });
   panelEl.addEventListener('touchmove', touchmoveHandler, { passive: false });
   panelEl.addEventListener('touchend', touchendHandler);
+  panelEl.addEventListener('touchcancel', touchendHandler);
   panelEl.addEventListener('focusin', focusinHandler);
   panelEl.addEventListener('focusout', focusoutHandler);
   panelEl.addEventListener('pointerover', pointeroverHandler);
@@ -231,6 +232,7 @@ function removeScrollListeners(panelEl) {
   }
   if (touchendHandler) {
     panelEl.removeEventListener('touchend', touchendHandler);
+    panelEl.removeEventListener('touchcancel', touchendHandler);
     touchendHandler = null;
   }
   lastTouchY = null;

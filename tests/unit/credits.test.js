@@ -304,7 +304,7 @@ describe('credits.js', () => {
       revealCreditsPanel(panel, scrollContent, defaultConfig);
       const spy = vi.spyOn(panel, 'removeEventListener');
       cleanupCredits(panel);
-      expect(spy).toHaveBeenCalledTimes(8);
+      expect(spy).toHaveBeenCalledTimes(9);
     });
   });
 
@@ -469,6 +469,19 @@ describe('credits.js', () => {
       // touchmove without touchstart — lastTouchY is null
       panel.dispatchEvent(makeTouchEvent('touchmove', 250));
 
+      expect(scrollTl.pause).not.toHaveBeenCalled();
+    });
+
+    it('resets touch tracking on touchcancel', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      const scrollTl = gsapMockState.lastTimeline;
+
+      panel.dispatchEvent(makeTouchEvent('touchstart', 300));
+      panel.dispatchEvent(new Event('touchcancel', { bubbles: true }));
+
+      // After touchcancel, a new touchmove without touchstart should be ignored
+      scrollTl.pause.mockClear();
+      panel.dispatchEvent(makeTouchEvent('touchmove', 250));
       expect(scrollTl.pause).not.toHaveBeenCalled();
     });
 
