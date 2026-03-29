@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.6](https://github.com/anchildress1/carbon-trace/compare/v0.0.5...v0.0.6) (2026-03-29)
+
+
+### Features
+
+* trace overlays ([#39](https://github.com/anchildress1/carbon-trace/issues/39)) ([746f7c7](https://github.com/anchildress1/carbon-trace/commit/746f7c738e9f6c1eb3381a201a7381ee0401b201))
+
 ## [0.0.5](https://github.com/anchildress1/carbon-trace/compare/carbon-trace-v0.0.4...carbon-trace-v0.0.5) (2026-03-28)
 
 
