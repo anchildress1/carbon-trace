@@ -993,7 +993,7 @@
             "end": 23000
           },
           {
-            "text": "They'd already walked through the fire and wouldn't nobody gonna make you feel smaller if you was still in it.",
+            "text": "They'd already walked through the fire and wouldn't nobody gonna make you feel small if you was still in it.",
             "start": 24000,
             "end": 30000
           },
@@ -1235,7 +1235,7 @@
           "type": "ambient",
           "src": "assets/audio/ambient/08-empty-wind-8aaca40d.m4a",
           "enter": 0,
-          "volume": 1,
+          "volume": 0.9,
           "loop": true,
           "fadeIn": 1500,
           "fadeOut": 1500
@@ -1379,7 +1379,7 @@
           "type": "ambient",
           "src": "assets/audio/ambient/09-return-forest-2c16365c.m4a",
           "enter": 0,
-          "volume": 0.35,
+          "volume": 0.25,
           "loop": true,
           "fadeIn": 1500,
           "fadeOut": 1000
@@ -1526,7 +1526,7 @@
     {
       "id": "scene-11-music",
       "frameType": "credits",
-      "holdAfterNarration": 2000,
+      "holdAfterNarration": 3000,
       "description": "Woman standing before record player on wooden table with diamond glowing, circuit traces and sparkles filling the bright room — the finale",
       "image": "assets/images/scene-11-music-f089c2e4.webp",
       "credits": {
@@ -1672,7 +1672,7 @@
           "type": "ambient",
           "src": "assets/audio/ambient/11-music-vinyl-21b71078.m4a",
           "enter": 0,
-          "volume": 0.1,
+          "volume": 0.15,
           "loop": true,
           "fadeIn": 1500,
           "fadeOut": 1000

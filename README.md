@@ -115,10 +115,10 @@ shasum -a 256 <file> | cut -c1-8
 - [Vite](https://vite.dev)—build tooling
 - Deployed via [Cloud Run](https://cloud.google.com/run) + nginx + GitHub Actions
 
-## Credits
+## Credits 🔆
 
 **Created & Narrated by** Ashley Childress
-[anchildress1.dev](https://anchildress1.dev) | [carbon-trace.anchildress1.dev](https://carbon-trace.anchildress1.dev)
+See my other projects at [anchildress1.dev](https://anchildress1.dev)
 
 **End Theme** ["Break the Chain"](https://notimeforfun.bandcamp.com/track/break-the-chain)—The Bridge City Sinners
 
