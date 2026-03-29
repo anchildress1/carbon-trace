@@ -17,6 +17,10 @@ let isPaused = false;
 
 // Event handler refs (for cleanup)
 let wheelHandler = null;
+let touchstartHandler = null;
+let touchmoveHandler = null;
+let touchendHandler = null;
+let lastTouchY = null;
 let pointeroverHandler = null;
 let pointeroutHandler = null;
 let focusinHandler = null;
@@ -135,6 +139,29 @@ function attachScrollListeners(panelEl, scrollContentEl, config) {
     scheduleScrollResume(config.resumeDelay);
   };
 
+  touchstartHandler = (e) => {
+    if (!scrollTimeline) return;
+    lastTouchY = e.touches[0].clientY;
+  };
+
+  touchmoveHandler = (e) => {
+    e.preventDefault();
+    if (!scrollTimeline || lastTouchY === null) return;
+    scrollTimeline.pause();
+    const currentY = e.touches[0].clientY;
+    const deltaY = lastTouchY - currentY;
+    lastTouchY = currentY;
+    const totalDuration = scrollTimeline.duration();
+    const currentTime = scrollTimeline.time();
+    const scrubDelta = (deltaY / scrollContentEl.scrollHeight) * totalDuration;
+    scrollTimeline.time(Math.max(0, Math.min(totalDuration, currentTime + scrubDelta)));
+    scheduleScrollResume(config.resumeDelay);
+  };
+
+  touchendHandler = () => {
+    lastTouchY = null;
+  };
+
   focusinHandler = (e) => {
     if (e.target.closest('a, button')) {
       focusedLink = e.target;
@@ -172,6 +199,9 @@ function attachScrollListeners(panelEl, scrollContentEl, config) {
   };
 
   panelEl.addEventListener('wheel', wheelHandler, { passive: false });
+  panelEl.addEventListener('touchstart', touchstartHandler, { passive: true });
+  panelEl.addEventListener('touchmove', touchmoveHandler, { passive: false });
+  panelEl.addEventListener('touchend', touchendHandler);
   panelEl.addEventListener('focusin', focusinHandler);
   panelEl.addEventListener('focusout', focusoutHandler);
   panelEl.addEventListener('pointerover', pointeroverHandler);
@@ -193,6 +223,19 @@ function removeScrollListeners(panelEl) {
     panelEl.removeEventListener('wheel', wheelHandler);
     wheelHandler = null;
   }
+  if (touchstartHandler) {
+    panelEl.removeEventListener('touchstart', touchstartHandler);
+    touchstartHandler = null;
+  }
+  if (touchmoveHandler) {
+    panelEl.removeEventListener('touchmove', touchmoveHandler);
+    touchmoveHandler = null;
+  }
+  if (touchendHandler) {
+    panelEl.removeEventListener('touchend', touchendHandler);
+    touchendHandler = null;
+  }
+  lastTouchY = null;
   if (focusinHandler) {
     panelEl.removeEventListener('focusin', focusinHandler);
     focusinHandler = null;
