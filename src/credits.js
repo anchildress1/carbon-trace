@@ -19,6 +19,8 @@ let pointeroverHandler = null;
 let pointeroutHandler = null;
 let focusinHandler = null;
 let focusoutHandler = null;
+let motionQuery = null;
+let motionHandler = null;
 
 /**
  * Populate the scroll content container with credits HTML.
@@ -93,6 +95,24 @@ function startAutoScroll(panelEl, scrollContentEl, config) {
   );
 
   attachScrollListeners(panelEl, scrollContentEl, config);
+  watchReducedMotion(panelEl, scrollContentEl);
+}
+
+function watchReducedMotion(panelEl, scrollContentEl) {
+  motionQuery = globalThis.matchMedia('(prefers-reduced-motion: reduce)');
+  motionHandler = (e) => {
+    if (!e.matches || !scrollTimeline) return;
+    // User enabled reduced motion mid-credits — kill auto-scroll,
+    // reset content to natural position for native scroll.
+    scrollTimeline.kill();
+    scrollTimeline = null;
+    scrollResumeTimer?.cancel();
+    scrollResumeTimer = null;
+    removeScrollListeners(panelEl);
+    gsap.set(scrollContentEl, { clearProps: 'y' });
+    panelEl.style.opacity = '1';
+  };
+  motionQuery.addEventListener('change', motionHandler);
 }
 
 function attachScrollListeners(panelEl, scrollContentEl, config) {
@@ -203,6 +223,12 @@ export function hideCreditsPanel(panelEl) {
   contentInitialized = false;
 
   removeScrollListeners(panelEl);
+
+  if (motionQuery && motionHandler) {
+    motionQuery.removeEventListener('change', motionHandler);
+    motionQuery = null;
+    motionHandler = null;
+  }
 
   panelEl.hidden = true;
   panelEl.style.opacity = '0';
