@@ -154,6 +154,7 @@ describe('shimmer.js', () => {
     vi.stubGlobal('matchMedia', vi.fn(() => ({
       matches: false,
       addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
     })));
 
     putImageDataCalls = [];
@@ -177,6 +178,25 @@ describe('shimmer.js', () => {
       shimmer.init(mockCanvas);
       expect(mockCanvas.getContext).toHaveBeenCalledWith('2d');
       expect(resizeCallbacks.length).toBeGreaterThan(0);
+    });
+
+    it('throws when canvasEl is not an HTMLCanvasElement', () => {
+      expect(() => shimmer.init(document.createElement('div'))).toThrow(
+        'requires an HTMLCanvasElement',
+      );
+    });
+
+    it('throws when getContext returns null', () => {
+      mockCanvas.getContext = vi.fn(() => null);
+      expect(() => shimmer.init(mockCanvas)).toThrow(
+        'failed to acquire 2D rendering context',
+      );
+    });
+
+    it('works without ResizeObserver', () => {
+      vi.stubGlobal('ResizeObserver', undefined);
+      shimmer.init(mockCanvas);
+      expect(mockCanvas.getContext).toHaveBeenCalledWith('2d');
     });
   });
 
@@ -289,6 +309,39 @@ describe('shimmer.js', () => {
       shimmer.init(mockCanvas);
       shimmer.destroy();
       shimmer.destroy(); // should not throw
+    });
+
+    it('resets paused state so re-init works correctly', async () => {
+      shimmer.init(mockCanvas);
+      await shimmer.loadScene({ mask: 'test.png', opacity: 0.5 });
+      shimmer.pause();
+      shimmer.destroy();
+
+      // Re-init and load — should start rAF (paused was reset to false)
+      vi.mocked(requestAnimationFrame).mockClear();
+      shimmer.init(mockCanvas);
+      await shimmer.loadScene({ mask: 'test.png', opacity: 0.5 });
+      expect(requestAnimationFrame).toHaveBeenCalled();
+    });
+
+    it('removes matchMedia listener on destroy', () => {
+      let removeHandler;
+      const mockQuery = {
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn((_event, handler) => {
+          removeHandler = handler;
+        }),
+      };
+      vi.stubGlobal('matchMedia', vi.fn(() => mockQuery));
+      vi.resetModules();
+
+      // Need fresh import to pick up the new matchMedia mock
+      return import('../../src/shimmer.js').then((mod) => {
+        mod.init(mockCanvas);
+        mod.destroy();
+        expect(mockQuery.removeEventListener).toHaveBeenCalledWith('change', expect.any(Function));
+      });
     });
 
     it('invalidates pending loadScene via loadGeneration', async () => {
@@ -409,6 +462,7 @@ describe('shimmer.js', () => {
       vi.stubGlobal('matchMedia', vi.fn(() => ({
         matches: true,
         addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
       })));
       vi.resetModules();
       shimmer = await import('../../src/shimmer.js');
@@ -434,6 +488,7 @@ describe('shimmer.js', () => {
       vi.stubGlobal('matchMedia', vi.fn(() => ({
         matches: true,
         addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
       })));
       vi.resetModules();
       shimmer = await import('../../src/shimmer.js');
@@ -465,6 +520,7 @@ describe('shimmer.js', () => {
         addEventListener: vi.fn((_event, handler) => {
           changeHandler = handler;
         }),
+        removeEventListener: vi.fn(),
       })));
       vi.resetModules();
       shimmer = await import('../../src/shimmer.js');

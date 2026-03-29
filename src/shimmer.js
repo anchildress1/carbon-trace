@@ -21,6 +21,7 @@ let mapH = 0;
 let dots = [];
 let opacity = 0;
 let motionQuery = null;
+let motionHandler = null;
 let reducedMotion = false;
 let traceImage = null;
 let activeColor = [232, 200, 120]; // current scene's glow color
@@ -44,9 +45,10 @@ function checkReducedMotion() {
   if (typeof globalThis.matchMedia !== 'function') return false;
   if (!motionQuery) {
     motionQuery = globalThis.matchMedia(REDUCED_MOTION_QUERY);
-    motionQuery.addEventListener('change', (e) => {
+    motionHandler = (e) => {
       reducedMotion = e.matches;
-    });
+    };
+    motionQuery.addEventListener('change', motionHandler);
   }
   reducedMotion = motionQuery.matches;
   return reducedMotion;
@@ -56,7 +58,13 @@ function buildWalkMap(img) {
   const off = document.createElement('canvas');
   off.width = img.naturalWidth || img.width;
   off.height = img.naturalHeight || img.height;
+  if (off.width === 0 || off.height === 0) {
+    throw new Error(`shimmer: mask image has zero dimensions (${off.width}×${off.height})`);
+  }
   const offCtx = off.getContext('2d', { willReadFrequently: true });
+  if (!offCtx) {
+    throw new Error('shimmer: failed to acquire offscreen 2D context for mask processing');
+  }
   offCtx.drawImage(img, 0, 0);
   const imageData = offCtx.getImageData(0, 0, off.width, off.height);
   const { data, width, height } = imageData;
@@ -434,13 +442,21 @@ function validateConfig(config) {
 // --- Public API ---
 
 export function init(canvasEl) {
+  if (!(canvasEl instanceof HTMLCanvasElement)) {
+    throw new Error('shimmer: init() requires an HTMLCanvasElement');
+  }
   canvas = canvasEl;
   ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('shimmer: failed to acquire 2D rendering context');
+  }
   checkReducedMotion();
   handleResize();
 
-  observer = new ResizeObserver(() => handleResize());
-  observer.observe(canvas);
+  if (typeof ResizeObserver === 'function') {
+    observer = new ResizeObserver(() => handleResize());
+    observer.observe(canvas);
+  }
 }
 
 export async function loadScene(config) {
@@ -516,6 +532,16 @@ export function destroy() {
     observer.disconnect();
     observer = null;
   }
+  if (motionQuery && motionHandler) {
+    motionQuery.removeEventListener('change', motionHandler);
+  }
+  motionQuery = null;
+  motionHandler = null;
+  reducedMotion = false;
+  paused = false;
+  opacity = 0;
+  activeColor = DEFAULT_COLOR;
+  activeDotSpeed = DOT_SPEED;
   walkMap = null;
   walkPositions = [];
   traceImage = null;
