@@ -92,6 +92,7 @@ Full system design: `docs/design/carbon-trace-system-design.md` and `docs/ADRs/*
 | `overlay.js`        | DOM controls — dot bar, roving-tabindex dots, progress           | Canvas, audio         |
 | `loader.js`         | Audio metadata preloading, frame-aware sequencing                | DOM, app state        |
 | `shimmer.js`        | Trace shimmer overlay — mask-based pixel-walking dots (ADR-006A) | Frame ordering, audio |
+| `credits.js`        | Credits overlay — GSAP scroll, focus/hover pause (ADR-011)       | Frame ordering, audio |
 | `pausable-timer.js` | Pause-aware timer — used by audio.js and app.js                  | Everything else       |
 
 ### Rules

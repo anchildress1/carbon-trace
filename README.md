@@ -110,6 +110,33 @@ shasum -a 256 <file> | cut -c1-8
 - [Vite](https://vite.dev) — build tooling
 - Deployed via [Cloud Run](https://cloud.google.com/run) + nginx + GitHub Actions
 
+## Credits
+
+**Created & Narrated by** Ashley Childress
+[anchildress1.dev](https://anchildress1.dev) | [carbon-trace.anchildress1.dev](https://carbon-trace.anchildress1.dev)
+
+**End Theme** "Break the Chain" — The Bridge City Sinners ([Bandcamp](https://notimeforfun.bandcamp.com/track/break-the-chain))
+
+**Sound Design** — All ambient audio sourced from [FreeSound.org](https://freesound.org):
+
+- [Mining Maschine Cave Mine Factory Field-recording Fantasy](https://freesound.org/s/529032/) by szegvari — Creative Commons
+- [Fabric flaps](https://freesound.org/s/580967/) by PelicanPolice — Creative Commons
+- [Sauna fireplace loop](https://freesound.org/s/797669/) by HenKonen — Creative Commons
+- [ticking watch clock midcentury travel alarm](https://freesound.org/s/508859/) by tenkism — CC0
+- [water running](https://freesound.org/s/135003/) by hdrck16 — Attribution 3.0
+- [Quartz crystal singing bowl](https://freesound.org/s/129219/) by juskiddink — Attribution 4.0
+- [00182 little summer storm and rain 1](https://freesound.org/s/56143/) by Robinhood76 — Attribution NonCommercial 4.0
+- [AMBForst_Autumn.A Quiet Forest.Wind In The Pines And Birches](https://freesound.org/s/756754/) by newlocknew — Attribution 4.0
+- [edge forest MONO 726AM](https://freesound.org/s/591158/) by klankbeeld — Attribution 4.0
+- [Welding 1](https://freesound.org/s/586505/) by destin_yyy — Attribution 4.0
+- [Glitching, Vinyl Record Player, A](https://freesound.org/s/427848/) by InspectorJ — Attribution 4.0
+
+**AI Assistants** — Claude, ChatGPT, Codex, Antigravity, Gemini
+
+**Image Generation** — Leonardo.ai, ChatGPT, Claude, GIMP
+
+**Fonts** — Lora (Google Fonts, self-hosted variable font)
+
 ## License 🛡️
 
 Polyform Shield License 1.0.0 — see [LICENSE](LICENSE).

@@ -39,6 +39,8 @@ carbon-trace/
 │   ├── captions.js             # Timed captions, localStorage persistence
 │   ├── effects.js              # Effect factory registry — water, heat, dust, glow, shockwave (ADR-007)
 │   ├── shimmer.js              # Trace shimmer overlay — mask-based pixel-walking dots (ADR-006A)
+│   ├── credits.js              # Credits overlay — GSAP scroll, focus/hover pause (ADR-011)
+│   ├── credits-content.html    # Credits text content (imported ?raw by credits.js)
 │   ├── overlay.js              # DOM controls — progress dots, buttons
 │   ├── loader.js               # Audio metadata preloading (sequential by scene)
 │   └── pausable-timer.js      # Pausable/cancelable timer utility
@@ -64,9 +66,11 @@ carbon-trace/
 
 ```
 app.js → canvas, effects-canvas, effects, audio, text,
-         captions, shimmer, overlay, loader, pausable-timer, scenes.json
+         captions, shimmer, credits, overlay, loader, pausable-timer, scenes.json
 
 audio.js → pausable-timer
+
+credits.js → pausable-timer
 
 All leaf modules → nothing (no cross-imports, no cycles)
 app.js is the ONLY module that knows frame ordering.
@@ -228,6 +232,18 @@ destroy()                   → cleanup canvas, observer, animation frame
 ```
 
 Renders visible circuit traces with traveling glow dots on a dedicated `<canvas id="trace-overlay">` layered above effects-canvas. Loads a per-scene mask image (dark pixels = walkable), builds a binary `walkMap` Uint8Array, and spawns autonomous pixel-walking dots that follow 8-compass pathfinding along circuit lines. Dots pulse via `sin()` for shimmer effect. `prefers-reduced-motion`: dots freeze at 0.6α, no movement. Generation counter guards stale async loads. See ADR-006A for the full mask-based architecture specification.
+
+### credits.js (ADR-011 — credits overlay)
+
+```
+initCreditsContent(el)                          → populate credits HTML from static import
+revealCreditsPanel(panel, scroll, config, opts) → fade-in + GSAP auto-scroll timeline
+hideCreditsPanel(panel)                         → kill timelines, cancel timers, hide panel
+pauseCreditsScroll() / resumeCreditsScroll()    → pause/resume scroll timeline
+cleanupCredits(panel)                           → full teardown (alias for hide)
+```
+
+Frosted glass overlay on frame 11. Triggered by `makeNarrationEndCallback` after narration ends + `holdAfterNarration` delay. GSAP `translateY` auto-scroll with `repeat: -1` loop. Wheel events scrub timeline; focus/hover on links pauses scroll (WCAG 2.4.3). PausableTimer-based resume delay after manual interaction. `prefers-reduced-motion`: no GSAP animation, native `overflow-y: auto` scroll. Credits content imported from `credits-content.html` via Vite `?raw`. See ADR-011 for the full architecture specification.
 
 ---
 
