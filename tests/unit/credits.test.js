@@ -479,4 +479,74 @@ describe('credits.js', () => {
       // No errors — timer was cancelled
     });
   });
+
+  // -- pause-aware listener lifecycle --
+
+  describe('pause detaches listeners, resume reattaches', () => {
+    it('wheel during pause does not create resume timer or resume scroll', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      const scrollTl = gsapMockState.lastTimeline;
+
+      pauseCreditsScroll();
+      scrollTl.play.mockClear();
+
+      // Wheel event during pause — listeners are detached
+      const wheelEvent = new Event('wheel', { bubbles: true });
+      wheelEvent.deltaY = 100;
+      wheelEvent.preventDefault = vi.fn();
+      panel.dispatchEvent(wheelEvent);
+
+      vi.advanceTimersByTime(5000);
+      expect(scrollTl.play).not.toHaveBeenCalled();
+    });
+
+    it('focus during pause does not create resume timer', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      const scrollTl = gsapMockState.lastTimeline;
+
+      pauseCreditsScroll();
+      scrollTl.play.mockClear();
+      scrollTl.pause.mockClear();
+
+      // Focus on link during pause — focusin listener is detached
+      const link = scrollContent.querySelector('a');
+      link.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+
+      // No scroll pause triggered (listener wasn't there)
+      expect(scrollTl.pause).not.toHaveBeenCalled();
+
+      // Focus out — no resume timer created
+      link.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+      vi.advanceTimersByTime(5000);
+      expect(scrollTl.play).not.toHaveBeenCalled();
+    });
+
+    it('listeners reattach on resume — wheel works again', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      const scrollTl = gsapMockState.lastTimeline;
+
+      pauseCreditsScroll();
+      resumeCreditsScroll();
+
+      // Wheel should work again — listeners reattached
+      scrollTl.pause.mockClear();
+      const wheelEvent = new Event('wheel', { bubbles: true });
+      wheelEvent.deltaY = 100;
+      wheelEvent.preventDefault = vi.fn();
+      panel.dispatchEvent(wheelEvent);
+
+      expect(scrollTl.pause).toHaveBeenCalled();
+    });
+
+    it('resume after pause plays scroll timeline automatically', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      const scrollTl = gsapMockState.lastTimeline;
+
+      pauseCreditsScroll();
+      scrollTl.play.mockClear();
+
+      resumeCreditsScroll();
+      expect(scrollTl.play).toHaveBeenCalled();
+    });
+  });
 });

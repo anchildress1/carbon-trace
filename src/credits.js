@@ -12,6 +12,11 @@ let focusedLink = null;
 let hoveredLink = false;
 let contentInitialized = false;
 
+// Element refs — stored during reveal so pause/resume can detach/reattach listeners
+let panelRef = null;
+let scrollContentRef = null;
+let configRef = null;
+
 // Event handler refs (for cleanup)
 let wheelHandler = null;
 let pointeroverHandler = null;
@@ -46,6 +51,12 @@ export function initCreditsContent(scrollContentEl) {
  */
 export function revealCreditsPanel(panelEl, scrollContentEl, config, opts = {}) {
   initCreditsContent(scrollContentEl);
+
+  // Store refs so pauseCreditsScroll/resumeCreditsScroll can
+  // detach/reattach event listeners without extra arguments.
+  panelRef = panelEl;
+  scrollContentRef = scrollContentEl;
+  configRef = config;
 
   // Remove hidden FIRST so clientHeight is measurable —
   // hidden = display:none = clientHeight 0. Panel is still opacity:0
@@ -202,22 +213,35 @@ export function hideCreditsPanel(panelEl) {
 
   removeScrollListeners(panelEl);
 
+  panelRef = null;
+  scrollContentRef = null;
+  configRef = null;
+
   panelEl.hidden = true;
   panelEl.style.opacity = '0';
 }
 
 /**
  * Pause the credits scroll timeline (called from app doPause).
+ * Detaches scroll event listeners so no new resume timers can be
+ * created during pause — structural prevention, not a flag check.
  */
 export function pauseCreditsScroll() {
   scrollTimeline?.pause();
   scrollResumeTimer?.pause();
+  if (panelRef) removeScrollListeners(panelRef);
+  focusedLink = null;
+  hoveredLink = false;
 }
 
 /**
  * Resume the credits scroll timeline (called from app doResume).
+ * Reattaches scroll event listeners that were detached on pause.
  */
 export function resumeCreditsScroll() {
+  if (scrollTimeline && !wheelHandler && panelRef && scrollContentRef && configRef) {
+    attachScrollListeners(panelRef, scrollContentRef, configRef);
+  }
   scrollResumeTimer?.resume();
   if (!scrollResumeTimer && !focusedLink && !hoveredLink) {
     scrollTimeline?.play();
