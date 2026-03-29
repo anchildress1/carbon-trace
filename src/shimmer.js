@@ -149,7 +149,7 @@ const DIRS_8 = [
 
 // Normalize diagonal directions so speed is consistent
 const DIRS_NORM = DIRS_8.map((d) => {
-  const mag = Math.sqrt(d.dx * d.dx + d.dy * d.dy);
+  const mag = Math.hypot(d.dx, d.dy);
   return { dx: d.dx / mag, dy: d.dy / mag };
 });
 
@@ -198,6 +198,37 @@ function findBestDirection(x, y, curDx, curDy) {
 }
 
 /**
+ * Search a rectangular cell for a random walkable pixel.
+ * Returns {x, y} or null after maxAttempts.
+ */
+function findWalkableInCell(x0, y0, x1, y1) {
+  for (let attempt = 0; attempt < 60; attempt++) {
+    const x = x0 + Math.floor(Math.random() * (x1 - x0));
+    const y = y0 + Math.floor(Math.random() * (y1 - y0));
+    if (isWalkableExact(x, y)) return { x, y };
+  }
+  return null;
+}
+
+/**
+ * Create a dot record at the given position with a random heading.
+ */
+function makeDot(pos) {
+  const dir = findBestDirection(pos.x, pos.y);
+  return {
+    x: pos.x,
+    y: pos.y,
+    dx: dir ? dir.dx : DIRS_NORM[0].dx,
+    dy: dir ? dir.dy : DIRS_NORM[0].dy,
+    speed: activeDotSpeed * (0.5 + Math.random()),
+    phase: Math.random() * Math.PI * 2,
+    life: 0,
+    maxLife: 800 + Math.random() * 1200,
+    stuckCount: 0,
+  };
+}
+
+/**
  * Distribute spawns across the mask by dividing into grid cells
  * and spawning one dot per populated cell.
  */
@@ -216,33 +247,8 @@ function spawnDistributed(count) {
       const x1 = Math.floor((c + 1) * cellW);
       const y1 = Math.floor((r + 1) * cellH);
 
-      // Try to find a walkable pixel in this cell
-      let found = null;
-      for (let attempt = 0; attempt < 60; attempt++) {
-        const x = x0 + Math.floor(Math.random() * (x1 - x0));
-        const y = y0 + Math.floor(Math.random() * (y1 - y0));
-        if (isWalkableExact(x, y)) {
-          found = { x, y };
-          break;
-        }
-      }
-
-      if (!found) continue;
-
-      const dir = findBestDirection(found.x, found.y);
-      const speed = activeDotSpeed * (0.5 + Math.random() * 1.0);
-
-      spawned.push({
-        x: found.x,
-        y: found.y,
-        dx: dir ? dir.dx : DIRS_NORM[0].dx,
-        dy: dir ? dir.dy : DIRS_NORM[0].dy,
-        speed,
-        phase: Math.random() * Math.PI * 2,
-        life: 0,
-        maxLife: 800 + Math.random() * 1200,
-        stuckCount: 0,
-      });
+      const found = findWalkableInCell(x0, y0, x1, y1);
+      if (found) spawned.push(makeDot(found));
     }
   }
 
@@ -250,21 +256,61 @@ function spawnDistributed(count) {
   while (spawned.length < count) {
     const pos = findRandomWalkable();
     if (!pos) break;
-    const dir = findBestDirection(pos.x, pos.y);
-    spawned.push({
-      x: pos.x,
-      y: pos.y,
-      dx: dir ? dir.dx : DIRS_NORM[0].dx,
-      dy: dir ? dir.dy : DIRS_NORM[0].dy,
-      speed: activeDotSpeed * (0.5 + Math.random() * 1.0),
-      phase: Math.random() * Math.PI * 2,
-      life: 0,
-      maxLife: 800 + Math.random() * 1200,
-      stuckCount: 0,
-    });
+    spawned.push(makeDot(pos));
   }
 
   return spawned;
+}
+
+/**
+ * Re-steer a dot if its current runway is running short.
+ * Called periodically while the dot is moving normally.
+ */
+function maybeResteer(dot) {
+  if (dot.life % 24 !== 0) return;
+  const rx = Math.round(dot.x);
+  const ry = Math.round(dot.y);
+  const currentRun = countRunway(rx, ry, dot.dx, dot.dy);
+  if (currentRun >= 6) return;
+
+  const better = findBestDirection(rx, ry, dot.dx, dot.dy);
+  if (better && better.runway > currentRun + 2) {
+    dot.dx = better.dx;
+    dot.dy = better.dy;
+  }
+}
+
+/**
+ * Handle a dot that hit a dead end: try one redirect, or mark for respawn.
+ */
+function handleDeadEnd(dot) {
+  const rx = Math.round(dot.x);
+  const ry = Math.round(dot.y);
+  const newDir = findBestDirection(rx, ry, dot.dx, dot.dy);
+  if (newDir && newDir.runway > 4) {
+    dot.dx = newDir.dx;
+    dot.dy = newDir.dy;
+  } else {
+    dot.life = dot.maxLife;
+  }
+}
+
+/**
+ * Respawn a dot at a new random walkable position.
+ */
+function respawnDot(dot) {
+  const pos = findRandomWalkable();
+  if (!pos) return;
+  const dir = findBestDirection(pos.x, pos.y);
+  dot.x = pos.x;
+  dot.y = pos.y;
+  dot.dx = dir ? dir.dx : DIRS_NORM[0].dx;
+  dot.dy = dir ? dir.dy : DIRS_NORM[0].dy;
+  dot.speed = activeDotSpeed * (0.5 + Math.random());
+  dot.phase = Math.random() * Math.PI * 2;
+  dot.life = 0;
+  dot.maxLife = 800 + Math.random() * 1200;
+  dot.stuckCount = 0;
 }
 
 function stepDot(dot) {
@@ -277,50 +323,13 @@ function stepDot(dot) {
     dot.x = nx;
     dot.y = ny;
     dot.stuckCount = 0;
-
-    // Periodically check if we should steer (for curves and forks)
-    if (dot.life % 24 === 0) {
-      const rx = Math.round(dot.x);
-      const ry = Math.round(dot.y);
-      const currentRun = countRunway(rx, ry, dot.dx, dot.dy);
-
-      // Only re-steer if current direction is running out
-      if (currentRun < 6) {
-        const better = findBestDirection(rx, ry, dot.dx, dot.dy);
-        if (better && better.runway > currentRun + 2) {
-          dot.dx = better.dx;
-          dot.dy = better.dy;
-        }
-      }
-    }
+    maybeResteer(dot);
   } else {
-    // Hit a dead end — try one redirect, then respawn
-    const rx = Math.round(dot.x);
-    const ry = Math.round(dot.y);
-    const newDir = findBestDirection(rx, ry, dot.dx, dot.dy);
-    if (newDir && newDir.runway > 4) {
-      dot.dx = newDir.dx;
-      dot.dy = newDir.dy;
-    } else {
-      // Don't spin — just respawn somewhere useful
-      dot.life = dot.maxLife;
-    }
+    handleDeadEnd(dot);
   }
 
   if (dot.life >= dot.maxLife) {
-    const pos = findRandomWalkable();
-    if (pos) {
-      const dir = findBestDirection(pos.x, pos.y);
-      dot.x = pos.x;
-      dot.y = pos.y;
-      dot.dx = dir ? dir.dx : DIRS_NORM[0].dx;
-      dot.dy = dir ? dir.dy : DIRS_NORM[0].dy;
-      dot.speed = activeDotSpeed * (0.5 + Math.random() * 1.0);
-      dot.phase = Math.random() * Math.PI * 2;
-      dot.life = 0;
-      dot.maxLife = 800 + Math.random() * 1200;
-      dot.stuckCount = 0;
-    }
+    respawnDot(dot);
   }
 }
 
@@ -443,7 +452,7 @@ function validateConfig(config) {
 
 export function init(canvasEl) {
   if (!(canvasEl instanceof HTMLCanvasElement)) {
-    throw new Error('shimmer: init() requires an HTMLCanvasElement');
+    throw new TypeError('shimmer: init() requires an HTMLCanvasElement');
   }
   canvas = canvasEl;
   ctx = canvas.getContext('2d');

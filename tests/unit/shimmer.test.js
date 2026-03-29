@@ -308,7 +308,7 @@ describe('shimmer.js', () => {
     it('is safe to call multiple times', () => {
       shimmer.init(mockCanvas);
       shimmer.destroy();
-      shimmer.destroy(); // should not throw
+      expect(() => shimmer.destroy()).not.toThrow();
     });
 
     it('resets paused state so re-init works correctly', async () => {
