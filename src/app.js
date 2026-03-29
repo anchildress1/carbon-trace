@@ -39,6 +39,12 @@ import {
   pause as pauseShimmer,
   resume as resumeShimmer,
 } from './shimmer.js';
+import {
+  revealCreditsPanel,
+  pauseCreditsScroll,
+  resumeCreditsScroll,
+  cleanupCredits,
+} from './credits.js';
 
 // Lazy-load pixi.js effects to keep it off the critical rendering path.
 // The dynamic import starts immediately but doesn't block initial paint,
@@ -240,6 +246,14 @@ function makeNarrationEndCallback(app, frame, holdAfterNarration) {
     if (gen !== app.generation) return;
     if (shouldAutoAdvance(app)) {
       scheduleAutoAdvance(app, holdAfterNarration);
+    } else if (frame.credits) {
+      app.creditsRevealTimer = new PausableTimer(() => {
+        if (gen !== app.generation) return;
+        app.creditsRevealTimer = null;
+        revealCreditsPanel(app.els.creditsPanel, app.els.creditsScrollContent, frame.credits, {
+          reducedMotion: prefersReducedMotion(),
+        });
+      }, holdAfterNarration);
     }
   };
 }
@@ -591,6 +605,10 @@ function cleanupCurrentScene(app, opts = {}) {
     app.analysisStartTimer = null;
   }
 
+  app.creditsRevealTimer?.cancel();
+  app.creditsRevealTimer = null;
+  cleanupCredits(app.els.creditsPanel);
+
   clearCaptionElements(app.captionEntries);
   try {
     app.textTimeline?.kill();
@@ -858,6 +876,8 @@ function doResume(app) {
   }
 
   app.analysisStartTimer?.resume();
+  app.creditsRevealTimer?.resume();
+  resumeCreditsScroll();
 
   app.els.btnPause.setAttribute('aria-pressed', 'false');
   app.els.btnPause.classList.remove('paused');
@@ -879,6 +899,8 @@ function doPause(app) {
 
   app.autoAdvanceTimer?.pause();
   app.analysisStartTimer?.pause();
+  app.creditsRevealTimer?.pause();
+  pauseCreditsScroll();
 
   app.els.btnPause.setAttribute('aria-pressed', 'true');
   app.els.btnPause.classList.add('paused');
@@ -1073,6 +1095,8 @@ export function createApp() {
     'btn-captions',
     'loading-prompt',
     'transition-loader',
+    'credits-panel',
+    'credits-scroll-content',
   ];
 
   for (const id of requiredIds) {
@@ -1097,6 +1121,7 @@ export function createApp() {
     captionEntries: [],
     autoAdvanceTimer: null,
     analysisStartTimer: null,
+    creditsRevealTimer: null,
     autoAdvancing: false,
     pendingNavIndex: null,
     generation: 0,
@@ -1127,6 +1152,8 @@ export function createApp() {
       btnCaptions: document.getElementById('btn-captions'),
       loadingPrompt: document.getElementById('loading-prompt'),
       transitionLoader: document.getElementById('transition-loader'),
+      creditsPanel: document.getElementById('credits-panel'),
+      creditsScrollContent: document.getElementById('credits-scroll-content'),
     },
   };
 
