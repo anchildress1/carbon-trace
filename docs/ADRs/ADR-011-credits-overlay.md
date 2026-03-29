@@ -271,6 +271,11 @@ ON WHEEL / TOUCH-DRAG inside #credits-panel:
   2. Scrub timeline position based on scroll delta
   3. Set resumeTimer (PausableTimer, 1500ms idle, tunable)
 
+ON TOUCHCANCEL:
+  Reset touch tracking state (same as touchend). Prevents stale
+  lastTouchY when OS/browser cancels touch (interruptions, gesture
+  arbitration). Uses the same handler ref as touchend.
+
 ON RESUME TIMER FIRE:
   1. Resume GSAP timeline from current position
 ```
