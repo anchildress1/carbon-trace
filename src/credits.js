@@ -1,0 +1,217 @@
+import { gsap } from 'gsap';
+import { PausableTimer } from './pausable-timer.js';
+// Static build-time import — content is a compile-time constant from a local
+// file, not user-controlled input. Safe for innerHTML assignment.
+import creditsHtml from './credits-content.html?raw';
+
+// Module state
+let scrollTimeline = null;
+let fadeInTween = null;
+let scrollResumeTimer = null;
+let focusedLink = null;
+let hoveredLink = false;
+let contentInitialized = false;
+
+// Event handler refs (for cleanup)
+let wheelHandler = null;
+let pointeroverHandler = null;
+let pointeroutHandler = null;
+let focusinHandler = null;
+let focusoutHandler = null;
+
+/**
+ * Populate the scroll content container with credits HTML.
+ * Idempotent — no-op if content is already populated.
+ */
+export function initCreditsContent(scrollContentEl) {
+  if (contentInitialized) return;
+  // SAFE: creditsHtml is a static build-time import (credits-content.html?raw),
+  // not user-controlled input — no XSS risk.
+  scrollContentEl.innerHTML = creditsHtml; // NOSONAR
+  contentInitialized = true;
+}
+
+/**
+ * Reveal the credits panel with a fade-in and start auto-scrolling.
+ *
+ * @param {HTMLElement} panelEl - The #credits-panel container
+ * @param {HTMLElement} scrollContentEl - The #credits-scroll-content inner container
+ * @param {object} config - Credits config from scenes.json
+ * @param {number} config.scrollDuration - Total scroll cycle duration (ms)
+ * @param {number} config.resumeDelay - Idle delay before auto-scroll resumes after manual interaction (ms)
+ * @param {number} config.fadeInDuration - Panel fade-in duration (ms)
+ * @param {number} config.repeatDelay - Pause at loop restart point (ms)
+ * @param {object} opts
+ * @param {boolean} opts.reducedMotion - Whether prefers-reduced-motion is active
+ */
+export function revealCreditsPanel(panelEl, scrollContentEl, config, opts = {}) {
+  initCreditsContent(scrollContentEl);
+  panelEl.hidden = false;
+
+  if (opts.reducedMotion) {
+    panelEl.style.opacity = '1';
+    return;
+  }
+
+  fadeInTween = gsap.to(panelEl, {
+    opacity: 1,
+    duration: config.fadeInDuration / 1000,
+    ease: 'power2.out',
+    onComplete: () => {
+      fadeInTween = null;
+      startAutoScroll(panelEl, scrollContentEl, config);
+    },
+  });
+}
+
+function startAutoScroll(panelEl, scrollContentEl, config) {
+  const contentHeight = scrollContentEl.scrollHeight;
+  const panelHeight = panelEl.clientHeight;
+
+  gsap.set(scrollContentEl, { y: panelHeight });
+
+  scrollTimeline = gsap.to(scrollContentEl, {
+    y: -contentHeight,
+    duration: config.scrollDuration / 1000,
+    ease: 'none',
+    repeat: -1,
+    repeatDelay: config.repeatDelay / 1000,
+  });
+
+  attachScrollListeners(panelEl, scrollContentEl, config);
+}
+
+function attachScrollListeners(panelEl, scrollContentEl, config) {
+  wheelHandler = (e) => {
+    e.preventDefault();
+    if (!scrollTimeline) return;
+    scrollTimeline.pause();
+    const totalDuration = scrollTimeline.duration();
+    const currentTime = scrollTimeline.time();
+    const scrubDelta = (e.deltaY / scrollContentEl.scrollHeight) * totalDuration;
+    scrollTimeline.time(Math.max(0, Math.min(totalDuration, currentTime + scrubDelta)));
+    scheduleScrollResume(config.resumeDelay);
+  };
+
+  focusinHandler = (e) => {
+    if (e.target.closest('a, button')) {
+      focusedLink = e.target;
+      scrollTimeline?.pause();
+      scrollResumeTimer?.cancel();
+      scrollResumeTimer = null;
+    }
+  };
+
+  focusoutHandler = (e) => {
+    if (e.target === focusedLink) {
+      focusedLink = null;
+      if (!hoveredLink) {
+        scheduleScrollResume(config.resumeDelay);
+      }
+    }
+  };
+
+  pointeroverHandler = (e) => {
+    if (e.target.closest('a, button')) {
+      hoveredLink = true;
+      scrollTimeline?.pause();
+      scrollResumeTimer?.cancel();
+      scrollResumeTimer = null;
+    }
+  };
+
+  pointeroutHandler = (e) => {
+    if (e.target.closest('a, button')) {
+      hoveredLink = false;
+      if (!focusedLink) {
+        scheduleScrollResume(config.resumeDelay);
+      }
+    }
+  };
+
+  panelEl.addEventListener('wheel', wheelHandler, { passive: false });
+  panelEl.addEventListener('focusin', focusinHandler);
+  panelEl.addEventListener('focusout', focusoutHandler);
+  panelEl.addEventListener('pointerover', pointeroverHandler);
+  panelEl.addEventListener('pointerout', pointeroutHandler);
+}
+
+function scheduleScrollResume(delay) {
+  scrollResumeTimer?.cancel();
+  scrollResumeTimer = new PausableTimer(() => {
+    scrollResumeTimer = null;
+    if (!focusedLink && !hoveredLink) {
+      scrollTimeline?.play();
+    }
+  }, delay);
+}
+
+function removeScrollListeners(panelEl) {
+  if (wheelHandler) {
+    panelEl.removeEventListener('wheel', wheelHandler);
+    wheelHandler = null;
+  }
+  if (focusinHandler) {
+    panelEl.removeEventListener('focusin', focusinHandler);
+    focusinHandler = null;
+  }
+  if (focusoutHandler) {
+    panelEl.removeEventListener('focusout', focusoutHandler);
+    focusoutHandler = null;
+  }
+  if (pointeroverHandler) {
+    panelEl.removeEventListener('pointerover', pointeroverHandler);
+    pointeroverHandler = null;
+  }
+  if (pointeroutHandler) {
+    panelEl.removeEventListener('pointerout', pointeroutHandler);
+    pointeroutHandler = null;
+  }
+}
+
+/**
+ * Hide the credits panel and tear down all animation state.
+ */
+export function hideCreditsPanel(panelEl) {
+  fadeInTween?.kill();
+  fadeInTween = null;
+
+  scrollTimeline?.kill();
+  scrollTimeline = null;
+
+  scrollResumeTimer?.cancel();
+  scrollResumeTimer = null;
+
+  focusedLink = null;
+  hoveredLink = false;
+
+  removeScrollListeners(panelEl);
+
+  panelEl.hidden = true;
+  panelEl.style.opacity = '0';
+}
+
+/**
+ * Pause the credits scroll timeline (called from app doPause).
+ */
+export function pauseCreditsScroll() {
+  scrollTimeline?.pause();
+  scrollResumeTimer?.pause();
+}
+
+/**
+ * Resume the credits scroll timeline (called from app doResume).
+ */
+export function resumeCreditsScroll() {
+  scrollResumeTimer?.resume();
+  if (!scrollResumeTimer && !focusedLink && !hoveredLink) {
+    scrollTimeline?.play();
+  }
+}
+
+/**
+ * Full teardown — alias for hideCreditsPanel. Safe to call multiple times.
+ */
+export function cleanupCredits(panelEl) {
+  hideCreditsPanel(panelEl);
+}
