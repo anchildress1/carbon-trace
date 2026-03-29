@@ -1233,7 +1233,7 @@
         {
           "id": "ambient-08",
           "type": "ambient",
-          "src": "assets/audio/ambient/08-empty-snow-56774f21.m4a",
+          "src": "assets/audio/ambient/08-empty-wind-8aaca40d.m4a",
           "enter": 0,
           "volume": 1,
           "loop": true,
