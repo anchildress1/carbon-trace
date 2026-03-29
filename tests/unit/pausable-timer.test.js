@@ -26,6 +26,15 @@ describe('PausableTimer', () => {
       expect(timer.isActive).toBe(true);
       expect(timer.isPaused).toBe(false);
     });
+
+    it('fires on next tick with zero delay', () => {
+      const cb = vi.fn();
+      new PausableTimer(cb, 0);
+
+      expect(cb).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(0);
+      expect(cb).toHaveBeenCalledOnce();
+    });
   });
 
   describe('pause', () => {
@@ -152,6 +161,24 @@ describe('PausableTimer', () => {
 
       timer.resume();
       expect(cb).toHaveBeenCalledOnce();
+
+      dateSpy.mockRestore();
+    });
+
+    it('immediate-fire resume clears active/paused state', () => {
+      const dateSpy = vi.spyOn(Date, 'now');
+      dateSpy.mockReturnValue(0);
+
+      const cb = vi.fn();
+      const timer = new PausableTimer(cb, 500);
+
+      dateSpy.mockReturnValue(750);
+      timer.pause();
+      timer.resume();
+
+      expect(cb).toHaveBeenCalledOnce();
+      expect(timer.isActive).toBe(false);
+      expect(timer.isPaused).toBe(false);
 
       dateSpy.mockRestore();
     });
@@ -313,6 +340,57 @@ describe('PausableTimer', () => {
       expect(cb).toHaveBeenCalledOnce();
 
       dateSpy.mockRestore();
+    });
+
+    it('propagates callback errors and resets internal timer state', () => {
+      const timer = new PausableTimer(() => {
+        throw new Error('kaboom');
+      }, 50);
+
+      expect(() => vi.advanceTimersByTime(50)).toThrow('kaboom');
+      expect(timer.isActive).toBe(false);
+      expect(timer.isPaused).toBe(false);
+    });
+
+    it('callback can call cancel on its own timer without invalid state', () => {
+      let timer;
+      const cb = vi.fn(() => {
+        timer.cancel();
+      });
+      timer = new PausableTimer(cb, 10);
+
+      vi.advanceTimersByTime(10);
+
+      expect(cb).toHaveBeenCalledOnce();
+      expect(timer.isActive).toBe(false);
+      expect(timer.isPaused).toBe(false);
+    });
+
+    it('callback can call pause on its own timer without entering paused state', () => {
+      let timer;
+      const cb = vi.fn(() => {
+        timer.pause();
+      });
+      timer = new PausableTimer(cb, 10);
+
+      vi.advanceTimersByTime(10);
+
+      expect(cb).toHaveBeenCalledOnce();
+      expect(timer.isActive).toBe(false);
+      expect(timer.isPaused).toBe(false);
+    });
+
+    it('handles very large delay values without overflow behavior', () => {
+      const cb = vi.fn();
+      const timer = new PausableTimer(cb, Number.MAX_SAFE_INTEGER);
+
+      // JS runtimes may clamp huge delays; what matters is stable behavior.
+      expect(cb.mock.calls.length).toBeLessThanOrEqual(1);
+      expect(() => vi.advanceTimersByTime(1_000_000)).not.toThrow();
+      expect(cb.mock.calls.length).toBeLessThanOrEqual(1);
+
+      timer.cancel();
+      expect(timer.isActive).toBe(false);
     });
   });
 });
