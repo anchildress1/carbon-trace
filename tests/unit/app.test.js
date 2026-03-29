@@ -1,10 +1,23 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+const { gsapMockState } = vi.hoisted(() => ({
+  gsapMockState: {
+    autoComplete: true,
+    pendingOnCompletes: [],
+  },
+}));
+
 // --- Mock leaf modules ---
 vi.mock('gsap', () => {
   const set = vi.fn();
   const to = vi.fn((_target, opts) => {
-    if (opts.onComplete) opts.onComplete();
+    if (opts?.onComplete) {
+      if (gsapMockState.autoComplete) {
+        opts.onComplete();
+      } else {
+        gsapMockState.pendingOnCompletes.push(opts.onComplete);
+      }
+    }
     return { kill: vi.fn() };
   });
   const timeline = vi.fn(() => ({
@@ -248,6 +261,11 @@ async function flush() {
   await vi.advanceTimersByTimeAsync(0);
 }
 
+function runNextGsapCompletion() {
+  const callback = gsapMockState.pendingOnCompletes.shift();
+  if (callback) callback();
+}
+
 import { createApp } from '../../src/app.js';
 import {
   scheduleAudioCues,
@@ -336,15 +354,23 @@ describe('app.js', () => {
   beforeEach(async () => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    gsapMockState.autoComplete = true;
+    gsapMockState.pendingOnCompletes = [];
     buildDOM();
     loadEffectsScene.mockResolvedValue(true);
     loadImage.mockResolvedValue(new Image());
     globalThis.matchMedia = vi.fn().mockReturnValue({ matches: false });
 
-    // Restore gsap.to to synchronous onComplete (tests like pendingPause override this)
+    // Reset any per-test override back to the shared controllable implementation.
     const { gsap } = await import('gsap');
     gsap.to.mockImplementation((_target, opts) => {
-      if (opts.onComplete) opts.onComplete();
+      if (opts?.onComplete) {
+        if (gsapMockState.autoComplete) {
+          opts.onComplete();
+        } else {
+          gsapMockState.pendingOnCompletes.push(opts.onComplete);
+        }
+      }
       return { kill: vi.fn() };
     });
   });
@@ -580,6 +606,34 @@ describe('app.js', () => {
 
       if (storedOnComplete) storedOnComplete();
       expect(app.getState()).not.toBe('PAUSED');
+    });
+  });
+
+  // ── transition lifecycle ───────────────────────────────────────────
+
+  describe('transition lifecycle', () => {
+    beforeEach(async () => {
+      app = createApp();
+      await flush();
+      app.togglePause();
+    });
+
+    it('remains in TRANSITIONING until gsap completions run', async () => {
+      gsapMockState.autoComplete = false;
+
+      app.advance();
+      expect(app.getState()).toBe('TRANSITIONING');
+      expect(gsapMockState.pendingOnCompletes.length).toBeGreaterThan(0);
+
+      // Complete fade-out; fade-in tween is queued, but landing is not done yet.
+      runNextGsapCompletion();
+      await flush();
+      expect(app.getState()).toBe('TRANSITIONING');
+
+      // Complete fade-in; transition can now land on the next frame.
+      runNextGsapCompletion();
+      await flush();
+      expect(app.getState()).toBe('SCENE_ACTIVE');
     });
   });
 
