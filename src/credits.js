@@ -11,11 +11,7 @@ let scrollResumeTimer = null;
 let focusedLink = null;
 let hoveredLink = false;
 let contentInitialized = false;
-
-// Element refs — stored during reveal so pause/resume can detach/reattach listeners
-let panelRef = null;
-let scrollContentRef = null;
-let configRef = null;
+let isPaused = false;
 
 // Event handler refs (for cleanup)
 let wheelHandler = null;
@@ -51,12 +47,6 @@ export function initCreditsContent(scrollContentEl) {
  */
 export function revealCreditsPanel(panelEl, scrollContentEl, config, opts = {}) {
   initCreditsContent(scrollContentEl);
-
-  // Store refs so pauseCreditsScroll/resumeCreditsScroll can
-  // detach/reattach event listeners without extra arguments.
-  panelRef = panelEl;
-  scrollContentRef = scrollContentEl;
-  configRef = config;
 
   // Remove hidden FIRST so clientHeight is measurable —
   // hidden = display:none = clientHeight 0. Panel is still opacity:0
@@ -164,7 +154,7 @@ function scheduleScrollResume(delay) {
   scrollResumeTimer?.cancel();
   scrollResumeTimer = new PausableTimer(() => {
     scrollResumeTimer = null;
-    if (!focusedLink && !hoveredLink) {
+    if (!isPaused && !focusedLink && !hoveredLink) {
       scrollTimeline?.play();
     }
   }, delay);
@@ -208,14 +198,11 @@ export function hideCreditsPanel(panelEl) {
 
   focusedLink = null;
   hoveredLink = false;
+  isPaused = false;
 
   contentInitialized = false;
 
   removeScrollListeners(panelEl);
-
-  panelRef = null;
-  scrollContentRef = null;
-  configRef = null;
 
   panelEl.hidden = true;
   panelEl.style.opacity = '0';
@@ -223,25 +210,22 @@ export function hideCreditsPanel(panelEl) {
 
 /**
  * Pause the credits scroll timeline (called from app doPause).
- * Detaches scroll event listeners so no new resume timers can be
- * created during pause — structural prevention, not a flag check.
+ * Matches shimmer.js/effects-canvas.js pattern: single isPaused flag
+ * checked in scheduleScrollResume callback to prevent auto-resume
+ * while paused. All listeners stay attached — wheel scrubbing and
+ * link hover/focus still work during pause.
  */
 export function pauseCreditsScroll() {
+  isPaused = true;
   scrollTimeline?.pause();
   scrollResumeTimer?.pause();
-  if (panelRef) removeScrollListeners(panelRef);
-  focusedLink = null;
-  hoveredLink = false;
 }
 
 /**
  * Resume the credits scroll timeline (called from app doResume).
- * Reattaches scroll event listeners that were detached on pause.
  */
 export function resumeCreditsScroll() {
-  if (scrollTimeline && !wheelHandler && panelRef && scrollContentRef && configRef) {
-    attachScrollListeners(panelRef, scrollContentRef, configRef);
-  }
+  isPaused = false;
   scrollResumeTimer?.resume();
   if (!scrollResumeTimer && !focusedLink && !hoveredLink) {
     scrollTimeline?.play();

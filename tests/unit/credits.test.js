@@ -480,62 +480,43 @@ describe('credits.js', () => {
     });
   });
 
-  // -- pause-aware listener lifecycle --
+  // -- pause prevents auto-resume but allows interaction --
 
-  describe('pause detaches listeners, resume reattaches', () => {
-    it('wheel during pause does not create resume timer or resume scroll', () => {
+  describe('isPaused prevents auto-resume, allows wheel scrub', () => {
+    it('wheel scrub still works during pause', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      const scrollTl = gsapMockState.lastTimeline;
+      scrollTl.time.mockReturnValue(10);
+
+      pauseCreditsScroll();
+
+      const wheelEvent = new Event('wheel', { bubbles: true });
+      wheelEvent.deltaY = 200;
+      wheelEvent.preventDefault = vi.fn();
+      panel.dispatchEvent(wheelEvent);
+
+      // Scrub works — timeline position updated
+      expect(scrollTl.time).toHaveBeenCalledWith(16);
+    });
+
+    it('resume timer does not play timeline while paused', () => {
       revealCreditsPanel(panel, scrollContent, defaultConfig);
       const scrollTl = gsapMockState.lastTimeline;
 
-      pauseCreditsScroll();
-      scrollTl.play.mockClear();
-
-      // Wheel event during pause — listeners are detached
+      // Wheel creates a resume timer
       const wheelEvent = new Event('wheel', { bubbles: true });
       wheelEvent.deltaY = 100;
       wheelEvent.preventDefault = vi.fn();
       panel.dispatchEvent(wheelEvent);
 
-      vi.advanceTimersByTime(5000);
-      expect(scrollTl.play).not.toHaveBeenCalled();
-    });
-
-    it('focus during pause does not create resume timer', () => {
-      revealCreditsPanel(panel, scrollContent, defaultConfig);
-      const scrollTl = gsapMockState.lastTimeline;
-
+      // Pause before resume timer fires
       pauseCreditsScroll();
       scrollTl.play.mockClear();
-      scrollTl.pause.mockClear();
 
-      // Focus on link during pause — focusin listener is detached
-      const link = scrollContent.querySelector('a');
-      link.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
-
-      // No scroll pause triggered (listener wasn't there)
-      expect(scrollTl.pause).not.toHaveBeenCalled();
-
-      // Focus out — no resume timer created
-      link.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+      // Resume timer fires (PausableTimer was paused then we advance)
+      // But even if it somehow fires, isPaused guard prevents play()
       vi.advanceTimersByTime(5000);
       expect(scrollTl.play).not.toHaveBeenCalled();
-    });
-
-    it('listeners reattach on resume — wheel works again', () => {
-      revealCreditsPanel(panel, scrollContent, defaultConfig);
-      const scrollTl = gsapMockState.lastTimeline;
-
-      pauseCreditsScroll();
-      resumeCreditsScroll();
-
-      // Wheel should work again — listeners reattached
-      scrollTl.pause.mockClear();
-      const wheelEvent = new Event('wheel', { bubbles: true });
-      wheelEvent.deltaY = 100;
-      wheelEvent.preventDefault = vi.fn();
-      panel.dispatchEvent(wheelEvent);
-
-      expect(scrollTl.pause).toHaveBeenCalled();
     });
 
     it('resume after pause plays scroll timeline automatically', () => {
@@ -547,6 +528,24 @@ describe('credits.js', () => {
 
       resumeCreditsScroll();
       expect(scrollTl.play).toHaveBeenCalled();
+    });
+
+    it('link hover still works during pause', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      const scrollTl = gsapMockState.lastTimeline;
+
+      pauseCreditsScroll();
+      scrollTl.pause.mockClear();
+
+      // Hover on link during pause — listener fires, pauses timeline (no-op since already paused)
+      const link = scrollContent.querySelector('a');
+      link.dispatchEvent(new Event('pointerover', { bubbles: true }));
+
+      // Pointer out + timer fires — but isPaused prevents play()
+      link.dispatchEvent(new Event('pointerout', { bubbles: true }));
+      scrollTl.play.mockClear();
+      vi.advanceTimersByTime(5000);
+      expect(scrollTl.play).not.toHaveBeenCalled();
     });
   });
 });
