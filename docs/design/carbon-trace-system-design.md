@@ -393,6 +393,19 @@ by the CREDITS state.
 4. End song (type: "ambient", anchor-based entry, crescendo to 0.25 over 45s)
 ```
 
+### 4.7 credits Object (ADR-011)
+
+```
+FIELD          │ TYPE   │ DESCRIPTION
+───────────────┼────────┼──────────────────────────────────────
+scrollDuration │ number │ Total scroll cycle duration (ms)
+resumeDelay    │ number │ Idle delay before auto-scroll resumes after manual interaction (ms)
+fadeInDuration │ number │ Panel fade-in duration (ms)
+repeatDelay    │ number │ Pause at loop restart point before re-scrolling (ms)
+```
+
+`credits: null` = no credits overlay on this frame. Only frame 11 (`frameType: "credits"`) has this config. Triggers `revealCreditsPanel()` after narration ends + `holdAfterNarration` delay via `makeNarrationEndCallback()`. See ADR-011 for full specification.
+
 ---
 
 ## 5. State Machine (app.js)
@@ -434,9 +447,10 @@ const app = {
   audioDurations: new Map(), // src → duration in seconds (from loader.js metadata preload)
   projectMaxCaptionMs: 0,    // max caption end time across all frames (computed at startup)
 
-  // Timer — PausableTimer instance (auto-advance is a state machine concern, stays in app.js)
+  // Timers — PausableTimer instances (state machine concerns, stay in app.js)
   // All audio timers (narration delay, music enter/exit) are internal to audio.js (ADR-005)
-  autoAdvanceTimer: null,    // PausableTimer | null
+  autoAdvanceTimer: null,       // PausableTimer | null
+  creditsRevealTimer: null,     // PausableTimer | null — holdAfterNarration delay before credits reveal (ADR-011)
   els: { /* DOM element references — see createApp() */ },
 };
 ```
@@ -560,11 +574,14 @@ else:
 **doPause():**
 - Set `paused = true`, `pausedFromState = current state`, `state = PAUSED`
 - `pauseAudioCues()` — freezes all audio + pending timers in activeCues Map
-- Pause text timeline, effects canvas
+- Pause text timeline, effects canvas, shimmer
 - `autoAdvanceTimer?.pause()` — saves remaining auto-advance time
+- `creditsRevealTimer?.pause()` — saves remaining reveal delay (ADR-011)
+- `pauseCreditsScroll()` — freezes scroll timeline, sets isPaused flag. Wheel scrub still works; auto-resume blocked until doResume (ADR-011)
 
 **doResume():**
 - Restore `pausedFromState`, clear pause
+- `creditsRevealTimer?.resume()`, `resumeCreditsScroll()` — clears isPaused, resumes scroll (ADR-011)
 
 ```
 if replayPending:
@@ -675,6 +692,9 @@ Auto-advance       │ (internal)           │ (internal)         │ advance(c
     <canvas id="trace-overlay" aria-hidden="true"></canvas>    <!-- shimmer dots — ADR-006A -->
     <div id="narration-layer" aria-hidden="true"></div>
     <div id="caption-layer" aria-hidden="true"></div>
+    <div id="credits-panel" hidden aria-label="Credits">  <!-- ADR-011, z-index 7 -->
+      <div id="credits-scroll-content"></div>
+    </div>
   </div>
 
   <div id="transition-loader" hidden aria-hidden="true"></div>
