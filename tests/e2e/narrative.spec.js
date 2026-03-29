@@ -401,6 +401,56 @@ test.describe('carbon-trace — credits overlay', () => {
     await expect(panel).toBeVisible({ timeout: 6000 });
   });
 
+  test('touch drag pauses auto-scroll and resumes after delay', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    const creditsFrameIndex = TOTAL_FRAMES - 1;
+    await jumpToFrameByDot(page, creditsFrameIndex);
+    await dispatchNarrationEnded(page);
+
+    const panel = page.locator('#credits-panel');
+    await expect(panel).toBeVisible({ timeout: 6000 });
+    await page.waitForTimeout(800);
+
+    // Verify auto-scroll is active
+    const movingY1 = await getCreditsTranslateY(page);
+    await page.waitForTimeout(800);
+    const movingY2 = await getCreditsTranslateY(page);
+    expect(Math.abs(movingY2 - movingY1)).toBeGreaterThan(1);
+
+    // Perform touch drag via real TouchEvent dispatch
+    await page.evaluate(() => {
+      const el = document.querySelector('#credits-panel');
+      const dispatchTouch = (type, clientY) => {
+        const touchInit =
+          type === 'touchend' || type === 'touchcancel'
+            ? { bubbles: true, cancelable: true, touches: [], changedTouches: [] }
+            : {
+                bubbles: true,
+                cancelable: true,
+                touches: [new Touch({ identifier: 0, target: el, clientX: 100, clientY })],
+                changedTouches: [new Touch({ identifier: 0, target: el, clientX: 100, clientY })],
+              };
+        el.dispatchEvent(new TouchEvent(type, touchInit));
+      };
+      dispatchTouch('touchstart', 300);
+      dispatchTouch('touchmove', 200);
+      dispatchTouch('touchend', 200);
+    });
+
+    // After touch drag, auto-scroll should be paused (resume timer pending)
+    const pausedY1 = await getCreditsTranslateY(page);
+    await page.waitForTimeout(500);
+    const pausedY2 = await getCreditsTranslateY(page);
+    expect(Math.abs(pausedY2 - pausedY1)).toBeLessThan(1);
+
+    // Wait for resumeDelay (1500ms from scenes.json) + buffer
+    await page.waitForTimeout(1500);
+    const resumedY1 = await getCreditsTranslateY(page);
+    await page.waitForTimeout(800);
+    const resumedY2 = await getCreditsTranslateY(page);
+    expect(Math.abs(resumedY2 - resumedY1)).toBeGreaterThan(1);
+  });
+
   test('reduced-motion revisit clears stale transform state', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     const creditsFrameIndex = TOTAL_FRAMES - 1;
