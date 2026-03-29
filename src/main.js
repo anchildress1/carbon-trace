@@ -11,7 +11,10 @@ if (!globalThis.__carbonTraceInitialized) {
 
   document.addEventListener('DOMContentLoaded', () => {
     try {
-      createApp();
+      const app = createApp();
+      if (import.meta.env.VITE_E2E === '1') {
+        globalThis.__ctE2EApp = app;
+      }
     } catch (err) {
       console.error('Fatal error:', err);
       const loading = document.getElementById('loading-screen');

@@ -1173,5 +1173,11 @@ export function createApp() {
     toggleMute: () => toggleMute(app),
     togglePause: () => togglePause(app),
     getState: () => app.state,
+    forceNarrationEndForTesting: () => {
+      const frame = app.frames[app.currentIndex];
+      if (!frame) return;
+      const holdAfterNarration = getHoldAfterNarration(frame);
+      makeNarrationEndCallback(app, frame, holdAfterNarration)();
+    },
   };
 }

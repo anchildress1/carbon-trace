@@ -45,6 +45,30 @@ async function advanceByKeyboard(page, count, startIndex = 0) {
   }
 }
 
+async function jumpToFrameByDot(page, frameIndex) {
+  await page.locator('.progress-dot').nth(frameIndex).click();
+  await expect(page.locator('#scene-stage')).toHaveAttribute('aria-label', frameDescription(frameIndex), {
+    timeout: 5000,
+  });
+}
+
+async function dispatchNarrationEnded(page) {
+  await page.evaluate(() => {
+    if (typeof globalThis.__ctE2EApp?.forceNarrationEndForTesting !== 'function') {
+      throw new Error('E2E app harness missing forceNarrationEndForTesting');
+    }
+    globalThis.__ctE2EApp.forceNarrationEndForTesting();
+  });
+}
+
+async function getCreditsTranslateY(page) {
+  return page.locator('#credits-scroll-content').evaluate((el) => {
+    const transform = getComputedStyle(el).transform;
+    if (!transform || transform === 'none') return 0;
+    return new DOMMatrixReadOnly(transform).m42;
+  });
+}
+
 test.describe('carbon-trace narrative', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
@@ -292,6 +316,100 @@ test.describe('carbon-trace narrative', () => {
 
     await muteBtn.click();
     await expect(muteBtn).toHaveAttribute('aria-label', 'Mute audio');
+  });
+});
+
+test.describe('carbon-trace — credits overlay', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await dismissLoadingScreen(page);
+  });
+
+  test('credits panel is a named region landmark', async ({ page }) => {
+    const panel = page.locator('#credits-panel');
+    await expect(panel).toHaveAttribute('role', 'region');
+    await expect(panel).toHaveAttribute('aria-label', 'Credits');
+  });
+
+  test('credits auto-scroll pauses on focused link and resumes after focus leaves', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    const creditsFrameIndex = TOTAL_FRAMES - 1;
+    await jumpToFrameByDot(page, creditsFrameIndex);
+    await dispatchNarrationEnded(page);
+
+    const panel = page.locator('#credits-panel');
+    await expect(panel).toBeVisible({ timeout: 6000 });
+    await page.waitForTimeout(800);
+
+    const movingY1 = await getCreditsTranslateY(page);
+    await page.waitForTimeout(800);
+    const movingY2 = await getCreditsTranslateY(page);
+    expect(Math.abs(movingY2 - movingY1)).toBeGreaterThan(1);
+
+    const firstLink = page.locator('#credits-panel a').first();
+    await firstLink.focus();
+    const pausedY1 = await getCreditsTranslateY(page);
+    await page.waitForTimeout(2200);
+    const pausedY2 = await getCreditsTranslateY(page);
+    expect(Math.abs(pausedY2 - pausedY1)).toBeLessThan(0.75);
+
+    await page.locator('#btn-pause').focus();
+    const resumedY1 = await getCreditsTranslateY(page);
+    await page.waitForTimeout(2200);
+    const resumedY2 = await getCreditsTranslateY(page);
+    expect(Math.abs(resumedY2 - resumedY1)).toBeGreaterThan(1);
+  });
+
+  test('replay while credits are visible hides panel and re-reveals after narration end', async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    const creditsFrameIndex = TOTAL_FRAMES - 1;
+    await jumpToFrameByDot(page, creditsFrameIndex);
+    await dispatchNarrationEnded(page);
+
+    const panel = page.locator('#credits-panel');
+    await expect(panel).toBeVisible({ timeout: 6000 });
+
+    await page.click('#btn-replay');
+    await expect(panel).toBeHidden({ timeout: 2000 });
+
+    await dispatchNarrationEnded(page);
+    await expect(panel).toBeVisible({ timeout: 6000 });
+  });
+
+  test('reduced-motion revisit clears stale transform state', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    const creditsFrameIndex = TOTAL_FRAMES - 1;
+    const prevFrameIndex = TOTAL_FRAMES - 2;
+
+    await jumpToFrameByDot(page, creditsFrameIndex);
+    await dispatchNarrationEnded(page);
+    await expect(page.locator('#credits-panel')).toBeVisible({ timeout: 6000 });
+
+    await page.waitForTimeout(800);
+    const firstTransform = await page
+      .locator('#credits-scroll-content')
+      .evaluate((el) => getComputedStyle(el).transform);
+    expect(firstTransform).not.toBe('none');
+
+    await page.click('#btn-prev');
+    await expect(page.locator('#scene-stage')).toHaveAttribute('aria-label', frameDescription(prevFrameIndex), {
+      timeout: 5000,
+    });
+
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await jumpToFrameByDot(page, creditsFrameIndex);
+    await dispatchNarrationEnded(page);
+    await expect(page.locator('#credits-panel')).toBeVisible({ timeout: 6000 });
+
+    const revisitTransform = await page
+      .locator('#credits-scroll-content')
+      .evaluate((el) => getComputedStyle(el).transform);
+    expect(revisitTransform).toBe('none');
   });
 });
 
