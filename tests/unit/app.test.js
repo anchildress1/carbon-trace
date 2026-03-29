@@ -3074,6 +3074,26 @@ describe('app.js', () => {
       expect(resumeShimmer).toHaveBeenCalled();
     });
 
+    it('logs error and continues when initShimmer throws', async () => {
+      initShimmer.mockImplementationOnce(() => {
+        throw new TypeError('shimmer: init() requires an HTMLCanvasElement');
+      });
+      const consoleSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      app = createApp();
+      await flush();
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Shimmer init failed:',
+        'shimmer: init() requires an HTMLCanvasElement',
+      );
+      // App continues to function despite shimmer init failure
+      expect(app.getState()).toBeTruthy();
+      consoleSpy.mockRestore();
+    });
+
     it('recovers gracefully when loadShimmerScene rejects', async () => {
       loadShimmerScene.mockRejectedValueOnce(new Error('mask load failed'));
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});

@@ -877,6 +877,69 @@ describe('shimmer.js', () => {
       ).rejects.toThrow('Failed to load mask');
     });
 
+    it('throws when mask image has zero dimensions', async () => {
+      const ZeroImage = class {
+        constructor() {
+          this.naturalWidth = 0;
+          this.naturalHeight = 0;
+          this.width = 0;
+          this.height = 0;
+          this.crossOrigin = '';
+        }
+        set src(_val) {
+          Promise.resolve().then(() => {
+            if (this.onload) this.onload();
+          });
+        }
+      };
+      vi.stubGlobal('Image', ZeroImage);
+
+      shimmer.init(mockCanvas);
+      await expect(
+        shimmer.loadScene({ mask: 'zero.png', opacity: 0.5 }),
+      ).rejects.toThrow('zero dimensions');
+    });
+
+    it('throws when offscreen context fails in buildWalkMap', async () => {
+      vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+        if (tag === 'canvas') {
+          const c = originalCreateElement('canvas');
+          c.getContext = vi.fn(() => null);
+          return c;
+        }
+        return originalCreateElement(tag);
+      });
+
+      shimmer.init(mockCanvas);
+      await expect(
+        shimmer.loadScene({ mask: 'test.png', opacity: 0.5 }),
+      ).rejects.toThrow('failed to acquire offscreen 2D context for mask processing');
+    });
+
+    it('throws when offscreen context fails in buildTraceImage', async () => {
+      let callCount = 0;
+      vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+        if (tag === 'canvas') {
+          callCount++;
+          const c = originalCreateElement('canvas');
+          if (callCount === 1) {
+            // First offscreen canvas (buildWalkMap) — provide working context
+            c.getContext = vi.fn(() => createMock2dContext());
+          } else {
+            // Second offscreen canvas (buildTraceImage) — return null
+            c.getContext = vi.fn(() => null);
+          }
+          return c;
+        }
+        return originalCreateElement(tag);
+      });
+
+      shimmer.init(mockCanvas);
+      await expect(
+        shimmer.loadScene({ mask: 'test.png', opacity: 0.5 }),
+      ).rejects.toThrow('failed to acquire offscreen 2D context for trace image');
+    });
+
     it('handleResize updates canvas dimensions from bounding rect', async () => {
       shimmer.init(mockCanvas);
       await shimmer.loadScene({ mask: 'test.png', opacity: 0.5 });
