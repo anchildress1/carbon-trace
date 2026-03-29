@@ -2,8 +2,6 @@
   "ci": {
     "collect": {
       "url": ["http://localhost:4173"],
-      "startServerCommand": "pnpm preview",
-      "startServerReadyPattern": "Local",
       "numberOfRuns": 3,
       "settings": {
         "preset": "desktop",

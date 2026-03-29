@@ -11,9 +11,11 @@ coverage/
 # Playwright
 playwright-report/
 playwright-results/
+test-results/
 
 # Lighthouse
 .lighthouseci/
+.lighthouseci-mobile/
 
 # Secrets baseline
 .secrets.baseline

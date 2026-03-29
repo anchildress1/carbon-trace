@@ -1,0 +1,15 @@
+{
+  "ci": {
+    "collect": {
+      "url": ["http://localhost:4173"],
+      "numberOfRuns": 3,
+      "settings": {
+        "chromeFlags": "--headless=new"
+      }
+    },
+    "upload": {
+      "target": "filesystem",
+      "outputDir": ".lighthouseci-mobile"
+    }
+  }
+}

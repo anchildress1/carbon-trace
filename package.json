@@ -18,7 +18,10 @@
     "lint:fix": "eslint src/ --fix",
     "format": "prettier --write 'src/**/*.{js,css,html,json}' '*.{js,json,html,yml,yaml,md}'",
     "format:check": "prettier --check 'src/**/*.{js,css,html,json}' '*.{js,json,html,yml,yaml,md}'",
-    "perf": "lhci autorun"
+    "perf:lighthouse:desktop": "lhci autorun --config=.lighthouserc.json",
+    "perf:lighthouse:mobile": "lhci autorun --config=.lighthouserc.mobile.json",
+    "perf:runtime": "playwright test -c playwright.perf.config.js",
+    "perf": "node scripts/run-perf.mjs"
   },
   "dependencies": {
     "gsap": "^3.12.7",
