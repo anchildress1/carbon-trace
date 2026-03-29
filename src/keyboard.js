@@ -15,6 +15,8 @@ const KEY_MAP = {
   Escape: { action: 'pause', preventDefault: false, allowOnButton: true },
 };
 
+let activeListener = null;
+
 /**
  * Process a keydown event against the key map.
  *
@@ -41,7 +43,17 @@ export function handleKeydown(e, actionHandler) {
  * @returns {() => void} cleanup function that removes the listener
  */
 export function initKeyboard(actionHandler) {
+  if (activeListener) {
+    document.removeEventListener('keydown', activeListener);
+  }
+
   const listener = (e) => handleKeydown(e, actionHandler);
+  activeListener = listener;
   document.addEventListener('keydown', listener);
-  return () => document.removeEventListener('keydown', listener);
+  return () => {
+    document.removeEventListener('keydown', listener);
+    if (activeListener === listener) {
+      activeListener = null;
+    }
+  };
 }

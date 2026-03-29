@@ -52,9 +52,7 @@ export function preloadFirstFrameAudio(frames, onLoaded) {
   if (!frames.length) return;
   const srcs = audioSrcsFromEntry(frames[0]);
   for (const src of srcs) {
-    preloadAudio(src)
-      .then((result) => onLoaded(result))
-      .catch((err) => console.warn('First frame audio preload failed:', err));
+    preloadAudio(src).then((result) => onLoaded(result));
   }
 }
 

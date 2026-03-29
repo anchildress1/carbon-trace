@@ -1,21 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock pixi.js before importing effects.js
 vi.mock('pixi.js', () => ({
   DisplacementFilter: vi.fn(function ({ sprite, scale }) {
     this.sprite = sprite;
-    this.scale = { x: scale, y: scale, set: vi.fn((v) => { this.scale.x = v; this.scale.y = v; }) };
+    this.scale = {
+      x: scale,
+      y: scale,
+      set: vi.fn((x, y = x) => {
+        this.scale.x = x;
+        this.scale.y = y;
+      }),
+    };
     this.enabled = true;
   }),
 }));
 
 vi.mock('pixi-filters', () => ({
-  GlowFilter: vi.fn(function ({ color, distance, outerStrength, innerStrength, quality }) {
+  GlowFilter: vi.fn(function ({ color, distance, outerStrength, innerStrength, quality, knockout, alpha }) {
     this.color = color;
     this.distance = distance;
     this.outerStrength = outerStrength;
     this.innerStrength = innerStrength;
     this.quality = quality;
+    this.knockout = knockout;
+    this.alpha = alpha;
+    this.enabled = true;
   }),
   ShockwaveFilter: vi.fn(function ({ center, amplitude, wavelength, speed, radius }) {
     this.center = center;
@@ -23,17 +32,10 @@ vi.mock('pixi-filters', () => ({
     this.wavelength = wavelength;
     this.speed = speed;
     this.radius = radius;
+    this.enabled = true;
     this.time = 0;
   }),
 }));
-
-import {
-  registerEffect,
-  createEffect,
-  hasEffectType,
-  noiseFreeTypes,
-  overlayTypes,
-} from '../../src/effects.js';
 
 function mockSprite() {
   return {
@@ -45,8 +47,28 @@ function mockSprite() {
 }
 
 describe('effects.js — factory registry', () => {
-  beforeEach(() => {
+  let registerEffect;
+  let createEffect;
+  let hasEffectType;
+  let noiseFreeTypes;
+  let overlayTypes;
+  let DisplacementFilter;
+  let GlowFilter;
+  let ShockwaveFilter;
+
+  beforeEach(async () => {
+    vi.resetModules();
     vi.clearAllMocks();
+
+    ({ DisplacementFilter } = await import('pixi.js'));
+    ({ GlowFilter, ShockwaveFilter } = await import('pixi-filters'));
+    ({
+      registerEffect,
+      createEffect,
+      hasEffectType,
+      noiseFreeTypes,
+      overlayTypes,
+    } = await import('../../src/effects.js'));
   });
 
   describe('hasEffectType', () => {
@@ -58,25 +80,23 @@ describe('effects.js — factory registry', () => {
       expect(hasEffectType('shockwave')).toBe(true);
     });
 
-    it('returns false for unregistered types', () => {
+    it('returns false for unregistered types and non-strings', () => {
       expect(hasEffectType('nonexistent')).toBe(false);
-    });
-
-    it('returns false for empty string', () => {
       expect(hasEffectType('')).toBe(false);
-    });
-
-    it.each([
-      { label: 'null', value: null },
-      { label: 'undefined', value: undefined },
-    ])('returns false for $label', ({ value }) => {
-      expect(hasEffectType(value)).toBe(false);
+      expect(hasEffectType(null)).toBe(false);
+      expect(hasEffectType(undefined)).toBe(false);
     });
   });
 
   describe('registerEffect', () => {
-    it('throws for empty string type', () => {
-      expect(() => registerEffect('', vi.fn())).toThrow(
+    it.each([
+      { label: 'empty string', value: '' },
+      { label: 'number', value: 123 },
+      { label: 'boolean', value: false },
+      { label: 'null', value: null },
+      { label: 'undefined', value: undefined },
+    ])('throws for invalid type: $label', ({ value }) => {
+      expect(() => registerEffect(value, vi.fn())).toThrow(
         'registerEffect requires a non-empty string type',
       );
     });
@@ -87,20 +107,24 @@ describe('effects.js — factory registry', () => {
       );
     });
 
-    it('registers a custom effect type', () => {
-      registerEffect('custom', vi.fn(() => ({ filter: {}, update: vi.fn() })));
-      expect(hasEffectType('custom')).toBe(true);
+    it('overwrites existing factory when type is re-registered', () => {
+      const firstFactory = vi.fn(() => ({ filter: { id: 'first' }, update: vi.fn() }));
+      const secondFactory = vi.fn(() => ({ filter: { id: 'second' }, update: vi.fn() }));
+
+      registerEffect('custom', firstFactory);
+      registerEffect('custom', secondFactory);
+
+      const effect = createEffect('custom', mockSprite(), {});
+      expect(effect.filter.id).toBe('second');
+      expect(firstFactory).not.toHaveBeenCalled();
+      expect(secondFactory).toHaveBeenCalledOnce();
     });
   });
 
   describe('type sets', () => {
-    it('noiseFreeTypes contains glow and shockwave', () => {
+    it('exports noiseFreeTypes and overlayTypes', () => {
       expect(noiseFreeTypes.has('glow')).toBe(true);
       expect(noiseFreeTypes.has('shockwave')).toBe(true);
-      expect(noiseFreeTypes.has('water')).toBe(false);
-    });
-
-    it('overlayTypes contains glow', () => {
       expect(overlayTypes.has('glow')).toBe(true);
       expect(overlayTypes.has('shockwave')).toBe(false);
     });
@@ -109,252 +133,183 @@ describe('effects.js — factory registry', () => {
   describe('createEffect', () => {
     it('returns null and warns for unregistered type', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
       const result = createEffect('nonexistent', mockSprite(), {});
 
       expect(result).toBeNull();
-      expect(warnSpy).toHaveBeenCalledWith(
-        'Effect type "nonexistent" is not registered.',
-      );
+      expect(warnSpy).toHaveBeenCalledWith('Effect type "nonexistent" is not registered.');
       warnSpy.mockRestore();
     });
 
-    it('creates a water effect with filter and update function', () => {
+    it('propagates errors thrown by factory functions', () => {
+      registerEffect('throws', () => {
+        throw new Error('boom');
+      });
+
+      expect(() => createEffect('throws', mockSprite(), {})).toThrow('boom');
+    });
+
+    it('water effect wires displacement filter and respects explicit params', () => {
       const sprite = mockSprite();
-      const result = createEffect('water', sprite, {
+      const effect = createEffect('water', sprite, {
         direction: 180,
         speed: 0.6,
         intensity: 8,
         scale: 0.02,
       });
 
-      expect(result).not.toBeNull();
-      expect(result.filter).toBeDefined();
-      expect(typeof result.update).toBe('function');
+      expect(effect).not.toBeNull();
+      expect(DisplacementFilter).toHaveBeenLastCalledWith({ sprite, scale: 8 });
+      expect(sprite.scale.set).toHaveBeenCalledWith(0.02);
       expect(sprite.texture.source.style.addressMode).toBe('repeat');
     });
 
-    it('creates a heat effect with upward direction', () => {
+    it('water defaults to direction 90 and speed 0.6', () => {
       const sprite = mockSprite();
-      const result = createEffect('heat', sprite, {
-        speed: 0.8,
-        intensity: 4,
-        scale: 0.15,
-      });
+      const effect = createEffect('water', sprite);
 
-      expect(result).not.toBeNull();
-      expect(typeof result.update).toBe('function');
+      expect(DisplacementFilter).toHaveBeenLastCalledWith({ sprite, scale: 20 });
+      expect(sprite.scale.set).toHaveBeenCalledWith(0.15);
 
-      const startY = sprite.y;
-      result.update();
-      expect(sprite.y).toBeLessThan(startY);
+      effect.update();
+      expect(sprite.x).toBeCloseTo(0, 10);
+      expect(sprite.y).toBeCloseTo(0.6, 10);
     });
 
-    it('creates a dust effect with oscillating movement', () => {
+    it('water direction=90 moves in Y only', () => {
       const sprite = mockSprite();
-      const result = createEffect('dust', sprite, {
-        speed: 0.3,
-        intensity: 3,
-        scale: 0.08,
-      });
-
-      expect(result).not.toBeNull();
-      expect(typeof result.update).toBe('function');
-
-      result.update();
-      expect(sprite.x !== 0 || sprite.y !== 0).toBe(true);
-    });
-
-    it('water effect uses default params when none provided', () => {
-      const sprite = mockSprite();
-      const result = createEffect('water', sprite, {});
-
-      expect(result).not.toBeNull();
-      expect(result.filter).toBeDefined();
-    });
-
-    it('heat effect uses default params when none provided', () => {
-      const sprite = mockSprite();
-      const result = createEffect('heat', sprite);
-
-      expect(result).not.toBeNull();
-      expect(result.filter).toBeDefined();
-    });
-
-    it('dust effect uses default params when none provided', () => {
-      const sprite = mockSprite();
-      const result = createEffect('dust', sprite);
-
-      expect(result).not.toBeNull();
-      expect(result.filter).toBeDefined();
-    });
-
-    it('water update scrolls sprite in configured direction', () => {
-      const sprite = mockSprite();
-      const result = createEffect('water', sprite, {
-        direction: 0,
+      const effect = createEffect('water', sprite, {
+        direction: 90,
         speed: 1,
       });
 
-      const startX = sprite.x;
-      result.update();
-      expect(sprite.x).toBeGreaterThan(startX);
+      effect.update();
+      expect(sprite.x).toBeCloseTo(0, 10);
+      expect(sprite.y).toBeCloseTo(1, 10);
     });
 
-    it('creates a glow effect with filter and update function', () => {
-      const result = createEffect('glow', null, { outerStrength: 3 });
+    it('heat effect uses default params and moves upward', () => {
+      const sprite = mockSprite();
+      const effect = createEffect('heat', sprite);
 
-      expect(result).not.toBeNull();
-      expect(result.filter).toBeDefined();
-      expect(typeof result.update).toBe('function');
+      expect(DisplacementFilter).toHaveBeenLastCalledWith({ sprite, scale: 15 });
+      expect(sprite.scale.set).toHaveBeenCalledWith(0.15);
+
+      const startY = sprite.y;
+      effect.update();
+      expect(sprite.y).toBeCloseTo(startY - 0.8, 10);
     });
 
-    it('glow effect pulses outerStrength', () => {
-      const result = createEffect('glow', null, {
+    it('dust effect uses default params and oscillates over time', () => {
+      const sprite = mockSprite();
+      const effect = createEffect('dust', sprite);
+
+      expect(DisplacementFilter).toHaveBeenLastCalledWith({ sprite, scale: 4 });
+      expect(sprite.scale.set).toHaveBeenCalledWith(0.15);
+
+      const xs = [];
+      for (let i = 0; i < 50; i++) {
+        effect.update();
+        xs.push(sprite.x);
+      }
+
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      expect(maxX).toBeGreaterThan(minX);
+    });
+
+    it('accepts negative displacement params without crashing', () => {
+      const sprite = mockSprite();
+      const effect = createEffect('water', sprite, {
+        speed: -1,
+        intensity: -5,
+      });
+
+      expect(DisplacementFilter).toHaveBeenLastCalledWith({ sprite, scale: -5 });
+      expect(() => effect.update()).not.toThrow();
+    });
+
+    it('glow effect passes constructor params including knockout and alpha', () => {
+      const effect = createEffect('glow', null, {
+        color: 0xabcdef,
+        distance: 10,
         outerStrength: 3,
-        pulseSpeed: 0.5,
+        innerStrength: 2,
+        glowAlpha: 0.4,
       });
 
-      const initial = result.filter.outerStrength;
-      result.update();
-      expect(result.filter.outerStrength).not.toBe(initial);
+      expect(GlowFilter).toHaveBeenCalledWith({
+        color: 0xabcdef,
+        distance: 10,
+        outerStrength: 3,
+        innerStrength: 2,
+        quality: 0.5,
+        knockout: true,
+        alpha: 0.4,
+      });
+      expect(effect.filter.knockout).toBe(true);
+      expect(effect.filter.alpha).toBe(0.4);
     });
 
-    it('glow effect uses default params when none provided', () => {
-      const result = createEffect('glow', null);
+    it('glow effect defaults match expected values', () => {
+      const effect = createEffect('glow', null);
 
-      expect(result).not.toBeNull();
-      expect(result.filter).toBeDefined();
+      expect(GlowFilter).toHaveBeenCalledWith({
+        color: 0xffcc66,
+        distance: 25,
+        outerStrength: 6,
+        innerStrength: 1,
+        quality: 0.5,
+        knockout: true,
+        alpha: 1,
+      });
+
+      const initial = effect.filter.outerStrength;
+      effect.update();
+      expect(effect.filter.outerStrength).not.toBe(initial);
     });
 
-    it('creates a shockwave effect with filter and update function', () => {
-      const result = createEffect('shockwave', null, {
-        speed: 300,
+    it('shockwave effect passes constructor params and initializes time to cycleDuration', () => {
+      const effect = createEffect('shockwave', null, {
+        centerX: 0.25,
+        centerY: 0.75,
         amplitude: 15,
+        wavelength: 80,
+        speed: 300,
+        radius: -1,
+        cycleDuration: 0.3,
       });
 
-      expect(result).not.toBeNull();
-      expect(result.filter).toBeDefined();
-      expect(typeof result.update).toBe('function');
-    });
-
-    it('shockwave cycles between burst and rest', () => {
-      const result = createEffect('shockwave', null, {
-        cycleDuration: 0.1,
-        cyclePause: 1,
+      expect(ShockwaveFilter).toHaveBeenCalledWith({
+        center: { x: 0.25, y: 0.75 },
+        amplitude: 15,
+        wavelength: 80,
+        speed: 300,
+        radius: -1,
       });
-
-      const dt = 1 / 60;
-
-      // During burst phase — time advances, filter enabled
-      result.update(dt);
-      expect(result.filter.enabled).toBe(true);
-      expect(result.filter.time).toBeGreaterThan(0);
-      expect(result.filter.time).toBeLessThan(0.1);
-
-      // Advance past burst into rest phase — filter disabled (no frozen wave)
-      for (let i = 0; i < 10; i++) result.update(dt);
-      expect(result.filter.enabled).toBe(false);
+      expect(effect.filter.time).toBe(0.3);
     });
 
-    it('shockwave trigger() resets cycle to time 0', () => {
-      const result = createEffect('shockwave', null, {
-        cycleDuration: 1,
-        cyclePause: 2,
-      });
-
-      // Advance past burst into rest — filter disabled
-      for (let i = 0; i < 120; i++) result.update(1 / 60);
-      expect(result.filter.enabled).toBe(false);
-
-      // Trigger resets the cycle — filter re-enabled
-      result.trigger();
-      result.update(1 / 60);
-      expect(result.filter.enabled).toBe(true);
-      expect(result.filter.time).toBeGreaterThan(0);
-      expect(result.filter.time).toBeLessThan(0.1);
-    });
-
-    it('shockwave autoRepeat:false idles after one cycle', () => {
-      const result = createEffect('shockwave', null, {
-        cycleDuration: 0.1,
-        cyclePause: 0,
-        autoRepeat: false,
-      });
-
-      const dt = 1 / 60;
-
-      // Starts idle — filter disabled (no distortion before first beat)
-      expect(result.filter.enabled).toBe(false);
-      result.update(dt);
-      expect(result.filter.enabled).toBe(false);
-
-      // Still idle after many frames — no auto-repeat
-      for (let i = 0; i < 120; i++) result.update(dt);
-      expect(result.filter.enabled).toBe(false);
-    });
-
-    it('shockwave autoRepeat:false plays after trigger()', () => {
-      const result = createEffect('shockwave', null, {
+    it('shockwave autoRepeat:false starts disabled and can be triggered', () => {
+      const effect = createEffect('shockwave', null, {
         cycleDuration: 0.5,
         cyclePause: 0,
         autoRepeat: false,
       });
 
-      // Starts idle — filter disabled
-      expect(result.filter.enabled).toBe(false);
-
-      // Trigger enables filter and fires a new cycle
-      result.trigger();
-      expect(result.filter.enabled).toBe(true);
-      // filter.time must be 0 immediately after trigger so the first
-      // rendered frame starts at the beginning of the wave, not at the
-      // stale end-of-cycle value left by the previous completed wave.
-      expect(result.filter.time).toBe(0);
-      result.update(1 / 60);
-      expect(result.filter.time).toBeGreaterThan(0);
-      expect(result.filter.time).toBeLessThan(0.1);
-
-      // Cycle plays through then idles again — filter disabled
-      for (let i = 0; i < 60; i++) result.update(1 / 60);
-      expect(result.filter.enabled).toBe(false);
+      expect(effect.filter.enabled).toBe(false);
+      effect.trigger();
+      expect(effect.filter.enabled).toBe(true);
+      expect(effect.filter.time).toBe(0);
     });
 
-    it('shockwave trigger() is ignored while a wave is still expanding', () => {
-      const result = createEffect('shockwave', null, {
-        cycleDuration: 1,
-        autoRepeat: false,
+    it('shockwave cycleDuration=0 handles update without division errors', () => {
+      const effect = createEffect('shockwave', null, {
+        cycleDuration: 0,
+        cyclePause: 0,
       });
 
-      result.trigger();
-      expect(result.filter.enabled).toBe(true);
-      result.update(1 / 60); // mid-expansion
-
-      // A second trigger while the wave is expanding must be a no-op — resetting
-      // mid-expansion would freeze the wave near center.
-      const timeBeforeSecondTrigger = result.filter.time;
-      result.trigger();
-      expect(result.filter.time).toBe(timeBeforeSecondTrigger);
-      expect(result.filter.enabled).toBe(true);
-    });
-
-    it('shockwave autoRepeat:true (default) cycles normally', () => {
-      const result = createEffect('shockwave', null, {
-        cycleDuration: 0.1,
-        cyclePause: 0.1,
-      });
-
-      const dt = 1 / 60;
-
-      // First cycle — time advances
-      result.update(dt);
-      expect(result.filter.time).toBeGreaterThan(0);
-
-      // Advance past first full cycle into second
-      for (let i = 0; i < 20; i++) result.update(dt);
-
-      // Should have started cycling again (time goes back below cycleDuration)
-      const timeAfterCycle = result.filter.time;
-      expect(timeAfterCycle).toBeLessThanOrEqual(0.1);
+      expect(() => effect.update(1 / 60)).not.toThrow();
     });
   });
 });

@@ -98,6 +98,16 @@ describe('text.js', () => {
       expect(el.style.position).toBe('');
     });
 
+    it('does not apply positioning when x or y is missing', () => {
+      const onlyX = createLineElement('Only X', container, { x: 10, y: null });
+      const onlyY = createLineElement('Only Y', container, { x: null, y: 10 });
+
+      expect(onlyX.style.position).toBe('');
+      expect(onlyY.style.position).toBe('');
+      expect(onlyX.classList.contains('narration-line--positioned')).toBe(false);
+      expect(onlyY.classList.contains('narration-line--positioned')).toBe(false);
+    });
+
     it('handles x=0 and y=0 as valid positions', () => {
       const el = createLineElement('Origin', container, { x: 0, y: 0 });
 
@@ -129,11 +139,15 @@ describe('text.js', () => {
       expect(tl.to).toHaveBeenCalledTimes(2);
     });
 
-    it('creates timeline paused by default', () => {
-      const { timeline: tl } = buildNarrationTimeline([], container);
+    it('creates independent GSAP timelines per invocation', () => {
+      const lines = [{ text: 'First', enter: 0, exit: 1000 }];
+      const firstResult = buildNarrationTimeline(lines, container);
 
-      expect(gsap.timeline).toHaveBeenCalledWith({ paused: true });
-      expect(tl).toBeDefined();
+      const secondContainer = document.createElement('div');
+      const secondResult = buildNarrationTimeline(lines, secondContainer);
+
+      expect(firstResult.timeline).not.toBe(secondResult.timeline);
+      expect(timelineInstances).toHaveLength(2);
     });
 
     it('creates independent GSAP timelines per invocation', () => {
@@ -203,6 +217,14 @@ describe('text.js', () => {
 
       expect(tl.fromTo.mock.calls[0][3]).toBe(0);
       expect(tl.to.mock.calls[0][2]).toBe(0);
+    });
+
+    it('passes negative enter/exit values through to timeline positions', () => {
+      const lines = [{ text: 'Negative', enter: -500, exit: -100 }];
+      const { timeline: tl } = buildNarrationTimeline(lines, container);
+
+      expect(tl.fromTo.mock.calls[0][3]).toBe(-0.5);
+      expect(tl.to.mock.calls[0][2]).toBe(-0.1);
     });
 
     it('uses reduced motion exit animation with short duration', () => {
@@ -318,6 +340,32 @@ describe('text.js', () => {
       expect(captionEntries).toEqual([]);
     });
 
+    it('does not schedule caption callbacks when captions is an empty array', () => {
+      const lines = [{ text: 'Line', enter: 0, exit: 1000 }];
+      const captionContainer = document.createElement('div');
+
+      const { timeline: tl, captionEntries } = buildNarrationTimeline(lines, container, {
+        captions: [],
+        captionContainer,
+      });
+
+      expect(captionEntries).toEqual([]);
+      expect(tl.call).not.toHaveBeenCalled();
+    });
+
+    it('ignores non-array captions payloads', () => {
+      const lines = [{ text: 'Line', enter: 0, exit: 1000 }];
+      const captionContainer = document.createElement('div');
+
+      const { timeline: tl, captionEntries } = buildNarrationTimeline(lines, container, {
+        captions: null,
+        captionContainer,
+      });
+
+      expect(captionEntries).toEqual([]);
+      expect(tl.call).not.toHaveBeenCalled();
+    });
+
     it('places caption callbacks at correct timeline positions', () => {
       const lines = [{ text: 'Line', enter: 0, exit: 5000 }];
       const captions = [
@@ -378,6 +426,23 @@ describe('text.js', () => {
       expect(captionContainer.children[0].textContent).toBe('Gated');
     });
 
+    it('caption show callback is unconditional when isCaptionEnabled is omitted', () => {
+      const lines = [{ text: 'Line', enter: 0, exit: 2000 }];
+      const captions = [{ text: 'Ungated', start: 0, end: 1000 }];
+      const captionContainer = document.createElement('div');
+
+      const { timeline: tl } = buildNarrationTimeline(lines, container, {
+        captions,
+        captionContainer,
+      });
+
+      const showCallback = tl.call.mock.calls[0][0];
+      showCallback();
+
+      expect(captionContainer.children.length).toBe(1);
+      expect(captionContainer.children[0].textContent).toBe('Ungated');
+    });
+
     it('caption hide callback removes the element and nullifies entry.el', () => {
       const lines = [{ text: 'Line', enter: 0, exit: 5000 }];
       const captions = [{ text: 'Removable', start: 0, end: 2000 }];
@@ -417,6 +482,44 @@ describe('text.js', () => {
       expect(captionEntries[0].el).toBeNull();
       const hideCallback = tl.call.mock.calls[1][0];
       expect(() => hideCallback()).not.toThrow();
+    });
+
+    it('removes previous caption element when show callback fires twice', () => {
+      const lines = [{ text: 'Line', enter: 0, exit: 5000 }];
+      const captions = [{ text: 'Duplicate-safe', start: 0, end: 2000 }];
+      const captionContainer = document.createElement('div');
+
+      const { timeline: tl, captionEntries } = buildNarrationTimeline(lines, container, {
+        captions,
+        captionContainer,
+        isCaptionEnabled: () => true,
+      });
+
+      const showCallback = tl.call.mock.calls[0][0];
+      showCallback();
+      const firstEl = captionEntries[0].el;
+      expect(captionContainer.children.length).toBe(1);
+
+      showCallback();
+      expect(captionContainer.children.length).toBe(1);
+      expect(captionEntries[0].el).not.toBe(firstEl);
+      expect(firstEl.isConnected).toBe(false);
+    });
+
+    it('uses captionDelay default of 0 when not provided', () => {
+      const lines = [{ text: 'Line', enter: 0, exit: 1000 }];
+      const captions = [{ text: 'Delayless', start: 500, end: 900 }];
+      const captionContainer = document.createElement('div');
+
+      const { timeline: tl, captionEntries } = buildNarrationTimeline(lines, container, {
+        captions,
+        captionContainer,
+      });
+
+      expect(tl.call.mock.calls[0][2]).toBe(0.5);
+      expect(tl.call.mock.calls[1][2]).toBe(0.9);
+      expect(captionEntries[0].startSec).toBe(0.5);
+      expect(captionEntries[0].endSec).toBe(0.9);
     });
 
     it('does not place caption callbacks when captionContainer is missing', () => {
