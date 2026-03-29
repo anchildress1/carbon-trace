@@ -86,6 +86,16 @@ describe('captions.js', () => {
       setItemSpy.mockRestore();
       warnSpy.mockRestore();
     });
+
+    it('keeps in-memory state when persisting to localStorage fails', () => {
+      vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+        throw new Error('storage broken');
+      });
+
+      setCaptionsEnabled(true);
+
+      expect(areCaptionsEnabled()).toBe(true);
+    });
   });
 
   describe('areCaptionsEnabled', () => {
@@ -145,6 +155,17 @@ describe('captions.js', () => {
       // Old element removed, new one created
       expect(container.children.length).toBe(1);
       expect(container.children[0].textContent).toBe('Active');
+      expect(entries[0].el).toBe(container.children[0]);
+    });
+
+    it('nulls detached entry elements before creating fresh caption nodes', () => {
+      const detached = document.createElement('p');
+      const entries = [{ text: 'Detached', startSec: 0, endSec: 2, el: detached }];
+
+      syncCaptionsToTime(entries, 1, container);
+
+      expect(container.children.length).toBe(1);
+      expect(container.children[0].textContent).toBe('Detached');
       expect(entries[0].el).toBe(container.children[0]);
     });
 
