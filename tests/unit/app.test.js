@@ -635,6 +635,24 @@ describe('app.js', () => {
       await flush();
       expect(app.getState()).toBe('SCENE_ACTIVE');
     });
+
+    it('applies pending pause only after manual transition completion callbacks', async () => {
+      gsapMockState.autoComplete = false;
+
+      app.advance();
+      expect(app.getState()).toBe('TRANSITIONING');
+
+      app.togglePause();
+      expect(app.getState()).toBe('TRANSITIONING');
+
+      runNextGsapCompletion();
+      await flush();
+      expect(app.getState()).toBe('TRANSITIONING');
+
+      runNextGsapCompletion();
+      await flush();
+      expect(app.getState()).toBe('PAUSED');
+    });
   });
 
   // ── keyboard handling ──────────────────────────────────────────────
