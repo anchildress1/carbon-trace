@@ -1916,17 +1916,15 @@ describe('effects-canvas.js — effect creation failure', () => {
 
     expect(result).toBe(true);
 
-    // Verify that createEffect received the center coordinates
+    // Verify that createEffect was called and center was set on the filter
     const { createEffect } = await import('../../src/effects.js');
-    if (createEffect.mock.results.length > 0) {
-      const effect = createEffect.mock.results[0].value;
-      if (effect?.filter?.center) {
-        expect(effect.filter.center).toEqual({
-          x: 0.5 * 1920,
-          y: 0.3 * 1080,
-        });
-      }
-    }
+    expect(createEffect.mock.results.length).toBeGreaterThan(0);
+    const effect = createEffect.mock.results[0].value;
+    expect(effect).toBeDefined();
+    expect(effect.filter.center).toEqual({
+      x: 0.5 * 1920,
+      y: 0.3 * 1080,
+    });
   });
 
   it('resize updates centered effect positions to new dimensions', async () => {
@@ -1960,15 +1958,13 @@ describe('effects-canvas.js — effect creation failure', () => {
 
     // Verify centered effects were recalculated for new dimensions
     const { createEffect } = await import('../../src/effects.js');
-    if (createEffect.mock.results.length > 0) {
-      const effect = createEffect.mock.results[0].value;
-      if (effect?.filter?.center) {
-        expect(effect.filter.center).toEqual({
-          x: 0.5 * 1280,
-          y: 0.3 * 720,
-        });
-      }
-    }
+    expect(createEffect.mock.results.length).toBeGreaterThan(0);
+    const effect = createEffect.mock.results[0].value;
+    expect(effect).toBeDefined();
+    expect(effect.filter.center).toEqual({
+      x: 0.5 * 1280,
+      y: 0.3 * 720,
+    });
   });
 });
 
