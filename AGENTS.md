@@ -27,7 +27,7 @@ Canonical instruction source for this repository. Treat this file as authoritati
 
 ### Spec compliance
 
-- All implementation MUST follow `docs/design/carbon-trace-system-design.md` and
+- All implementation MUST follow `docs/carbon-trace-system-design.md` and
   `docs/ADRs/*.md` as the authoritative source of truth.
 - If a deviation from the spec is warranted, you MUST:
   1. Stop implementation.
@@ -66,7 +66,7 @@ Canvas 2D rendering, GSAP text/transition animation, and Howler.js audio. 12 fra
 (title + 10 scenes + credits) with ghost-drift text, per-scene visual effects, ambient
 audio, and recorded narration. Deployed via Cloud Run + nginx.
 
-Full system design: `docs/design/carbon-trace-system-design.md` and `docs/ADRs/*.md`
+Full system design: `docs/carbon-trace-system-design.md` and `docs/ADRs/*.md`
 
 ## Architecture: two rendering layers
 
@@ -113,6 +113,18 @@ Full system design: `docs/design/carbon-trace-system-design.md` and `docs/ADRs/*
 - One orchestrator (`app.js`) manages state; other modules are pure utilities.
 - `src/scenes.json` narration text is written in Appalachian dialect — never correct spelling, grammar, or phrasing in this file.
 
+## Development Commands
+
+| Command          | Description                                      |
+| ---------------- | ------------------------------------------------ |
+| `make unit`      | Run unit tests with coverage                     |
+| `make e2e`       | Build, then run Playwright E2E tests             |
+| `make test`      | Run all tests (unit + E2E + performance)         |
+| `make build`     | Production build                                 |
+| `make lint`      | Lint source files                                |
+| `make ai-checks` | Run secret-scan, format check, and lint (for AI) |
+| `make deploy`    | Deploy to Cloud Run via `deploy.sh`              |
+
 ## Test Standards
 
 - **Coverage thresholds**: 85% lines/functions/statements, 80% branches (enforced in vitest.config.js).
@@ -137,15 +149,15 @@ Full system design: `docs/design/carbon-trace-system-design.md` and `docs/ADRs/*
 - Stable DOM narration via `aria-live="polite"` for screen readers.
 - `prefers-reduced-motion` swaps ghost-drift for simple fade or static text.
   Canvas effects minimal/none under reduced motion.
-- Keyboard navigation: Space toggles play/pause, Enter/ArrowRight advances,
-  ArrowLeft retreats, Tab to replay/mute.
+- Keyboard navigation: Space toggles play/pause, Escape pauses,
+  Enter/ArrowRight advances, ArrowLeft retreats, Tab to replay/mute.
 - Narration panel meets WCAG AA contrast.
 
 ## Documentation
 
 - Keep docs in `docs/` aligned with the codebase — update them whenever code changes affect architecture, audio system, or accessibility behavior.
 - Prefer Mermaid diagrams whenever a visual would clarify architecture, data flow, or state machines.
-- System design docs are authoritative for architectural decisions: `docs/design/carbon-trace-system-design.md` and `docs/ADRs/*.md`
+- System design docs are authoritative for architectural decisions: `docs/carbon-trace-system-design.md` and `docs/ADRs/*.md`
 
 ## Security
 

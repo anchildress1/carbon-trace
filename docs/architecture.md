@@ -98,7 +98,9 @@ Key responsibilities:
 
 ### audio.js (3-channel mixer)
 
-Three independent Howler.js channels: ambient, narration, and music.
+Three audio cue types: ambient (looping background, crossfade on transition),
+narration (one-shot per scene, drives auto-advance), and sfx (one-shot, no
+crossfade). Music is modeled as an ambient cue with anchor-based entry.
 See [audio-system.md](audio-system.md) for full details.
 
 ### text.js (ghost-drift animation)

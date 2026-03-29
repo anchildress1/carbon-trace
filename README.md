@@ -47,6 +47,7 @@ The narration drives the pacing—scenes auto-advance when narration ends. You c
 | **Prev / Next** buttons | Navigate between scenes                              |
 | **Arrow Left / Right**  | Navigate between scenes                              |
 | **Space**               | Toggle play/pause                                    |
+| **Escape**              | Pause                                                |
 | **Enter / Arrow Right** | Advance to next scene                                |
 | **Pause** button        | Freeze/resume all audio, animations, and captions    |
 | **Mute** button         | Toggle audio mute                                    |
@@ -80,25 +81,29 @@ shasum -a 256 <file> | cut -c1-8
 
 ## Available Commands 🪄
 
-| Command            | Description                       |
-| ------------------ | --------------------------------- |
-| `make install`     | Install all dependencies          |
-| `make dev`         | Start development server          |
-| `make format`      | Format code                       |
-| `make lint`        | Run linter                        |
-| `make typecheck`   | Type check (no-op for vanilla JS) |
-| `make test`        | Run unit tests                    |
-| `make build`       | Production build                  |
-| `make e2e`         | Run E2E tests                     |
-| `make perf`        | Run performance tests             |
-| `make secret-scan` | Scan for secrets                  |
-| `make clean`       | Remove build artifacts            |
+| Command            | Description                              |
+| ------------------ | ---------------------------------------- |
+| `make install`     | Install all dependencies                 |
+| `make dev`         | Start development server                 |
+| `make format`      | Format code                              |
+| `make lint`        | Run linter                               |
+| `make typecheck`   | Type check (no-op for vanilla JS)        |
+| `make unit`        | Run unit tests                           |
+| `make test`        | Run all tests (unit + E2E + performance) |
+| `make build`       | Production build                         |
+| `make e2e`         | Run E2E tests                            |
+| `make perf`        | Run performance tests                    |
+| `make secret-scan` | Scan for secrets                         |
+| `make deploy`      | Deploy to Cloud Run                      |
+| `make clean`       | Remove build artifacts                   |
 
 ## Deeper Docs 🔮
 
+- [System Design](docs/carbon-trace-system-design.md)—module contracts, state machine, frame schema, edge cases, rules
 - [Architecture](docs/architecture.md)—module graph, state machine, frame lifecycle, deployment pipeline
 - [Accessibility](docs/accessibility.md)—screen reader support, keyboard nav, reduced motion, captions, ARIA
 - [Audio System](docs/audio-system.md)—3-channel mixer, buffer recovery, crossfade, pause/resume math
+- [Trace Overlay System](docs/trace-overlay-system.md)—shimmer circuit rendering, walk-map construction, dot pathfinding
 - [ADRs](docs/ADRs/)—every architectural decision and why, from foundational architecture to audio-reactive effects
 
 ## Built With 🪸
