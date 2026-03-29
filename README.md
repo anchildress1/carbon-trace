@@ -115,7 +115,7 @@ shasum -a 256 <file> | cut -c1-8
 **Created & Narrated by** Ashley Childress
 [anchildress1.dev](https://anchildress1.dev) | [carbon-trace.anchildress1.dev](https://carbon-trace.anchildress1.dev)
 
-**End Theme** "Break the Chain" — The Bridge City Sinners ([Bandcamp](https://notimeforfun.bandcamp.com/track/break-the-chain))
+**End Theme** ["Break the Chain"](https://notimeforfun.bandcamp.com/track/break-the-chain) — The Bridge City Sinners
 
 **Sound Design** — All ambient audio sourced from [FreeSound.org](https://freesound.org):
 

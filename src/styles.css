@@ -505,81 +505,98 @@ body {
 /* Credits overlay — frosted glass panel with feathered edges (ADR-011) */
 #credits-panel {
   position: absolute;
-  inset: 10%;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  background: rgba(0, 0, 0, 0.45);
+  inset: 8% 12%;
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  background: rgba(0, 0, 0, 0.5);
   overflow: hidden;
   opacity: 0;
-  mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%);
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent 0%,
-    black 12%,
-    black 88%,
+    black 10%,
+    black 90%,
     transparent 100%
   );
   z-index: 7;
-  border-radius: 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(232, 200, 120, 0.08);
 }
 
 #credits-scroll-content {
-  padding: 15% 10%;
+  padding: 18% 12%;
   text-align: center;
 }
 
 .credits-section {
-  margin-bottom: 3em;
+  margin-bottom: 3.5em;
+  padding-bottom: 2.5em;
+  border-bottom: 1px solid rgba(232, 200, 120, 0.1);
+}
+
+.credits-section:last-child {
+  border-bottom: none;
+  margin-bottom: 2em;
 }
 
 .credits-heading {
   font-family: 'Lora', serif;
   font-weight: 300;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: clamp(1rem, 2.5vw, 1.8rem);
-  letter-spacing: 0.15em;
+  color: rgba(232, 200, 120, 0.7);
+  font-size: clamp(0.7rem, 1.4vw, 0.9rem);
+  letter-spacing: 0.25em;
   text-transform: uppercase;
-  margin-bottom: 0.5em;
+  margin-bottom: 1em;
 }
 
 .credits-text {
   font-family: 'Lora', serif;
   font-weight: 300;
-  color: rgba(255, 255, 255, 0.75);
-  font-size: clamp(0.85rem, 2vw, 1.3rem);
-  line-height: 1.8;
-  margin-bottom: 0.5em;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: clamp(0.9rem, 2vw, 1.25rem);
+  line-height: 1.9;
+  margin-bottom: 0.6em;
 }
 
 .credits-text--name {
-  font-size: clamp(1rem, 2.2vw, 1.5rem);
-  color: rgba(255, 255, 255, 0.9);
+  font-size: clamp(1.2rem, 2.8vw, 1.8rem);
+  color: rgba(255, 255, 255, 0.95);
   font-style: italic;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.8em;
 }
 
 .credits-text--attribution {
-  font-size: clamp(0.75rem, 1.6vw, 1rem);
-  line-height: 1.6;
-  margin-bottom: 0.3em;
+  font-size: clamp(0.78rem, 1.5vw, 0.95rem);
+  line-height: 1.7;
+  margin-bottom: 0.4em;
+  color: rgba(255, 255, 255, 0.65);
 }
 
 .credits-link {
-  color: rgba(232, 200, 120, 0.85);
+  color: rgba(232, 200, 120, 0.9);
   text-decoration: none;
-  border-bottom: 1px solid rgba(232, 200, 120, 0.3);
-  transition: border-color 0.3s ease;
+  border-bottom: 1px solid rgba(232, 200, 120, 0.35);
+  transition:
+    border-color 0.3s ease,
+    color 0.3s ease;
   display: inline-block;
-  margin: 0.3em 0;
+  margin: 0.4em 0;
+  font-size: inherit;
+  padding-bottom: 1px;
 }
 
 .credits-link:hover,
 .credits-link:focus-visible {
-  border-color: rgba(232, 200, 120, 0.85);
+  color: rgba(232, 200, 120, 1);
+  border-color: rgba(232, 200, 120, 0.8);
 }
 
 .credits-link:focus-visible {
   outline: 2px solid rgba(232, 200, 120, 0.5);
-  outline-offset: 2px;
+  outline-offset: 3px;
+  border-radius: 2px;
 }
 
 /* Reduced motion */

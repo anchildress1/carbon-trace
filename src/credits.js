@@ -46,6 +46,13 @@ export function initCreditsContent(scrollContentEl) {
  */
 export function revealCreditsPanel(panelEl, scrollContentEl, config, opts = {}) {
   initCreditsContent(scrollContentEl);
+
+  // Position content off-screen BEFORE showing the panel to prevent
+  // a flash of all text at natural position during the fade-in.
+  if (!opts.reducedMotion) {
+    gsap.set(scrollContentEl, { y: panelEl.clientHeight });
+  }
+
   panelEl.hidden = false;
 
   if (opts.reducedMotion) {
@@ -68,15 +75,19 @@ function startAutoScroll(panelEl, scrollContentEl, config) {
   const contentHeight = scrollContentEl.scrollHeight;
   const panelHeight = panelEl.clientHeight;
 
-  gsap.set(scrollContentEl, { y: panelHeight });
-
-  scrollTimeline = gsap.to(scrollContentEl, {
-    y: -contentHeight,
-    duration: config.scrollDuration / 1000,
-    ease: 'none',
-    repeat: -1,
-    repeatDelay: config.repeatDelay / 1000,
-  });
+  // fromTo ensures the repeat cycle has an explicit start position —
+  // gsap.to() with repeat can lose the start value on loop restart.
+  scrollTimeline = gsap.fromTo(
+    scrollContentEl,
+    { y: panelHeight },
+    {
+      y: -contentHeight,
+      duration: config.scrollDuration / 1000,
+      ease: 'none',
+      repeat: -1,
+      repeatDelay: config.repeatDelay / 1000,
+    },
+  );
 
   attachScrollListeners(panelEl, scrollContentEl, config);
 }
