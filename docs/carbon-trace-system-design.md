@@ -390,7 +390,7 @@ FRAME                │ holdAfterNarration
 08 Empty             │ 16000
 09 Return            │ 2000
 10 Building          │ 3000
-11 Music (credits)   │ 2000 (credits reveal delay)
+11 Music (credits)   │ 3000 (credits reveal delay)
 ```
 
 All non-final frames auto-advance after narration + holdAfterNarration. The credits
@@ -706,9 +706,9 @@ Auto-advance       │ (internal)           │ (internal)         │ advance(c
     <canvas id="trace-overlay" aria-hidden="true"></canvas>    <!-- shimmer dots — ADR-006A -->
     <div id="narration-layer" aria-hidden="true"></div>
     <div id="caption-layer" aria-hidden="true"></div>
-    <div id="credits-panel" role="region" hidden aria-label="Credits">  <!-- ADR-011, z-index 7 -->
+    <section id="credits-panel" hidden aria-label="Credits">  <!-- ADR-011, z-index 7 -->
       <div id="credits-scroll-content"></div>
-    </div>
+    </section>
   </div>
 
   <div id="transition-loader" hidden aria-hidden="true"></div>

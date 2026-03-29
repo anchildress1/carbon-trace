@@ -18,12 +18,12 @@ WHAT FRAME 11 ALREADY HAS (implemented):
   ✓ Ghost-drift narration — 6 positioned text lines with enter/exit timing
   ✓ Captions — 5 timed caption entries
   ✓ Narration audio — 11-music.m4a, enters at 500ms
-  ✓ Ambient audio — vinyl crackle, loop: true, volume 0.1
+  ✓ Ambient audio — vinyl crackle, loop: true, volume 0.15
   ✓ End-song — Bridge City Sinners, enters at narration offset -12000ms,
     volume 0.15 → ramps to 0.75 over 3s after narration ends, loop: true
   ✓ Effects — shockwave (audio-reactive to end-song bass) + diamond glow
   ✓ Shimmer — mask-based traces, opacity 0.6, 60 dots, speed 1.0
-  ✓ holdAfterNarration: 2000ms
+  ✓ holdAfterNarration: 3000ms
   ✓ State: CREDITS — advance() blocked, terminal frame
 
 WHAT FRAME 11 DOES NOT HAVE (this ADR adds):
@@ -92,7 +92,7 @@ Credits panel sits inside `#scene-stage`. `overlay-controls` is a **sibling** of
 ### 010.4.2 DOM Structure
 
 ```html
-<div id="credits-panel" role="region" hidden aria-label="Credits">
+<section id="credits-panel" hidden aria-label="Credits">
   <div id="credits-scroll-content">
     <section class="credits-section">
       <h2 class="credits-heading"><!-- section heading --></h2>
@@ -103,7 +103,7 @@ Credits panel sits inside `#scene-stage`. `overlay-controls` is a **sibling** of
       <a class="credits-link" href="..." target="_blank" rel="noopener"><!-- link text --></a>
     </section>
   </div>
-</div>
+</section>
 ```
 
 ### 010.4.3 CSS
@@ -196,7 +196,7 @@ MODIFIED CHAIN (credits frame only):
     → makeNarrationEndCallback()
       → shouldAutoAdvance() → false
       → frame.credits exists → true
-      → PausableTimer(holdAfterNarration: 2000ms)
+      → PausableTimer(holdAfterNarration: 3000ms)
         → revealCreditsPanel()  ← NEW
 ```
 
@@ -207,7 +207,7 @@ Same Howler `onend`. Same PausableTimer. Same generation guard. Same pause/resum
 ```
 revealCreditsPanel():
   1. Remove hidden from #credits-panel
-  2. GSAP fade-in: opacity 0 → 1 over 800ms (tunable)
+  2. GSAP fade-in: opacity 0 → 1 over 500ms (tunable)
   3. Position #credits-scroll-content at translateY(100%)
   4. Create GSAP scroll timeline (paused)
   5. On fade-in complete → play scroll timeline
@@ -219,7 +219,7 @@ revealCreditsPanel():
 By the time `revealCreditsPanel()` fires:
 - Ghost-drift text has exited (exit timings are before narration `onend`)
 - Narration audio has finished
-- holdAfterNarration (2000ms) has elapsed
+- holdAfterNarration (3000ms) has elapsed
 - End-song has been playing for 14+ seconds (entered at -12s offset, ramped 3s after narration)
 - Shockwave effects are active (audio-reactive to end-song bass)
 - Shimmer dots are walking
@@ -243,7 +243,7 @@ GSAP tween:
   duration: scrollDurationMs / 1000
   ease: "none"                   ← linear, film credits pacing
   repeat: -1                     ← infinite loop
-  repeatDelay: 3                 ← 3s pause at loop point (tunable)
+  repeatDelay: 0.1               ← 100ms pause at loop point (tunable)
 ```
 
 **Song is independent.** End-song loops (`loop: true`). Credits loop (`repeat: -1`). They run in parallel, decoupled. Scroll duration is based on comfortable reading speed (~35-45px/s), not song length. Both values are tunable.
@@ -254,7 +254,7 @@ GSAP tween:
 ON WHEEL / TOUCH-DRAG inside #credits-panel:
   1. Pause GSAP timeline
   2. Scrub timeline position based on scroll delta
-  3. Set resumeTimer (PausableTimer, 2000ms idle, tunable)
+  3. Set resumeTimer (PausableTimer, 1500ms idle, tunable)
 
 ON RESUME TIMER FIRE:
   1. Resume GSAP timeline from current position
@@ -268,7 +268,7 @@ Auto-scroll MUST pause when any `<a>` inside `#credits-panel` receives focus (Ta
 
 ### 010.6.4 Credits Panel Entry Animation
 
-Fade-in over 800ms (tunable). Fires after narration + holdAfterNarration — the scene is already fully revealed at this point (scene transition completed long before narration ended).
+Fade-in over 500ms (tunable). Fires after narration + holdAfterNarration — the scene is already fully revealed at this point (scene transition completed long before narration ended).
 
 ---
 
@@ -336,10 +336,10 @@ Three audio cues already configured. `scheduleFrameAudio()` handles them. End-so
 ```jsonc
 // ADD to frame 11 definition:
 "credits": {
-  "scrollDuration": 60000,        // ms, tunable (starting point ~60s)
-  "resumeDelay": 2000,            // ms idle before auto-scroll resumes
-  "fadeInDuration": 800,          // ms for panel fade-in
-  "repeatDelay": 3000             // ms pause at loop point before restarting
+  "scrollDuration": 65000,        // ms, tunable (starting point ~65s)
+  "resumeDelay": 1500,            // ms idle before auto-scroll resumes
+  "fadeInDuration": 500,          // ms for panel fade-in
+  "repeatDelay": 100              // ms pause at loop point before restarting
 }
 ```
 
@@ -369,7 +369,7 @@ Nav back then return to credits: **restart**. `showFrame()` rebuilds everything.
 
 ## 010.9 Accessibility
 
-- `#credits-panel` is a named region (`role="region" aria-label="Credits"`)
+- `#credits-panel` is a named landmark via `<section aria-label="Credits">` (implicit `region`)
 - Links are native `<a>` with `target="_blank" rel="noopener"`
 - Headings use `<h2>` for screen reader structure
 - Auto-scroll pauses on link focus/hover (WCAG 2.4.3)
@@ -492,7 +492,7 @@ Credits content location?                         │ Separate HTML file
 FreeSound links clickable?                        │ Yes — sound name as hyperlink
 Replay while credits visible?                     │ Hide panel, replay narration, re-trigger
 Scroll duration starting point?                   │ 60s, tunable
-Loop restart delay?                               │ 3s, tunable
+Loop restart delay?                               │ 100ms, tunable
 Include fonts/tech stack/challenge?               │ Yes to all
 Freeze everything on pause?                       │ Yes (existing PAUSED model)
 Links clickable while paused?                     │ Yes

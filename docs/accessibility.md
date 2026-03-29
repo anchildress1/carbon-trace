@@ -160,7 +160,7 @@ The credits panel on frame 11 follows the same two-layer accessibility model as 
 
 | Element | ARIA | Purpose |
 |---------|------|---------|
-| `#credits-panel` | `role="region" aria-label="Credits"` | Named landmark region for screen readers |
+| `#credits-panel` | `<section aria-label="Credits">` (implicit `region`) | Named landmark region for screen readers |
 | Section headings | `<h2>` | Screen reader structure within credits |
 | Attribution links | `<a target="_blank" rel="noopener">` | Native links — tabbable, clickable, announced |
 
