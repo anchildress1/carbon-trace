@@ -6,7 +6,7 @@
 
 An immersive visual narrative told from the awareness of a diamond trapped in a coal seam — 12 painted scenes with ghost-drift text, narrated audio, and pixel-level visual effects. Built for [WeCoded 2026 DEV Challenge](https://dev.to/devteam/join-the-2026-wecoded-challenge-and-celebrate-underrepresented-voices-in-tech-through-writing--4828) Frontend Art.
 
-**[Experience it live](http://carbon-trace.anchildress1.dev)**
+**Experience it live: [https://carbon-trace.anchildress1.dev](https://carbon-trace.anchildress1.dev)**
 
 ## The Story 💎
 
