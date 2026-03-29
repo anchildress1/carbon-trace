@@ -1046,7 +1046,7 @@
         {
           "id": "ambient-06",
           "type": "ambient",
-          "src": "assets/audio/ambient/06-storage-electromagnetic-d1a80aab.m4a",
+          "src": "assets/audio/ambient/06-storage-server-c15d48ab.m4a",
           "enter": 0,
           "volume": 0.35,
           "loop": true,
