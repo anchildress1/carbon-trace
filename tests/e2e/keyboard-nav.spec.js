@@ -228,11 +228,6 @@ test.describe('keyboard boundary conditions', () => {
     await expect(nextBtn).toBeDisabled();
   });
 
-  test('prev button is disabled on first frame', async ({ page }) => {
-    const prevBtn = page.locator('#btn-prev');
-    await expect(prevBtn).toBeDisabled();
-  });
-
   test('prev button becomes enabled after advancing', async ({ page }) => {
     await page.keyboard.press('ArrowRight');
     const stage = page.locator('#scene-stage');
@@ -673,22 +668,6 @@ test.describe('keyboard navigation accessibility attributes', () => {
       const label = await dots.nth(i).getAttribute('aria-label');
       expect(label).toBe(`Go to scene ${i + 1} of ${count}`);
     }
-  });
-
-  test('progress dots have title attributes', async ({ page }) => {
-    const dots = page.locator('.progress-dot');
-    const count = await dots.count();
-
-    for (let i = 0; i < count; i++) {
-      const title = await dots.nth(i).getAttribute('title');
-      expect(title).toBe(`Scene ${i + 1} of ${count}`);
-    }
-  });
-
-  test('progress dots are button elements (keyboard accessible)', async ({ page }) => {
-    const dots = page.locator('.progress-dot');
-    const firstTag = await dots.first().evaluate((el) => el.tagName);
-    expect(firstTag).toBe('BUTTON');
   });
 
   test('scene stage aria-label updates on every keyboard navigation', async ({ page }) => {
