@@ -358,7 +358,7 @@ test.describe('carbon-trace — credits overlay', () => {
   test('credits reveal waits for the final-frame holdAfterNarration delay', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     const creditsFrameIndex = TOTAL_FRAMES - 1;
-    const expectedRevealDelayMs = 3000;
+    const expectedRevealDelayMs = 10000;
     const revealEarlyProbeMs = 700;
 
     expect(scenesData.frames[creditsFrameIndex]?.holdAfterNarration).toBe(expectedRevealDelayMs);
