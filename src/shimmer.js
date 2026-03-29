@@ -93,6 +93,9 @@ function buildTraceImage() {
   off.width = mapW;
   off.height = mapH;
   const offCtx = off.getContext('2d');
+  if (!offCtx) {
+    throw new Error('shimmer: failed to acquire offscreen 2D context for trace image');
+  }
   const imageData = offCtx.createImageData(mapW, mapH);
   const { data } = imageData;
   const [cr, cg, cb] = activeColor;
