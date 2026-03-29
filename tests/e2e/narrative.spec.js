@@ -361,6 +361,18 @@ test.describe('carbon-trace — timer, buffering, and failure resilience', () =>
     await page.click('#btn-next');
     const stage = page.locator('#scene-stage');
     await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
+    const sceneOneNarration = fileNameFromAssetPath(narrationSrcForFrame(1));
+
+    await page.evaluate(() => {
+      const stageNode = document.getElementById('scene-stage');
+      if (!stageNode) return;
+      globalThis.__ctBufferClassStates = [stageNode.className];
+      const observer = new MutationObserver(() => {
+        globalThis.__ctBufferClassStates.push(stageNode.className);
+      });
+      observer.observe(stageNode, { attributes: true, attributeFilter: ['class'] });
+      globalThis.__ctBufferClassObserver = observer;
+    });
 
     await page.waitForFunction(
       () =>
@@ -371,17 +383,40 @@ test.describe('carbon-trace — timer, buffering, and failure resilience', () =>
       { timeout: 10000 },
     );
 
-    await page.evaluate(() => {
-      const hook = globalThis.__ctMediaHooks.at(-1);
+    await page.evaluate((expectedSrc) => {
+      const hooks = Array.isArray(globalThis.__ctMediaHooks) ? globalThis.__ctMediaHooks : [];
+      const hook =
+        hooks.find(
+          (entry) =>
+            typeof entry?.waiting === 'function' &&
+            String(entry.node?.currentSrc || entry.node?.src || '').includes(expectedSrc),
+        ) || hooks.find((entry) => typeof entry?.waiting === 'function');
       hook?.waiting?.call(hook.node, new Event('waiting'));
-    });
-    await expect(stage).toHaveClass(/buffering/);
+    }, sceneOneNarration);
+    await page.waitForFunction(
+      () =>
+        Array.isArray(globalThis.__ctBufferClassStates) &&
+        globalThis.__ctBufferClassStates.some((className) =>
+          String(className).split(/\s+/).includes('buffering'),
+        ),
+      { timeout: 5000 },
+    );
 
-    await page.evaluate(() => {
-      const hook = globalThis.__ctMediaHooks.at(-1);
+    await page.evaluate((expectedSrc) => {
+      const hooks = Array.isArray(globalThis.__ctMediaHooks) ? globalThis.__ctMediaHooks : [];
+      const hook =
+        hooks.find(
+          (entry) =>
+            typeof entry?.playing === 'function' &&
+            String(entry.node?.currentSrc || entry.node?.src || '').includes(expectedSrc),
+        ) || hooks.find((entry) => typeof entry?.playing === 'function');
       hook?.playing?.call(hook.node, new Event('playing'));
-    });
+    }, sceneOneNarration);
     await expect(stage).not.toHaveClass(/buffering/);
+    await page.evaluate(() => {
+      globalThis.__ctBufferClassObserver?.disconnect?.();
+      delete globalThis.__ctBufferClassObserver;
+    });
   });
 
   test('scene image failure falls back without freezing navigation', async ({ page }) => {
