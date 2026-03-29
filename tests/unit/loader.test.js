@@ -175,6 +175,16 @@ describe('loader.js', () => {
   });
 
   describe('preloadFirstFrameAudio', () => {
+    let originalAudio;
+
+    beforeEach(() => {
+      originalAudio = globalThis.Audio;
+    });
+
+    afterEach(() => {
+      globalThis.Audio = originalAudio;
+    });
+
     it('does nothing when frames array is empty', () => {
       const onLoaded = vi.fn();
       preloadFirstFrameAudio([], onLoaded);
@@ -183,7 +193,6 @@ describe('loader.js', () => {
     });
 
     it('calls onLoaded for each audio source', async () => {
-      const originalAudio = globalThis.Audio;
       globalThis.Audio = class MockAudio {
         set preload(_v) {}
         set src(v) {
@@ -214,7 +223,6 @@ describe('loader.js', () => {
       expect(onLoaded).toHaveBeenCalledTimes(2);
       expect(onLoaded).toHaveBeenNthCalledWith(1, { src: 'ambient.mp3', duration: 4 });
       expect(onLoaded).toHaveBeenNthCalledWith(2, { src: 'narration.m4a', duration: 6.5 });
-      globalThis.Audio = originalAudio;
     });
 
     it('does nothing when first frame has no audio', () => {
