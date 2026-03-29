@@ -246,7 +246,7 @@ function makeNarrationEndCallback(app, frame, holdAfterNarration) {
     if (gen !== app.generation) return;
     if (shouldAutoAdvance(app)) {
       scheduleAutoAdvance(app, holdAfterNarration);
-    } else if (frame.credits) {
+    } else if (frame.credits && !app.creditsRevealTimer) {
       app.creditsRevealTimer = new PausableTimer(() => {
         if (gen !== app.generation) return;
         app.creditsRevealTimer = null;
@@ -1174,10 +1174,6 @@ export function createApp() {
     togglePause: () => togglePause(app),
     getState: () => app.state,
     forceNarrationEndForTesting: () => {
-      // Cancel any existing credits reveal timer to prevent duplicate
-      // reveals when real audio end races with the test harness.
-      app.creditsRevealTimer?.cancel();
-      app.creditsRevealTimer = null;
       const frame = app.frames[app.currentIndex];
       if (!frame) return;
       const holdAfterNarration = getHoldAfterNarration(frame);

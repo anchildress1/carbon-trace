@@ -321,11 +321,6 @@ test.describe('carbon-trace narrative', () => {
 
 test.describe('carbon-trace — credits overlay', () => {
   test.beforeEach(async ({ page }) => {
-    // Abort all audio requests so Howler never fires real onend callbacks.
-    // This makes forceNarrationEndForTesting the sole narration-end path,
-    // eliminating the race between real audio completion and the test harness.
-    await page.route('**/*.m4a', (route) => route.abort('failed'));
-    await page.route('**/*.mp3', (route) => route.abort('failed'));
     await page.goto('/');
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
     await dismissLoadingScreen(page);
