@@ -1,14 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const { timelineInstances } = vi.hoisted(() => ({
+  timelineInstances: [],
+}));
+
 vi.mock('gsap', () => {
-  const timelineMock = {
-    fromTo: vi.fn().mockReturnThis(),
-    to: vi.fn().mockReturnThis(),
-    call: vi.fn().mockReturnThis(),
-  };
   return {
     gsap: {
-      timeline: vi.fn(() => timelineMock),
+      timeline: vi.fn(() => {
+        const timelineMock = {
+          fromTo: vi.fn().mockReturnThis(),
+          to: vi.fn().mockReturnThis(),
+          call: vi.fn().mockReturnThis(),
+        };
+        timelineInstances.push(timelineMock);
+        return timelineMock;
+      }),
       killTweensOf: vi.fn(),
     },
   };
@@ -23,6 +30,7 @@ describe('text.js', () => {
   beforeEach(() => {
     container = document.createElement('div');
     vi.clearAllMocks();
+    timelineInstances.length = 0;
   });
 
   describe('createLineElement', () => {
@@ -71,10 +79,9 @@ describe('text.js', () => {
       expect(el.classList.contains('narration-line--positioned')).toBe(true);
     });
 
-    it('applies left alignment when positioned', () => {
+    it('applies vertical centering transform when positioned', () => {
       const el = createLineElement('Left text', container, { x: 10, y: 50 });
 
-      expect(el.style.textAlign).toBe('left');
       expect(el.style.transform).toBe('translateY(-50%)');
     });
 
@@ -99,10 +106,10 @@ describe('text.js', () => {
       expect(el.style.top).toBe('0%');
     });
 
-    it('ignores unknown options and applies left alignment', () => {
-      const el = createLineElement('Fallback', container, { x: 50, y: 50, align: 'center' });
+    it('ignores unknown options while preserving positioned styles', () => {
+      const el = createLineElement('Fallback', container, { x: 50, y: 50, unused: 'center' });
 
-      expect(el.style.textAlign).toBe('left');
+      expect(el.style.getPropertyValue('text-align')).toBe('');
       expect(el.style.transform).toBe('translateY(-50%)');
     });
   });
@@ -127,6 +134,17 @@ describe('text.js', () => {
 
       expect(gsap.timeline).toHaveBeenCalledWith({ paused: true });
       expect(tl).toBeDefined();
+    });
+
+    it('creates independent GSAP timelines per invocation', () => {
+      const lines = [{ text: 'First', enter: 0, exit: 1000 }];
+      const firstResult = buildNarrationTimeline(lines, container);
+
+      const secondContainer = document.createElement('div');
+      const secondResult = buildNarrationTimeline(lines, secondContainer);
+
+      expect(firstResult.timeline).not.toBe(secondResult.timeline);
+      expect(timelineInstances).toHaveLength(2);
     });
 
     it('uses reduced motion styles when flag is true', () => {
@@ -223,11 +241,9 @@ describe('text.js', () => {
       expect(first.style.position).toBe('absolute');
       expect(first.style.left).toBe('10%');
       expect(first.style.top).toBe('70%');
-      expect(first.style.textAlign).toBe('left');
 
       const second = container.children[1];
       expect(second.style.left).toBe('50%');
-      expect(second.style.textAlign).toBe('left');
     });
 
     it('handles lines without position data (backward-compatible)', () => {
