@@ -425,8 +425,8 @@ function validateConfig(config) {
     }
   }
   if (config.dotSpeed !== undefined) {
-    if (typeof config.dotSpeed !== 'number' || config.dotSpeed <= 0) {
-      throw new Error(`shimmer: dotSpeed must be a positive number, got ${config.dotSpeed}`);
+    if (typeof config.dotSpeed !== 'number' || config.dotSpeed < 0) {
+      throw new Error(`shimmer: dotSpeed must be a non-negative number, got ${config.dotSpeed}`);
     }
   }
 }

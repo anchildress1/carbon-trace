@@ -73,7 +73,7 @@ frames without traces):
 | `mask`     | Required string, relative path to PNG                                 |
 | `color`    | `[r, g, b]`, must be warm-toned (R dominant, B < 0.65 x R)           |
 | `dotCount` | Non-negative integer                                                  |
-| `dotSpeed` | Positive float                                                        |
+| `dotSpeed` | Non-negative float (0 = no movement, static trace only)               |
 
 All validation errors throw synchronously inside `loadScene()` before any
 async work begins.

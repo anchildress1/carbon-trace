@@ -730,6 +730,21 @@ describe('shimmer.js', () => {
         shimmer.loadScene({ mask: 'test.png', opacity: 0.5, dotCount: -1 }),
       ).rejects.toThrow('dotCount must be a non-negative integer');
     });
+
+    it('rejects negative dotSpeed', async () => {
+      shimmer.init(mockCanvas);
+      await expect(
+        shimmer.loadScene({ mask: 'test.png', opacity: 0.5, dotSpeed: -1 }),
+      ).rejects.toThrow('dotSpeed must be a non-negative number');
+    });
+
+    it('accepts dotSpeed 0 for static-trace-only scenes', async () => {
+      shimmer.init(mockCanvas);
+      // dotSpeed: 0 with dotCount: 0 = static trace, no dots — should not throw
+      await expect(
+        shimmer.loadScene({ mask: 'test.png', opacity: 0.2, dotCount: 0, dotSpeed: 0 }),
+      ).resolves.not.toThrow();
+    });
   });
 
   describe('generation guard', () => {

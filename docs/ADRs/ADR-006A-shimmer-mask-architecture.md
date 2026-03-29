@@ -84,7 +84,7 @@ The `traceOverlay` key references a mask image instead of containing inline path
 | `mask`     | string       | yes      | —                 | Relative URL to mask PNG in `assets/masks/`       |
 | `color`    | `[r, g, b]`  | no       | `[232, 200, 120]` | Per-scene glow color (trace tint + dot fill)      |
 | `dotCount` | integer ≥ 0  | no       | `DOT_COUNT` (15)  | Number of walking dots for this scene (0 = static trace only) |
-| `dotSpeed` | float > 0    | no       | `DOT_SPEED` (0.8) | Base dot speed in pixels/frame for this scene     |
+| `dotSpeed` | float ≥ 0    | no       | `DOT_SPEED` (0.8) | Base dot speed in pixels/frame for this scene (0 = no movement) |
 
 `paths` is removed entirely. `mask` references a dark-on-light PNG where dark pixels (luminance < 128) define circuit trace geometry. `color` enables per-scene warm palette variation — most scenes use amber, but scene 03 (reach/coke oven) uses red-orange `[220, 110, 50]`.
 
@@ -110,7 +110,7 @@ DO:
   ✓ mask is a relative URL to a PNG in assets/masks/
   ✓ color is optional [r, g, b] — warm palette only (amber through red-orange)
   ✓ dotCount is optional integer (≥ 0) override for per-scene dot density
-  ✓ dotSpeed is optional positive float override for per-scene dot speed
+  ✓ dotSpeed is optional non-negative float override for per-scene dot speed (0 = no movement)
 
 DON'T:
   ✗ inline path coordinates (use mask images)
