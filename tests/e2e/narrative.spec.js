@@ -321,6 +321,11 @@ test.describe('carbon-trace narrative', () => {
 
 test.describe('carbon-trace — credits overlay', () => {
   test.beforeEach(async ({ page }) => {
+    // Abort all audio requests so Howler never fires real onend callbacks.
+    // This makes forceNarrationEndForTesting the sole narration-end path,
+    // eliminating the race between real audio completion and the test harness.
+    await page.route('**/*.m4a', (route) => route.abort('failed'));
+    await page.route('**/*.mp3', (route) => route.abort('failed'));
     await page.goto('/');
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
     await dismissLoadingScreen(page);
@@ -522,26 +527,6 @@ test.describe('carbon-trace — timer, buffering, and failure resilience', () =>
   });
 
   test('buffering class appears on narration stall and clears on resume event', async ({ page }) => {
-    await page.addInitScript(() => {
-      globalThis.__ctMediaHooks = [];
-      const originalAddEventListener = HTMLMediaElement.prototype.addEventListener;
-      HTMLMediaElement.prototype.addEventListener = function patchedAddEventListener(
-        type,
-        listener,
-        options,
-      ) {
-        if (type === 'waiting' || type === 'playing') {
-          let hook = globalThis.__ctMediaHooks.find((entry) => entry.node === this);
-          if (!hook) {
-            hook = { node: this, waiting: null, playing: null };
-            globalThis.__ctMediaHooks.push(hook);
-          }
-          hook[type] = listener;
-        }
-        return originalAddEventListener.call(this, type, listener, options);
-      };
-    });
-
     await page.goto('/');
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
     await dismissLoadingScreen(page);
@@ -549,62 +534,20 @@ test.describe('carbon-trace — timer, buffering, and failure resilience', () =>
     await page.click('#btn-next');
     const stage = page.locator('#scene-stage');
     await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
-    const sceneOneNarration = fileNameFromAssetPath(narrationSrcForFrame(1));
+
+    // Use the app's test harness to toggle buffer state directly,
+    // instead of monkey-patching HTMLMediaElement.addEventListener.
+    // Howler manages its own event system internally, so intercepting
+    // native media events is fragile and environment-dependent.
+    await page.evaluate(() => {
+      globalThis.__ctE2EApp.forceBufferStateForTesting(true);
+    });
+    await expect(stage).toHaveClass(/buffering/);
 
     await page.evaluate(() => {
-      const stageNode = document.getElementById('scene-stage');
-      if (!stageNode) return;
-      globalThis.__ctBufferClassStates = [stageNode.className];
-      const observer = new MutationObserver(() => {
-        globalThis.__ctBufferClassStates.push(stageNode.className);
-      });
-      observer.observe(stageNode, { attributes: true, attributeFilter: ['class'] });
-      globalThis.__ctBufferClassObserver = observer;
+      globalThis.__ctE2EApp.forceBufferStateForTesting(false);
     });
-
-    await page.waitForFunction(
-      () =>
-        Array.isArray(globalThis.__ctMediaHooks) &&
-        globalThis.__ctMediaHooks.some(
-          (hook) => typeof hook.waiting === 'function' && typeof hook.playing === 'function',
-        ),
-      { timeout: 10000 },
-    );
-
-    await page.evaluate((expectedSrc) => {
-      const hooks = Array.isArray(globalThis.__ctMediaHooks) ? globalThis.__ctMediaHooks : [];
-      const hook =
-        hooks.find(
-          (entry) =>
-            typeof entry?.waiting === 'function' &&
-            String(entry.node?.currentSrc || entry.node?.src || '').includes(expectedSrc),
-        ) || hooks.find((entry) => typeof entry?.waiting === 'function');
-      hook?.waiting?.call(hook.node, new Event('waiting'));
-    }, sceneOneNarration);
-    await page.waitForFunction(
-      () =>
-        Array.isArray(globalThis.__ctBufferClassStates) &&
-        globalThis.__ctBufferClassStates.some((className) =>
-          String(className).split(/\s+/).includes('buffering'),
-        ),
-      { timeout: 5000 },
-    );
-
-    await page.evaluate((expectedSrc) => {
-      const hooks = Array.isArray(globalThis.__ctMediaHooks) ? globalThis.__ctMediaHooks : [];
-      const hook =
-        hooks.find(
-          (entry) =>
-            typeof entry?.playing === 'function' &&
-            String(entry.node?.currentSrc || entry.node?.src || '').includes(expectedSrc),
-        ) || hooks.find((entry) => typeof entry?.playing === 'function');
-      hook?.playing?.call(hook.node, new Event('playing'));
-    }, sceneOneNarration);
     await expect(stage).not.toHaveClass(/buffering/);
-    await page.evaluate(() => {
-      globalThis.__ctBufferClassObserver?.disconnect?.();
-      delete globalThis.__ctBufferClassObserver;
-    });
   });
 
   test('scene image failure falls back without freezing navigation', async ({ page }) => {

@@ -57,6 +57,11 @@ export function initCreditsContent(scrollContentEl) {
  * @param {boolean} opts.reducedMotion - Whether prefers-reduced-motion is active
  */
 export function revealCreditsPanel(panelEl, scrollContentEl, config, opts = {}) {
+  // Guard against duplicate reveals — if the panel is already visible,
+  // a second call would create orphaned GSAP timelines and duplicate
+  // event listeners that can't be cleaned up.
+  if (!panelEl.hidden) return;
+
   initCreditsContent(scrollContentEl);
 
   // Remove hidden FIRST so clientHeight is measurable —

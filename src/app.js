@@ -1174,10 +1174,17 @@ export function createApp() {
     togglePause: () => togglePause(app),
     getState: () => app.state,
     forceNarrationEndForTesting: () => {
+      // Cancel any existing credits reveal timer to prevent duplicate
+      // reveals when real audio end races with the test harness.
+      app.creditsRevealTimer?.cancel();
+      app.creditsRevealTimer = null;
       const frame = app.frames[app.currentIndex];
       if (!frame) return;
       const holdAfterNarration = getHoldAfterNarration(frame);
       makeNarrationEndCallback(app, frame, holdAfterNarration)();
+    },
+    forceBufferStateForTesting: (isBuffering) => {
+      handleBufferChange(app, isBuffering);
     },
   };
 }
