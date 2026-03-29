@@ -502,6 +502,86 @@ body {
   border: 0;
 }
 
+/* Credits overlay — frosted glass panel with feathered edges (ADR-011) */
+#credits-panel {
+  position: absolute;
+  inset: 10%;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  opacity: 0;
+  mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%);
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    black 12%,
+    black 88%,
+    transparent 100%
+  );
+  z-index: 7;
+  border-radius: 8px;
+}
+
+#credits-scroll-content {
+  padding: 15% 10%;
+  text-align: center;
+}
+
+.credits-section {
+  margin-bottom: 3em;
+}
+
+.credits-heading {
+  font-family: 'Lora', serif;
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: clamp(1rem, 2.5vw, 1.8rem);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 0.5em;
+}
+
+.credits-text {
+  font-family: 'Lora', serif;
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: clamp(0.85rem, 2vw, 1.3rem);
+  line-height: 1.8;
+  margin-bottom: 0.5em;
+}
+
+.credits-text--name {
+  font-size: clamp(1rem, 2.2vw, 1.5rem);
+  color: rgba(255, 255, 255, 0.9);
+  font-style: italic;
+}
+
+.credits-text--attribution {
+  font-size: clamp(0.75rem, 1.6vw, 1rem);
+  line-height: 1.6;
+  margin-bottom: 0.3em;
+}
+
+.credits-link {
+  color: rgba(232, 200, 120, 0.85);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(232, 200, 120, 0.3);
+  transition: border-color 0.3s ease;
+  display: inline-block;
+  margin: 0.3em 0;
+}
+
+.credits-link:hover,
+.credits-link:focus-visible {
+  border-color: rgba(232, 200, 120, 0.85);
+}
+
+.credits-link:focus-visible {
+  outline: 2px solid rgba(232, 200, 120, 0.5);
+  outline-offset: 2px;
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .narration-line {
@@ -545,5 +625,12 @@ body {
 
   .transition-loader::after {
     animation: none;
+  }
+
+  #credits-panel {
+    overflow-y: auto;
+    opacity: 1;
+    mask-image: none;
+    -webkit-mask-image: none;
   }
 }
