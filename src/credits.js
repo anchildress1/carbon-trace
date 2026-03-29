@@ -4,6 +4,8 @@ import { PausableTimer } from './pausable-timer.js';
 // file, not user-controlled input. Safe for innerHTML assignment.
 import creditsHtml from './credits-content.html?raw';
 
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+
 // Module state
 let scrollTimeline = null;
 let fadeInTween = null;
@@ -99,7 +101,7 @@ function startAutoScroll(panelEl, scrollContentEl, config) {
 }
 
 function watchReducedMotion(panelEl, scrollContentEl) {
-  motionQuery = globalThis.matchMedia('(prefers-reduced-motion: reduce)');
+  motionQuery = globalThis.matchMedia(REDUCED_MOTION_QUERY);
   motionHandler = (e) => {
     if (!e.matches || !scrollTimeline) return;
     // User enabled reduced motion mid-credits — kill auto-scroll,

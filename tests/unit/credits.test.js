@@ -548,4 +548,44 @@ describe('credits.js', () => {
       expect(scrollTl.play).not.toHaveBeenCalled();
     });
   });
+
+  // -- runtime reduced motion change --
+
+  describe('runtime prefers-reduced-motion change', () => {
+    it('stops auto-scroll when reduced motion enabled mid-credits', () => {
+      // Set up a dispatchable matchMedia mock
+      let changeCallback = null;
+      const mockQuery = {
+        matches: false,
+        addEventListener: vi.fn((event, cb) => {
+          changeCallback = cb;
+        }),
+        removeEventListener: vi.fn(),
+      };
+      vi.spyOn(globalThis, 'matchMedia').mockReturnValue(mockQuery);
+
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      const scrollTl = gsapMockState.lastTimeline;
+
+      // Scroll timeline is running
+      expect(scrollTl).not.toBeNull();
+
+      // Simulate user enabling reduced motion
+      changeCallback({ matches: true });
+
+      // Scroll timeline should be killed
+      expect(scrollTl.kill).toHaveBeenCalled();
+
+      // Panel should be visible with opacity 1 (native scroll takes over)
+      expect(panel.style.opacity).toBe('1');
+
+      // gsap.set should have been called to clear the y transform
+      expect(gsap.set).toHaveBeenCalledWith(
+        scrollContent,
+        expect.objectContaining({ clearProps: 'y' }),
+      );
+
+      vi.restoreAllMocks();
+    });
+  });
 });
