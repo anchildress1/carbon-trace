@@ -24,6 +24,11 @@ let focusoutHandler = null;
 let motionQuery = null;
 let motionHandler = null;
 
+function clearScrollTransform(scrollContentEl) {
+  if (!scrollContentEl) return;
+  gsap.set(scrollContentEl, { clearProps: 'y' });
+}
+
 /**
  * Populate the scroll content container with credits HTML.
  * Idempotent — no-op if content is already populated.
@@ -56,6 +61,7 @@ export function revealCreditsPanel(panelEl, scrollContentEl, config, opts = {}) 
   // hidden = display:none = clientHeight 0. Panel is still opacity:0
   // from CSS so nothing is visually revealed yet.
   panelEl.hidden = false;
+  clearScrollTransform(scrollContentEl);
 
   if (opts.reducedMotion) {
     panelEl.style.opacity = '1';
@@ -209,6 +215,8 @@ function removeScrollListeners(panelEl) {
  * Hide the credits panel and tear down all animation state.
  */
 export function hideCreditsPanel(panelEl) {
+  const scrollContentEl = panelEl.querySelector('#credits-scroll-content');
+
   fadeInTween?.kill();
   fadeInTween = null;
 
@@ -232,6 +240,7 @@ export function hideCreditsPanel(panelEl) {
     motionHandler = null;
   }
 
+  clearScrollTransform(scrollContentEl);
   panelEl.hidden = true;
   panelEl.style.opacity = '0';
 }

@@ -224,16 +224,34 @@ describe('credits.js', () => {
       expect(panel.style.opacity).toBe('1');
     });
 
-    it('does not create any GSAP tweens or position content off-screen', () => {
+    it('does not create GSAP tweens in reduced motion', () => {
       revealCreditsPanel(panel, scrollContent, defaultConfig, { reducedMotion: true });
       expect(gsap.to).not.toHaveBeenCalled();
-      expect(gsap.set).not.toHaveBeenCalled();
       expect(gsap.fromTo).not.toHaveBeenCalled();
+      expect(gsap.set).toHaveBeenCalledWith(
+        scrollContent,
+        expect.objectContaining({ clearProps: 'y' }),
+      );
     });
 
     it('removes hidden attribute', () => {
       revealCreditsPanel(panel, scrollContent, defaultConfig, { reducedMotion: true });
       expect(panel.hidden).toBe(false);
+    });
+
+    it('clears stale transform state from a prior animated reveal', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      hideCreditsPanel(panel);
+      vi.clearAllMocks();
+
+      revealCreditsPanel(panel, scrollContent, defaultConfig, { reducedMotion: true });
+
+      expect(gsap.set).toHaveBeenCalledWith(
+        scrollContent,
+        expect.objectContaining({ clearProps: 'y' }),
+      );
+      expect(gsap.to).not.toHaveBeenCalled();
+      expect(gsap.fromTo).not.toHaveBeenCalled();
     });
   });
 
@@ -245,6 +263,18 @@ describe('credits.js', () => {
       hideCreditsPanel(panel);
       expect(panel.hidden).toBe(true);
       expect(panel.style.opacity).toBe('0');
+    });
+
+    it('clears scroll transform state on hide', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      vi.clearAllMocks();
+
+      hideCreditsPanel(panel);
+
+      expect(gsap.set).toHaveBeenCalledWith(
+        scrollContent,
+        expect.objectContaining({ clearProps: 'y' }),
+      );
     });
 
     it('kills fade-in tween if active', () => {
