@@ -106,6 +106,16 @@ describe('credits.js', () => {
     gsapMockState.pendingOnCompletes = [];
     gsapMockState.lastTimeline = null;
     vi.clearAllMocks();
+
+    // Ensure a deterministic matchMedia for tests that hit watchReducedMotion.
+    // happy-dom provides one, but relying on that is fragile.
+    globalThis.matchMedia = vi.fn().mockImplementation((query) => ({
+      matches: false,
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+
     document.body.replaceChildren();
     ({ panel, scrollContent } = buildPanel());
   });
@@ -300,11 +310,18 @@ describe('credits.js', () => {
       expect(panel.hidden).toBe(true);
     });
 
-    it('removes event listeners', () => {
+    it('removes every event listener it registered', () => {
+      const addSpy = vi.spyOn(panel, 'addEventListener');
+      const removeSpy = vi.spyOn(panel, 'removeEventListener');
+
       revealCreditsPanel(panel, scrollContent, defaultConfig);
-      const spy = vi.spyOn(panel, 'removeEventListener');
+      const addedListeners = addSpy.mock.calls.map(([type, handler]) => [type, handler]);
+
       cleanupCredits(panel);
-      expect(spy).toHaveBeenCalledTimes(9);
+
+      for (const [type, handler] of addedListeners) {
+        expect(removeSpy).toHaveBeenCalledWith(type, handler);
+      }
     });
   });
 
