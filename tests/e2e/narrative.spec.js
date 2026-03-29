@@ -327,8 +327,9 @@ test.describe('carbon-trace — credits overlay', () => {
   });
 
   test('credits panel is a named region landmark', async ({ page }) => {
-    const panel = page.locator('#credits-panel');
-    await expect(panel).toHaveAttribute('role', 'region');
+    // <section aria-label="Credits"> has implicit ARIA role="region" when named
+    const panel = page.getByRole('region', { name: 'Credits' });
+    await expect(panel).toHaveAttribute('id', 'credits-panel');
     await expect(panel).toHaveAttribute('aria-label', 'Credits');
   });
 

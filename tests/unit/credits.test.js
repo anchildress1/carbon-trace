@@ -505,8 +505,8 @@ describe('credits.js', () => {
       panel.dispatchEvent(wheelEvent);
 
       cleanupCredits(panel);
-      vi.advanceTimersByTime(5000);
-      // No errors — timer was cancelled
+      // Timer was cancelled — advancing time must not throw
+      expect(() => vi.advanceTimersByTime(5000)).not.toThrow();
     });
   });
 

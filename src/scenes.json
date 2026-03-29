@@ -862,8 +862,8 @@
             "mask": "assets/masks/mask-05-rinse-diamond-99a0ae66.png",
             "color": 16642996,
             "glowAlpha": 0.15,
-            "distance": 12,
-            "outerStrength": 2.5,
+            "distance": 8,
+            "outerStrength": 2,
             "pulseSpeed": 0.02,
             "pulseDepth": 0.4
           }
