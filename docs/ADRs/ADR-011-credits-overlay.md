@@ -50,12 +50,12 @@ Credits panel fades in after narration ends + holdAfterNarration delay. Content 
 
 ### Option A+ (SELECTED): Mask-Feathered Glass Panel
 
-| Dimension | Assessment |
-|-----------|------------|
-| Complexity | Low — backdrop-filter + mask-image, both CSS-only |
-| Visual integration | High — edges dissolve into scene |
-| Readability | High — opaque center zone |
-| Implementation effort | ~3–4 hours |
+| Dimension             | Assessment                                        |
+| --------------------- | ------------------------------------------------- |
+| Complexity            | Low — backdrop-filter + mask-image, both CSS-only |
+| Visual integration    | High — edges dissolve into scene                  |
+| Readability           | High — opaque center zone                         |
+| Implementation effort | ~3–4 hours                                        |
 
 **Pros:** `backdrop-filter: blur()` + `mask-image: linear-gradient()` feathers edges. Shimmer dots and effects show through blurred. Center is clean dark reading zone. Pure CSS — no extra layers. Links are native DOM.
 
@@ -111,21 +111,19 @@ Credits panel sits inside `#scene-stage`. `overlay-controls` is a **sibling** of
 ```css
 #credits-panel {
   position: absolute;
-  inset: 10%;                              /* 10% margin all sides */
+  inset: 10%; /* 10% margin all sides */
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   background: rgba(0, 0, 0, 0.45);
-  overflow: hidden;                        /* GSAP translateY drives scroll */
-  opacity: 0;                             /* GSAP fade-in after narration */
-  mask-image: linear-gradient(
-    to bottom,
-    transparent 0%, black 12%,
-    black 88%, transparent 100%
-  );
+  overflow: hidden; /* GSAP translateY drives scroll */
+  opacity: 0; /* GSAP fade-in after narration */
+  mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%);
   -webkit-mask-image: linear-gradient(
     to bottom,
-    transparent 0%, black 12%,
-    black 88%, transparent 100%
+    transparent 0%,
+    black 12%,
+    black 88%,
+    transparent 100%
   );
   z-index: 7;
 }
@@ -155,7 +153,7 @@ Credits panel sits inside `#scene-stage`. `overlay-controls` is a **sibling** of
 }
 
 .credits-link {
-  color: rgba(232, 200, 120, 0.85);       /* amber — trace glow color */
+  color: rgba(232, 200, 120, 0.85); /* amber — trace glow color */
   text-decoration: none;
   border-bottom: 1px solid rgba(232, 200, 120, 0.3);
   transition: border-color 0.3s ease;
@@ -170,6 +168,7 @@ Credits panel sits inside `#scene-stage`. `overlay-controls` is a **sibling** of
 ### 010.4.4 Reduced Motion
 
 When `prefers-reduced-motion: reduce`:
+
 - Credits panel appears instantly (no fade-in animation)
 - Auto-scroll disabled — `overflow-y: auto` enabled, native scroll
 - All content visible and accessible without animation
@@ -217,6 +216,7 @@ revealCreditsPanel():
 ### 010.5.3 Timeline
 
 By the time `revealCreditsPanel()` fires:
+
 - Ghost-drift text has exited (exit timings are before narration `onend`)
 - Narration audio has finished
 - holdAfterNarration (3000ms) has elapsed
@@ -430,6 +430,7 @@ Bandcamp.com
 
 **Sound Design**
 All ambient audio sourced from [FreeSound.org](https://freesound.org):
+
 - [Mining Maschine Cave Mine Factory Field-recording Fantasy 200726_0022_01_01](https://freesound.org/s/529032/) by szegvari — Creative Commons
 - [Fabric flaps](https://freesound.org/s/580967/) by PelicanPolice — Creative Commons
 - [Sauna fireplace loop](https://freesound.org/s/797669/) by HenKonen — Creative Commons
@@ -517,8 +518,18 @@ Nav back + return = restart?                      │ Yes
 8. [x] Implement: replay edge case — hide credits, replay narration, re-trigger
 9. [x] Implement: reduced motion fallback (overflow-y: auto)
 10. [x] Implement: pause integration — isPaused flag blocks auto-resume, wheel scrub still works
-11. [ ] Test: Safari 16.2+ (mask-image + backdrop-filter compositing)
-12. [ ] Test: Pixel 3a class — 60fps with all layers + backdrop-filter
+11. [x] Test: Safari/WebKit compositing regression (`pnpm perf:runtime:adr11`, WebKit project)
+12. [x] Test: Pixel 3a-class performance proxy (`pnpm perf:runtime:adr11`, Chromium with device + CPU emulation)
 13. [x] Test: Tab focus through credits links during auto-scroll
 14. [x] Test: Replay during credits scroll — clean re-entry
 15. [x] Tune: blur radius, opacity, mask gradient, scroll speed against live scene
+
+### 010.13.1 Validation Evidence (March 29, 2026)
+
+- Added `tests/perf/adr11-credits.spec.js` with:
+  - WebKit compositing check for credits mask/backdrop stack and controls interactivity
+  - Pixel-class proxy FPS check on credits frame under full layer load
+- Added opt-in runtime command: `pnpm perf:runtime:adr11`
+- Latest run result: `2 passed, 4 skipped` (project-targeted skips are expected)
+
+**Note:** Physical Safari/Pixel hardware spot-checks are still useful before final release, but the ADR's previously unchecked regression targets now have automated coverage in repo.
