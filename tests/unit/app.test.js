@@ -137,6 +137,7 @@ vi.mock('../../src/scenes.json', () => ({
           { id: 'narration', type: 'narration', src: 'title-narration.m4a', enter: 0, volume: 1, loop: false, fadeIn: 0, fadeOut: 0 },
         ],
         effects: null,
+        traceOverlay: null,
         transition: { type: 'fade', duration: 400 },
 
       },
@@ -146,6 +147,7 @@ vi.mock('../../src/scenes.json', () => ({
 
         holdAfterNarration: 2000,
         image: 'scene-01.webp',
+        traceOverlay: { mask: 'mask-01.png', opacity: 0.3, color: [232, 200, 120], dotCount: 10, dotSpeed: 0.8 },
         narration: {
           lines: [{ text: 'Hello', enter: 0, exit: 2000 }],
           captions: [{ text: 'Hello', start: 0, end: 2000 }],
@@ -274,6 +276,12 @@ import { clearScene, drawFallback, loadImage } from '../../src/canvas.js';
 import { setCaptionsEnabled, areCaptionsEnabled, syncCaptionsToTime, clearCaptionElements } from '../../src/captions.js';
 import { initOverlay, focusActiveDot } from '../../src/overlay.js';
 import { preloadFirstFrameAudio } from '../../src/loader.js';
+import {
+  init as initShimmer,
+  loadScene as loadShimmerScene,
+  pause as pauseShimmer,
+  resume as resumeShimmer,
+} from '../../src/shimmer.js';
 
 function buildDOM() {
   document.body.replaceChildren();
@@ -478,17 +486,11 @@ describe('app.js', () => {
       expect(app.getState()).toBe('PAUSED');
     });
 
-    it('calls cancelAudioCues for cleanup', async () => {
+    it('cancels audio and defers new audio during hard cut', async () => {
       vi.clearAllMocks();
       app.advance();
       await flush();
       expect(cancelAudioCues).toHaveBeenCalled();
-    });
-
-    it('defers frame audio during hard cut', async () => {
-      vi.clearAllMocks();
-      app.advance();
-      await flush();
       expect(cueAudioCues).not.toHaveBeenCalled();
       expect(scheduleAudioCues).not.toHaveBeenCalled();
     });
@@ -498,14 +500,6 @@ describe('app.js', () => {
       app.advance(); // to scene-01 which has effects regions
       await flush();
       expect(loadEffectsScene).toHaveBeenCalled();
-    });
-
-    it('does not start ambient during hard cut', async () => {
-      vi.clearAllMocks();
-      app.advance();
-      await flush();
-      expect(cueAudioCues).not.toHaveBeenCalled();
-      expect(scheduleAudioCues).not.toHaveBeenCalled();
     });
 
     it('schedules fresh frame audio on resume after hard cut', async () => {
@@ -604,18 +598,21 @@ describe('app.js', () => {
       expect(app.getState()).toBe('SCENE_ACTIVE');
     });
 
-    it('ArrowRight advances when playing', async () => {
+    it('ArrowRight advances to next frame', async () => {
       app.togglePause();
       vi.clearAllMocks();
       const stage = document.getElementById('scene-stage');
       stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
       await flush();
       expect(cancelAudioCues).toHaveBeenCalled();
+      // Verify we moved to scene-01 by checking accessible narration text
+      const region = document.getElementById('accessible-narration');
+      expect(region.textContent).toBe('Hello');
     });
 
-    it('ArrowLeft retreats when on scene-01', async () => {
+    it('ArrowLeft retreats to previous frame', async () => {
       app.togglePause();
-      app.advance();
+      app.advance(); // to scene-01
       await flush();
 
       vi.clearAllMocks();
@@ -623,6 +620,9 @@ describe('app.js', () => {
       stage.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
       await flush();
       expect(cancelAudioCues).toHaveBeenCalled();
+      // Verify we moved back to title by checking accessible narration text
+      const region = document.getElementById('accessible-narration');
+      expect(region.textContent).toBe('Opening line');
     });
 
     it('keyboard advance does not steal focus to dot (preserves global nav mode)', async () => {
@@ -1099,12 +1099,19 @@ describe('app.js', () => {
       document.getElementById('btn-prev').click();
       await flush();
       expect(cancelAudioCues).toHaveBeenCalled();
+      // Was on scene-01, retreated to title
+      const region = document.getElementById('accessible-narration');
+      expect(region.textContent).toBe('Opening line');
     });
 
-    it('btn-next advances to next frame', () => {
+    it('btn-next advances to next frame', async () => {
       vi.clearAllMocks();
       document.getElementById('btn-next').click();
+      await flush();
       expect(cancelAudioCues).toHaveBeenCalled();
+      // Was on scene-01, advanced to scene-02
+      const region = document.getElementById('accessible-narration');
+      expect(region.textContent).toBe('');
     });
 
     it('btn-pause toggles pause via listener', () => {
@@ -2956,6 +2963,76 @@ describe('app.js', () => {
         mockAnalyser,
         true,
       );
+    });
+  });
+
+  // ── shimmer integration ───────────────────────────────────────────
+
+  describe('shimmer integration', () => {
+    it('initializes shimmer with trace-overlay canvas on createApp', async () => {
+      app = createApp();
+      await flush();
+      const traceCanvas = document.getElementById('trace-overlay');
+      expect(initShimmer).toHaveBeenCalledWith(traceCanvas);
+    });
+
+    it('calls loadShimmerScene with traceOverlay config on scene transition', async () => {
+      app = createApp();
+      await flush();
+      app.togglePause(); // play
+      vi.clearAllMocks();
+      app.advance(); // to scene-01 which has traceOverlay
+      await flush();
+      expect(loadShimmerScene).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mask: 'mask-01.png',
+          opacity: 0.3,
+          color: [232, 200, 120],
+          dotCount: 10,
+          dotSpeed: 0.8,
+        }),
+      );
+    });
+
+    it('calls loadShimmerScene(null) for frames without traceOverlay', async () => {
+      app = createApp();
+      await flush();
+      // Title frame has traceOverlay: null
+      expect(loadShimmerScene).toHaveBeenCalledWith(null);
+    });
+
+    it('pauses shimmer when experience is paused', async () => {
+      app = createApp();
+      await flush();
+      app.togglePause(); // play
+      vi.clearAllMocks();
+      app.togglePause(); // pause
+      expect(pauseShimmer).toHaveBeenCalled();
+    });
+
+    it('resumes shimmer when experience is resumed', async () => {
+      app = createApp();
+      await flush();
+      app.togglePause(); // play
+      app.togglePause(); // pause
+      vi.clearAllMocks();
+      app.togglePause(); // resume
+      expect(resumeShimmer).toHaveBeenCalled();
+    });
+
+    it('recovers gracefully when loadShimmerScene rejects', async () => {
+      loadShimmerScene.mockRejectedValueOnce(new Error('mask load failed'));
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      app = createApp();
+      await flush();
+      app.togglePause();
+      app.advance(); // to scene-01 with traceOverlay
+      await flush();
+
+      // App should not crash — state remains SCENE_ACTIVE
+      expect(app.getState()).toBe('SCENE_ACTIVE');
+      consoleSpy.mockRestore();
     });
   });
 });
