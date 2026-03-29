@@ -519,6 +519,6 @@ Nav back + return = restart?                      │ Yes
 10. [x] Implement: pause integration — isPaused flag blocks auto-resume, wheel scrub still works
 11. [ ] Test: Safari 16.2+ (mask-image + backdrop-filter compositing)
 12. [ ] Test: Pixel 3a class — 60fps with all layers + backdrop-filter
-13. [ ] Test: Tab focus through credits links during auto-scroll
+13. [x] Test: Tab focus through credits links during auto-scroll
 14. [ ] Test: Replay during credits scroll — clean re-entry
 15. [x] Tune: blur radius, opacity, mask gradient, scroll speed against live scene
