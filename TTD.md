@@ -3,6 +3,9 @@
 Adversarial test review findings deferred from `feat/trace-overlays`. These cover
 modules and E2E tests NOT changed on that branch. Address on a dedicated test-debt branch.
 
+> Sweep status (2026-03-29): **Closed on `feat/ttd-full-sweep`**.  
+> Per-item disposition is recorded in **Section 12**.
+
 ---
 
 ## 1. `audio.js` / `audio.test.js`
@@ -302,3 +305,70 @@ modules and E2E tests NOT changed on that branch. Address on a dedicated test-de
 | `effects-canvas.test.js` | `globalThis.Image` set via direct assignment, not `vi.stubGlobal`                             | `vi.restoreAllMocks()` cannot restore it. Use `vi.stubGlobal`.   |
 | `effects.test.js`        | `DisplacementFilter` mock `scale` diverges from real PixiJS                                   | Align with actual API.                                           |
 | `effects.test.js`        | `GlowFilter` mock missing `knockout`, `alpha` fields                                          | Add them.                                                        |
+
+---
+
+## 12. Completion Ledger (2026-03-29)
+
+No items were intentionally deferred in this sweep.
+
+### 12.1 `audio.js` / `audio.test.js`
+
+- Resolved: 1.1 checkbox tests (`onNarrationBufferChange` registration behavior, `disconnectAnalyserSource` state reset behavior, `cancelAudioCues` crossfade cleanup assertion).
+- Resolved: 1.2 missing coverage (`audioDurations` zero/negative, `reloadFromPosition` paused/rejected play paths, `crossfadeAmbientCue` error unload/error-state branches, undefined `onNarrationEnd`, mute propagation to new cues, narration `cancelCue` buffer cleanup, falsy `keepSrcs` trim filter, `handleWaiting`/`handlePlaying` early returns, `getBufferedEnd` empty buffered list).
+- Resolved: 1.3 reliability issues (shared `mockNode` reset, `lastHowlOptions` reset, consolidated setup/teardown strategy).
+- Resolved: 1.4 mock issues (stateful `volume()`, no pre-attached crossfade internals, explicit reject-path tests).
+
+### 12.2 `canvas.js` / `canvas.test.js`
+
+- Resolved: 2.1 checkbox tests (full `drawImage` cover-fit argument assertions, resize path asserts sizing before redraw).
+- Resolved: 2.2 missing coverage (`coverFit` fallback dimensions, DPR/resetTransform/scale verification, concurrent `loadImage` dedupe, post-destroy resize callback safety, non-16:9 paths, full 8-arg cover-fit validation).
+- Resolved: 2.3 reliability issues (timer lifecycle moved to deterministic setup/teardown, realistic ResizeObserver callback shape, varied geometry mocks).
+
+### 12.3 `captions.js` / `captions.test.js`
+
+- Resolved: 3.1 missing coverage (localStorage throw with in-memory persistence, detached-node cleanup in `syncCaptionsToTime`).
+
+### 12.4 `loader.js` / `loader.test.js`
+
+- Resolved: 4.1 checkbox test (`onLoaded` payload assertions now validate `{ src, duration }`).
+- Resolved: 4.2 missing coverage (metadata success cleanup assertions, NaN/undefined duration fallback validation, dead `.catch()` removed from `preloadFirstFrameAudio`, sequential background preload verification, missing-`src` cue-object filtering).
+- Resolved: 4.3 mock/title mismatch (error-path expectations aligned to real control flow after dead-branch removal).
+
+### 12.5 `effects.js` / `effects.test.js`
+
+- Resolved: 5.1 checkbox tests (default parameter assertions for water/dust/heat/glow/shockwave, filter constructor argument assertions).
+- Resolved: 5.2 missing coverage (`registerEffect` invalid type matrix, overwrite behavior, thrown factory propagation, water direction math, dust oscillation updates, glow `knockout`/`alpha` assertions, shockwave `cycleDuration` init, `cycleDuration=0` edge path, negative parameter edge behavior).
+- Resolved: 5.3 reliability issues (registry isolation via module reset/import pattern, Pixi displacement mock shape aligned to runtime usage).
+
+### 12.6 `keyboard.js` / `keyboard.test.js`
+
+- Resolved: 6.1 missing coverage (non-Element target guards, repeat-key behavior, repeated `initKeyboard` listener stacking).
+- Resolved: 6.2 reliability issue (deterministic DOM cleanup for helper elements between tests).
+
+### 12.7 `overlay.js` / `overlay.test.js`
+
+- Resolved: 7.1 checkbox tests (stateful assertions for missing container, no-handler dot creation, pre-init update behavior).
+- Resolved: 7.2 missing coverage (same-index no-op, backward deactivation path, out-of-bounds roving target, re-init listener replacement, `focusActiveDot` OOB no-op, click `stopPropagation`, negative index safety, single-dot wrapping behavior).
+- Resolved: 7.3 reliability issue (module-level state reset via deterministic init/cleanup in each test setup).
+
+### 12.8 `text.js` / `text.test.js`
+
+- Resolved: 8.1 checkbox test debt (redundant paused-default timeline test removed).
+- Resolved: 8.2 missing coverage (duplicate-caption callback regression guard, partial-coordinate guards, missing `isCaptionEnabled` behavior, empty/null/non-array captions safety, negative timing path assertions, `captionDelay` default behavior).
+- Resolved: 8.3 mock issues (timeline mock isolation per invocation; position-sensitive expectations now explicitly validated by tests).
+
+### 12.9 `pausable-timer.js` / `pausable-timer.test.js`
+
+- Resolved: 9.1 missing coverage (throwing callback path and post-throw state, zero-delay fire, immediate-fire resume state, self-cancel/self-pause callbacks, `Number.MAX_SAFE_INTEGER` delay edge).
+- Resolved: 9.2 reliability issue (timer/date pattern hardened and covered consistently across lifecycle tests).
+
+### 12.10 E2E sweep
+
+- Resolved: 10.1 checkbox/duplicate debt removed or consolidated (`has accessible narration region`, `scene canvas is aria-hidden`, `caption-layer has aria-hidden`, `has CSP meta tag`, weak initial description-length assertion, static pause visibility, static replay-disabled-before-play, duplicate/static dot/accessibility assertions in `keyboard-nav`).
+- Resolved: 10.2 missing scenarios (ghost-drift lifecycle, ambient cross-scene handoff, narration enter-delay timing, buffering wait/playing timeline pause-resume behavior, caption transition-on-advance, caption disable removal, mid-experience reload restart, title-word sequence, mobile touch interactions).
+- Resolved: 10.3 reliability issues (`replay` test now verifies restart semantics, rapid-next test now checks deterministic state progression without brittle exact-frame assumption).
+
+### 12.11 Cross-cutting mock debt
+
+- Resolved: 11 (`app.test.js` manual-completion race-path coverage expanded; `effects-canvas.test.js` async deferred `initPromise` testability added; global stubs migrated to `vi.stubGlobal` with restore; Pixi/Glow mock shapes aligned with runtime semantics).
