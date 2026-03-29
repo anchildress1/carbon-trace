@@ -1179,6 +1179,19 @@ export function createApp() {
       const holdAfterNarration = getHoldAfterNarration(frame);
       makeNarrationEndCallback(app, frame, holdAfterNarration)();
     },
+    /** @internal E2E diagnostics — returns a snapshot of credits-relevant state */
+    _debugCreditsState: () => ({
+      currentIndex: app.currentIndex,
+      frameCount: app.frames.length,
+      state: app.state,
+      paused: app.paused,
+      generation: app.generation,
+      hasCreditsTimer: app.creditsRevealTimer !== null,
+      creditsTimerActive: app.creditsRevealTimer?.isActive ?? null,
+      creditsTimerPaused: app.creditsRevealTimer?.isPaused ?? null,
+      panelHidden: app.els.creditsPanel?.hidden,
+      frameHasCredits: !!app.frames[app.currentIndex]?.credits,
+    }),
     forceBufferStateForTesting: (isBuffering) => {
       handleBufferChange(app, isBuffering);
     },

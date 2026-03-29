@@ -53,12 +53,32 @@ async function jumpToFrameByDot(page, frameIndex) {
 }
 
 async function dispatchNarrationEnded(page) {
-  await page.evaluate(() => {
+  const beforeState = await page.evaluate(() => {
     if (typeof globalThis.__ctE2EApp?.forceNarrationEndForTesting !== 'function') {
       throw new TypeError('E2E app harness missing forceNarrationEndForTesting');
     }
+    const before = globalThis.__ctE2EApp._debugCreditsState?.() ?? 'no debug';
     globalThis.__ctE2EApp.forceNarrationEndForTesting();
+    const after = globalThis.__ctE2EApp._debugCreditsState?.() ?? 'no debug';
+    return { before, after };
   });
+  // eslint-disable-next-line no-console
+  console.log('[E2E] dispatchNarrationEnded state:', JSON.stringify(beforeState));
+}
+
+async function waitForCreditsVisible(page, panel, timeout = 6000) {
+  try {
+    await expect(panel).toBeVisible({ timeout });
+  } catch (err) {
+    const state = await page.evaluate(
+      () => globalThis.__ctE2EApp?._debugCreditsState?.() ?? 'no debug',
+    );
+    const stateStr = JSON.stringify(state);
+    // eslint-disable-next-line no-console
+    console.error('[E2E] Credits panel not visible! App state:', stateStr);
+    err.message += `\n\n[E2E DIAG] App state at timeout: ${stateStr}`;
+    throw err;
+  }
 }
 
 async function getCreditsTranslateY(page) {
@@ -361,7 +381,7 @@ test.describe('carbon-trace — credits overlay', () => {
     await dispatchNarrationEnded(page);
 
     const panel = page.locator('#credits-panel');
-    await expect(panel).toBeVisible({ timeout: 6000 });
+    await waitForCreditsVisible(page, panel);
     await page.waitForTimeout(800);
 
     const movingY1 = await getCreditsTranslateY(page);
@@ -392,13 +412,13 @@ test.describe('carbon-trace — credits overlay', () => {
     await dispatchNarrationEnded(page);
 
     const panel = page.locator('#credits-panel');
-    await expect(panel).toBeVisible({ timeout: 6000 });
+    await waitForCreditsVisible(page, panel);
 
     await page.click('#btn-replay');
     await expect(panel).toBeHidden({ timeout: 2000 });
 
     await dispatchNarrationEnded(page);
-    await expect(panel).toBeVisible({ timeout: 6000 });
+    await waitForCreditsVisible(page, panel);
   });
 
   test('touch drag pauses auto-scroll and resumes after delay', async ({ page }) => {
@@ -408,7 +428,7 @@ test.describe('carbon-trace — credits overlay', () => {
     await dispatchNarrationEnded(page);
 
     const panel = page.locator('#credits-panel');
-    await expect(panel).toBeVisible({ timeout: 6000 });
+    await waitForCreditsVisible(page, panel);
     await page.waitForTimeout(800);
 
     // Verify auto-scroll is active
@@ -458,7 +478,7 @@ test.describe('carbon-trace — credits overlay', () => {
 
     await jumpToFrameByDot(page, creditsFrameIndex);
     await dispatchNarrationEnded(page);
-    await expect(page.locator('#credits-panel')).toBeVisible({ timeout: 6000 });
+    await waitForCreditsVisible(page, page.locator('#credits-panel'));
 
     await page.waitForTimeout(800);
     const firstTransform = await page
