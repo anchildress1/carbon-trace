@@ -2,6 +2,8 @@
   "ci": {
     "collect": {
       "url": ["http://localhost:4173"],
+      "startServerCommand": "pnpm exec vite preview --host localhost --port 4173",
+      "startServerReadyPattern": "Local:",
       "numberOfRuns": 3,
       "settings": {
         "preset": "desktop",
