@@ -126,11 +126,13 @@ describe('credits.js', () => {
       expect(scrollContent.querySelector('.credits-link')).not.toBeNull();
     });
 
-    it('is idempotent — does not repopulate on second call', () => {
+    it('is idempotent — does not repopulate when children already exist', () => {
       initCreditsContent(scrollContent);
-      scrollContent.textContent = 'modified';
+      const originalHTML = scrollContent.innerHTML;
+      // Mutate a child — initCreditsContent should not overwrite
+      scrollContent.querySelector('.credits-heading').textContent = 'Modified';
       initCreditsContent(scrollContent);
-      expect(scrollContent.textContent).toBe('modified');
+      expect(scrollContent.querySelector('.credits-heading').textContent).toBe('Modified');
     });
   });
 

@@ -12,7 +12,6 @@ let fadeInTween = null;
 let scrollResumeTimer = null;
 let focusedLink = null;
 let hoveredLink = false;
-let contentInitialized = false;
 let isPaused = false;
 
 // Event handler refs (for cleanup)
@@ -35,14 +34,13 @@ function clearScrollTransform(scrollContentEl) {
 
 /**
  * Populate the scroll content container with credits HTML.
- * Idempotent — no-op if content is already populated.
+ * Idempotent — no-op if the element already has child content.
  */
 export function initCreditsContent(scrollContentEl) {
-  if (contentInitialized) return;
+  if (scrollContentEl.children.length > 0) return;
   // SAFE: creditsHtml is a static build-time import (credits-content.html?raw),
   // not user-controlled input — no XSS risk.
   scrollContentEl.innerHTML = creditsHtml; // NOSONAR
-  contentInitialized = true;
 }
 
 /**
@@ -273,8 +271,6 @@ export function cleanupCredits(panelEl) {
   focusedLink = null;
   hoveredLink = false;
   isPaused = false;
-
-  contentInitialized = false;
 
   removeScrollListeners(panelEl);
 
