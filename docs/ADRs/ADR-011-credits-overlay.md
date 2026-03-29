@@ -415,10 +415,11 @@ Audio failure            │ Credits panel still appears and scrolls even if
 
 **Created & Narrated by**
 Ashley Childress
-"If you made it this far, then thank you! I'm Ashley Childress, a senior software engineer from a small mining town in Southwest Virginia. I'm a backend engineer who's not in love with frontend work. I built this anyway—with a lot of AI wrangling—in my own voice and in a dialect most people have never heard spoken with pride. Some things are worth the tedious parts."
-https://anchildress1.dev
-https://carbon-trace.anchildress1.dev
-[DEV.to WeCoded submission link — TBD post-publish]
+
+If you made it this far, then thank you! I'm a senior software engineer from a small mining town in Southwest Virginia. I'm a backend engineer who's not in love with frontend work. I built this anyway—with a lot of AI wrangling—in my own voice and in a dialect most people have never heard spoken with pride. Some things are worth the tedious parts.
+
+[See my other projects](https://anchildress1.dev/projects)
+[DEV.to WeCoded Challenge 2026]()
 
 **Early Testers**
 "To everyone who took the time to give me early feedback—you made this better. Thank you!"
