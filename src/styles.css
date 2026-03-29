@@ -94,7 +94,7 @@ body {
 
 .trace-path {
   fill: none;
-  stroke: rgba(232, 228, 223, 0.25);
+  stroke: rgba(232, 220, 195, 0.25);
   stroke-width: 0.8;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -105,7 +105,7 @@ body {
 
 .trace-glow {
   fill: none;
-  stroke: rgba(232, 228, 223, 0.06);
+  stroke: rgba(232, 220, 195, 0.06);
   stroke-width: 4;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -132,7 +132,7 @@ body {
   font-family: 'Lora', Georgia, serif;
   font-style: italic;
   font-weight: 400;
-  color: rgba(232, 228, 223, 0);
+  color: rgba(232, 220, 195, 0);
   animation: title-emerge 1.8s ease 1.2s forwards;
 }
 
@@ -157,7 +157,7 @@ body {
   font-size: clamp(0.75rem, 1.1vw, 0.875rem);
   letter-spacing: 0.15em;
   text-transform: lowercase;
-  color: rgba(232, 228, 223, 0);
+  color: rgba(232, 220, 195, 0);
   transition: color 0.8s ease;
 }
 
@@ -169,7 +169,7 @@ body {
 }
 
 .loading-prompt.visible {
-  color: rgba(232, 228, 223, 0.55);
+  color: rgba(232, 220, 195, 0.55);
 }
 
 .loading-screen.ready:hover .loading-prompt.visible,
@@ -203,16 +203,16 @@ body {
 
 @keyframes node-travel {
   from {
-    offset-distance: 0%;
+    offset-distance: 35%;
   }
   to {
-    offset-distance: 100%;
+    offset-distance: 65%;
   }
 }
 
 @keyframes title-emerge {
   to {
-    color: rgba(232, 228, 223, 0.55);
+    color: rgba(232, 220, 195, 0.55);
   }
 }
 
@@ -628,7 +628,7 @@ body {
   .loading-title,
   .loading-title--main,
   .loading-title--byline {
-    color: rgba(232, 228, 223, 0.55);
+    color: rgba(232, 220, 195, 0.55);
     animation: none;
   }
 
