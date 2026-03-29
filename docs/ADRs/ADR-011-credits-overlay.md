@@ -80,7 +80,9 @@ Credits panel sits inside `#scene-stage`. `overlay-controls` is a **sibling** of
   │                                    (mix-blend-mode: screen, no z-index)
   ├── .narration-layer                 DOM — ghost-drift text (implicit z)
   ├── .caption-layer          z: 5     DOM — captions
-  └── #credits-panel          z: 7     DOM — credits overlay ← NEW
+  └── #credits-panel          z: 7     DOM — credits overlay
+        ├── #credits-backdrop              Backdrop-filter isolation layer
+        └── #credits-scroll-content        Scrolling content container
 
 .overlay-controls             z: 10    DOM — progress dots, buttons (sibling of #scene-stage)
 ```
@@ -93,6 +95,7 @@ Credits panel sits inside `#scene-stage`. `overlay-controls` is a **sibling** of
 
 ```html
 <section id="credits-panel" hidden aria-label="Credits">
+  <div id="credits-backdrop" aria-hidden="true"></div>
   <div id="credits-scroll-content">
     <section class="credits-section">
       <h2 class="credits-heading"><!-- section heading --></h2>
@@ -106,62 +109,74 @@ Credits panel sits inside `#scene-stage`. `overlay-controls` is a **sibling** of
 </section>
 ```
 
+`#credits-backdrop` is a child element that isolates `backdrop-filter` within the panel's opacity stacking context. This prevents backdrop-filter from rendering visibly while the panel is at `opacity: 0` — a known compositing bug in Safari and some Chrome versions.
+
 ### 010.4.3 CSS
 
 ```css
 #credits-panel {
   position: absolute;
-  inset: 10%; /* 10% margin all sides */
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  background: rgba(0, 0, 0, 0.45);
+  inset: 8% 12%;
   overflow: hidden; /* GSAP translateY drives scroll */
   opacity: 0; /* GSAP fade-in after narration */
-  mask-image: linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%);
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent 0%,
-    black 12%,
-    black 88%,
+    black 10%,
+    black 90%,
     transparent 100%
   );
   z-index: 7;
+  border-radius: 12px;
+  border: 1px solid rgba(232, 200, 120, 0.08);
+}
+
+/* Backdrop lives in a child element — see §010.4.2 */
+#credits-backdrop {
+  position: absolute;
+  inset: 0;
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+  background: rgba(0, 0, 0, 0.5);
 }
 
 #credits-scroll-content {
-  padding: 15% 10%;
+  position: relative;
+  padding: 15% 12% 0;
   text-align: center;
 }
 
 .credits-heading {
   font-family: 'Lora', serif;
   font-weight: 300;
-  color: rgba(255, 255, 255, 0.9);
-  font-size: clamp(1rem, 2.5vw, 1.8rem);
-  letter-spacing: 0.15em;
+  color: rgba(232, 200, 120, 0.7);
+  font-size: clamp(0.7rem, 1.4vw, 0.9rem);
+  letter-spacing: 0.25em;
   text-transform: uppercase;
-  margin-bottom: 0.5em;
+  margin-bottom: 1em;
 }
 
 .credits-text {
   font-family: 'Lora', serif;
   font-weight: 300;
-  color: rgba(255, 255, 255, 0.75);
-  font-size: clamp(0.85rem, 2vw, 1.3rem);
-  line-height: 1.8;
-  margin-bottom: 2em;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: clamp(0.9rem, 2vw, 1.25rem);
+  line-height: 1.9;
+  margin-bottom: 0.6em;
 }
 
 .credits-link {
-  color: rgba(232, 200, 120, 0.85); /* amber — trace glow color */
+  color: rgba(232, 200, 120, 0.9); /* amber — trace glow color */
   text-decoration: none;
-  border-bottom: 1px solid rgba(232, 200, 120, 0.3);
-  transition: border-color 0.3s ease;
+  border-bottom: 1px solid rgba(232, 200, 120, 0.35);
+  transition: border-color 0.3s ease, color 0.3s ease;
 }
 
 .credits-link:hover,
 .credits-link:focus-visible {
-  border-color: rgba(232, 200, 120, 0.85);
+  color: rgba(232, 200, 120, 1);
+  border-color: rgba(232, 200, 120, 0.8);
 }
 ```
 
@@ -207,10 +222,10 @@ Same Howler `onend`. Same PausableTimer. Same generation guard. Same pause/resum
 revealCreditsPanel():
   1. Remove hidden from #credits-panel
   2. GSAP fade-in: opacity 0 → 1 over 500ms (tunable)
-  3. Position #credits-scroll-content at translateY(100%)
+  3. Position #credits-scroll-content at translateY(panelHeight)
   4. Create GSAP scroll timeline (paused)
-  5. On fade-in complete → play scroll timeline
-  6. Store timeline ref in app.creditsTimeline
+  5. On fade-in complete → play scroll timeline + attach scroll listeners
+  6. Store timeline ref in module-private scrollTimeline
 ```
 
 ### 010.5.3 Timeline
@@ -361,7 +376,7 @@ Link focused/hovered│ Paused          │ Playing  │ Animate  │ Animate  �
 Resume after manual │ Auto from pos   │ Playing  │ Animate  │ Animate  │ Click ✓
 ```
 
-When paused: `app.creditsTimeline.pause()` alongside existing `shimmer.pause()`, `effects-canvas.pause()`, `audio.pauseAllCues()`. Resume restores all.
+When paused: `pauseCreditsScroll()` alongside existing `shimmer.pause()`, `effects-canvas.pause()`, `audio.pauseAllCues()`. Resume restores all. The scroll timeline is module-private inside `credits.js` — `app.js` calls `pauseCreditsScroll()`/`resumeCreditsScroll()` rather than accessing the timeline directly.
 
 Nav back then return to credits: **restart**. `showFrame()` rebuilds everything. Narration replays, credits re-triggered after narration.
 
