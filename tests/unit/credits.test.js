@@ -148,18 +148,33 @@ describe('credits.js', () => {
       expect(scrollContent.textContent).toContain('Test Credit');
     });
 
+    it('removes hidden before measuring clientHeight for off-screen position', () => {
+      gsapMockState.autoComplete = false;
+      // Panel starts hidden — clientHeight would be 0
+      expect(panel.hidden).toBe(true);
+
+      let hiddenWhenSetCalled = null;
+      gsap.set.mockImplementationOnce((el, props) => {
+        // Capture hidden state at the moment gsap.set is called
+        hiddenWhenSetCalled = panel.hidden;
+      });
+
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+
+      // hidden must be false when gsap.set is called (so clientHeight > 0)
+      expect(hiddenWhenSetCalled).toBe(false);
+    });
+
     it('positions content off-screen before fade-in to prevent flash', () => {
       gsapMockState.autoComplete = false;
       revealCreditsPanel(panel, scrollContent, defaultConfig);
 
       // gsap.set must be called BEFORE gsap.to (fade-in)
-      // to prevent a flash of all text at natural position during fade
       expect(gsap.set).toHaveBeenCalledWith(
         scrollContent,
-        expect.objectContaining({ y: 400 }), // panelHeight
+        expect.objectContaining({ y: 400 }),
       );
 
-      // set() was called before to() — verify call order
       const setCallOrder = gsap.set.mock.invocationCallOrder[0];
       const toCallOrder = gsap.to.mock.invocationCallOrder[0];
       expect(setCallOrder).toBeLessThan(toCallOrder);
@@ -209,9 +224,11 @@ describe('credits.js', () => {
       expect(panel.style.opacity).toBe('1');
     });
 
-    it('does not create GSAP tweens', () => {
+    it('does not create any GSAP tweens or position content off-screen', () => {
       revealCreditsPanel(panel, scrollContent, defaultConfig, { reducedMotion: true });
       expect(gsap.to).not.toHaveBeenCalled();
+      expect(gsap.set).not.toHaveBeenCalled();
+      expect(gsap.fromTo).not.toHaveBeenCalled();
     });
 
     it('removes hidden attribute', () => {

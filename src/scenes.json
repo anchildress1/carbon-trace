@@ -1533,7 +1533,7 @@
         "scrollDuration": 60000,
         "resumeDelay": 2000,
         "fadeInDuration": 800,
-        "repeatDelay": 3000
+        "repeatDelay": 500
       },
       "traceOverlay": {
         "mask": "assets/masks/mask-11-music-circuit-0ae69818.png",

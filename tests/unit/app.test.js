@@ -236,7 +236,7 @@ vi.mock('../../src/scenes.json', () => ({
           scrollDuration: 60000,
           resumeDelay: 2000,
           fadeInDuration: 800,
-          repeatDelay: 3000,
+          repeatDelay: 500,
         },
         narration: {
           lines: [
@@ -3068,7 +3068,7 @@ describe('app.js', () => {
           scrollDuration: 60000,
           resumeDelay: 2000,
           fadeInDuration: 800,
-          repeatDelay: 3000,
+          repeatDelay: 500,
         }),
         expect.objectContaining({ reducedMotion: expect.any(Boolean) }),
       );

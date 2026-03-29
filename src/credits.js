@@ -47,18 +47,20 @@ export function initCreditsContent(scrollContentEl) {
 export function revealCreditsPanel(panelEl, scrollContentEl, config, opts = {}) {
   initCreditsContent(scrollContentEl);
 
-  // Position content off-screen BEFORE showing the panel to prevent
-  // a flash of all text at natural position during the fade-in.
-  if (!opts.reducedMotion) {
-    gsap.set(scrollContentEl, { y: panelEl.clientHeight });
-  }
-
+  // Remove hidden FIRST so clientHeight is measurable —
+  // hidden = display:none = clientHeight 0. Panel is still opacity:0
+  // from CSS so nothing is visually revealed yet.
   panelEl.hidden = false;
 
   if (opts.reducedMotion) {
     panelEl.style.opacity = '1';
+    // Content stays at natural position — CSS overflow-y:auto handles scroll
     return;
   }
+
+  // Position content below the visible area AFTER hidden is removed
+  // so clientHeight returns a real value. Prevents flash of full text.
+  gsap.set(scrollContentEl, { y: panelEl.clientHeight });
 
   fadeInTween = gsap.to(panelEl, {
     opacity: 1,
