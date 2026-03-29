@@ -1530,10 +1530,10 @@
       "description": "Woman standing before record player on wooden table with diamond glowing, circuit traces and sparkles filling the bright room — the finale",
       "image": "assets/images/scene-11-music-f089c2e4.webp",
       "credits": {
-        "scrollDuration": 50000,
+        "scrollDuration": 45000,
         "resumeDelay": 1500,
         "fadeInDuration": 500,
-        "repeatDelay": 500
+        "repeatDelay": 100
       },
       "traceOverlay": {
         "mask": "assets/masks/mask-11-music-circuit-0ae69818.png",
