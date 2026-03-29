@@ -251,9 +251,8 @@ Renders visible circuit traces with traveling glow dots on a dedicated `<canvas 
 ```
 initCreditsContent(el)                          → populate credits HTML from static import
 revealCreditsPanel(panel, scroll, config, opts) → fade-in + GSAP auto-scroll timeline
-hideCreditsPanel(panel)                         → kill timelines, cancel timers, hide panel
+cleanupCredits(panel)                           → kill timelines, cancel timers, hide panel
 pauseCreditsScroll() / resumeCreditsScroll()    → pause/resume scroll timeline
-cleanupCredits(panel)                           → full teardown (alias for hide)
 ```
 
 Frosted glass overlay on frame 11. Triggered by `makeNarrationEndCallback` after narration ends + `holdAfterNarration` delay. GSAP `translateY` auto-scroll with `repeat: -1` loop. Wheel events scrub timeline; focus/hover on links pauses scroll (WCAG 2.4.3). PausableTimer-based resume delay after manual interaction. `prefers-reduced-motion`: no GSAP animation, native `overflow-y: auto` scroll. Credits content imported from `credits-content.html` via Vite `?raw`. See ADR-011 for the full architecture specification.

@@ -97,7 +97,6 @@ vi.mock('../../src/shimmer.js', () => ({
 
 vi.mock('../../src/credits.js', () => ({
   revealCreditsPanel: vi.fn(),
-  hideCreditsPanel: vi.fn(),
   pauseCreditsScroll: vi.fn(),
   resumeCreditsScroll: vi.fn(),
   cleanupCredits: vi.fn(),

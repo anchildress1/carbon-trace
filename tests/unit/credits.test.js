@@ -60,7 +60,6 @@ vi.mock('../../src/credits-content.html?raw', () => ({
 import {
   initCreditsContent,
   revealCreditsPanel,
-  hideCreditsPanel,
   pauseCreditsScroll,
   resumeCreditsScroll,
   cleanupCredits,
@@ -241,7 +240,7 @@ describe('credits.js', () => {
 
     it('clears stale transform state from a prior animated reveal', () => {
       revealCreditsPanel(panel, scrollContent, defaultConfig);
-      hideCreditsPanel(panel);
+      cleanupCredits(panel);
       vi.clearAllMocks();
 
       revealCreditsPanel(panel, scrollContent, defaultConfig, { reducedMotion: true });
@@ -255,12 +254,12 @@ describe('credits.js', () => {
     });
   });
 
-  // -- hideCreditsPanel --
+  // -- cleanupCredits --
 
-  describe('hideCreditsPanel', () => {
+  describe('cleanupCredits', () => {
     it('sets hidden and resets opacity', () => {
       revealCreditsPanel(panel, scrollContent, defaultConfig);
-      hideCreditsPanel(panel);
+      cleanupCredits(panel);
       expect(panel.hidden).toBe(true);
       expect(panel.style.opacity).toBe('0');
     });
@@ -269,7 +268,7 @@ describe('credits.js', () => {
       revealCreditsPanel(panel, scrollContent, defaultConfig);
       vi.clearAllMocks();
 
-      hideCreditsPanel(panel);
+      cleanupCredits(panel);
 
       expect(gsap.set).toHaveBeenCalledWith(
         scrollContent,
@@ -282,7 +281,7 @@ describe('credits.js', () => {
       revealCreditsPanel(panel, scrollContent, defaultConfig);
       const fadeInTween = gsapMockState.lastTimeline;
 
-      hideCreditsPanel(panel);
+      cleanupCredits(panel);
       expect(fadeInTween.kill).toHaveBeenCalled();
     });
 
@@ -290,20 +289,20 @@ describe('credits.js', () => {
       revealCreditsPanel(panel, scrollContent, defaultConfig);
       const scrollTl = gsapMockState.lastTimeline;
 
-      hideCreditsPanel(panel);
+      cleanupCredits(panel);
       expect(scrollTl.kill).toHaveBeenCalled();
     });
 
     it('is idempotent — safe to call when already hidden', () => {
-      hideCreditsPanel(panel);
+      cleanupCredits(panel);
       expect(panel.hidden).toBe(true);
     });
 
     it('removes event listeners', () => {
       revealCreditsPanel(panel, scrollContent, defaultConfig);
       const spy = vi.spyOn(panel, 'removeEventListener');
-      hideCreditsPanel(panel);
-      expect(spy).toHaveBeenCalledTimes(5);
+      cleanupCredits(panel);
+      expect(spy).toHaveBeenCalledTimes(8);
     });
   });
 

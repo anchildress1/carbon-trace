@@ -256,8 +256,9 @@ function removeScrollListeners(panelEl) {
 
 /**
  * Hide the credits panel and tear down all animation state.
+ * Safe to call multiple times.
  */
-export function hideCreditsPanel(panelEl) {
+export function cleanupCredits(panelEl) {
   const scrollContentEl = panelEl.querySelector('#credits-scroll-content');
 
   fadeInTween?.kill();
@@ -310,11 +311,4 @@ export function resumeCreditsScroll() {
   if (!scrollResumeTimer && !focusedLink && !hoveredLink) {
     scrollTimeline?.play();
   }
-}
-
-/**
- * Full teardown — alias for hideCreditsPanel. Safe to call multiple times.
- */
-export function cleanupCredits(panelEl) {
-  hideCreditsPanel(panelEl);
 }
