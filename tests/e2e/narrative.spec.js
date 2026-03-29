@@ -333,6 +333,25 @@ test.describe('carbon-trace — credits overlay', () => {
     await expect(panel).toHaveAttribute('aria-label', 'Credits');
   });
 
+  test('credits reveal waits for the final-frame holdAfterNarration delay', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    const creditsFrameIndex = TOTAL_FRAMES - 1;
+    const expectedRevealDelayMs = 3000;
+    const revealEarlyProbeMs = 700;
+
+    expect(scenesData.frames[creditsFrameIndex]?.holdAfterNarration).toBe(expectedRevealDelayMs);
+
+    await jumpToFrameByDot(page, creditsFrameIndex);
+    await dispatchNarrationEnded(page);
+
+    const panel = page.locator('#credits-panel');
+
+    await page.waitForTimeout(expectedRevealDelayMs - revealEarlyProbeMs);
+    await expect(panel).toBeHidden();
+
+    await expect(panel).toBeVisible({ timeout: revealEarlyProbeMs + 1500 });
+  });
+
   test('credits auto-scroll pauses on focused link and resumes after focus leaves', async ({
     page,
   }) => {
