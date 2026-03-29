@@ -31,7 +31,7 @@
               class="trace-path"
               d="M 10,20 H 55 L 59,12 L 63,20 H 100 L 104,28 L 108,20 H 140 L 144,12 L 148,20 H 190"
             />
-            <circle class="trace-node" cx="10" cy="20" r="2" />
+            <circle class="trace-node" cx="0" cy="0" r="2" />
           </svg>
           <span class="loading-prompt" id="loading-prompt" hidden>
             <svg class="loading-play-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -54,6 +54,10 @@
         <canvas class="trace-overlay" id="trace-overlay" aria-hidden="true" tabindex="-1"></canvas>
         <div class="narration-layer" id="narration-layer" aria-hidden="true"></div>
         <div class="caption-layer" id="caption-layer" aria-hidden="true"></div>
+        <section id="credits-panel" hidden aria-label="Credits">
+          <div id="credits-backdrop" aria-hidden="true"></div>
+          <div id="credits-scroll-content"></div>
+        </section>
       </div>
 
       <div class="transition-loader" id="transition-loader" hidden aria-hidden="true"></div>

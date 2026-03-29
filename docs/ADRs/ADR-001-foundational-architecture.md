@@ -58,7 +58,7 @@ Simultaneous ambient + narration with crossfade. Mobile autoplay unlock. `.fade(
 
 ### 7. Vite for build
 
-Fast HMR, ES modules, tree-shakes GSAP/Howler. Already known — no learning curve during deadline.
+Fast HMR, ES modules, tree-shakes GSAP/Howler. Already known—no learning curve during deadline.
 
 ### 8. Cloud Run + nginx + GitHub Actions for deployment
 
@@ -66,7 +66,7 @@ Static site. Vite builds to `dist/`. Container-based deployment on existing veri
 
 ### 9. `navigate(from, to)` as single navigation function
 
-Dot bar enables random-access — the user can jump from frame 2 to frame 9. One function handles all navigation: dots, forward/back buttons, keyboard, click-to-skip, and auto-advance timer. Five+ callers, one code path.
+Dot bar enables random-access—the user can jump from frame 2 to frame 9. One function handles all navigation: dots, forward/back buttons, keyboard, click-to-skip, and auto-advance timer. Five+ callers, one code path.
 
 **Rejected: Separate `next()`/`prev()`/`jumpTo()` functions.** Duplicated logic, divergent behavior.
 
@@ -76,11 +76,11 @@ Random access via dot bar means any image could be needed next. 12 WebP images a
 
 ### 11. Scene config as data, not logic
 
-All 12 frames share identical schema shape — same keys, same types. `null` means "skip this feature." Scene differences expressed as data in `scenes.json`, not `if`-blocks in code. New per-scene behavior is added by adding a config key, not a conditional.
+All 12 frames share identical schema shape—same keys, same types. `null` means "skip this feature." Scene differences expressed as data in `scenes.json`, not `if`-blocks in code. New per-scene behavior is added by adding a config key, not a conditional.
 
 ### 12. Ghost-drift text (over typewriter)
 
-Lines pour in and blow out independently on the DOM overlay — overlap allowed. Atmospheric, not mechanical. GSAP drives opacity + subtle Y drift. Reduced motion swaps drift for simple fade.
+Lines "pour in and blow out" independently on the DOM overlay—overlap allowed. Atmospheric, not mechanical. GSAP drives opacity + subtle Y drift. Reduced motion swaps drift for simple fade.
 
 ### 13. Baked traces in images
 
@@ -90,15 +90,15 @@ Circuit traces baked into Leonardo AI images at scene-appropriate visibility.
 
 **What becomes easier:**
 
-- Pixel effects work from day 1 — no renderer migration needed for v2
-- Screen reader support is clean — DOM overlay is the a11y layer, canvas is invisible
-- Navigation logic lives in one place — any new input source just calls `navigate()`
-- Adding new scenes is pure data — drop an entry in `scenes.json`
+- Pixel effects work from day 1—no renderer migration needed for v2
+- Screen reader support is clean—DOM overlay is the a11y layer, canvas is invisible
+- Navigation logic lives in one place—any new input source just calls `navigate()`
+- Adding new scenes is pure data—drop an entry in `scenes.json`
 
 **What becomes harder:**
 
-- Canvas text rendering is off the table — all text must live in DOM overlay
-- No component lifecycle management — DOM state is manual (acceptable at this scale)
+- Canvas text rendering is off the table—all text must live in DOM overlay
+- No component lifecycle management—DOM state is manual (acceptable at this scale)
 - Testing visual output requires screenshots, not DOM assertions
 
 **What to revisit as the system grows:**

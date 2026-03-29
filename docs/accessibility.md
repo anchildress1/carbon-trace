@@ -154,6 +154,24 @@ timeline position.
 The caption preference is persisted in `localStorage` under the key
 `carbon-trace-captions-enabled`.
 
+## Credits Overlay (ADR-011)
+
+The credits panel on frame 11 follows the same two-layer accessibility model as the rest of the experience:
+
+| Element | ARIA | Purpose |
+|---------|------|---------|
+| `#credits-panel` | `<section aria-label="Credits">` (implicit `region`) | Named landmark region for screen readers |
+| Section headings | `<h2>` | Screen reader structure within credits |
+| Attribution links | `<a target="_blank" rel="noopener">` | Native links — tabbable, clickable, announced |
+
+**Auto-scroll pause (WCAG 2.4.3):** Auto-scrolling credits pause when any link receives focus (Tab) or pointer hover. A resume timer (configurable via `resumeDelay` in scenes.json) restarts the scroll after idle. The resume timer does not fire while a link has focus, preventing focused content from scrolling off-screen.
+
+**Reduced motion:** When `prefers-reduced-motion: reduce` is active, the credits panel appears instantly (no GSAP fade-in), auto-scroll is disabled, and the panel uses native `overflow-y: auto` for manual scrolling. The mask-image gradient feathering is removed so content isn't clipped during native scroll.
+
+**Focus order:** `#credits-panel` sits inside `#scene-stage` (z-index 7). Overlay controls (z-index 10) are a sibling that paints after scene-stage by DOM order. Tab naturally moves from credits links to overlay controls — no focus trap.
+
+**Pause interaction:** When the experience is paused, the scroll timeline freezes but wheel scrubbing and link interaction still work. The `isPaused` flag prevents auto-resume timers from restarting the scroll until the experience resumes.
+
 ## Content Security Policy 🔐
 
 The CSP meta tag restricts resource loading:

@@ -21,6 +21,7 @@
     "perf:lighthouse:desktop": "lhci autorun --config=.lighthouserc.json",
     "perf:lighthouse:mobile": "lhci autorun --config=.lighthouserc.mobile.json",
     "perf:runtime": "playwright test -c playwright.perf.config.js",
+    "perf:runtime:adr11": "VITE_E2E=1 pnpm exec vite build && PERF_ADR11=1 PERF_INCLUDE_WEBKIT=1 playwright test -c playwright.perf.config.js tests/perf/adr11-credits.spec.js",
     "perf": "node scripts/run-perf.mjs"
   },
   "dependencies": {
@@ -38,7 +39,7 @@
     "@vitest/coverage-v8": "^4.1.2",
     "eslint": "^10.1.0",
     "globals": "^17.4.0",
-    "happy-dom": "^20.8.8",
+    "happy-dom": "^20.8.9",
     "lefthook": "^2.1.4",
     "prettier": "^3.5.0",
     "vite": "^8.0.2",

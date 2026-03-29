@@ -4,8 +4,8 @@
 **Author:** Ashley Childress (@anchildress1)
 **Deadline:** April 5, 2026 @ 11:59 PM PDT
 **Supersedes:** v6 — docs aligned with implemented codebase (effects, shimmer, audio-reactive all shipped)
-**Spec convention:** This document describes the implemented architecture. All ADR decisions through ADR-010 are reflected in code.
-**Active ADRs:** ADR-006/006A (trace shimmer overlay, mask-based), ADR-007 (PixiJS effects), ADR-008 (audio-reactive modulation) are all implemented in v1. See individual ADRs for specifications.
+**Spec convention:** This document describes the implemented architecture. All ADR decisions through ADR-011 are reflected in code.
+**Active ADRs:** ADR-006/006A (trace shimmer overlay, mask-based), ADR-007 (PixiJS effects), ADR-008 (audio-reactive modulation), ADR-011 (credits overlay) are all implemented in v1. See individual ADRs for specifications.
 
 ---
 
@@ -37,8 +37,11 @@ carbon-trace/
 │   ├── audio.js                # Howler — narration, ambient, buffer recovery
 │   ├── text.js                 # Ghost-drift text + caption entries — GSAP timelines
 │   ├── captions.js             # Timed captions, localStorage persistence
+│   ├── keyboard.js             # Declarative key-action map, document listener
 │   ├── effects.js              # Effect factory registry — water, heat, dust, glow, shockwave (ADR-007)
 │   ├── shimmer.js              # Trace shimmer overlay — mask-based pixel-walking dots (ADR-006A)
+│   ├── credits.js              # Credits overlay — GSAP scroll, focus/hover pause (ADR-011)
+│   ├── credits-content.html    # Credits text content (imported ?raw by credits.js)
 │   ├── overlay.js              # DOM controls — progress dots, buttons
 │   ├── loader.js               # Audio metadata preloading (sequential by scene)
 │   └── pausable-timer.js      # Pausable/cancelable timer utility
@@ -64,9 +67,11 @@ carbon-trace/
 
 ```
 app.js → canvas, effects-canvas, effects, audio, text,
-         captions, shimmer, overlay, loader, pausable-timer, scenes.json
+         captions, keyboard, shimmer, credits, overlay, loader, pausable-timer, scenes.json
 
 audio.js → pausable-timer
+
+credits.js → pausable-timer
 
 All leaf modules → nothing (no cross-imports, no cycles)
 app.js is the ONLY module that knows frame ordering.
@@ -188,6 +193,17 @@ syncCaptionsToTime(entries, timeSec, container) → show correct caption for cur
 clearCaptionElements(entries)     → remove all active caption DOM elements
 ```
 
+### keyboard.js
+
+```
+handleKeydown(e, actionHandler)  → pure key handler: resolves key to action, fires actionHandler
+initKeyboard(actionHandler)      → register document listener, return cleanup fn
+```
+
+Key map: Space → togglePause, Escape → pause, Enter → advance, ArrowRight → advance, ArrowLeft → retreat.
+`allowOnButton: false` on Space/Enter suppresses the key when a `<button>` is focused (native button takes precedence).
+`allowOnButton: true` on arrows and Escape allows global navigation even when a button is focused.
+
 ### effects.js (UPDATED by ADR-007 — now PixiJS factory registry)
 
 ```
@@ -202,6 +218,7 @@ Built-in registrations: `water`, `heat`, `dust`, `glow`, `shockwave`. Displaceme
 ```
 initOverlay(sceneCount, onDotClick)  → create progress dots
 updateProgress(sceneIndex)           → update active dot
+focusActiveDot()                     → move keyboard focus to the current active dot
 showControls()                       → unhide overlay
 ```
 
@@ -228,6 +245,17 @@ destroy()                   → cleanup canvas, observer, animation frame
 ```
 
 Renders visible circuit traces with traveling glow dots on a dedicated `<canvas id="trace-overlay">` layered above effects-canvas. Loads a per-scene mask image (dark pixels = walkable), builds a binary `walkMap` Uint8Array, and spawns autonomous pixel-walking dots that follow 8-compass pathfinding along circuit lines. Dots pulse via `sin()` for shimmer effect. `prefers-reduced-motion`: dots freeze at 0.6α, no movement. Generation counter guards stale async loads. See ADR-006A for the full mask-based architecture specification.
+
+### credits.js (ADR-011 — credits overlay)
+
+```
+initCreditsContent(el)                          → populate credits HTML from static import
+revealCreditsPanel(panel, scroll, config, opts) → fade-in + GSAP auto-scroll timeline
+cleanupCredits(panel)                           → kill timelines, cancel timers, hide panel
+pauseCreditsScroll() / resumeCreditsScroll()    → pause/resume scroll timeline
+```
+
+Frosted glass overlay on frame 11. Triggered by `makeNarrationEndCallback` after narration ends + `holdAfterNarration` delay. GSAP `translateY` auto-scroll with `repeat: -1` loop. Wheel and touch-drag events scrub timeline; focus/hover on links pauses scroll (WCAG 2.4.3). PausableTimer-based resume delay after manual interaction. `prefers-reduced-motion`: no GSAP animation, native `overflow-y: auto` scroll. Credits content imported from `credits-content.html` via Vite `?raw`. See ADR-011 for the full architecture specification.
 
 ---
 
@@ -361,12 +389,13 @@ FRAME                │ holdAfterNarration
 08 Empty             │ 16000
 09 Return            │ 2000
 10 Building          │ 3000
-11 Music (credits)   │ n/a (last frame, no advance)
+11 Music (credits)   │ 3000 (credits reveal delay)
 ```
 
-All frames auto-advance after narration + holdAfterNarration. The credits frame
-is the last frame, so `shouldAutoAdvance` returns false and `advance()` is blocked
-by the CREDITS state.
+All non-final frames auto-advance after narration + holdAfterNarration. The credits
+frame is the last frame, so `shouldAutoAdvance` returns false and `advance()` is
+blocked by the CREDITS state. For frame 11, `holdAfterNarration` is still used as
+the delay before `revealCreditsPanel()` fires.
 
 ### 4.6 Audio Hierarchy
 
@@ -376,6 +405,19 @@ by the CREDITS state.
 3. Ambient texture (volume: 0.08–0.20, loop: true)
 4. End song (type: "ambient", anchor-based entry, crescendo to 0.25 over 45s)
 ```
+
+### 4.7 credits Object (ADR-011)
+
+```
+FIELD          │ TYPE   │ DESCRIPTION
+───────────────┼────────┼──────────────────────────────────────
+scrollDuration │ number │ Total scroll cycle duration (ms)
+resumeDelay    │ number │ Idle delay before auto-scroll resumes after manual interaction (ms)
+fadeInDuration │ number │ Panel fade-in duration (ms)
+repeatDelay    │ number │ Pause at loop restart point before re-scrolling (ms)
+```
+
+`credits: null` = no credits overlay on this frame. Only frame 11 (`frameType: "credits"`) has this config. Triggers `revealCreditsPanel()` after narration ends + `holdAfterNarration` delay via `makeNarrationEndCallback()`. See ADR-011 for full specification.
 
 ---
 
@@ -418,9 +460,10 @@ const app = {
   audioDurations: new Map(), // src → duration in seconds (from loader.js metadata preload)
   projectMaxCaptionMs: 0,    // max caption end time across all frames (computed at startup)
 
-  // Timer — PausableTimer instance (auto-advance is a state machine concern, stays in app.js)
+  // Timers — PausableTimer instances (state machine concerns, stay in app.js)
   // All audio timers (narration delay, music enter/exit) are internal to audio.js (ADR-005)
-  autoAdvanceTimer: null,    // PausableTimer | null
+  autoAdvanceTimer: null,       // PausableTimer | null
+  creditsRevealTimer: null,     // PausableTimer | null — holdAfterNarration delay before credits reveal (ADR-011)
   els: { /* DOM element references — see createApp() */ },
 };
 ```
@@ -544,11 +587,14 @@ else:
 **doPause():**
 - Set `paused = true`, `pausedFromState = current state`, `state = PAUSED`
 - `pauseAudioCues()` — freezes all audio + pending timers in activeCues Map
-- Pause text timeline, effects canvas
+- Pause text timeline, effects canvas, shimmer
 - `autoAdvanceTimer?.pause()` — saves remaining auto-advance time
+- `creditsRevealTimer?.pause()` — saves remaining reveal delay (ADR-011)
+- `pauseCreditsScroll()` — freezes scroll timeline, sets isPaused flag. Wheel scrub still works; auto-resume blocked until doResume (ADR-011)
 
 **doResume():**
 - Restore `pausedFromState`, clear pause
+- `creditsRevealTimer?.resume()`, `resumeCreditsScroll()` — clears isPaused, resumes scroll (ADR-011)
 
 ```
 if replayPending:
@@ -659,6 +705,10 @@ Auto-advance       │ (internal)           │ (internal)         │ advance(c
     <canvas id="trace-overlay" aria-hidden="true"></canvas>    <!-- shimmer dots — ADR-006A -->
     <div id="narration-layer" aria-hidden="true"></div>
     <div id="caption-layer" aria-hidden="true"></div>
+    <section id="credits-panel" hidden aria-label="Credits">  <!-- ADR-011, z-index 7 -->
+      <div id="credits-backdrop" aria-hidden="true"></div>
+      <div id="credits-scroll-content"></div>
+    </section>
   </div>
 
   <div id="transition-loader" hidden aria-hidden="true"></div>
@@ -774,7 +824,7 @@ See `Dockerfile` and `nginx.conf` at repo root for the canonical deployment conf
 - **Non-root runtime:** runs as `nginx` user with `chown` on `/run` and cache directories
 - **Port 8080:** Cloud Run requirement
 - **Health check:** `wget` against localhost for container orchestrator liveness
-- **Caching strategy:** immutable hashed assets (1 year), images/audio (30 days); security headers configured in nginx
+- **Caching strategy:** all `/assets/` content gets 1-year immutable cache (content-hashed filenames guarantee freshness); HTML is no-cache; favicon is 7 days. Audio gets the same 1-year immutable rule plus `Accept-Ranges: bytes` for streaming. Security headers in nginx.
 - **Gzip:** enabled for text-based assets (JS, CSS, JSON, SVG)
 
 CSP in `index.html`:
@@ -795,7 +845,7 @@ runtime style attributes in `text.js` (per-line x/y coordinates).
 
 - Canvas: `aria-hidden="true"` on all three canvases (scene, effects, trace-overlay)
 - DOM: `aria-live="polite"` narration region populated from caption text
-- Keyboard: Arrow ←/→ navigate, Space toggle pause, Enter advance, Tab to controls
+- Keyboard: Arrow ←/→ navigate, Space toggle pause, Escape pause, Enter advance, Tab to controls
 - Play/pause button satisfies WCAG 2.2.2 (Pause, Stop, Hide)
 - `prefers-reduced-motion`: ghost-drift → opacity fade, transitions → instant, effects static (no displacement/animation, audioReactive ignored — see ADR-007, ADR-008), loading animation disabled
 - All buttons: `aria-label`, `aria-pressed` where stateful, `aria-disabled` when inactive
@@ -810,7 +860,7 @@ runtime style attributes in `text.js` (per-line x/y coordinates).
 CASE                                │ BEHAVIOR
 ────────────────────────────────────┼──────────────────────────────
 Muted audio                         │ 'end' still fires. Auto-advance works.
-No narration audio (Scene 8)        │ holdAfterNarration (8s) used as scene duration.
+No narration audio (Scene 8)        │ holdAfterNarration (16s) used as scene duration.
                                     │ Auto-advances after the long hold.
 Skip mid-narration (playing)        │ cleanupCurrentScene: stop narration,
                                     │ crossfade ambient, clear all timers.
@@ -867,7 +917,7 @@ First paint         │ <2s (loading screen)
 First frame visible │ <4s (first image + audio metadata)
 Background preload  │ Deferred 4s after first frame
 Total images        │ ~2-5MB (12 WebP at 1536×824)
-Total masks         │ ~4MB worst case (12 grayscale PNG at 768×432) (ADR-007)
+Total masks         │ ~4MB worst case (26 PNG scene masks + 1 shared noise sprite) (ADR-007)
 Total audio         │ TBD (narration .m4a + end song .mp3)
 JS bundle (vendor)  │ ~150KB gzipped PixiJS v8 + tree-shaken pixi-filters (GlowFilter,
                     │ ShockwaveFilter) (ADR-007). Verify final size during profiling.
