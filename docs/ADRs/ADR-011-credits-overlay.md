@@ -138,7 +138,7 @@ Credits panel sits inside `#scene-stage`. `overlay-controls` is a **sibling** of
   inset: 0;
   backdrop-filter: blur(16px) saturate(1.2);
   -webkit-backdrop-filter: blur(16px) saturate(1.2);
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.75);
 }
 
 #credits-scroll-content {
