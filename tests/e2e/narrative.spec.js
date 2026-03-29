@@ -5,6 +5,7 @@ import { test, expect } from '@playwright/test';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const scenesData = JSON.parse(readFileSync(resolve(__dirname, '../../src/scenes.json'), 'utf8'));
+const TOTAL_FRAMES = scenesData.frames.length;
 const SCENE_COUNT = scenesData.frames.filter(
   (f) => f.frameType === 'title' || f.frameType === 'scene' || f.frameType === 'credits',
 ).length;
@@ -13,10 +14,35 @@ function frameDescription(index) {
   return scenesData.frames[index]?.description || '';
 }
 
+function narrationSrcForFrame(index) {
+  return (
+    scenesData.frames[index]?.audioCues?.find((cue) => cue.type === 'narration')?.src || null
+  );
+}
+
+function imageSrcForFrame(index) {
+  return scenesData.frames[index]?.image || null;
+}
+
+function fileNameFromAssetPath(assetPath) {
+  if (!assetPath) return '';
+  return assetPath.split('/').pop() || '';
+}
+
 async function dismissLoadingScreen(page) {
   await page.waitForSelector('#loading-prompt:not([hidden])', { timeout: 15000 });
   await page.click('#loading-screen');
   await page.locator('#loading-screen').waitFor({ state: 'hidden', timeout: 3000 });
+}
+
+async function advanceByKeyboard(page, count, startIndex = 0) {
+  const stage = page.locator('#scene-stage');
+  for (let i = 0; i < count; i++) {
+    await page.keyboard.press('ArrowRight');
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(startIndex + i + 1), {
+      timeout: 5000,
+    });
+  }
 }
 
 test.describe('carbon-trace narrative', () => {
@@ -63,10 +89,8 @@ test.describe('carbon-trace narrative', () => {
     await page.click('#scene-stage');
     await page.click('#scene-stage');
     await page.click('#scene-stage');
-    await page.waitForTimeout(500);
 
-    const labelAfter = await stage.getAttribute('aria-label');
-    expect(labelAfter).toBe(frameDescription(1));
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 3000 });
   });
 
   test('forward button advances scene', async ({ page }) => {
@@ -201,8 +225,7 @@ test.describe('carbon-trace narrative', () => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 
     const stage = page.locator('#scene-stage');
-    const label = await stage.getAttribute('aria-label');
-    expect(label.length).toBeGreaterThan(0);
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(0));
   });
 
   test('scene stage description changes when scene advances', async ({ page }) => {
@@ -232,12 +255,7 @@ test.describe('carbon-trace narrative', () => {
     // Pause so each ArrowRight triggers an instant hard-jump (no fade animation).
     await page.keyboard.press('Space');
 
-    const totalFrames = scenesData.frames.length;
-    for (let i = 0; i < totalFrames - 1; i++) {
-      await page.keyboard.press('ArrowRight');
-      // Wait for transition to settle (readiness gate may await image load)
-      await page.waitForTimeout(200);
-    }
+    await advanceByKeyboard(page, TOTAL_FRAMES - 1);
 
     const nextBtn = page.locator('#btn-next');
     await expect(nextBtn).toBeDisabled();
@@ -267,13 +285,128 @@ test.describe('carbon-trace narrative', () => {
     await dismissLoadingScreen(page);
 
     const muteBtn = page.locator('#btn-mute');
-    await page.evaluate(() => document.getElementById('btn-mute').removeAttribute('aria-disabled'));
+    await expect(muteBtn).not.toHaveAttribute('aria-disabled', 'true', { timeout: 10000 });
 
     await muteBtn.click();
     await expect(muteBtn).toHaveAttribute('aria-label', 'Unmute audio');
 
     await muteBtn.click();
     await expect(muteBtn).toHaveAttribute('aria-label', 'Mute audio');
+  });
+});
+
+test.describe('carbon-trace — timer, buffering, and failure resilience', () => {
+  test('auto-advances from title frame during active playback', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+
+    const errors = [];
+    page.on('pageerror', (err) => errors.push(err));
+
+    await page.goto('/');
+    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await dismissLoadingScreen(page);
+
+    const stage = page.locator('#scene-stage');
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(0));
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 20000 });
+    expect(errors.length).toBe(0);
+  });
+
+  test('manual navigation remains stable when narration audio fails to load', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const sceneOneNarration = fileNameFromAssetPath(narrationSrcForFrame(1));
+    await page.route(`**/${sceneOneNarration}`, (route) => route.abort('failed'));
+
+    const errors = [];
+    page.on('pageerror', (err) => errors.push(err));
+
+    await page.goto('/');
+    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await dismissLoadingScreen(page);
+
+    const stage = page.locator('#scene-stage');
+    await page.click('#btn-next');
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
+
+    await page.click('#btn-next');
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(2), { timeout: 5000 });
+    expect(errors.length).toBe(0);
+  });
+
+  test('buffering class appears on narration stall and clears on resume event', async ({ page }) => {
+    await page.addInitScript(() => {
+      globalThis.__ctMediaHooks = [];
+      const originalAddEventListener = HTMLMediaElement.prototype.addEventListener;
+      HTMLMediaElement.prototype.addEventListener = function patchedAddEventListener(
+        type,
+        listener,
+        options,
+      ) {
+        if (type === 'waiting' || type === 'playing') {
+          let hook = globalThis.__ctMediaHooks.find((entry) => entry.node === this);
+          if (!hook) {
+            hook = { node: this, waiting: null, playing: null };
+            globalThis.__ctMediaHooks.push(hook);
+          }
+          hook[type] = listener;
+        }
+        return originalAddEventListener.call(this, type, listener, options);
+      };
+    });
+
+    await page.goto('/');
+    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await dismissLoadingScreen(page);
+
+    await page.click('#btn-next');
+    const stage = page.locator('#scene-stage');
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
+
+    await page.waitForFunction(
+      () =>
+        Array.isArray(globalThis.__ctMediaHooks) &&
+        globalThis.__ctMediaHooks.some(
+          (hook) => typeof hook.waiting === 'function' && typeof hook.playing === 'function',
+        ),
+      { timeout: 10000 },
+    );
+
+    await page.evaluate(() => {
+      const hook = globalThis.__ctMediaHooks.at(-1);
+      hook?.waiting?.call(hook.node, new Event('waiting'));
+    });
+    await expect(stage).toHaveClass(/buffering/);
+
+    await page.evaluate(() => {
+      const hook = globalThis.__ctMediaHooks.at(-1);
+      hook?.playing?.call(hook.node, new Event('playing'));
+    });
+    await expect(stage).not.toHaveClass(/buffering/);
+  });
+
+  test('scene image failure falls back without freezing navigation', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const sceneTwoImage = fileNameFromAssetPath(imageSrcForFrame(2));
+    await page.route(`**/${sceneTwoImage}`, (route) => route.abort('failed'));
+
+    const errors = [];
+    page.on('pageerror', (err) => errors.push(err));
+
+    await page.goto('/');
+    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await dismissLoadingScreen(page);
+
+    const stage = page.locator('#scene-stage');
+    await page.click('#btn-next');
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
+
+    await page.click('#btn-next');
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(2), { timeout: 5000 });
+    await expect(page.locator('#transition-loader')).toBeHidden();
+
+    await page.click('#btn-prev');
+    await expect(stage).toHaveAttribute('aria-label', frameDescription(1), { timeout: 5000 });
+    expect(errors.length).toBe(0);
   });
 });
 
@@ -327,7 +460,7 @@ test.describe('carbon-trace — positioned text', () => {
     expect(position).toBe('absolute');
   });
 
-  test('positioned lines use left alignment', async ({ page }) => {
+  test('positioned lines keep left alignment via CSS only', async ({ page }) => {
     // Press play so narration renders on title frame
     await page.click('#loading-screen');
 
@@ -335,8 +468,11 @@ test.describe('carbon-trace — positioned text', () => {
     await expect(lines.first()).toBeVisible({ timeout: 5000 });
     const first = lines.first();
 
-    const textAlign = await first.evaluate((el) => el.style.textAlign);
-    expect(textAlign).toBe('left');
+    const inlineAlign = await first.evaluate((el) => el.style.getPropertyValue('text-align'));
+    expect(inlineAlign).toBe('');
+
+    const computedAlign = await first.evaluate((el) => getComputedStyle(el).getPropertyValue('text-align'));
+    expect(computedAlign).toBe('left');
   });
 });
 
