@@ -314,6 +314,12 @@ import {
   pause as pauseShimmer,
   resume as resumeShimmer,
 } from '../../src/shimmer.js';
+import {
+  revealCreditsPanel,
+  pauseCreditsScroll,
+  resumeCreditsScroll,
+  cleanupCredits,
+} from '../../src/credits.js';
 
 function buildDOM() {
   document.body.replaceChildren();
@@ -3032,6 +3038,147 @@ describe('app.js', () => {
         mockAnalyser,
         true,
       );
+    });
+
+    // -- credits overlay integration (ADR-011) --
+
+    it('reveals credits panel after narration ends + holdAfterNarration', async () => {
+      await navigateToCredits(app);
+
+      // Extract onNarrationEnd callback from scheduleAudioCues
+      const lastCall = scheduleAudioCues.mock.calls.at(-1);
+      const opts = lastCall[1];
+      expect(opts.onNarrationEnd).toBeDefined();
+
+      vi.clearAllMocks();
+
+      // Fire narration end
+      opts.onNarrationEnd();
+
+      // revealCreditsPanel should NOT be called yet (holdAfterNarration = 2000ms)
+      expect(revealCreditsPanel).not.toHaveBeenCalled();
+
+      // Advance by holdAfterNarration
+      vi.advanceTimersByTime(2000);
+
+      expect(revealCreditsPanel).toHaveBeenCalledWith(
+        document.getElementById('credits-panel'),
+        document.getElementById('credits-scroll-content'),
+        expect.objectContaining({
+          scrollDuration: 60000,
+          resumeDelay: 2000,
+          fadeInDuration: 800,
+          repeatDelay: 3000,
+        }),
+        expect.objectContaining({ reducedMotion: expect.any(Boolean) }),
+      );
+    });
+
+    it('pauses creditsRevealTimer and credits scroll on doPause', async () => {
+      await navigateToCredits(app);
+
+      // Fire narration end to start the creditsRevealTimer
+      const onEnd = scheduleAudioCues.mock.calls.at(-1)[1].onNarrationEnd;
+      onEnd();
+
+      vi.clearAllMocks();
+
+      // Pause before timer fires
+      app.togglePause();
+      expect(pauseCreditsScroll).toHaveBeenCalled();
+
+      // Advance past holdAfterNarration — timer was paused so credits should NOT reveal
+      vi.advanceTimersByTime(5000);
+      expect(revealCreditsPanel).not.toHaveBeenCalled();
+    });
+
+    it('resumes creditsRevealTimer and credits scroll on doResume', async () => {
+      await navigateToCredits(app);
+
+      const onEnd = scheduleAudioCues.mock.calls.at(-1)[1].onNarrationEnd;
+      onEnd();
+
+      // Pause at 1000ms into holdAfterNarration
+      vi.advanceTimersByTime(1000);
+      app.togglePause();
+
+      vi.clearAllMocks();
+
+      // Resume
+      app.togglePause();
+      expect(resumeCreditsScroll).toHaveBeenCalled();
+
+      // Remaining 1000ms should fire credits reveal
+      vi.advanceTimersByTime(1000);
+      expect(revealCreditsPanel).toHaveBeenCalled();
+    });
+
+    it('cleanupCurrentScene cancels creditsRevealTimer and calls cleanupCredits', async () => {
+      await navigateToCredits(app);
+
+      const onEnd = scheduleAudioCues.mock.calls.at(-1)[1].onNarrationEnd;
+      onEnd();
+
+      vi.clearAllMocks();
+      loadEffectsScene.mockResolvedValue(true);
+      loadImage.mockResolvedValue(new Image());
+
+      // Navigate back — triggers cleanupCurrentScene
+      document.getElementById('btn-prev').click();
+      await flush();
+
+      expect(cleanupCredits).toHaveBeenCalledWith(document.getElementById('credits-panel'));
+
+      // Timer was cancelled — credits should NOT reveal
+      vi.advanceTimersByTime(5000);
+      expect(revealCreditsPanel).not.toHaveBeenCalled();
+    });
+
+    it('replay calls cleanupCredits then re-triggers after new narration', async () => {
+      await navigateToCredits(app);
+
+      // Simulate credits already revealed
+      const onEnd1 = scheduleAudioCues.mock.calls.at(-1)[1].onNarrationEnd;
+      onEnd1();
+      vi.advanceTimersByTime(2000);
+      expect(revealCreditsPanel).toHaveBeenCalledTimes(1);
+
+      vi.clearAllMocks();
+      loadEffectsScene.mockResolvedValue(true);
+      loadImage.mockResolvedValue(new Image());
+
+      // Replay
+      document.getElementById('btn-replay').click();
+      await flush();
+
+      expect(cleanupCredits).toHaveBeenCalled();
+
+      // New narration end fires → new timer → new reveal
+      const onEnd2 = scheduleAudioCues.mock.calls.at(-1)[1].onNarrationEnd;
+      onEnd2();
+      vi.advanceTimersByTime(2000);
+      expect(revealCreditsPanel).toHaveBeenCalledTimes(1);
+    });
+
+    it('stale creditsRevealTimer ignored after generation change', async () => {
+      await navigateToCredits(app);
+
+      const onEnd = scheduleAudioCues.mock.calls.at(-1)[1].onNarrationEnd;
+      onEnd();
+
+      vi.clearAllMocks();
+      loadEffectsScene.mockResolvedValue(true);
+      loadImage.mockResolvedValue(new Image());
+
+      // Navigate away (increments generation)
+      document.getElementById('btn-prev').click();
+      await flush();
+
+      // Advance timer past holdAfterNarration
+      vi.advanceTimersByTime(5000);
+
+      // revealCreditsPanel should NOT have been called (generation guard)
+      expect(revealCreditsPanel).not.toHaveBeenCalled();
     });
   });
 
