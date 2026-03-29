@@ -125,7 +125,7 @@ body {
   animation:
     node-appear 0.6s ease 1.4s forwards,
     node-glow 2.4s ease-in-out 2s infinite,
-    node-travel 4s ease-in-out 2s infinite alternate;
+    node-travel 5s ease-in-out 2s infinite alternate;
 }
 
 .loading-title {
@@ -203,10 +203,10 @@ body {
 
 @keyframes node-travel {
   from {
-    offset-distance: 35%;
+    offset-distance: 10%;
   }
   to {
-    offset-distance: 65%;
+    offset-distance: 90%;
   }
 }
 
