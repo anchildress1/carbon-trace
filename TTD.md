@@ -272,41 +272,33 @@ modules and E2E tests NOT changed on that branch. Address on a dedicated test-de
 
 ### 10.2 Missing E2E scenarios
 
-| Scenario                                                   | Priority | What to verify                                                                        |
-| ---------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------- |
-| Full auto-advance playback (timer-driven scene transition) | High     | Let narrative auto-advance through at least one scene. Verify frame index changes.    |
-| Ghost-drift text animation renders and removes             | High     | Navigate to a scene. Assert narration text appears then fades.                        |
-| Audio mute actually stops output (not just label toggle)   | High     | Current test bypasses `aria-disabled` via `page.evaluate()` — not real user behavior. |
-| Ambient audio crossfade between scenes                     | Medium   | Navigate. Verify no audio gap or overlap.                                             |
-| Narration audio starts after `enter` delay                 | Medium   | Every scene has `"enter": 500`. Verify timing.                                        |
-| Caption text changes when scene advances                   | Medium   | Enable captions. Advance. Assert new caption text matches scene config.               |
-| Captions disappear when disabled                           | Medium   | Enable, verify visible. Disable, verify hidden.                                       |
-| Asset load failure (image, audio)                          | Medium   | Intercept network request. Verify graceful degradation.                               |
-| Page reload mid-experience                                 | Medium   | Reload mid-narrative. Verify clean restart from beginning.                            |
-| Title frame narration word sequence                        | Low      | Verify "buried" → "carbon" → "mine" → "started" sequence.                             |
-| Mobile touch interactions                                  | Low      | Config includes `mobile-chrome` but zero mobile-specific tests exist.                 |
+| Scenario                                         | Priority | What to verify                                                                 |
+| ------------------------------------------------ | -------- | ------------------------------------------------------------------------------ |
+| Ghost-drift text animation renders and removes   | High     | Navigate to a scene. Assert narration text appears then fades.                 |
+| Ambient audio crossfade between scenes           | Medium   | Navigate. Verify no audio gap or overlap.                                      |
+| Narration audio starts after `enter` delay       | Medium   | Every scene has `"enter": 500`. Verify timing.                                 |
+| Buffer stall pauses and resumes timeline content | Medium   | Trigger waiting/playing and verify both spinner and narration timeline resume. |
+| Caption text changes when scene advances         | Medium   | Enable captions. Advance. Assert new caption text matches scene config.        |
+| Captions disappear when disabled                 | Medium   | Enable, verify visible. Disable, verify hidden.                                |
+| Page reload mid-experience                       | Medium   | Reload mid-narrative. Verify clean restart from beginning.                     |
+| Title frame narration word sequence              | Low      | Verify "buried" → "carbon" → "mine" → "started" sequence.                      |
+| Mobile touch interactions                        | Low      | Config includes `mobile-chrome` but zero mobile-specific tests exist.          |
 
 ### 10.3 Reliability issues
 
-| Issue                                                          | Location                 | Impact                                                                                        | Fix                                                                                         |
-| -------------------------------------------------------------- | ------------------------ | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| 15 hardcoded `waitForTimeout` calls (200–1000ms)               | Both spec files          | Every one is a flake risk on slow CI.                                                         | Replace with `waitForSelector`, `expect.poll`, or the existing `advanceByKeyboard` pattern. |
-| Mute button test bypasses real UI                              | narrative.spec.js:270    | `page.evaluate()` removes `aria-disabled` before clicking. Tests impossible user action.      | Test the real enable/disable flow.                                                          |
-| "rapid alternating ArrowRight/ArrowLeft" only checks no errors | keyboard-nav.spec.js:437 | No assertion on final frame, dot state, or UI consistency.                                    | Assert landing frame and dot bar state.                                                     |
-| "pause/unpause + navigation" only checks no errors             | keyboard-nav.spec.js:759 | Same gap.                                                                                     | Assert final state.                                                                         |
-| "unpause then navigate transitions animated"                   | keyboard-nav.spec.js:514 | Claims to test animated transition but only checks `aria-label`. No opacity/timing assertion. | Rename or add animation assertion.                                                          |
-| "clicking replay does not advance"                             | narrative.spec.js:167    | Checks label unchanged but not that replay actually replayed.                                 | Assert narration text reset or audio restart.                                               |
-| "rapid next-button clicks land on correct frame"               | narrative.spec.js:514    | 5 clicks from frame 0 should land on frame 5 — fragile if coalescing occurs.                  | Verify intermediate state or document expected coalescing behavior.                         |
+| Issue                                            | Location              | Impact                                                                       | Fix                                                                 |
+| ------------------------------------------------ | --------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| "clicking replay does not advance"               | narrative.spec.js:167 | Checks label unchanged but not that replay actually replayed.                | Assert narration text reset or audio restart.                       |
+| "rapid next-button clicks land on correct frame" | narrative.spec.js:514 | 5 clicks from frame 0 should land on frame 5 — fragile if coalescing occurs. | Verify intermediate state or document expected coalescing behavior. |
 
 ---
 
 ## 11. Cross-cutting mock issues
 
-| Module                   | Problem                                                                             | Fix                                                                             |
-| ------------------------ | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `app.test.js`            | `gsap.to` mock calls `onComplete` synchronously — eliminates TRANSITIONING state    | Default should NOT auto-complete. Tests that need it should trigger explicitly. |
-| `app.test.js`            | Mock audio module includes stale exports not in real API                            | Audit against `src/audio.js`. Remove stale entries.                             |
-| `effects-canvas.test.js` | `Application` mock resolves `init()` synchronously — `initPromise` guard untestable | Make `init()` return a deferred promise.                                        |
-| `effects-canvas.test.js` | `globalThis.Image` set via direct assignment, not `vi.stubGlobal`                   | `vi.restoreAllMocks()` cannot restore it. Use `vi.stubGlobal`.                  |
-| `effects.test.js`        | `DisplacementFilter` mock `scale` diverges from real PixiJS                         | Align with actual API.                                                          |
-| `effects.test.js`        | `GlowFilter` mock missing `knockout`, `alpha` fields                                | Add them.                                                                       |
+| Module                   | Problem                                                                                       | Fix                                                              |
+| ------------------------ | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `app.test.js`            | GSAP mock now supports manual completion, but many tests still rely on auto-complete defaults | Expand manual-completion usage across more race-condition paths. |
+| `effects-canvas.test.js` | `Application` mock resolves `init()` synchronously — `initPromise` guard untestable           | Make `init()` return a deferred promise.                         |
+| `effects-canvas.test.js` | `globalThis.Image` set via direct assignment, not `vi.stubGlobal`                             | `vi.restoreAllMocks()` cannot restore it. Use `vi.stubGlobal`.   |
+| `effects.test.js`        | `DisplacementFilter` mock `scale` diverges from real PixiJS                                   | Align with actual API.                                           |
+| `effects.test.js`        | `GlowFilter` mock missing `knockout`, `alpha` fields                                          | Add them.                                                        |
