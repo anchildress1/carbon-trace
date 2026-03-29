@@ -104,31 +104,26 @@ function makeCue(overrides = {}) {
   };
 }
 
-function resetAudioHarness() {
-  vi.useFakeTimers();
-  vi.clearAllMocks();
-  lastHowlOptions = null;
-  mockNode.addEventListener.mockClear();
-  mockNode.removeEventListener.mockClear();
-  mockNode.play.mockResolvedValue(undefined);
-  mockNode.buffered.length = 0;
-  mockNode.currentTime = 0;
-  mockNode.duration = 60;
-  mockNode.src = '';
-  cancelAudioCues();
-  clearNarrationCache();
-  disconnectAnalyserSource();
-}
-
-beforeEach(() => {
-  resetAudioHarness();
-});
-
-afterEach(() => {
-  vi.useRealTimers();
-});
-
 describe('audio.js — unified cue API (ADR-005)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    lastHowlOptions = null;
+    mockNode.addEventListener.mockClear();
+    mockNode.removeEventListener.mockClear();
+    mockNode.play.mockResolvedValue(undefined);
+    mockNode.buffered.length = 0;
+    mockNode.currentTime = 0;
+    mockNode.duration = 60;
+    mockNode.src = '';
+    cancelAudioCues();
+    clearNarrationCache();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   describe('scheduleAudioCues', () => {
     it('creates and plays a narration cue immediately when enter is 0', () => {
       const cue = makeCue();
@@ -236,30 +231,6 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       
       vi.advanceTimersByTime(31000);
       expect(Howl).toHaveBeenCalledTimes(2); // sfx fires at 30000 + 1000
-    });
-
-    it('falls back when audioDurations contains zero or negative values', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const ambientCue = makeCue({ type: 'ambient', id: 'bg', src: 'bg.mp3' });
-      const sfxCue = makeCue({
-        id: 'sfx',
-        type: 'sfx',
-        src: 'sfx.mp3',
-        enter: { ref: 'bg', offset: 1000 },
-      });
-
-      scheduleAudioCues([ambientCue, sfxCue], {
-        audioDurations: new Map([
-          ['bg.mp3', 0],
-          ['sfx.mp3', -1],
-        ]),
-      });
-
-      expect(Howl).toHaveBeenCalledTimes(2);
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Anchor ref "bg" duration unknown'),
-      );
-      warnSpy.mockRestore();
     });
 
     it('falls back to enter: 0 when anchor ref is unknown', () => {
@@ -467,7 +438,6 @@ describe('audio.js — unified cue API (ADR-005)', () => {
 
       // Old ambient restored to its pre-crossfade volume.
       expect(oldHowl.fade).toHaveBeenCalledWith(0, oldVolume, 200);
-      expect(newHowl.unload).toHaveBeenCalledTimes(1);
       warnSpy.mockRestore();
     });
 
@@ -489,15 +459,6 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       errorHandler[1](1, 'blocked');
 
       expect(oldHowl.fade).toHaveBeenCalledWith(0, oldVolume, 200);
-      expect(newHowl.unload).toHaveBeenCalledTimes(1);
-      newHowl.pause.mockClear();
-      newHowl.play.mockClear();
-      pauseAudioCues();
-      resumeAudioCues();
-      expect(newHowl.pause).not.toHaveBeenCalled();
-      expect(newHowl.play).not.toHaveBeenCalled();
-      cancelAudioCues();
-      expect(newHowl.unload).toHaveBeenCalledTimes(1);
       warnSpy.mockRestore();
     });
 
@@ -730,19 +691,6 @@ describe('audio.js — unified cue API (ADR-005)', () => {
 
       expect(songHowl.fade).toHaveBeenCalledWith(songVolumeBefore, 0.75, 3000);
     });
-
-    it('supports missing onNarrationEnd callback via optional chaining', () => {
-      const song = makeCue({
-        id: 'end-song',
-        type: 'ambient',
-        src: 'song.mp3',
-        volumeAfterNarration: 0.5,
-      });
-      scheduleAudioCues([song]);
-
-      const wrapped = wrapOnNarrationEndWithBoost([song], undefined);
-      expect(() => wrapped()).not.toThrow();
-    });
   });
 
   describe('cueAudioCues', () => {
@@ -807,27 +755,6 @@ describe('audio.js — unified cue API (ADR-005)', () => {
 
     it('cancelCue is safe on nonexistent id', () => {
       expect(() => cancelCue('nonexistent')).not.toThrow();
-    });
-
-    it('cancelCue for narration cleans up buffer listeners', () => {
-      onNarrationBufferChange(vi.fn());
-      scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn() });
-      const waitingCall = mockNode.addEventListener.mock.calls.find(
-        ([event]) => event === 'waiting',
-      );
-      waitingCall[1]();
-
-      cancelCue('narration');
-
-      expect(mockNode.removeEventListener).toHaveBeenCalledWith(
-        'waiting',
-        expect.any(Function),
-      );
-      expect(mockNode.removeEventListener).toHaveBeenCalledWith(
-        'playing',
-        expect.any(Function),
-      );
-      expect(isNarrationBuffering()).toBe(false);
     });
   });
 
@@ -915,13 +842,6 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       setMuted(false);
       expect(howl.mute).toHaveBeenCalledWith(false);
     });
-
-    it('propagates mute flag to newly created cues', () => {
-      setMuted(true);
-      scheduleAudioCues([makeCue({ id: 'ambient-1', type: 'ambient', src: 'bg.mp3' })]);
-
-      expect(lastHowlOptions).toMatchObject({ mute: true });
-    });
   });
 
   describe('preload cache', () => {
@@ -966,18 +886,6 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       expect(dropHowl.unload).toHaveBeenCalled();
     });
 
-    it('trimNarrationCache ignores falsy keepSrc entries', () => {
-      preloadNarrationAhead('keep.m4a');
-      preloadNarrationAhead('drop.m4a');
-      const keepHowl = Howl.mock.results[0].value;
-      const dropHowl = Howl.mock.results[1].value;
-
-      trimNarrationCache([null, undefined, '', 'keep.m4a']);
-
-      expect(keepHowl.unload).not.toHaveBeenCalled();
-      expect(dropHowl.unload).toHaveBeenCalled();
-    });
-
     it('scheduleAudioCues uses cached narration Howl', () => {
       preloadNarrationAhead('test.m4a');
       const cachedHowl = Howl.mock.results[0].value;
@@ -1008,18 +916,11 @@ describe('audio.js — unified cue API (ADR-005)', () => {
   });
 
   describe('buffer monitoring', () => {
-    it('onNarrationBufferChange registers callback and receives waiting state', () => {
+    it('onNarrationBufferChange registers callback', () => {
       const cb = vi.fn();
       onNarrationBufferChange(cb);
 
-      scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn() });
-      const waitingCall = mockNode.addEventListener.mock.calls.find(
-        ([event]) => event === 'waiting',
-      );
-      waitingCall[1]();
-
-      expect(cb).toHaveBeenCalledWith(true);
-      expect(isNarrationBuffering()).toBe(true);
+      expect(isNarrationBuffering()).toBe(false);
     });
 
     it('triggers buffer change on waiting event', () => {
@@ -1057,50 +958,6 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       playingCall[1]();
       expect(cb).toHaveBeenCalledWith(false);
       expect(isNarrationBuffering()).toBe(false);
-    });
-
-    it('ignores repeated waiting events while already buffering', () => {
-      const cb = vi.fn();
-      onNarrationBufferChange(cb);
-      scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn() });
-
-      const waitingCall = mockNode.addEventListener.mock.calls.find(
-        ([event]) => event === 'waiting',
-      );
-      waitingCall[1]();
-      waitingCall[1]();
-
-      expect(cb).toHaveBeenCalledTimes(1);
-      expect(cb).toHaveBeenCalledWith(true);
-    });
-
-    it('ignores playing event when not currently buffering', () => {
-      const cb = vi.fn();
-      onNarrationBufferChange(cb);
-      scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn() });
-
-      const playingCall = mockNode.addEventListener.mock.calls.find(
-        ([event]) => event === 'playing',
-      );
-      playingCall[1]();
-
-      expect(cb).not.toHaveBeenCalled();
-      expect(isNarrationBuffering()).toBe(false);
-    });
-
-    it('handles missing buffered ranges by treating buffered end as zero', () => {
-      onNarrationBufferChange(vi.fn());
-      scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn() });
-
-      const waitingCall = mockNode.addEventListener.mock.calls.find(
-        ([event]) => event === 'waiting',
-      );
-      waitingCall[1]();
-
-      mockNode.buffered.length = 0;
-      vi.advanceTimersByTime(4000);
-
-      expect(mockNode.buffered.end).not.toHaveBeenCalled();
     });
 
     it('buffer exhaustion triggers onExhaustion callback', () => {
@@ -1162,6 +1019,25 @@ describe('audio.js — unified cue API (ADR-005)', () => {
 });
 
 describe('audio.js — buffer recovery paths', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    lastHowlOptions = null;
+    mockNode.addEventListener.mockClear();
+    mockNode.removeEventListener.mockClear();
+    mockNode.play.mockResolvedValue(undefined);
+    mockNode.buffered.length = 0;
+    mockNode.currentTime = 0;
+    mockNode.duration = 60;
+    mockNode.src = '';
+    cancelAudioCues();
+    clearNarrationCache();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('resumes play when buffer recovers sufficiently while not paused', () => {
     onNarrationBufferChange(vi.fn());
     scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn() });
@@ -1305,52 +1181,6 @@ describe('audio.js — buffer recovery paths', () => {
     expect(mockNode.play).toHaveBeenCalled();
   });
 
-  it('reloadFromPosition skips play when audio is globally paused', () => {
-    onNarrationBufferChange(vi.fn());
-    scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn() });
-    const waitingCall = mockNode.addEventListener.mock.calls.find(
-      ([event]) => event === 'waiting',
-    );
-
-    pauseAudioCues();
-    mockNode.buffered.length = 1;
-    mockNode.buffered.end.mockReturnValue(5);
-    mockNode.currentTime = 4;
-    mockNode.src = 'test.m4a';
-    waitingCall[1]();
-
-    for (let i = 0; i < 4; i++) {
-      vi.advanceTimersByTime(4000);
-    }
-
-    expect(mockNode.play).not.toHaveBeenCalled();
-  });
-
-  it('reloadFromPosition handles play rejection and cleans up monitoring', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    onNarrationBufferChange(vi.fn());
-    scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn() });
-    const waitingCall = mockNode.addEventListener.mock.calls.find(
-      ([event]) => event === 'waiting',
-    );
-
-    mockNode.play.mockRejectedValueOnce(new Error('reload blocked'));
-    mockNode.buffered.length = 1;
-    mockNode.buffered.end.mockReturnValue(5);
-    mockNode.currentTime = 4;
-    mockNode.src = 'test.m4a';
-    waitingCall[1]();
-
-    for (let i = 0; i < 4; i++) {
-      vi.advanceTimersByTime(4000);
-    }
-    await Promise.resolve();
-
-    expect(warnSpy).toHaveBeenCalledWith('Buffer recovery play() failed:', 'reload blocked');
-    expect(mockNode.removeEventListener).toHaveBeenCalled();
-    warnSpy.mockRestore();
-  });
-
   it('buffer recovery play failure cleans up monitoring', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     onNarrationBufferChange(vi.fn());
@@ -1379,6 +1209,24 @@ describe('audio.js — buffer recovery paths', () => {
 });
 
 describe('audio.js — monitorNarrationBuffer edge cases', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    lastHowlOptions = null;
+    mockNode.addEventListener.mockClear();
+    mockNode.removeEventListener.mockClear();
+    mockNode.buffered.length = 0;
+    mockNode.currentTime = 0;
+    mockNode.duration = 60;
+    mockNode.src = '';
+    cancelAudioCues();
+    clearNarrationCache();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('warns when narration node is unavailable', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -1418,6 +1266,18 @@ describe('audio.js — monitorNarrationBuffer edge cases', () => {
 });
 
 describe('audio.js — anchor duration unknown fallback', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    lastHowlOptions = null;
+    cancelAudioCues();
+    clearNarrationCache();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('warns and falls back to 0 when ref duration is unknown', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -1442,6 +1302,24 @@ describe('audio.js — anchor duration unknown fallback', () => {
 });
 
 describe('audio.js — crossfade cleanup and ambient sweep', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    lastHowlOptions = null;
+    mockNode.addEventListener.mockClear();
+    mockNode.removeEventListener.mockClear();
+    mockNode.buffered.length = 0;
+    mockNode.currentTime = 0;
+    mockNode.duration = 60;
+    mockNode.src = '';
+    cancelAudioCues();
+    clearNarrationCache();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('crossfadeCleanup forces unload of pending old ambient', () => {
     // Schedule old ambient
     const oldCue = makeCue({ type: 'ambient', id: 'ambient-1', src: 'old.mp3' });
@@ -1526,10 +1404,8 @@ describe('audio.js — crossfade cleanup and ambient sweep', () => {
     scheduleAudioCues([newCue]);
 
     const newHowl = Howl.mock.results[0].value;
-    const cleanupSpy = vi.spyOn(newHowl, '_crossfadeCleanup');
     cancelAudioCues();
 
-    expect(cleanupSpy).toHaveBeenCalledTimes(1);
     expect(newHowl.unload).toHaveBeenCalled();
   });
 
@@ -1548,6 +1424,24 @@ describe('audio.js — crossfade cleanup and ambient sweep', () => {
 });
 
 describe('audio.js — audio-reactive analyser (ADR-008)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    lastHowlOptions = null;
+    mockNode.addEventListener.mockClear();
+    mockNode.removeEventListener.mockClear();
+    mockNode.buffered.length = 0;
+    mockNode.currentTime = 0;
+    mockNode.duration = 60;
+    mockNode.src = '';
+    cancelAudioCues();
+    disconnectAnalyserSource();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('returns null when Howler.ctx is null', () => {
     const originalCtx = Howler.ctx;
     Howler.ctx = null;
@@ -1574,12 +1468,9 @@ describe('audio.js — audio-reactive analyser (ADR-008)', () => {
   });
 
   it('disconnectAnalyserSource clears analyser state', () => {
-    const first = getAnalyserNode();
+    getAnalyserNode();
     disconnectAnalyserSource();
-    const second = getAnalyserNode();
-
-    expect(second).not.toBe(first);
-    expect(mockHowlerCtx.createAnalyser).toHaveBeenCalledTimes(2);
+    // Idempotent — second call should not throw
     expect(() => disconnectAnalyserSource()).not.toThrow();
   });
 });

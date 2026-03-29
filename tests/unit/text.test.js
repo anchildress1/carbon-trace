@@ -150,6 +150,17 @@ describe('text.js', () => {
       expect(timelineInstances).toHaveLength(2);
     });
 
+    it('creates independent GSAP timelines per invocation', () => {
+      const lines = [{ text: 'First', enter: 0, exit: 1000 }];
+      const firstResult = buildNarrationTimeline(lines, container);
+
+      const secondContainer = document.createElement('div');
+      const secondResult = buildNarrationTimeline(lines, secondContainer);
+
+      expect(firstResult.timeline).not.toBe(secondResult.timeline);
+      expect(timelineInstances).toHaveLength(2);
+    });
+
     it('uses reduced motion styles when flag is true', () => {
       const lines = [{ text: 'Reduced', enter: 0, exit: 1000 }];
 

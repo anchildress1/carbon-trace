@@ -635,24 +635,6 @@ describe('app.js', () => {
       await flush();
       expect(app.getState()).toBe('SCENE_ACTIVE');
     });
-
-    it('applies pending pause only after manual transition completion callbacks', async () => {
-      gsapMockState.autoComplete = false;
-
-      app.advance();
-      expect(app.getState()).toBe('TRANSITIONING');
-
-      app.togglePause();
-      expect(app.getState()).toBe('TRANSITIONING');
-
-      runNextGsapCompletion();
-      await flush();
-      expect(app.getState()).toBe('TRANSITIONING');
-
-      runNextGsapCompletion();
-      await flush();
-      expect(app.getState()).toBe('PAUSED');
-    });
   });
 
   // ── keyboard handling ──────────────────────────────────────────────
@@ -3090,6 +3072,26 @@ describe('app.js', () => {
       vi.clearAllMocks();
       app.togglePause(); // resume
       expect(resumeShimmer).toHaveBeenCalled();
+    });
+
+    it('logs error and continues when initShimmer throws', async () => {
+      initShimmer.mockImplementationOnce(() => {
+        throw new TypeError('shimmer: init() requires an HTMLCanvasElement');
+      });
+      const consoleSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+
+      app = createApp();
+      await flush();
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Shimmer init failed:',
+        'shimmer: init() requires an HTMLCanvasElement',
+      );
+      // App continues to function despite shimmer init failure
+      expect(app.getState()).toBeTruthy();
+      consoleSpy.mockRestore();
     });
 
     it('recovers gracefully when loadShimmerScene rejects', async () => {

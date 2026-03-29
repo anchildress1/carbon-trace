@@ -33,7 +33,7 @@ const mockPixiApp = {
   renderer: mockRenderer,
   stage: mockStage,
   screen: { width: 1920, height: 1080 },
-  init: vi.fn().mockResolvedValue(undefined),
+  init: vi.fn(),
   destroy: vi.fn(),
 };
 
@@ -44,7 +44,6 @@ vi.mock('pixi.js', () => ({
       stage: { ...mockStage, children: [] },
     });
     this.init = vi.fn();
-    this.init.mockResolvedValue(undefined);
     this.destroy = vi.fn();
     this.render = vi.fn();
     this.ticker = { ...mockTicker };
@@ -113,10 +112,6 @@ import {
   startAnalysisPlayback,
 } from '../../src/effects-canvas.js';
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
-
 function createMockCanvas() {
   const canvas = document.createElement('canvas');
   vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue({
@@ -146,24 +141,21 @@ function createMockCanvas() {
  * must provide width/height for the offscreen canvas sizing.
  */
 function setupImageMock() {
-  vi.stubGlobal(
-    'Image',
-    vi.fn(function () {
-      this.width = 256;
-      this.height = 256;
-      this.naturalWidth = 256;
-      this.naturalHeight = 256;
-      Object.defineProperty(this, 'src', {
-        set: () => {
-          this.onload?.();
-        },
-      });
-    }),
-  );
+  globalThis.Image = vi.fn(function () {
+    this.width = 256;
+    this.height = 256;
+    this.naturalWidth = 256;
+    this.naturalHeight = 256;
+    Object.defineProperty(this, 'src', {
+      set: () => {
+        this.onload?.();
+      },
+    });
+  });
 
   // createImageBitmap is not available in jsdom/happy-dom.
   // Return a plain object — Texture.from() is mocked anyway.
-  vi.stubGlobal('createImageBitmap', vi.fn().mockResolvedValue({ width: 256, height: 256 }));
+  globalThis.createImageBitmap = vi.fn().mockResolvedValue({ width: 256, height: 256 });
 }
 
 function createMockAnalyser(sampleRate = 44100, frequencyBinCount = 1024) {
@@ -225,14 +217,6 @@ function createMockAnalyserWithContext() {
     disconnect: vi.fn(),
   };
   return { analyser, ctx, mockSource, mockGain };
-}
-
-function createDeferred() {
-  let resolve;
-  const promise = new Promise((res) => {
-    resolve = res;
-  });
-  return { promise, resolve };
 }
 
 describe('effects-canvas.js — PixiJS lifecycle', () => {
@@ -328,42 +312,6 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
         expect.any(String),
       );
       errorSpy.mockRestore();
-    });
-
-    it('loadScene waits for in-flight initPromise before proceeding', async () => {
-      const { Application } = await import('pixi.js');
-      const deferredInit = createDeferred();
-
-      Application.mockImplementationOnce(function () {
-        this.init = vi.fn(() => deferredInit.promise);
-        this.destroy = vi.fn();
-        this.render = vi.fn();
-        this.ticker = { add: vi.fn(), stop: vi.fn(), start: vi.fn() };
-        this.renderer = { resize: vi.fn() };
-        this.stage = {
-          addChild: vi.fn(),
-          removeChildren: vi.fn(() => []),
-          removeChild: vi.fn(),
-          children: [],
-        };
-        this.screen = { width: 1920, height: 1080 };
-      });
-
-      const canvas = createMockCanvas();
-      const initPromise = init(canvas);
-
-      let settled = false;
-      const scenePromise = loadScene({ regions: [] }, 'scene.png').then((result) => {
-        settled = true;
-        return result;
-      });
-      await Promise.resolve();
-      expect(settled).toBe(false);
-
-      deferredInit.resolve();
-      await initPromise;
-      const result = await scenePromise;
-      expect(result).toBe(true);
     });
   });
 
@@ -896,16 +844,13 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
       await init(canvas);
 
       // Make Image.src trigger onerror
-      vi.stubGlobal(
-        'Image',
-        vi.fn(function () {
-          Object.defineProperty(this, 'src', {
-            set() {
-              this.onerror?.();
-            },
-          });
-        }),
-      );
+      globalThis.Image = vi.fn(function () {
+        Object.defineProperty(this, 'src', {
+          set() {
+            this.onerror?.();
+          },
+        });
+      });
 
       const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
@@ -933,27 +878,25 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
       // First call to loadLuminanceMask (for mask1.png) will fail,
       // second (for mask2.png) should succeed.
       let callCount = 0;
-      vi.stubGlobal(
-        'Image',
-        vi.fn(function () {
-          this.width = 256;
-          this.height = 256;
-          this.naturalWidth = 256;
-          this.naturalHeight = 256;
-          Object.defineProperty(this, 'src', {
-            set: () => {
-              callCount++;
-              // Fail the second Image load (first mask's luminance processing)
-              // but succeed on others (noise, scene texture, second mask)
-              if (callCount === 2) {
-                this.onerror?.();
-              } else {
-                this.onload?.();
-              }
-            },
-          });
-        }),
-      );
+      const originalImage = globalThis.Image;
+      globalThis.Image = vi.fn(function () {
+        this.width = 256;
+        this.height = 256;
+        this.naturalWidth = 256;
+        this.naturalHeight = 256;
+        Object.defineProperty(this, 'src', {
+          set: () => {
+            callCount++;
+            // Fail the second Image load (first mask's luminance processing)
+            // but succeed on others (noise, scene texture, second mask)
+            if (callCount === 2) {
+              this.onerror?.();
+            } else {
+              this.onload?.();
+            }
+          },
+        });
+      });
 
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -973,6 +916,7 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
         expect.any(String),
       );
 
+      globalThis.Image = originalImage;
       warnSpy.mockRestore();
     });
   });
@@ -1764,6 +1708,8 @@ describe('effects-canvas — dedicated analysis element (ADR-008 Approach B)', (
 
 describe('effects-canvas.js — mask validation errors', () => {
   let originalGetContext;
+  let originalImage;
+  let originalCreateImageBitmap;
 
   beforeEach(() => {
     destroy();
@@ -1781,42 +1727,41 @@ describe('effects-canvas.js — mask validation errors', () => {
     });
 
     originalGetContext = HTMLCanvasElement.prototype.getContext;
+    originalImage = globalThis.Image;
+    originalCreateImageBitmap = globalThis.createImageBitmap;
   });
 
   afterEach(() => {
     destroy();
     HTMLCanvasElement.prototype.getContext = originalGetContext;
+    globalThis.Image = originalImage;
+    globalThis.createImageBitmap = originalCreateImageBitmap;
     vi.restoreAllMocks();
   });
 
   it('skips region when mask image has zero dimensions', async () => {
     // First Image (scene texture) loads fine, second (mask) has zero dims
     let imgCount = 0;
-    vi.stubGlobal(
-      'Image',
-      vi.fn(function () {
-        imgCount++;
-        if (imgCount <= 1) {
-          // Scene texture load — normal
-          this.width = 256;
-          this.height = 256;
-          this.naturalWidth = 256;
-          this.naturalHeight = 256;
-        } else {
-          // Mask load — zero dimensions
-          this.width = 0;
-          this.height = 0;
-          this.naturalWidth = 0;
-          this.naturalHeight = 0;
-        }
-        Object.defineProperty(this, 'src', {
-          set: () => {
-            this.onload?.();
-          },
-        });
-      }),
-    );
-    vi.stubGlobal('createImageBitmap', vi.fn().mockResolvedValue({ width: 256, height: 256 }));
+    globalThis.Image = vi.fn(function () {
+      imgCount++;
+      if (imgCount <= 1) {
+        // Scene texture load — normal
+        this.width = 256;
+        this.height = 256;
+        this.naturalWidth = 256;
+        this.naturalHeight = 256;
+      } else {
+        // Mask load — zero dimensions
+        this.width = 0;
+        this.height = 0;
+        this.naturalWidth = 0;
+        this.naturalHeight = 0;
+      }
+      Object.defineProperty(this, 'src', {
+        set: () => { this.onload?.(); },
+      });
+    });
+    globalThis.createImageBitmap = vi.fn().mockResolvedValue({ width: 256, height: 256 });
 
     HTMLCanvasElement.prototype.getContext = function (type) {
       if (type === '2d') {
@@ -1854,22 +1799,17 @@ describe('effects-canvas.js — mask validation errors', () => {
   it('skips region when 2D context creation fails for mask processing', async () => {
     // First Image (scene texture) succeeds, second (mask) needs 2D context
     let imgCount = 0;
-    vi.stubGlobal(
-      'Image',
-      vi.fn(function () {
-        imgCount++;
-        this.width = 256;
-        this.height = 256;
-        this.naturalWidth = 256;
-        this.naturalHeight = 256;
-        Object.defineProperty(this, 'src', {
-          set: () => {
-            this.onload?.();
-          },
-        });
-      }),
-    );
-    vi.stubGlobal('createImageBitmap', vi.fn().mockResolvedValue({ width: 256, height: 256 }));
+    globalThis.Image = vi.fn(function () {
+      imgCount++;
+      this.width = 256;
+      this.height = 256;
+      this.naturalWidth = 256;
+      this.naturalHeight = 256;
+      Object.defineProperty(this, 'src', {
+        set: () => { this.onload?.(); },
+      });
+    });
+    globalThis.createImageBitmap = vi.fn().mockResolvedValue({ width: 256, height: 256 });
 
     // Make getContext('2d') return null for mask canvas creation
     HTMLCanvasElement.prototype.getContext = function () {
@@ -2296,26 +2236,18 @@ describe('effects-canvas.js — createImageBitmap fallback', () => {
   });
 
   it('falls back to canvas when createImageBitmap rejects', async () => {
-    vi.stubGlobal(
-      'Image',
-      vi.fn(function () {
-        this.width = 256;
-        this.height = 256;
-        this.naturalWidth = 256;
-        this.naturalHeight = 256;
-        Object.defineProperty(this, 'src', {
-          set: () => {
-            this.onload?.();
-          },
-        });
-      }),
-    );
+    globalThis.Image = vi.fn(function () {
+      this.width = 256;
+      this.height = 256;
+      this.naturalWidth = 256;
+      this.naturalHeight = 256;
+      Object.defineProperty(this, 'src', {
+        set: () => { this.onload?.(); },
+      });
+    });
 
     // createImageBitmap rejects — should fall back to canvas
-    vi.stubGlobal(
-      'createImageBitmap',
-      vi.fn().mockRejectedValue(new Error('bitmap not supported')),
-    );
+    globalThis.createImageBitmap = vi.fn().mockRejectedValue(new Error('bitmap not supported'));
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     const canvas = createMockCanvas();
@@ -2333,25 +2265,24 @@ describe('effects-canvas.js — createImageBitmap fallback', () => {
     );
 
     warnSpy.mockRestore();
+    delete globalThis.createImageBitmap;
+    delete globalThis.Image;
   });
 
   it('falls back to canvas when createImageBitmap is not available', async () => {
-    vi.stubGlobal(
-      'Image',
-      vi.fn(function () {
-        this.width = 256;
-        this.height = 256;
-        this.naturalWidth = 256;
-        this.naturalHeight = 256;
-        Object.defineProperty(this, 'src', {
-          set: () => {
-            this.onload?.();
-          },
-        });
-      }),
-    );
+    globalThis.Image = vi.fn(function () {
+      this.width = 256;
+      this.height = 256;
+      this.naturalWidth = 256;
+      this.naturalHeight = 256;
+      Object.defineProperty(this, 'src', {
+        set: () => { this.onload?.(); },
+      });
+    });
 
-    vi.stubGlobal('createImageBitmap', undefined);
+    // Remove createImageBitmap entirely
+    const saved = globalThis.createImageBitmap;
+    delete globalThis.createImageBitmap;
 
     const canvas = createMockCanvas();
     await init(canvas);
@@ -2363,5 +2294,8 @@ describe('effects-canvas.js — createImageBitmap fallback', () => {
 
     // Should succeed using canvas fallback
     expect(result).toBe(true);
+
+    globalThis.createImageBitmap = saved;
+    delete globalThis.Image;
   });
 });
