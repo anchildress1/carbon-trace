@@ -1048,7 +1048,7 @@
           "type": "ambient",
           "src": "assets/audio/ambient/06-storage-server-c15d48ab.m4a",
           "enter": 0,
-          "volume": 0.35,
+          "volume": 0.1,
           "loop": true,
           "fadeIn": 1500,
           "fadeOut": 1500
