@@ -65,6 +65,26 @@ describe('loader.js', () => {
       expect(result).toEqual({ src: 'nan.m4a', duration: 0 });
     });
 
+    it('falls back to duration 0 when metadata duration is undefined', async () => {
+      globalThis.Audio = class MockAudio {
+        duration = undefined;
+        set preload(_v) {}
+        set src(v) {
+          this._src = v;
+          setTimeout(() => this.onloadedmetadata?.(), 0);
+        }
+        get src() {
+          return this._src;
+        }
+      };
+
+      const p = preloadAudio('undefined-duration.m4a');
+      vi.advanceTimersByTime(1);
+      const result = await p;
+
+      expect(result).toEqual({ src: 'undefined-duration.m4a', duration: 0 });
+    });
+
     it('resolves with { src: null, duration: 0 } on audio error', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       globalThis.Audio = class MockAudio {
@@ -171,6 +191,10 @@ describe('loader.js', () => {
 
     it('returns empty array when audioCues is empty', () => {
       expect(audioSrcsFromEntry({ audioCues: [] })).toEqual([]);
+    });
+
+    it('filters out cue objects that do not have src', () => {
+      expect(audioSrcsFromEntry({ audioCues: [{}] })).toEqual([]);
     });
   });
 
@@ -288,6 +312,50 @@ describe('loader.js', () => {
       await p;
 
       expect(onLoaded).toHaveBeenCalledTimes(1);
+    });
+
+    it('loads background audio sequentially (next starts after previous resolves)', async () => {
+      let audioBySrc = {};
+      const originalAudio = globalThis.Audio;
+      const loadOrder = [];
+      try {
+        globalThis.Audio = class MockAudio {
+          set preload(_v) {}
+          set src(v) {
+            this._src = v;
+            this.duration = v === 'second.m4a' ? 2 : 3;
+            if (v) {
+              loadOrder.push(v);
+              audioBySrc[v] = this;
+            }
+          }
+          get src() {
+            return this._src;
+          }
+        };
+
+        const onLoaded = vi.fn();
+        const frames = [
+          { audioCues: [{ src: 'first.m4a' }] },
+          { audioCues: [{ src: 'second.m4a' }] },
+          { audioCues: [{ src: 'third.m4a' }] },
+        ];
+
+        const preloadPromise = preloadBackgroundAudio(frames, onLoaded);
+
+        expect(loadOrder).toEqual(['second.m4a']);
+        audioBySrc['second.m4a'].onloadedmetadata();
+        await Promise.resolve();
+
+        expect(loadOrder).toEqual(['second.m4a', 'third.m4a']);
+        audioBySrc['third.m4a'].onloadedmetadata();
+        await preloadPromise;
+
+        expect(onLoaded).toHaveBeenNthCalledWith(1, { src: 'second.m4a', duration: 2 });
+        expect(onLoaded).toHaveBeenNthCalledWith(2, { src: 'third.m4a', duration: 3 });
+      } finally {
+        globalThis.Audio = originalAudio;
+      }
     });
 
     it('handles empty frames array', async () => {
