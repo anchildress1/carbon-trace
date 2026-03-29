@@ -55,7 +55,7 @@ async function jumpToFrameByDot(page, frameIndex) {
 async function dispatchNarrationEnded(page) {
   await page.evaluate(() => {
     if (typeof globalThis.__ctE2EApp?.forceNarrationEndForTesting !== 'function') {
-      throw new Error('E2E app harness missing forceNarrationEndForTesting');
+      throw new TypeError('E2E app harness missing forceNarrationEndForTesting');
     }
     globalThis.__ctE2EApp.forceNarrationEndForTesting();
   });

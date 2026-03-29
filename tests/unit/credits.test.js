@@ -138,7 +138,6 @@ describe('credits.js', () => {
 
     it('is idempotent — does not repopulate when children already exist', () => {
       initCreditsContent(scrollContent);
-      const originalHTML = scrollContent.innerHTML;
       // Mutate a child — initCreditsContent should not overwrite
       scrollContent.querySelector('.credits-heading').textContent = 'Modified';
       initCreditsContent(scrollContent);
@@ -426,14 +425,14 @@ describe('credits.js', () => {
 
   // -- touch drag scroll override --
 
-  describe('touch drag scroll override', () => {
-    function makeTouchEvent(type, clientY) {
-      const e = new Event(type, { bubbles: true });
-      e.touches = [{ clientY }];
-      e.preventDefault = vi.fn();
-      return e;
-    }
+  function makeTouchEvent(type, clientY) {
+    const e = new Event(type, { bubbles: true });
+    e.touches = [{ clientY }];
+    e.preventDefault = vi.fn();
+    return e;
+  }
 
+  describe('touch drag scroll override', () => {
     it('pauses timeline on touchmove', () => {
       revealCreditsPanel(panel, scrollContent, defaultConfig);
       const scrollTl = gsapMockState.lastTimeline;

@@ -149,10 +149,9 @@ test.describe('ADR-011 outstanding validation checks', () => {
 
       return {
         opacity: panelStyles.opacity,
-        maskImage: panelStyles.maskImage,
-        webkitMaskImage: panelStyles.webkitMaskImage,
-        backdropFilter: backdropStyles.backdropFilter,
-        webkitBackdropFilter: backdropStyles.webkitBackdropFilter,
+        // Standard property first, webkit-prefixed fallback for Safari
+        maskImage: panelStyles.maskImage || panelStyles['webkitMaskImage'],
+        backdropFilter: backdropStyles.backdropFilter || backdropStyles['webkitBackdropFilter'],
       };
     });
 
@@ -167,8 +166,8 @@ test.describe('ADR-011 outstanding validation checks', () => {
         { timeout: 3000 },
       )
       .toBeGreaterThan(0.95);
-    expect(`${styleSummary.maskImage} ${styleSummary.webkitMaskImage}`).toContain('gradient');
-    expect(`${styleSummary.backdropFilter} ${styleSummary.webkitBackdropFilter}`).toContain('blur');
+    expect(styleSummary.maskImage).toContain('gradient');
+    expect(styleSummary.backdropFilter).toContain('blur');
 
     await testInfo.attach('webkit-credits-panel', {
       contentType: 'image/png',
