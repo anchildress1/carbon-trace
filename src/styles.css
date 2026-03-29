@@ -346,10 +346,12 @@ body {
 .progress-dots {
   display: flex;
   gap: 0;
+  max-width: 100%;
 }
 
 .progress-dot {
-  width: 44px;
+  flex: 0 1 44px;
+  min-width: 28px;
   height: 44px;
   padding: 0;
   border-radius: 50%;
