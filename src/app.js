@@ -408,6 +408,23 @@ function renderSceneImage(app, frame) {
   }
 }
 
+/**
+ * Schedule a late redraw for frames whose image wasn't cached at render time.
+ * When the image arrives asynchronously, redraw the scene canvas — but only if
+ * the user is still on the same frame (stale guard via generation + currentIndex).
+ * Deduplicates with in-flight requests: canvas.js loadImage returns the existing promise.
+ */
+function scheduleImageArrival(app, frame, index) {
+  if (!frame.image || app.imageCache.has(frame.image)) return;
+  const arrivalGeneration = app.generation;
+  loadImage(frame.image).then((img) => {
+    if (!img) return;
+    app.imageCache.set(frame.image, img);
+    if (app.generation !== arrivalGeneration || app.currentIndex !== index) return;
+    drawSceneImage(img);
+  });
+}
+
 function prebufferNextScene(app, index) {
   const currentFrame = app.frames[index];
   const nextFrame = app.frames[index + 1];
@@ -473,6 +490,7 @@ function showFrame(app, index) {
   const frame = app.frames[index];
   app.els.sceneStage.setAttribute('aria-label', frame.description || '');
   renderSceneImage(app, frame);
+  scheduleImageArrival(app, frame, index);
   clearNarrationLayer(app.els.narrationLayer);
 
   if (frame.effects?.regions?.length) {
@@ -744,8 +762,10 @@ function transition(app, toIndex) {
 
   // Hard jump: instant cut when navigating while paused.
   // No fade animation — swap frame and re-pause immediately.
+  // Image is not awaited — showFrame renders fallback if uncached,
+  // and scheduleImageArrival redraws when the image arrives.
   if (wasPaused) {
-    whenImageReady(app, toFrame, doHardJump.bind(null, app, toIndex, toFrame));
+    doHardJump(app, toIndex, toFrame);
     return;
   }
 
@@ -753,16 +773,13 @@ function transition(app, toIndex) {
   // Keyboard nav and auto-advance still use the animated path for cinematic feel.
   if (app.lastNavSource === 'click') {
     const prevFrame = app.frames[app.currentIndex];
-    whenImageReady(app, toFrame, doClickJump.bind(null, app, toIndex, toFrame, prevFrame));
+    doClickJump(app, toIndex, toFrame, prevFrame);
     return;
   }
 
   if (prefersReducedMotion()) {
-    // Re-check at execution time — image may have been cached by preload-ahead
-    whenImageReady(app, toFrame, () => {
-      if (!proceedWithFrame(app, toIndex)) return;
-      landOnFrame(app, toFrame);
-    });
+    if (!proceedWithFrame(app, toIndex)) return;
+    landOnFrame(app, toFrame);
     return;
   }
 
