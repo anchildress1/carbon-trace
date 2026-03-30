@@ -611,6 +611,18 @@ body {
   border-radius: 2px;
 }
 
+/* Small viewports: scale narration text to avoid overlapping controls */
+@media (max-width: 480px) {
+  .narration-line {
+    font-size: clamp(0.8rem, 2vw, 1rem);
+    line-height: 1.5;
+  }
+
+  .narration-line:not(.narration-line--positioned) {
+    bottom: 14%;
+  }
+}
+
 /* Desktop: larger control button icons */
 @media (min-width: 768px) {
   .control-buttons button svg {
