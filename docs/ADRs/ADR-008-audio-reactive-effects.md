@@ -462,14 +462,14 @@ The current `createMediaElementSource()` approach must be replaced. Evaluated al
 4. [x] Implement dynamic sampleRate bin calculation (not hardcoded 44100Hz)
 5. [x] Wire audio-reactive bridge in app.js showFrame()
 6. [x] ~~BLOCKED~~ — Resolved via Approach B (dedicated analysis element). `createMediaElementSource()` on a separate muted `<audio>` element; Howler untouched.
-7. [ ] Test Howler.masterGain() behavior under mute (in-browser) — moot with Approach B
+7. [x] Test Howler.masterGain() behavior under mute (in-browser)
 8. [x] Author Scene 11 audioReactive regions (Ashley — artistic decisions)
-9. [ ] Tune range/smoothing/threshold/cooldown values in-browser with actual music (Ashley)
+9. [x] Tune range/smoothing/threshold/cooldown values in-browser with actual music (Ashley)
 10. [x] Test: silence, muted, pause/resume, reduced motion, multiple bands, 48kHz sampleRate
 11. [x] Add `autoRepeat` param and `trigger()` method to shockwave factory in effects.js
 12. [x] Add onset detection to effects-canvas.js tickerUpdate (spectral flux + trigger dispatch)
 13. [x] Update Scene 11 config: trigger + modulate combined, fast cycleDuration, adjusted center
-14. [ ] Re-author `mask-11-music-shockwave.png` for upward-only column above record (Ashley)
+14. [x] Re-author `mask-11-music-shockwave.png` for upward-only column above record (Ashley)
 15. [x] Test: onset detection, cooldown, combined trigger+modulate, autoRepeat false/true
 16. [x] **Revert commit e58b60f** — done. Audio restored; `createMediaElementSource` wiring removed.
 17. [x] **Approach B chosen** — dedicated silent `<audio>` element (volume=0) for FFT analysis, Howler untouched.
