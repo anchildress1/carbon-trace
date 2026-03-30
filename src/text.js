@@ -55,7 +55,7 @@ export function buildNarrationTimeline(lines, container, opts = {}) {
       );
       tl.to(
         el,
-        { opacity: 0, y: -10, filter: 'blur(3px)', duration: 0.9, ease: 'power2.in' },
+        { opacity: 0, y: -40, x: 30, filter: 'blur(8px)', duration: 1.4, ease: 'power2.in' },
         line.exit / 1000,
       );
     }
