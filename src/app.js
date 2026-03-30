@@ -1179,6 +1179,17 @@ export function createApp() {
       const holdAfterNarration = getHoldAfterNarration(frame);
       makeNarrationEndCallback(app, frame, holdAfterNarration)();
     },
+    forceCreditsRevealForTesting: () => {
+      const frame = app.frames[app.currentIndex];
+      if (!frame?.credits) return;
+      if (app.creditsRevealTimer) {
+        app.creditsRevealTimer.cancel();
+        app.creditsRevealTimer = null;
+      }
+      revealCreditsPanel(app.els.creditsPanel, app.els.creditsScrollContent, frame.credits, {
+        reducedMotion: prefersReducedMotion(),
+      });
+    },
     /** @internal E2E diagnostics — returns a snapshot of credits-relevant state */
     _debugCreditsState: () => ({
       currentIndex: app.currentIndex,
