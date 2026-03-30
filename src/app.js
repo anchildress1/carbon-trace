@@ -1186,6 +1186,11 @@ export function createApp() {
         app.creditsRevealTimer.cancel();
         app.creditsRevealTimer = null;
       }
+      // Pause canvas effects and shimmer to free the main thread —
+      // on CI runners, rAF loops from PixiJS/shimmer/canvas starve
+      // Playwright's CDP communication and cause test timeouts.
+      pauseEffects();
+      pauseShimmer();
       revealCreditsPanel(app.els.creditsPanel, app.els.creditsScrollContent, frame.credits, {
         reducedMotion: prefersReducedMotion(),
       });
