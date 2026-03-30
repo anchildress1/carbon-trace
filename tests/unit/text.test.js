@@ -244,7 +244,7 @@ describe('text.js', () => {
       const toCall = tl.to.mock.calls[0];
       expect(toCall[1]).toMatchObject({
         opacity: 0,
-        y: 120,
+        y: 90,
         x: 0,
         filter: 'blur(14px)',
         duration: 1.8,
