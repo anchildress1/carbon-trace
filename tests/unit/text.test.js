@@ -177,7 +177,7 @@ describe('text.js', () => {
       const { timeline: tl } = buildNarrationTimeline(lines, container, { reducedMotion: false });
 
       const fromToCall = tl.fromTo.mock.calls[0];
-      expect(fromToCall[1]).toEqual({ opacity: 0, y: 18, filter: 'blur(4px)' });
+      expect(fromToCall[1]).toEqual({ opacity: 0, y: -20, filter: 'blur(4px)' });
       expect(fromToCall[2]).toMatchObject({ duration: 1.2, ease: 'power3.out' });
     });
 
@@ -244,9 +244,10 @@ describe('text.js', () => {
       const toCall = tl.to.mock.calls[0];
       expect(toCall[1]).toMatchObject({
         opacity: 0,
-        y: -10,
-        filter: 'blur(3px)',
-        duration: 0.9,
+        y: 90,
+        x: 0,
+        filter: 'blur(14px)',
+        duration: 1.8,
         ease: 'power2.in',
       });
     });

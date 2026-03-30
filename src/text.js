@@ -49,13 +49,13 @@ export function buildNarrationTimeline(lines, container, opts = {}) {
     } else {
       tl.fromTo(
         el,
-        { opacity: 0, y: 18, filter: 'blur(4px)' },
+        { opacity: 0, y: -20, filter: 'blur(4px)' },
         { opacity: 1, y: 0, filter: 'blur(0px)', duration: 1.2, ease: 'power3.out' },
         line.enter / 1000,
       );
       tl.to(
         el,
-        { opacity: 0, y: -10, filter: 'blur(3px)', duration: 0.9, ease: 'power2.in' },
+        { opacity: 0, y: 90, x: 0, filter: 'blur(14px)', duration: 1.8, ease: 'power2.in' },
         line.exit / 1000,
       );
     }

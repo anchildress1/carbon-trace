@@ -36,6 +36,11 @@ Canonical instruction source for this repository. Treat this file as authoritati
   4. Only then proceed with implementation.
 - Never silently diverge from the spec. Undocumented drift creates rework.
 
+### Port management
+
+- Never kill ports or processes listening on ports (e.g., `lsof -ti | xargs kill`, `kill` on a PID bound to a port).
+- If a port conflict arises, report it to the user and let them decide how to resolve it.
+
 ### Security: file access and path handling
 
 - Reject any user-controlled path input containing `..`.

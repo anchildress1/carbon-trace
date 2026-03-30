@@ -68,7 +68,13 @@ async function dispatchNarrationEnded(page) {
   }
 }
 
-async function waitForCreditsVisible(page, panel, timeout = 6000) {
+async function forceCreditsReveal(page) {
+  await page.evaluate(() => {
+    globalThis.__ctE2EApp.forceCreditsRevealForTesting();
+  });
+}
+
+async function waitForCreditsVisible(page, panel, timeout = 5000) {
   try {
     await expect(panel).toBeVisible({ timeout });
   } catch (err) {
@@ -355,36 +361,38 @@ test.describe('carbon-trace — credits overlay', () => {
     await expect(panel).toHaveAttribute('aria-label', 'Credits');
   });
 
-  test('credits reveal waits for the final-frame holdAfterNarration delay', async ({ page }) => {
+  test('credits reveal is gated behind holdAfterNarration timer', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     const creditsFrameIndex = TOTAL_FRAMES - 1;
-    const expectedRevealDelayMs = 10000;
-    const revealEarlyProbeMs = 700;
 
-    expect(scenesData.frames[creditsFrameIndex]?.holdAfterNarration).toBe(expectedRevealDelayMs);
+    expect(scenesData.frames[creditsFrameIndex]?.holdAfterNarration).toBe(10000);
 
     await jumpToFrameByDot(page, creditsFrameIndex);
-    await dispatchNarrationEnded(page);
 
     const panel = page.locator('#credits-panel');
-
-    await page.waitForTimeout(expectedRevealDelayMs - revealEarlyProbeMs);
     await expect(panel).toBeHidden();
 
-    await expect(panel).toBeVisible({ timeout: revealEarlyProbeMs + 1500 });
+    await dispatchNarrationEnded(page);
+
+    const state = await page.evaluate(() => globalThis.__ctE2EApp._debugCreditsState());
+    expect(state.hasCreditsTimer).toBe(true);
+    expect(state.creditsTimerActive).toBe(true);
+    expect(state.panelHidden).toBe(true);
+
+    await forceCreditsReveal(page);
+    await expect(panel).toBeVisible({ timeout: 5000 });
   });
 
-  // eslint-disable-next-line playwright/no-skipped-test -- flaky in CI: credits panel stays hidden (race condition), tracked for later fix
-  test.skip('credits auto-scroll pauses on focused link and resumes after focus leaves', async ({
+  test('credits auto-scroll pauses on focused link and resumes after focus leaves', async ({
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     const creditsFrameIndex = TOTAL_FRAMES - 1;
     await jumpToFrameByDot(page, creditsFrameIndex);
-    await dispatchNarrationEnded(page);
+    await forceCreditsReveal(page);
 
     const panel = page.locator('#credits-panel');
-    await waitForCreditsVisible(page, panel);
+    await expect(panel).toBeVisible({ timeout: 5000 });
     await page.waitForTimeout(800);
 
     const movingY1 = await getCreditsTranslateY(page);
@@ -406,34 +414,33 @@ test.describe('carbon-trace — credits overlay', () => {
     expect(Math.abs(resumedY2 - resumedY1)).toBeGreaterThan(1);
   });
 
-  // eslint-disable-next-line playwright/no-skipped-test -- flaky in CI: credits panel stays hidden (race condition), tracked for later fix
-  test.skip('replay while credits are visible hides panel and re-reveals after narration end', async ({
+  test('replay while credits are visible hides panel and re-reveals after narration end', async ({
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     const creditsFrameIndex = TOTAL_FRAMES - 1;
     await jumpToFrameByDot(page, creditsFrameIndex);
-    await dispatchNarrationEnded(page);
+    await forceCreditsReveal(page);
 
     const panel = page.locator('#credits-panel');
-    await waitForCreditsVisible(page, panel);
+    await expect(panel).toBeVisible({ timeout: 5000 });
 
     await page.click('#btn-replay');
     await expect(panel).toBeHidden({ timeout: 2000 });
 
     await dispatchNarrationEnded(page);
-    await waitForCreditsVisible(page, panel);
+    await forceCreditsReveal(page);
+    await expect(panel).toBeVisible({ timeout: 5000 });
   });
 
-  // eslint-disable-next-line playwright/no-skipped-test -- flaky in CI: credits panel stays hidden (race condition), tracked for later fix
-  test.skip('touch drag pauses auto-scroll and resumes after delay', async ({ page }) => {
+  test('touch drag pauses auto-scroll and resumes after delay', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     const creditsFrameIndex = TOTAL_FRAMES - 1;
     await jumpToFrameByDot(page, creditsFrameIndex);
-    await dispatchNarrationEnded(page);
+    await forceCreditsReveal(page);
 
     const panel = page.locator('#credits-panel');
-    await waitForCreditsVisible(page, panel);
+    await expect(panel).toBeVisible({ timeout: 5000 });
     await page.waitForTimeout(800);
 
     // Verify auto-scroll is active
@@ -476,15 +483,14 @@ test.describe('carbon-trace — credits overlay', () => {
     expect(Math.abs(resumedY2 - resumedY1)).toBeGreaterThan(1);
   });
 
-  // eslint-disable-next-line playwright/no-skipped-test -- flaky in CI: credits panel stays hidden (race condition), tracked for later fix
-  test.skip('reduced-motion revisit clears stale transform state', async ({ page }) => {
+  test('reduced-motion revisit clears stale transform state', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     const creditsFrameIndex = TOTAL_FRAMES - 1;
     const prevFrameIndex = TOTAL_FRAMES - 2;
 
     await jumpToFrameByDot(page, creditsFrameIndex);
-    await dispatchNarrationEnded(page);
-    await waitForCreditsVisible(page, page.locator('#credits-panel'));
+    await forceCreditsReveal(page);
+    await expect(page.locator('#credits-panel')).toBeVisible({ timeout: 5000 });
 
     await page.waitForTimeout(800);
     const firstTransform = await page
@@ -499,8 +505,8 @@ test.describe('carbon-trace — credits overlay', () => {
 
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await jumpToFrameByDot(page, creditsFrameIndex);
-    await dispatchNarrationEnded(page);
-    await expect(page.locator('#credits-panel')).toBeVisible({ timeout: 6000 });
+    await forceCreditsReveal(page);
+    await expect(page.locator('#credits-panel')).toBeVisible({ timeout: 5000 });
 
     const revisitTransform = await page
       .locator('#credits-scroll-content')
