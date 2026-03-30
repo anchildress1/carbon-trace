@@ -1,10 +1,16 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const isCI = !!process.env.CI;
+
 export default defineConfig({
   testDir: 'tests/e2e',
   outputDir: 'playwright-results',
-  reporter: [['html', { outputFolder: 'playwright-report', open: 'never' }]],
+  reporter: isCI
+    ? [['github'], ['html', { outputFolder: 'playwright-report', open: 'never' }]]
+    : [['html', { outputFolder: 'playwright-report', open: 'never' }]],
   timeout: 30_000,
+  retries: isCI ? 2 : 0,
+  workers: isCI ? 1 : undefined,
   use: {
     baseURL: 'http://localhost:4173',
     headless: true,

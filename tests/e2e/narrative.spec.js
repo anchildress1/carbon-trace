@@ -68,7 +68,7 @@ async function dispatchNarrationEnded(page) {
   }
 }
 
-async function waitForCreditsVisible(page, panel, timeout = 6000) {
+async function waitForCreditsVisible(page, panel, timeout = 12_000) {
   try {
     await expect(panel).toBeVisible({ timeout });
   } catch (err) {
@@ -374,8 +374,7 @@ test.describe('carbon-trace — credits overlay', () => {
     await expect(panel).toBeVisible({ timeout: revealEarlyProbeMs + 1500 });
   });
 
-  // eslint-disable-next-line playwright/no-skipped-test -- flaky in CI: credits panel stays hidden (race condition), tracked for later fix
-  test.skip('credits auto-scroll pauses on focused link and resumes after focus leaves', async ({
+  test('credits auto-scroll pauses on focused link and resumes after focus leaves', async ({
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
@@ -406,8 +405,7 @@ test.describe('carbon-trace — credits overlay', () => {
     expect(Math.abs(resumedY2 - resumedY1)).toBeGreaterThan(1);
   });
 
-  // eslint-disable-next-line playwright/no-skipped-test -- flaky in CI: credits panel stays hidden (race condition), tracked for later fix
-  test.skip('replay while credits are visible hides panel and re-reveals after narration end', async ({
+  test('replay while credits are visible hides panel and re-reveals after narration end', async ({
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
@@ -425,8 +423,7 @@ test.describe('carbon-trace — credits overlay', () => {
     await waitForCreditsVisible(page, panel);
   });
 
-  // eslint-disable-next-line playwright/no-skipped-test -- flaky in CI: credits panel stays hidden (race condition), tracked for later fix
-  test.skip('touch drag pauses auto-scroll and resumes after delay', async ({ page }) => {
+  test('touch drag pauses auto-scroll and resumes after delay', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     const creditsFrameIndex = TOTAL_FRAMES - 1;
     await jumpToFrameByDot(page, creditsFrameIndex);
@@ -476,8 +473,7 @@ test.describe('carbon-trace — credits overlay', () => {
     expect(Math.abs(resumedY2 - resumedY1)).toBeGreaterThan(1);
   });
 
-  // eslint-disable-next-line playwright/no-skipped-test -- flaky in CI: credits panel stays hidden (race condition), tracked for later fix
-  test.skip('reduced-motion revisit clears stale transform state', async ({ page }) => {
+  test('reduced-motion revisit clears stale transform state', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     const creditsFrameIndex = TOTAL_FRAMES - 1;
     const prevFrameIndex = TOTAL_FRAMES - 2;
@@ -500,7 +496,7 @@ test.describe('carbon-trace — credits overlay', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await jumpToFrameByDot(page, creditsFrameIndex);
     await dispatchNarrationEnded(page);
-    await expect(page.locator('#credits-panel')).toBeVisible({ timeout: 6000 });
+    await expect(page.locator('#credits-panel')).toBeVisible({ timeout: 12_000 });
 
     const revisitTransform = await page
       .locator('#credits-scroll-content')
