@@ -459,7 +459,7 @@ These are scoped implementation choices, not architectural decisions. The ADR's 
 
 ## Action Items
 
-1. [ ] Design and author mask images for all scenes (Ashley)
+1. [x] Design and author mask images for all scenes (Ashley) — 26 masks + 1 noise texture in `public/assets/masks/`, 4.8MB total
 2. [x] Add pixi.js v8.17.1 (pinned) to package.json — no particle emitter package needed
 3. [x] Implement effect factory registry in effects.js (water, heat, dust, glow, shockwave)
 4. [x] Refactor effects-canvas.js with PixiJS lifecycle (init, loadScene, clearAll, pause/resume)
@@ -467,7 +467,7 @@ These are scoped implementation choices, not architectural decisions. The ADR's 
 6. [x] Implement heat displacement (DisplacementFilter, upward, large scale)
 7. [x] Implement dust displacement (DisplacementFilter, multi-directional slow drift)
 8. [x] Update app.js showFrame() to use new effects API
-9. [ ] ~~Add mask preloading to loader.js pipeline~~ Masks loaded lazily via `new Image()` + `TextureSource.from()` inside loadScene(). No loader.js changes needed.
+9. [x] ~~Add mask preloading to loader.js pipeline~~ **Decision: keep lazy loading.** Masks load on-demand via `new Image()` + `TextureSource.from()` inside `loadScene()`. No loader.js changes. Rationale: most masks are 27–116KB and load in <50ms from same-origin; animated transitions hide the load behind the GSAP fade + `waitForOverlaysReady()` (800ms timeout); instant-cut paths (hard-jump, click-jump, reduced-motion) show the static scene image immediately while effects activate async — acceptable because `maskSourceCache` makes revisits instant and the brief static-to-animated transition is subtle. The two large godray masks (674KB, 1.9MB) are the worst case but only affect two scenes on cold cache. If profiling reveals visible jank, promote masks to background preload (alongside images at 4s) rather than blocking the loading screen.
 10. [x] Update scenes.json schema for all 12 frames
 11. [x] WebGL fallback: detect unavailability, degrade to static + context loss recovery (re-init on next loadScene)
 12. [x] Error boundary: try/catch around init(), webglAvailable flag, loadScene() no-op on failure
