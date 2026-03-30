@@ -32,6 +32,7 @@ let disposableTextures = [];
 let loadGeneration = 0;
 let isPaused = false;
 let initPromise = null;
+let destroyed = false;
 let centeredEffects = []; // effects with normalized center → pixel conversion
 
 // Audio-reactive modulation state (ADR-008)
@@ -131,6 +132,14 @@ async function createLuminanceMaskSource(url) {
   if (typeof createImageBitmap === 'function') {
     try {
       const bitmap = await createImageBitmap(canvas, { premultiplyAlpha: 'none' });
+      if (destroyed) {
+        try {
+          bitmap.close?.();
+        } catch {
+          /* already closed */
+        }
+        return canvas;
+      }
       releasableMaskSources.add(bitmap);
       return bitmap;
     } catch (err) {
@@ -408,6 +417,7 @@ export function init(el) {
 
   if (canvasEl && pixiApp) destroy();
 
+  destroyed = false;
   canvasEl = el;
   webglAvailable = true;
 
@@ -780,6 +790,7 @@ export function resume() {
 
 export function destroy() {
   pause();
+  destroyed = true;
   cleanupAnalysisElement();
 
   if (canvasEl) {
@@ -803,13 +814,17 @@ export function destroy() {
   releasableMaskSources.clear();
 
   for (const sourcePromise of maskSourceCache.values()) {
-    sourcePromise.then((textureSource) => {
-      try {
-        textureSource.destroy();
-      } catch {
-        /* context lost */
-      }
-    });
+    sourcePromise
+      .then((textureSource) => {
+        try {
+          textureSource.destroy();
+        } catch {
+          /* context lost */
+        }
+      })
+      .catch(() => {
+        /* promise rejected during initialization; nothing to destroy */
+      });
   }
   maskSourceCache.clear();
 

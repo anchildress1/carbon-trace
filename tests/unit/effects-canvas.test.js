@@ -383,6 +383,51 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
       destroy();
       expect(() => destroy()).not.toThrow();
     });
+
+    it('destroys cached TextureSources from the mask cache', async () => {
+      const { TextureSource } = await import('pixi.js');
+      const mockTextureSource = { style: {}, destroy: vi.fn() };
+      TextureSource.from.mockReturnValue(mockTextureSource);
+
+      const canvas = createMockCanvas();
+      await init(canvas);
+      await loadScene({ regions: [{ type: 'water', mask: 'mask.png' }] }, 'scene.webp');
+
+      expect(TextureSource.from).toHaveBeenCalled();
+
+      destroy();
+      await Promise.resolve(); // flush microtasks so the .then() callback executes
+
+      expect(mockTextureSource.destroy).toHaveBeenCalled();
+    });
+
+    it('closes in-flight ImageBitmaps that resolve after destroy', async () => {
+      let resolveBitmap;
+      const bitmap = { width: 256, height: 256, close: vi.fn() };
+      globalThis.createImageBitmap = vi.fn(
+        () => new Promise((resolve) => { resolveBitmap = () => resolve(bitmap); }),
+      );
+
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      // Start a loadScene — createImageBitmap will be called but not yet resolved
+      const sceneLoad = loadScene(
+        { regions: [{ type: 'water', mask: 'inflight.png' }] },
+        'scene.webp',
+      );
+
+      // Wait until the async chain has reached createImageBitmap so resolveBitmap is set
+      await vi.waitFor(() => expect(globalThis.createImageBitmap).toHaveBeenCalled());
+
+      destroy(); // destroys before the bitmap resolves
+
+      resolveBitmap(); // now resolve the in-flight bitmap
+      await sceneLoad;
+      await Promise.resolve(); // flush remaining microtasks
+
+      expect(bitmap.close).toHaveBeenCalled();
+    });
   });
 
   describe('loadScene', () => {
