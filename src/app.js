@@ -1173,6 +1173,7 @@ export function createApp() {
     toggleMute: () => toggleMute(app),
     togglePause: () => togglePause(app),
     getState: () => app.state,
+    /* v8 ignore start -- E2E harness methods: exercised by Playwright, not unit tests */
     forceNarrationEndForTesting: () => {
       const frame = app.frames[app.currentIndex];
       if (!frame) return;
@@ -1195,7 +1196,6 @@ export function createApp() {
         reducedMotion: prefersReducedMotion(),
       });
     },
-    /** @internal E2E diagnostics — returns a snapshot of credits-relevant state */
     _debugCreditsState: () => ({
       currentIndex: app.currentIndex,
       frameCount: app.frames.length,
@@ -1211,5 +1211,6 @@ export function createApp() {
     forceBufferStateForTesting: (isBuffering) => {
       handleBufferChange(app, isBuffering);
     },
+    /* v8 ignore stop */
   };
 }
