@@ -244,10 +244,10 @@ describe('text.js', () => {
       const toCall = tl.to.mock.calls[0];
       expect(toCall[1]).toMatchObject({
         opacity: 0,
-        y: -40,
-        x: 30,
-        filter: 'blur(8px)',
-        duration: 1.4,
+        y: -120,
+        x: 80,
+        filter: 'blur(14px)',
+        duration: 1.8,
         ease: 'power2.in',
       });
     });
