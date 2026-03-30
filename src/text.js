@@ -49,7 +49,7 @@ export function buildNarrationTimeline(lines, container, opts = {}) {
     } else {
       tl.fromTo(
         el,
-        { opacity: 0, y: 18, filter: 'blur(4px)' },
+        { opacity: 0, y: -80, filter: 'blur(4px)' },
         { opacity: 1, y: 0, filter: 'blur(0px)', duration: 1.2, ease: 'power3.out' },
         line.enter / 1000,
       );
