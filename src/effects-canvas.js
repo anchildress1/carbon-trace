@@ -16,7 +16,7 @@
 // Must run before any pixi.js import — patches shader compilation to
 // use CSP-safe alternatives, required by script-src 'self' policy.
 import 'pixi.js/unsafe-eval';
-import { Application, Container, Sprite, Texture } from 'pixi.js';
+import { Application, Container, Sprite, Texture, TextureSource } from 'pixi.js';
 import { createEffect, noiseFreeTypes, overlayTypes } from './effects.js';
 
 let pixiApp = null;
@@ -44,7 +44,7 @@ let analysisElement = null;
 let analysisSource = null;
 let analysisSilentGain = null;
 let analysisAnalyserRef = null; // tracks which analyserNode is wired into the analysis graph for cleanup
-const maskSourceCache = new Map(); // Map<maskUrl, Promise<ImageBitmap | HTMLCanvasElement>>
+const maskSourceCache = new Map(); // Map<maskUrl, Promise<TextureSource>>
 const releasableMaskSources = new Set(); // ImageBitmaps need explicit close() on destroy()
 
 const REDUCED_MOTION_MEDIA_QUERY = '(prefers-reduced-motion: reduce)';
@@ -79,7 +79,7 @@ function loadTexture(url) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(Texture.from(img));
+    img.onload = () => resolve(Texture.from(img, true));
     img.onerror = () => reject(new Error(`Failed to load texture: ${url}`));
     img.src = url;
   });
@@ -145,20 +145,22 @@ async function createLuminanceMaskSource(url) {
 async function loadLuminanceMask(url) {
   let sourcePromise = maskSourceCache.get(url);
   if (!sourcePromise) {
-    sourcePromise = createLuminanceMaskSource(url).catch((err) => {
-      maskSourceCache.delete(url);
-      throw err;
-    });
+    sourcePromise = createLuminanceMaskSource(url)
+      .then((rawSource) => TextureSource.from(rawSource))
+      .catch((err) => {
+        maskSourceCache.delete(url);
+        throw err;
+      });
     maskSourceCache.set(url, sourcePromise);
   }
-  const source = await sourcePromise;
+  const textureSource = await sourcePromise;
 
   // Create a disposable Texture wrapper that shares the cached TextureSource.
   // PixiJS v8 removed Texture.clone() — construct a new Texture from the
-  // shared source instead. destroy(false) on the wrapper leaves the source
-  // alive for reuse by the next scene load.
-  const base = Texture.from(source);
-  return new Texture({ source: base.source, frame: base.frame });
+  // shared source directly. destroy(false) on the wrapper leaves the source
+  // alive for reuse by the next scene load. TextureSource.from() bypasses
+  // PixiJS's global Cache, keeping texture lifecycle fully application-managed.
+  return new Texture({ source: textureSource });
 }
 
 function handleContextLost(e) {
@@ -799,6 +801,16 @@ export function destroy() {
     }
   }
   releasableMaskSources.clear();
+
+  for (const sourcePromise of maskSourceCache.values()) {
+    sourcePromise.then((textureSource) => {
+      try {
+        textureSource.destroy();
+      } catch {
+        /* context lost */
+      }
+    });
+  }
   maskSourceCache.clear();
 
   if (observer) {

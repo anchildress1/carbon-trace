@@ -48,9 +48,9 @@ Each scene declares one or more effect regions. Each region is defined by a gray
 ```
 ON SCENE LOAD:
   1. Create PixiJS Application on the effects canvas (or reuse existing)
-  2. Load scene image via new Image() → Texture.from() (store as shared texture, NO full-screen sprite)
+  2. Load scene image via new Image() → Texture.from(img, skipCache) (store as shared texture, NO full-screen sprite)
   3. For each effect region:
-     a. Load mask image via new Image() → Texture.from() → Sprite (masking)
+     a. Load mask image via new Image() → luminance conversion → TextureSource.from() (cached) → new Texture() → Sprite (masking)
      b. Clone scene texture into a new Sprite inside a masked Container
      c. Load pre-authored displacement noise texture via new Image() → Texture.from()
      d. Create a DisplacementFilter with the noise sprite
@@ -190,13 +190,13 @@ Replaces the current `effects: { idle: "dust-drift", entry: "fade-in" }` structu
 - Resolution: can be lower than scene images (e.g., 768×432) — scaled up on load. Soft edges are fine and desirable.
 - White = full effect. Black = no effect. Gray = partial (used for edge falloff and dust density).
 - Stored in `public/assets/masks/` with a content hash suffix for cache busting (see ADR-010). When updating a mask, regenerate the hash (`shasum -a 256 <file> | cut -c1-8`), rename the file, and update `scenes.json`.
-- **Loaded via `new Image()` + `Texture.from()` inside `loadScene()`** — not preloaded ahead of time. Masks are small (~330KB each) and load behind the GSAP fade during transitions. No changes to loader.js. If profiling shows transition jank from mask loading, promote to browser cache warming in loader.js. **CSP note:** `new Image()` falls under `img-src 'self'`, preserving `connect-src 'none'`. `Assets.load()` is NOT used because some PixiJS code paths use `fetch()` internally, which is blocked by `connect-src 'none'`.
+- **Loaded via `new Image()` → luminance conversion → `TextureSource.from()` inside `loadScene()`** — not preloaded ahead of time. Masks are small (~330KB each) and load behind the GSAP fade during transitions. No changes to loader.js. If profiling shows transition jank from mask loading, promote to browser cache warming in loader.js. The `TextureSource` (not the raw `ImageBitmap`) is cached in `maskSourceCache` for cross-scene reuse; each scene wraps it in a disposable `new Texture({ source })`. This bypasses PixiJS's global `Cache`, keeping texture lifecycle fully application-managed. **CSP note:** `new Image()` falls under `img-src 'self'`, preserving `connect-src 'none'`. `Assets.load()` is NOT used because some PixiJS code paths use `fetch()` internally, which is blocked by `connect-src 'none'`.
 
 ### CSP impact
 
 Mask PNGs are local assets served from same origin. `img-src 'self'` already covers them.
 
-**Decision (adversarial review, March 21 2026):** PixiJS `Assets.load()` is NOT used for texture loading. Some PixiJS code paths use `fetch()` internally, which would be blocked by `connect-src 'none'`. Instead, all textures (scene images, masks, noise) are loaded via `new Image()` + `Texture.from()`, which falls under `img-src 'self'`. This preserves the strict `connect-src 'none'` CSP without amendment. `Assets` is not imported from PixiJS.
+**Decision (adversarial review, March 21 2026):** PixiJS `Assets.load()` is NOT used for texture loading. Some PixiJS code paths use `fetch()` internally, which would be blocked by `connect-src 'none'`. Instead, scene and noise textures are loaded via `new Image()` + `Texture.from(img, skipCache)`, and mask textures via `new Image()` → luminance conversion → `TextureSource.from()`, both falling under `img-src 'self'`. Scene/noise textures pass `skipCache = true` to avoid unnecessary PixiJS Cache entries; mask textures use `TextureSource.from()` which bypasses the Cache entirely. This preserves the strict `connect-src 'none'` CSP without amendment. `Assets` is not imported from PixiJS.
 
 ---
 
@@ -467,7 +467,7 @@ These are scoped implementation choices, not architectural decisions. The ADR's 
 6. [x] Implement heat displacement (DisplacementFilter, upward, large scale)
 7. [x] Implement dust displacement (DisplacementFilter, multi-directional slow drift)
 8. [x] Update app.js showFrame() to use new effects API
-9. [ ] ~~Add mask preloading to loader.js pipeline~~ Masks loaded lazily via `new Image()` + `Texture.from()` inside loadScene(). No loader.js changes needed.
+9. [ ] ~~Add mask preloading to loader.js pipeline~~ Masks loaded lazily via `new Image()` + `TextureSource.from()` inside loadScene(). No loader.js changes needed.
 10. [x] Update scenes.json schema for all 12 frames
 11. [x] WebGL fallback: detect unavailability, degrade to static + context loss recovery (re-init on next loadScene)
 12. [x] Error boundary: try/catch around init(), webglAvailable flag, loadScene() no-op on failure
@@ -476,4 +476,4 @@ These are scoped implementation choices, not architectural decisions. The ADR's 
 15. [x] Audio-reactive implementation — see ADR-008 action items
 16. [x] Add request-generation guard in loadScene() — increment a generation counter on each call, check on async image/mask load resolve, discard stale results if counter has changed (prevents race when user navigates mid-load)
 17. [x] Resize active effect/mask bounds — ResizeObserver tracks screen-sized sprites (maskSprite, effectSprite) and updates their dimensions on resize. Noise sprites use scale.set() with repeat addressing (viewport-independent).
-18. [x] Texture lifecycle cleanup in clearAll() — disposableTextures array tracks per-scene mask, noise, and scene textures. Destroyed with .destroy(false) to avoid BindGroup corruption; TextureSources left for GCSystem reclamation. Sprites destroyed via child.destroy({ children: true, texture: false }).
+18. [x] Texture lifecycle cleanup in clearAll() — disposableTextures array tracks per-scene mask, noise, and scene textures. Destroyed with .destroy(false) to avoid BindGroup corruption; TextureSources left for GCSystem reclamation. Sprites destroyed via child.destroy({ children: true, texture: false }). Mask TextureSources are cached directly in maskSourceCache (not raw ImageBitmaps) and explicitly destroyed in destroy().

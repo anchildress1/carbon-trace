@@ -87,6 +87,9 @@ vi.mock('pixi.js', () => ({
       })),
     },
   ),
+  TextureSource: {
+    from: vi.fn(() => ({ style: {}, destroy: vi.fn() })),
+  },
 }));
 
 vi.mock('../../src/effects.js', () => ({
@@ -154,7 +157,7 @@ function setupImageMock() {
   });
 
   // createImageBitmap is not available in jsdom/happy-dom.
-  // Return a plain object — Texture.from() is mocked anyway.
+  // Return a plain object — TextureSource.from() is mocked anyway.
   globalThis.createImageBitmap = vi.fn().mockResolvedValue({ width: 256, height: 256 });
 }
 
