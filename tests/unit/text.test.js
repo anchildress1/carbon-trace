@@ -177,7 +177,7 @@ describe('text.js', () => {
       const { timeline: tl } = buildNarrationTimeline(lines, container, { reducedMotion: false });
 
       const fromToCall = tl.fromTo.mock.calls[0];
-      expect(fromToCall[1]).toEqual({ opacity: 0, y: -80, filter: 'blur(4px)' });
+      expect(fromToCall[1]).toEqual({ opacity: 0, y: -20, filter: 'blur(4px)' });
       expect(fromToCall[2]).toMatchObject({ duration: 1.2, ease: 'power3.out' });
     });
 
