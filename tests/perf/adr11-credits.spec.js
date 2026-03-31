@@ -2,6 +2,12 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, expect } from '@playwright/test';
+import {
+  dismissLoadingScreen,
+  sampleRafStats,
+  percentile,
+  emulatePixelClassProxy,
+} from './helpers.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const scenesData = JSON.parse(readFileSync(resolve(__dirname, '../../src/scenes.json'), 'utf8'));
@@ -15,19 +21,6 @@ const runAdr11Perf = process.env.PERF_ADR11 === '1';
 const hasCreditsBackdropBlurRule =
   /#credits-backdrop[\s\S]*backdrop-filter:\s*blur\(/.test(stylesCss) &&
   /#credits-backdrop[\s\S]*-webkit-backdrop-filter:\s*blur\(/.test(stylesCss);
-
-function percentile(samples, p) {
-  if (!samples.length) return 0;
-  const sorted = [...samples].sort((a, b) => a - b);
-  const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * p) - 1));
-  return sorted[index];
-}
-
-async function dismissLoadingScreen(page) {
-  await page.waitForSelector('#loading-prompt:not([hidden])', { timeout: 15000 });
-  await page.click('#loading-screen');
-  await page.locator('#loading-screen').waitFor({ state: 'hidden', timeout: 3000 });
-}
 
 async function jumpToCreditsFrame(page) {
   const panel = page.locator('#credits-panel');
@@ -64,63 +57,6 @@ async function revealCreditsPanel(page) {
   await expect(page.locator('#credits-panel')).toBeVisible({
     timeout: holdAfterNarrationMs + 2000,
   });
-}
-
-async function sampleRafStats(page, sampleWindowMs) {
-  return page.evaluate(async (windowMs) => {
-    const intervalsMs = [];
-    const startedAt = performance.now();
-    let previous = startedAt;
-
-    await new Promise((resolve) => {
-      const tick = (timestamp) => {
-        intervalsMs.push(timestamp - previous);
-        previous = timestamp;
-
-        if (timestamp - startedAt < windowMs) {
-          requestAnimationFrame(tick);
-          return;
-        }
-
-        resolve();
-      };
-
-      requestAnimationFrame(tick);
-    });
-
-    const sampledDurationMs = performance.now() - startedAt;
-    const averageIntervalMs =
-      intervalsMs.length === 0
-        ? 0
-        : intervalsMs.reduce((total, ms) => total + ms, 0) / intervalsMs.length;
-    const averageFps = averageIntervalMs > 0 ? 1000 / averageIntervalMs : 0;
-    const droppedFrames = intervalsMs.filter((ms) => ms > 25).length;
-
-    return {
-      sampledDurationMs,
-      frames: intervalsMs.length,
-      intervalsMs,
-      averageFps,
-      droppedFramePercent:
-        intervalsMs.length === 0 ? 0 : (droppedFrames / intervalsMs.length) * 100,
-    };
-  }, sampleWindowMs);
-}
-
-async function emulatePixelClassProxy(page) {
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send('Emulation.setDeviceMetricsOverride', {
-    width: 393,
-    height: 851,
-    deviceScaleFactor: 2.75,
-    mobile: true,
-  });
-  await cdp.send('Emulation.setTouchEmulationEnabled', {
-    enabled: true,
-    maxTouchPoints: 5,
-  });
-  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
-  return cdp;
 }
 
 test.describe('ADR-011 outstanding validation checks', () => {
@@ -257,6 +193,7 @@ test.describe('ADR-011 outstanding validation checks', () => {
     } finally {
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
       await cdp.send('Emulation.clearDeviceMetricsOverride');
+      await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false });
     }
   });
 });

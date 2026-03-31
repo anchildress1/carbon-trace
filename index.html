@@ -10,6 +10,13 @@
     />
     <title>carbon-trace</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link
+      rel="preload"
+      href="/assets/fonts/lora-variable-ital-wght-8efedcd4.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
@@ -17,11 +24,13 @@
       <button
         class="loading-screen"
         id="loading-screen"
-        aria-label="carbon-trace, begin experience"
+        aria-label="Carbon Trace, begin experience"
       >
         <span class="loading-trace">
           <span class="loading-title loading-title--main">Carbon Trace</span>
-          <span class="loading-title loading-title--byline">By Ashley Childress</span>
+          <span class="loading-title loading-title--byline" aria-hidden="true"
+            >By Ashley Childress</span
+          >
           <svg class="loading-svg" viewBox="0 0 200 40" aria-hidden="true">
             <path
               class="trace-glow"
@@ -43,7 +52,7 @@
         </span>
       </button>
 
-      <div class="scene-stage" id="scene-stage" hidden>
+      <div class="scene-stage" id="scene-stage" role="region" hidden>
         <canvas class="scene-canvas" id="scene-canvas" aria-hidden="true" tabindex="-1"></canvas>
         <canvas
           class="effects-canvas"

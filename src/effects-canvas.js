@@ -462,6 +462,7 @@ async function doInit(el) {
       canvas: el,
       backgroundAlpha: 0,
       autoStart: false,
+      preference: 'webgl',
     });
 
     app.ticker.add(tickerUpdate);

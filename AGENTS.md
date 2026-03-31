@@ -139,7 +139,7 @@ Full system design: `docs/carbon-trace-system-design.md` and `docs/ADRs/*.md`
 
 ## Performance / Lighthouse
 
-- **Targets** (enforced in `.lighthouserc.json`): ≥90% performance, ≥95% accessibility, ≥95% best-practices, ≥90% SEO.
+- **Targets** (enforced in `.lighthouserc.json` and `.lighthouserc.mobile.json`): ≥90% performance, 100% accessibility, ≥95% best-practices, ≥90% SEO.
 - Images are WebP, 16:9, 2x resolution. Total asset budget <35MB.
 - All asset filenames in `public/assets/` carry an 8-char SHA-256 content
   hash suffix for cache busting (ADR-010). When adding or updating any asset,
