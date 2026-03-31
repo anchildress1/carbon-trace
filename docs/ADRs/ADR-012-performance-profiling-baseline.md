@@ -121,6 +121,8 @@ The primary bottleneck was **LCP (Largest Contentful Paint) at 4.4s**, with 90% 
 
 **Solution:** The dynamic import is deferred until after the loading prompt becomes visible (post-LCP). `initEffectsCanvas()` and `initShimmer()` are moved to the same post-LCP point. Frame 0 has no effects or shimmer, so nothing visual is lost. The import begins while the user reads the prompt and is ready before they advance to frame 1.
 
+**Invariant:** This optimization requires that frame 0 declares no `effects.regions` and no `traceOverlay`. `initApp()` enforces this with a startup validation that throws if frame 0 declares overlays. If frame 0 ever needs overlays, the init sequence must be restructured to init overlay systems before `showFrame()` — deferral past LCP would no longer be possible for those systems. `shimmer.loadScene()` also guards against pre-init calls (no-op when canvas is unbound) as a module-boundary safety net.
+
 **Impact:** Mobile TBT reduced from ~50ms to 0-19ms under simulated throttling.
 
 **Files:** `src/app.js`

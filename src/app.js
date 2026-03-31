@@ -1012,6 +1012,20 @@ function initApp(app) {
       app.els.btnCaptions.setAttribute('aria-pressed', String(captionsEnabled));
       app.els.btnCaptions.classList.toggle('cc-on', captionsEnabled);
 
+      // Performance invariant: overlay init is deferred until after LCP
+      // (ADR-012 §3, optimization #6). This requires frame 0 to have no
+      // effects or shimmer — otherwise showFrame(app, 0) would trigger
+      // overlay loads before the systems are initialized. If frame 0 ever
+      // needs overlays, the init sequence must be restructured.
+      const frame0 = app.frames[0];
+      if (frame0.effects?.regions?.length || frame0.traceOverlay) {
+        throw new Error(
+          'Frame 0 declares effects or traceOverlay, but overlay init is deferred ' +
+            'until after LCP. Restructure initApp() to init overlays before showFrame() ' +
+            'for frame 0, or remove overlays from frame 0. See ADR-012 §3, optimization #6.',
+        );
+      }
+
       showFrame(app, 0);
 
       // Loading screen stays visible as the interactive start gate.
@@ -1021,10 +1035,10 @@ function initApp(app) {
       app.els.loadingPrompt.classList.add('visible');
       app.els.loadingScreen.classList.add('ready');
 
-      // Defer effects and shimmer init until after LCP. Frame 0 has no
-      // effects or shimmer, so starting these now (while the user reads
-      // the prompt) avoids TBT on the critical path while ensuring they
-      // are ready before the user advances to frame 1.
+      // Deferred overlay init — post-LCP. Frame 0 is validated above to
+      // have no overlays, so starting these now (while the user reads the
+      // prompt) avoids TBT on the critical path while ensuring they are
+      // ready before the user advances to frame 1.
       startEffectsLoad();
       initEffectsCanvas(app.els.effectsCanvas).catch((err) =>
         console.error('Effects canvas init failed:', err.message),
