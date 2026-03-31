@@ -1250,6 +1250,40 @@ describe('app.js', () => {
       // Ambient crossfade is now handled by scheduleAudioCues
       expect(scheduleAudioCues).toHaveBeenCalled();
     });
+
+    it('waits for scene image readiness before landing on frame', async () => {
+      globalThis.matchMedia.mockReturnValue({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      });
+      // Prevent first-frame image from being cached during init.
+      loadImage.mockResolvedValue(null);
+      app = createApp();
+      await flush();
+
+      const delayedImage = new Image();
+      loadImage.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve(delayedImage), 500)),
+      );
+
+      app.togglePause(); // resume so advance() uses transition path
+      vi.clearAllMocks();
+
+      app.advance();
+      expect(app.getState()).toBe('TRANSITIONING');
+
+      vi.advanceTimersByTime(300);
+      await flush();
+      expect(document.getElementById('transition-loader').hidden).toBe(false);
+      expect(app.getState()).toBe('TRANSITIONING');
+
+      vi.advanceTimersByTime(200);
+      await flush();
+      expect(document.getElementById('transition-loader').hidden).toBe(true);
+      expect(app.getState()).toBe('SCENE_ACTIVE');
+      expect(drawImage).toHaveBeenCalledWith(delayedImage);
+    });
   });
 
   // ── registerAudio ──────────────────────────────────────────────────
@@ -1315,6 +1349,31 @@ describe('app.js', () => {
       vi.clearAllMocks();
 
       app.advance(); // hard-jump: title → scene-01
+
+      // Transition completes synchronously — spinner never shows
+      expect(document.getElementById('transition-loader').hidden).toBe(true);
+      // Frame was shown immediately (fallback rendered)
+      expect(drawFallback).toHaveBeenCalled();
+    });
+
+    it('click-jump completes synchronously without waiting for image', async () => {
+      let dotClickCb;
+      initOverlay.mockImplementation((count, cb) => {
+        dotClickCb = cb;
+      });
+
+      loadImage.mockResolvedValue(null);
+      app = createApp();
+      await flush();
+
+      loadImage.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve(new Image()), 500)),
+      );
+
+      app.togglePause(); // resume so dot click follows click-jump path
+      vi.clearAllMocks();
+
+      dotClickCb(2); // scene index 2 maps to frame index 1 (scene-01)
 
       // Transition completes synchronously — spinner never shows
       expect(document.getElementById('transition-loader').hidden).toBe(true);

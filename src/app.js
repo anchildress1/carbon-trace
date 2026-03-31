@@ -778,8 +778,11 @@ function transition(app, toIndex) {
   }
 
   if (prefersReducedMotion()) {
-    if (!proceedWithFrame(app, toIndex)) return;
-    landOnFrame(app, toFrame);
+    // Re-check at execution time — image may have been cached by preload-ahead
+    whenImageReady(app, toFrame, () => {
+      if (!proceedWithFrame(app, toIndex)) return;
+      landOnFrame(app, toFrame);
+    });
     return;
   }
 
