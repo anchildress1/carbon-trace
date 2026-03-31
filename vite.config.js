@@ -47,6 +47,12 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: 'index.html',
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/gsap')) return 'gsap';
+          if (id.includes('node_modules/howler')) return 'howler';
+        },
+      },
     },
   },
   server: {
