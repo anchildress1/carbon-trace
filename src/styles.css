@@ -1,6 +1,6 @@
 @font-face {
   font-family: 'Lora';
-  src: url('/assets/fonts/lora-variable-wght-53c6817f.ttf') format('truetype-variations');
+  src: url('/assets/fonts/lora-variable-wght-8eb3e1b0.woff2') format('woff2-variations');
   font-style: normal;
   font-weight: 100 900;
   font-display: swap;
@@ -8,7 +8,7 @@
 
 @font-face {
   font-family: 'Lora';
-  src: url('/assets/fonts/lora-variable-ital-wght-fe24ffb8.ttf') format('truetype-variations');
+  src: url('/assets/fonts/lora-variable-ital-wght-8efedcd4.woff2') format('woff2-variations');
   font-style: italic;
   font-weight: 100 900;
   font-display: swap;
