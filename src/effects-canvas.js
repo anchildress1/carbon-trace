@@ -340,7 +340,7 @@ async function applyRegionEffect(region, sceneTexture, gen) {
 
   let noiseSprite = null;
   if (!noiseFreeTypes.has(region.type)) {
-    const noiseTexture = await loadTexture(region.noise || 'assets/masks/noise-256-2ac4a54e.png');
+    const noiseTexture = await loadTexture(region.noise || 'assets/masks/noise-256-114294d2.png');
     if (gen !== loadGeneration) {
       noiseTexture.destroy(false);
       return null;
