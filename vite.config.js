@@ -15,10 +15,33 @@ function relaxCspInDev() {
   };
 }
 
+/**
+ * Stub out PixiJS renderers that this app never uses. autoDetectRenderer
+ * dynamically imports CanvasRenderer and WebGPURenderer — this plugin
+ * replaces those modules with empty exports so Rollup excludes their code.
+ * Application.init({ preference: 'webgl' }) ensures these stubs are never
+ * reached at runtime.
+ */
+function pixiWebGLOnly() {
+  return {
+    name: 'pixi-webgl-only',
+    enforce: 'pre',
+    load(id) {
+      if (id.includes('/renderers/canvas/CanvasRenderer')) {
+        return 'export const CanvasRenderer = null;';
+      }
+      if (id.includes('/renderers/gpu/WebGPURenderer')) {
+        return 'export const WebGPURenderer = null;';
+      }
+      return null;
+    },
+  };
+}
+
 export default defineConfig({
   root: '.',
   publicDir: 'public',
-  plugins: [relaxCspInDev()],
+  plugins: [relaxCspInDev(), pixiWebGLOnly()],
   build: {
     outDir: 'dist',
     emptyOutDir: true,
