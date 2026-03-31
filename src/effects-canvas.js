@@ -32,7 +32,7 @@ let disposableTextures = [];
 let loadGeneration = 0;
 let isPaused = false;
 let initPromise = null;
-let destroyed = false;
+let lifecycleToken = 0;
 let centeredEffects = []; // effects with normalized center → pixel conversion
 
 // Audio-reactive modulation state (ADR-008)
@@ -49,6 +49,25 @@ const maskSourceCache = new Map(); // Map<maskUrl, Promise<TextureSource>>
 const releasableMaskSources = new Set(); // ImageBitmaps need explicit close() on destroy()
 
 const REDUCED_MOTION_MEDIA_QUERY = '(prefers-reduced-motion: reduce)';
+
+function createStaleMaskLoadError(url) {
+  const err = new Error(`Stale mask load discarded: ${url}`);
+  err.name = 'StaleMaskLoadError';
+  return err;
+}
+
+function isStaleMaskLoadError(err) {
+  return err?.name === 'StaleMaskLoadError';
+}
+
+function releaseMaskSource(source) {
+  releasableMaskSources.delete(source);
+  try {
+    source?.close?.();
+  } catch {
+    /* already closed */
+  }
+}
 
 function getMotionQuery() {
   if (motionQuery) return motionQuery;
@@ -97,7 +116,7 @@ function loadTexture(url) {
  * scene loads. ImageBitmap provides a GPU-ready resource that uploads
  * reliably across scene transitions.
  */
-async function createLuminanceMaskSource(url) {
+async function createLuminanceMaskSource(url, requestToken) {
   const img = new Image();
   img.crossOrigin = 'anonymous';
   await new Promise((resolve, reject) => {
@@ -105,6 +124,9 @@ async function createLuminanceMaskSource(url) {
     img.onerror = () => reject(new Error(`Failed to load mask: ${url}`));
     img.src = url;
   });
+  if (requestToken !== lifecycleToken) {
+    throw createStaleMaskLoadError(url);
+  }
 
   if (!img.naturalWidth || !img.naturalHeight) {
     throw new Error(`Mask image has zero dimensions: ${url}`);
@@ -132,30 +154,37 @@ async function createLuminanceMaskSource(url) {
   if (typeof createImageBitmap === 'function') {
     try {
       const bitmap = await createImageBitmap(canvas, { premultiplyAlpha: 'none' });
-      if (destroyed) {
-        try {
-          bitmap.close?.();
-        } catch {
-          /* already closed */
-        }
-        return canvas;
+      if (requestToken !== lifecycleToken) {
+        releaseMaskSource(bitmap);
+        throw createStaleMaskLoadError(url);
       }
       releasableMaskSources.add(bitmap);
       return bitmap;
     } catch (err) {
+      if (isStaleMaskLoadError(err)) throw err;
       console.warn(`createImageBitmap failed for ${url}:`, err.message);
     }
   }
 
   // Fallback source for test/browser environments without createImageBitmap.
+  if (requestToken !== lifecycleToken) {
+    throw createStaleMaskLoadError(url);
+  }
   return canvas;
 }
 
 async function loadLuminanceMask(url) {
   let sourcePromise = maskSourceCache.get(url);
   if (!sourcePromise) {
-    sourcePromise = createLuminanceMaskSource(url)
-      .then((rawSource) => TextureSource.from(rawSource))
+    const requestToken = lifecycleToken;
+    sourcePromise = createLuminanceMaskSource(url, requestToken)
+      .then((rawSource) => {
+        if (requestToken !== lifecycleToken) {
+          releaseMaskSource(rawSource);
+          throw createStaleMaskLoadError(url);
+        }
+        return TextureSource.from(rawSource);
+      })
       .catch((err) => {
         maskSourceCache.delete(url);
         throw err;
@@ -417,7 +446,7 @@ export function init(el) {
 
   if (canvasEl && pixiApp) destroy();
 
-  destroyed = false;
+  lifecycleToken += 1;
   canvasEl = el;
   webglAvailable = true;
 
@@ -494,6 +523,7 @@ async function loadRegionEffects(regions, sceneTexture, gen) {
         activeEffects.push(effect);
       }
     } catch (err) {
+      if (isStaleMaskLoadError(err)) continue;
       console.warn(`Skipping effect region "${region.type}":`, err.message);
     }
   }
@@ -789,8 +819,8 @@ export function resume() {
 }
 
 export function destroy() {
+  lifecycleToken += 1;
   pause();
-  destroyed = true;
   cleanupAnalysisElement();
 
   if (canvasEl) {
@@ -804,13 +834,7 @@ export function destroy() {
   }
   reducedMotionEnabled = false;
 
-  for (const source of releasableMaskSources) {
-    try {
-      source.close?.();
-    } catch {
-      /* already closed */
-    }
-  }
+  for (const source of releasableMaskSources) releaseMaskSource(source);
   releasableMaskSources.clear();
 
   for (const sourcePromise of maskSourceCache.values()) {

@@ -428,6 +428,34 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
 
       expect(bitmap.close).toHaveBeenCalled();
     });
+
+    it('closes stale in-flight ImageBitmaps across destroy and re-init', async () => {
+      let resolveBitmap;
+      const bitmap = { width: 256, height: 256, close: vi.fn() };
+      globalThis.createImageBitmap = vi.fn(
+        () => new Promise((resolve) => { resolveBitmap = () => resolve(bitmap); }),
+      );
+
+      const firstCanvas = createMockCanvas();
+      await init(firstCanvas);
+
+      const sceneLoad = loadScene(
+        { regions: [{ type: 'water', mask: 'stale-race.png' }] },
+        'scene.webp',
+      );
+
+      await vi.waitFor(() => expect(globalThis.createImageBitmap).toHaveBeenCalled());
+
+      destroy();
+      const secondCanvas = createMockCanvas();
+      await init(secondCanvas);
+
+      resolveBitmap();
+      await sceneLoad;
+      await Promise.resolve();
+
+      expect(bitmap.close).toHaveBeenCalled();
+    });
   });
 
   describe('loadScene', () => {
