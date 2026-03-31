@@ -11,6 +11,7 @@ on:
       - ".github/**"
       - "lefthook.yml"
       - ".lighthouserc.json"
+      - ".lighthouserc.mobile.json"
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
     paths-ignore:
@@ -82,6 +83,17 @@ jobs:
 
       - name: Run Performance / Lighthouse Tests
         run: pnpm exec lhci autorun
+
+      - name: Run Mobile Lighthouse Tests
+        run: pnpm exec lhci autorun --config=.lighthouserc.mobile.json
+
+      - name: Store Mobile Lighthouse Report
+        uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: lighthouse-report-mobile
+          path: .lighthouseci-mobile/
+          retention-days: 30
 
       - name: Store Playwright Report
         uses: actions/upload-artifact@v7
