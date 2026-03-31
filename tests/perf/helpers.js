@@ -17,12 +17,13 @@ export async function dismissLoadingScreen(page) {
 export async function measureAdvanceLatencyMs(page) {
   const stage = page.locator('#scene-stage');
   const before = await stage.getAttribute('aria-label');
-  const start = Date.now();
+  const start = await page.evaluate(() => performance.now());
 
   await page.keyboard.press('ArrowRight');
   await expect(stage).not.toHaveAttribute('aria-label', before, { timeout: 5000 });
 
-  return Date.now() - start;
+  const end = await page.evaluate(() => performance.now());
+  return end - start;
 }
 
 /**
@@ -32,12 +33,49 @@ export async function measureAdvanceLatencyMs(page) {
 export async function measureRetreatLatencyMs(page) {
   const stage = page.locator('#scene-stage');
   const before = await stage.getAttribute('aria-label');
-  const start = Date.now();
+  const start = await page.evaluate(() => performance.now());
 
   await page.keyboard.press('ArrowLeft');
   await expect(stage).not.toHaveAttribute('aria-label', before, { timeout: 5000 });
 
-  return Date.now() - start;
+  const end = await page.evaluate(() => performance.now());
+  return end - start;
+}
+
+/**
+ * Measure loading-screen dismissal latency using in-page timing only.
+ */
+export async function measureLoadingScreenDismissLatencyMs(page, timeoutMs = 3000) {
+  return page.evaluate(async (maxWaitMs) => {
+    const loadingScreen = document.getElementById('loading-screen');
+    if (!loadingScreen) {
+      throw new Error('loading-screen element not found');
+    }
+
+    const start = performance.now();
+    loadingScreen.click();
+
+    if (!loadingScreen.hidden) {
+      await new Promise((resolve, reject) => {
+        let timerId;
+        const observer = new MutationObserver(() => {
+          if (loadingScreen.hidden) {
+            observer.disconnect();
+            clearTimeout(timerId);
+            resolve();
+          }
+        });
+
+        observer.observe(loadingScreen, { attributes: true, attributeFilter: ['hidden'] });
+        timerId = setTimeout(() => {
+          observer.disconnect();
+          reject(new Error('Timed out waiting for loading screen to hide'));
+        }, maxWaitMs);
+      });
+    }
+
+    return performance.now() - start;
+  }, timeoutMs);
 }
 
 /**
@@ -71,6 +109,16 @@ export async function collectLongTasks(page) {
 }
 
 /**
+ * Clear accumulated long tasks so subsequent collectLongTasks calls
+ * only return tasks recorded after this point.
+ */
+export async function clearLongTasks(page) {
+  await page.evaluate(() => {
+    globalThis.__ctLongTasks = [];
+  });
+}
+
+/**
  * Collect paint timing entries (first-contentful-paint, etc.).
  */
 export async function collectPaintMetrics(page) {
@@ -94,8 +142,15 @@ export async function sampleRafStats(page, sampleWindowMs) {
     let previous = startedAt;
 
     await new Promise((resolve) => {
+      let isFirstFrame = true;
       const tick = (timestamp) => {
-        intervalsMs.push(timestamp - previous);
+        if (isFirstFrame) {
+          // Discard the first interval — it measures from pre-rAF
+          // (performance.now()) to the first callback, inflating the average.
+          isFirstFrame = false;
+        } else {
+          intervalsMs.push(timestamp - previous);
+        }
         previous = timestamp;
 
         if (timestamp - startedAt < windowMs) {

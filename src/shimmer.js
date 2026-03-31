@@ -27,6 +27,9 @@ let traceImage = null;
 let activeColor = [232, 200, 120]; // current scene's glow color
 let activeDotSpeed = 0.8; // current scene's dot speed
 let loadGeneration = 0; // monotonic counter — guards against stale async loads
+let isInitialized = false;
+const NO_PENDING_SCENE = Symbol('NO_PENDING_SCENE');
+let pendingSceneConfig = NO_PENDING_SCENE;
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
@@ -469,9 +472,26 @@ export function init(canvasEl) {
     observer = new ResizeObserver(() => handleResize());
     observer.observe(canvas);
   }
+  isInitialized = true;
+
+  // If loadScene() was called before init(), replay the latest pending config
+  // now that a canvas/context exists.
+  if (pendingSceneConfig !== NO_PENDING_SCENE) {
+    const config = pendingSceneConfig;
+    pendingSceneConfig = NO_PENDING_SCENE;
+    void loadScene(config).catch((err) => {
+      console.error('shimmer: deferred scene load failed:', err);
+    });
+  }
 }
 
 export async function loadScene(config) {
+  if (!isInitialized || !ctx || !canvas) {
+    pendingSceneConfig = config ?? null;
+    return;
+  }
+  pendingSceneConfig = NO_PENDING_SCENE;
+
   const gen = ++loadGeneration;
 
   if (rafId) {
@@ -558,6 +578,8 @@ export function destroy() {
   walkPositions = [];
   traceImage = null;
   dots = [];
+  isInitialized = false;
+  pendingSceneConfig = NO_PENDING_SCENE;
   canvas = null;
   ctx = null;
 }

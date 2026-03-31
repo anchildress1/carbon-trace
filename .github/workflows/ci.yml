@@ -5,19 +5,17 @@ on:
     branches:
       - main
     paths-ignore:
-      - "*.md"
-      - "docs/**"
-      - "LICENSE"
-      - ".github/**"
-      - "lefthook.yml"
-      - ".lighthouserc.json"
-      - ".lighthouserc.mobile.json"
+      - '*.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.github/**'
+      - 'lefthook.yml'
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
     paths-ignore:
-      - "*.md"
-      - "docs/**"
-      - "LICENSE"
+      - '*.md'
+      - 'docs/**'
+      - 'LICENSE'
   workflow_dispatch:
 
 concurrency:
@@ -85,7 +83,7 @@ jobs:
         run: pnpm exec lhci autorun
 
       - name: Run Mobile Lighthouse Tests
-        run: pnpm exec lhci autorun --config=.lighthouserc.mobile.json
+        run: pnpm exec node scripts/lhci-autorun-ci.mjs --config=.lighthouserc.mobile.json
 
       - name: Store Mobile Lighthouse Report
         uses: actions/upload-artifact@v7

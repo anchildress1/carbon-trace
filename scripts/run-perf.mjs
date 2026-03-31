@@ -13,17 +13,14 @@ const PREVIEW_ARGS = [
   '--strictPort',
 ];
 
-const previewProcess = spawn('pnpm', PREVIEW_ARGS, {
-  stdio: 'inherit',
-  env: {
-    ...process.env,
-    BROWSER: 'none',
-  },
-});
+let previewProcess = null;
 
 let isStopping = false;
 
 async function waitForPreviewServer(timeoutMs = 45_000) {
+  if (!previewProcess) {
+    throw new Error('Preview server has not been started.');
+  }
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < timeoutMs) {
@@ -44,6 +41,19 @@ async function waitForPreviewServer(timeoutMs = 45_000) {
   }
 
   throw new Error(`Timed out waiting for preview server at ${PREVIEW_URL}.`);
+}
+
+function startPreviewServer() {
+  if (previewProcess) {
+    return;
+  }
+  previewProcess = spawn('pnpm', PREVIEW_ARGS, {
+    stdio: 'inherit',
+    env: {
+      ...process.env,
+      BROWSER: 'none',
+    },
+  });
 }
 
 function runCommand(command, args, extraEnv = {}) {
@@ -75,7 +85,7 @@ async function stopPreviewServer() {
   }
   isStopping = true;
 
-  if (previewProcess.exitCode !== null) {
+  if (!previewProcess || previewProcess.exitCode !== null) {
     return;
   }
 
@@ -90,6 +100,7 @@ async function stopPreviewServer() {
   if (previewProcess.exitCode === null) {
     previewProcess.kill('SIGKILL');
   }
+  previewProcess = null;
 }
 
 function attachSignalHandlers() {
@@ -112,10 +123,12 @@ function attachSignalHandlers() {
 attachSignalHandlers();
 
 try {
-  await waitForPreviewServer();
-
   await runCommand('pnpm', ['perf:lighthouse:desktop']);
   await runCommand('pnpm', ['perf:lighthouse:mobile']);
+
+  startPreviewServer();
+  await waitForPreviewServer();
+
   await runCommand('pnpm', ['perf:baseline'], {
     PERF_EXTERNAL_SERVER: '1',
   });

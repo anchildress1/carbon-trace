@@ -1000,7 +1000,7 @@ function initApp(app) {
   onNarrationBufferChange((isBuffering) => handleBufferChange(app, isBuffering));
 
   preloadFirstFrameImage(app)
-    .then(() => {
+    .then(async () => {
       app.els.sceneStage.hidden = false;
       showControls();
 
@@ -1011,6 +1011,26 @@ function initApp(app) {
       const captionsEnabled = initCaptions();
       app.els.btnCaptions.setAttribute('aria-pressed', String(captionsEnabled));
       app.els.btnCaptions.classList.toggle('cc-on', captionsEnabled);
+
+      const firstFrame = app.frames[0];
+      const firstFrameNeedsImmediateEffects = firstFrame?.effects?.regions?.length > 0;
+      const firstFrameNeedsImmediateShimmer = Boolean(firstFrame?.traceOverlay);
+
+      // If frame 0 uses overlays, initialize them before showFrame() so the
+      // first render does not depend on deferred post-LCP startup ordering.
+      if (firstFrameNeedsImmediateEffects) {
+        startEffectsLoad();
+        await initEffectsCanvas(app.els.effectsCanvas).catch((err) =>
+          console.error('Effects canvas init failed:', err.message),
+        );
+      }
+      if (firstFrameNeedsImmediateShimmer) {
+        try {
+          initShimmer(app.els.traceOverlay);
+        } catch (err) {
+          console.error('Shimmer init failed:', err.message);
+        }
+      }
 
       showFrame(app, 0);
 
@@ -1025,14 +1045,18 @@ function initApp(app) {
       // effects or shimmer, so starting these now (while the user reads
       // the prompt) avoids TBT on the critical path while ensuring they
       // are ready before the user advances to frame 1.
-      startEffectsLoad();
-      initEffectsCanvas(app.els.effectsCanvas).catch((err) =>
-        console.error('Effects canvas init failed:', err.message),
-      );
-      try {
-        initShimmer(app.els.traceOverlay);
-      } catch (err) {
-        console.error('Shimmer init failed:', err.message);
+      if (!firstFrameNeedsImmediateEffects) {
+        startEffectsLoad();
+        initEffectsCanvas(app.els.effectsCanvas).catch((err) =>
+          console.error('Effects canvas init failed:', err.message),
+        );
+      }
+      if (!firstFrameNeedsImmediateShimmer) {
+        try {
+          initShimmer(app.els.traceOverlay);
+        } catch (err) {
+          console.error('Shimmer init failed:', err.message);
+        }
       }
 
       app.state = State.SCENE_ACTIVE;

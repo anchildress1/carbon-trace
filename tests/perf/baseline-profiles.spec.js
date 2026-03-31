@@ -10,8 +10,10 @@ import {
   dismissLoadingScreen,
   measureAdvanceLatencyMs,
   measureRetreatLatencyMs,
+  measureLoadingScreenDismissLatencyMs,
   injectLongTaskObserver,
   collectLongTasks,
+  clearLongTasks,
   collectPaintMetrics,
   sampleRafStats,
   percentile,
@@ -28,10 +30,9 @@ test.describe('baseline performance profiles', () => {
   test('page load metrics', async ({ page }, testInfo) => {
     await injectLongTaskObserver(page);
 
-    const navStart = Date.now();
     await page.goto('/');
     await page.waitForSelector('#loading-prompt:not([hidden])', { timeout: 15000 });
-    const promptVisibleMs = Date.now() - navStart;
+    const promptVisibleMs = await page.evaluate(() => performance.now());
 
     const paintMetrics = await collectPaintMetrics(page);
     const longTasks = await collectLongTasks(page);
@@ -74,12 +75,9 @@ test.describe('baseline performance profiles', () => {
 
   test('click-to-begin latency', async ({ page }, testInfo) => {
     await page.goto('/');
-    await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
+    await page.waitForSelector('#loading-prompt:not([hidden])', { timeout: 15000 });
 
-    const start = Date.now();
-    await page.click('#loading-screen');
-    await page.locator('#loading-screen').waitFor({ state: 'hidden', timeout: 3000 });
-    const clickToVisibleMs = Date.now() - start;
+    const clickToVisibleMs = await measureLoadingScreenDismissLatencyMs(page);
 
     const sceneLabel = await page.locator('#scene-stage').getAttribute('aria-label');
 
@@ -124,6 +122,10 @@ test.describe('baseline performance profiles', () => {
       await measureAdvanceLatencyMs(page);
     }
 
+    // Clear long tasks accumulated during forward advances so we only
+    // measure tasks triggered by the retreat phase.
+    await clearLongTasks(page);
+
     const latenciesMs = [];
     for (let i = 0; i < 3; i++) {
       latenciesMs.push(await measureRetreatLatencyMs(page));
@@ -151,7 +153,8 @@ test.describe('baseline performance profiles', () => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
     await dismissLoadingScreen(page);
 
-    // Advance to scene 5 (water + glow effects)
+    // Advance to scene 5 (scene-05-rinse: water + glow effects).
+    // Hardcoded to match the current scene order in scenes.json.
     for (let i = 0; i < 5; i++) {
       await measureAdvanceLatencyMs(page);
     }
@@ -209,10 +212,7 @@ test.describe('baseline performance profiles', () => {
   });
 
   test('full navigation cycle memory', async ({ page }, testInfo) => {
-    test.skip(
-      testInfo.project.name !== 'chromium',
-      'Memory measurement requires chromium CDP.',
-    );
+    test.skip(testInfo.project.name !== 'chromium', 'Memory measurement requires chromium CDP.');
 
     await injectLongTaskObserver(page);
     await page.emulateMedia({ reducedMotion: 'no-preference' });

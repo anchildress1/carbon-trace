@@ -13,6 +13,7 @@
 Desktop Lighthouse CI gates at 90% performance and passes in CI. Mobile Lighthouse config existed but had **no assertions** — mobile scores were unknown. No baseline profiling existed for runtime functional flows beyond scene transition latency and credits FPS.
 
 This ADR documents:
+
 1. Baseline performance profiling infrastructure for all major functional flows
 2. Optimizations applied to push both desktop and mobile Lighthouse performance above 90%
 3. Measured impact of each optimization
@@ -24,12 +25,12 @@ This ADR documents:
 
 ### Lighthouse Scores (before any changes)
 
-| Category         | Desktop | Mobile |
-|------------------|---------|--------|
-| Performance      | 99%     | 79%    |
-| Accessibility    | 100%    | 100%   |
-| Best Practices   | 100%    | 100%   |
-| SEO              | 100%    | 100%   |
+| Category       | Desktop | Mobile |
+| -------------- | ------- | ------ |
+| Performance    | 99%     | 79%    |
+| Accessibility  | 100%    | 100%   |
+| Best Practices | 100%    | 100%   |
+| SEO            | 100%    | 100%   |
 
 ### Mobile Performance Bottleneck Analysis
 
@@ -66,6 +67,7 @@ The primary bottleneck was **LCP (Largest Contentful Paint) at 4.4s**, with 90% 
 **Solution:** `manualChunks` function in Vite config splits GSAP and Howler into separate chunks.
 
 **Result:**
+
 - `gsap-*.js`: 69 KB (gzip: 27 KB)
 - `howler-*.js`: 36 KB (gzip: 10 KB)
 - `index-*.js`: 70 KB (gzip: 23 KB)
@@ -89,6 +91,7 @@ The primary bottleneck was **LCP (Largest Contentful Paint) at 4.4s**, with 90% 
 **Problem:** No `contain` properties. Browser considers entire DOM for layout/paint calculations during canvas animations.
 
 **Solution:**
+
 - `contain: strict` on `.scene-stage`, `.scene-canvas`, `.effects-canvas`, `.trace-overlay` (fixed-size, no overflow)
 - `contain: layout style` on `.narration-layer`, `.overlay-controls` (flow content but isolated layout)
 
@@ -103,6 +106,7 @@ The primary bottleneck was **LCP (Largest Contentful Paint) at 4.4s**, with 90% 
 **Solution:** Converted both Lora variable fonts from TTF to WOFF2 (internal Brotli compression). Updated `@font-face` declarations to use `format('woff2-variations')`.
 
 **Result:**
+
 - Italic: 219 KB → 91 KB (58% reduction)
 - Normal: 211 KB → 85 KB (60% reduction)
 - Total: 430 KB → 176 KB (59% reduction)
@@ -127,25 +131,25 @@ The primary bottleneck was **LCP (Largest Contentful Paint) at 4.4s**, with 90% 
 
 ### Lighthouse Scores (after all optimizations)
 
-| Category         | Desktop | Mobile | Target | Status |
-|------------------|---------|--------|--------|--------|
-| Performance      | 99%     | 90%    | ≥ 90%  | Pass   |
-| Accessibility    | 100%    | 100%   | ≥ 95%  | Pass   |
-| Best Practices   | 100%    | 100%   | ≥ 95%  | Pass   |
-| SEO              | 100%    | 100%   | ≥ 90%  | Pass   |
+| Category       | Desktop | Mobile | Target | Status |
+| -------------- | ------- | ------ | ------ | ------ |
+| Performance    | 99%     | 90%    | ≥ 90%  | Pass   |
+| Accessibility  | 100%    | 100%   | = 100% | Pass   |
+| Best Practices | 100%    | 100%   | ≥ 95%  | Pass   |
+| SEO            | 100%    | 100%   | ≥ 90%  | Pass   |
 
 Mobile performance verified across 3 consecutive runs at 90%.
 
 ### Build Size Comparison
 
-| Chunk | Before | After | Change |
-|-------|--------|-------|--------|
-| CanvasRenderer | 84 KB | 0.09 KB (stub) | -99.9% |
-| WebGPURenderer | 38 KB | 0.09 KB (stub) | -99.8% |
-| index (app bundle) | 173 KB | 70 KB | -60% |
-| gsap (split out) | — | 69 KB | new chunk |
-| howler (split out) | — | 36 KB | new chunk |
-| Fonts (total) | 430 KB | 176 KB | -59% |
+| Chunk              | Before | After          | Change    |
+| ------------------ | ------ | -------------- | --------- |
+| CanvasRenderer     | 84 KB  | 0.09 KB (stub) | -99.9%    |
+| WebGPURenderer     | 38 KB  | 0.09 KB (stub) | -99.8%    |
+| index (app bundle) | 173 KB | 70 KB          | -60%      |
+| gsap (split out)   | —      | 69 KB          | new chunk |
+| howler (split out) | —      | 36 KB          | new chunk |
+| Fonts (total)      | 430 KB | 176 KB         | -59%      |
 
 ---
 
@@ -155,15 +159,15 @@ Mobile performance verified across 3 consecutive runs at 90%.
 
 `tests/perf/baseline-profiles.spec.js` profiles 7 functional flows:
 
-| Flow | Metrics Captured |
-|------|-----------------|
-| Page load → loading prompt | FCP, LCP, long tasks, CLS |
-| Click-to-begin → scene 1 | Transition latency, long tasks |
-| Forward navigation (3 advances) | Per-transition latency, long tasks |
-| Backward navigation (3 retreats) | Per-transition latency, long tasks |
-| Effects steady-state FPS | Avg FPS, p95 frame time, dropped frame % |
-| Pause/resume responsiveness | Keypress-to-state-change latency |
-| Full navigation cycle memory | JS heap size, cumulative long tasks |
+| Flow                             | Metrics Captured                         |
+| -------------------------------- | ---------------------------------------- |
+| Page load → loading prompt       | FCP, LCP, long tasks, CLS                |
+| Click-to-begin → scene 1         | Transition latency, long tasks           |
+| Forward navigation (3 advances)  | Per-transition latency, long tasks       |
+| Backward navigation (3 retreats) | Per-transition latency, long tasks       |
+| Effects steady-state FPS         | Avg FPS, p95 frame time, dropped frame % |
+| Pause/resume responsiveness      | Keypress-to-state-change latency         |
+| Full navigation cycle memory     | JS heap size, cumulative long tasks      |
 
 Each test attaches a JSON artifact via `testInfo.attach()` for cross-run comparison. No thresholds are enforced — this is observational profiling for tracking regressions over time.
 
@@ -209,8 +213,8 @@ Mobile is at the 90% threshold. The remaining LCP time (3.5s, 87% "Render Delay"
 
 ```css
 .loading-title {
-  color: rgba(232, 220, 195, 0);           /* starts fully transparent */
-  animation: title-emerge 1.8s ease 1.2s forwards;  /* 1.2s delay + 1.8s fade */
+  color: rgba(232, 220, 195, 0); /* starts fully transparent */
+  animation: title-emerge 1.8s ease 1.2s forwards; /* 1.2s delay + 1.8s fade */
 }
 ```
 
@@ -231,4 +235,4 @@ Both desktop and mobile Lighthouse are enforced in CI:
 - **Desktop:** `pnpm exec lhci autorun` (uses `.lighthouserc.json`)
 - **Mobile:** `pnpm exec lhci autorun --config=.lighthouserc.mobile.json`
 
-Both configs assert the same thresholds: 90% performance, 95% accessibility, 95% best practices, 90% SEO. Reports are uploaded as CI artifacts for debugging regressions.
+Both configs assert the same thresholds: 90% performance, 100% accessibility, 95% best practices, 90% SEO. Reports are uploaded as CI artifacts for debugging regressions.
