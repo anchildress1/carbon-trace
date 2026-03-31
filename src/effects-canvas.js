@@ -16,7 +16,7 @@
 // Must run before any pixi.js import — patches shader compilation to
 // use CSP-safe alternatives, required by script-src 'self' policy.
 import 'pixi.js/unsafe-eval';
-import { Application, Container, Sprite, Texture } from 'pixi.js';
+import { Application, Container, Sprite, Texture, TextureSource } from 'pixi.js';
 import { createEffect, noiseFreeTypes, overlayTypes } from './effects.js';
 
 let pixiApp = null;
@@ -32,6 +32,7 @@ let disposableTextures = [];
 let loadGeneration = 0;
 let isPaused = false;
 let initPromise = null;
+let lifecycleToken = 0;
 let centeredEffects = []; // effects with normalized center → pixel conversion
 
 // Audio-reactive modulation state (ADR-008)
@@ -44,10 +45,29 @@ let analysisElement = null;
 let analysisSource = null;
 let analysisSilentGain = null;
 let analysisAnalyserRef = null; // tracks which analyserNode is wired into the analysis graph for cleanup
-const maskSourceCache = new Map(); // Map<maskUrl, Promise<ImageBitmap | HTMLCanvasElement>>
+const maskSourceCache = new Map(); // Map<maskUrl, Promise<TextureSource>>
 const releasableMaskSources = new Set(); // ImageBitmaps need explicit close() on destroy()
 
 const REDUCED_MOTION_MEDIA_QUERY = '(prefers-reduced-motion: reduce)';
+
+function createStaleMaskLoadError(url) {
+  const err = new Error(`Stale mask load discarded: ${url}`);
+  err.name = 'StaleMaskLoadError';
+  return err;
+}
+
+function isStaleMaskLoadError(err) {
+  return err?.name === 'StaleMaskLoadError';
+}
+
+function releaseMaskSource(source) {
+  releasableMaskSources.delete(source);
+  try {
+    source?.close?.();
+  } catch {
+    /* already closed */
+  }
+}
 
 function getMotionQuery() {
   if (motionQuery) return motionQuery;
@@ -79,7 +99,7 @@ function loadTexture(url) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(Texture.from(img));
+    img.onload = () => resolve(Texture.from(img, true));
     img.onerror = () => reject(new Error(`Failed to load texture: ${url}`));
     img.src = url;
   });
@@ -96,7 +116,7 @@ function loadTexture(url) {
  * scene loads. ImageBitmap provides a GPU-ready resource that uploads
  * reliably across scene transitions.
  */
-async function createLuminanceMaskSource(url) {
+async function createLuminanceMaskSource(url, requestToken) {
   const img = new Image();
   img.crossOrigin = 'anonymous';
   await new Promise((resolve, reject) => {
@@ -104,6 +124,9 @@ async function createLuminanceMaskSource(url) {
     img.onerror = () => reject(new Error(`Failed to load mask: ${url}`));
     img.src = url;
   });
+  if (requestToken !== lifecycleToken) {
+    throw createStaleMaskLoadError(url);
+  }
 
   if (!img.naturalWidth || !img.naturalHeight) {
     throw new Error(`Mask image has zero dimensions: ${url}`);
@@ -131,34 +154,51 @@ async function createLuminanceMaskSource(url) {
   if (typeof createImageBitmap === 'function') {
     try {
       const bitmap = await createImageBitmap(canvas, { premultiplyAlpha: 'none' });
+      if (requestToken !== lifecycleToken) {
+        releaseMaskSource(bitmap);
+        throw createStaleMaskLoadError(url);
+      }
       releasableMaskSources.add(bitmap);
       return bitmap;
     } catch (err) {
+      if (isStaleMaskLoadError(err)) throw err;
       console.warn(`createImageBitmap failed for ${url}:`, err.message);
     }
   }
 
   // Fallback source for test/browser environments without createImageBitmap.
+  if (requestToken !== lifecycleToken) {
+    throw createStaleMaskLoadError(url);
+  }
   return canvas;
 }
 
 async function loadLuminanceMask(url) {
   let sourcePromise = maskSourceCache.get(url);
   if (!sourcePromise) {
-    sourcePromise = createLuminanceMaskSource(url).catch((err) => {
-      maskSourceCache.delete(url);
-      throw err;
-    });
+    const requestToken = lifecycleToken;
+    sourcePromise = createLuminanceMaskSource(url, requestToken)
+      .then((rawSource) => {
+        if (requestToken !== lifecycleToken) {
+          releaseMaskSource(rawSource);
+          throw createStaleMaskLoadError(url);
+        }
+        return TextureSource.from(rawSource);
+      })
+      .catch((err) => {
+        maskSourceCache.delete(url);
+        throw err;
+      });
     maskSourceCache.set(url, sourcePromise);
   }
-  const source = await sourcePromise;
+  const textureSource = await sourcePromise;
 
   // Create a disposable Texture wrapper that shares the cached TextureSource.
   // PixiJS v8 removed Texture.clone() — construct a new Texture from the
-  // shared source instead. destroy(false) on the wrapper leaves the source
-  // alive for reuse by the next scene load.
-  const base = Texture.from(source);
-  return new Texture({ source: base.source, frame: base.frame });
+  // shared source directly. destroy(false) on the wrapper leaves the source
+  // alive for reuse by the next scene load. TextureSource.from() bypasses
+  // PixiJS's global Cache, keeping texture lifecycle fully application-managed.
+  return new Texture({ source: textureSource });
 }
 
 function handleContextLost(e) {
@@ -406,6 +446,7 @@ export function init(el) {
 
   if (canvasEl && pixiApp) destroy();
 
+  lifecycleToken += 1;
   canvasEl = el;
   webglAvailable = true;
 
@@ -482,6 +523,7 @@ async function loadRegionEffects(regions, sceneTexture, gen) {
         activeEffects.push(effect);
       }
     } catch (err) {
+      if (isStaleMaskLoadError(err)) continue;
       console.warn(`Skipping effect region "${region.type}":`, err.message);
     }
   }
@@ -777,6 +819,7 @@ export function resume() {
 }
 
 export function destroy() {
+  lifecycleToken += 1;
   pause();
   cleanupAnalysisElement();
 
@@ -791,14 +834,22 @@ export function destroy() {
   }
   reducedMotionEnabled = false;
 
-  for (const source of releasableMaskSources) {
-    try {
-      source.close?.();
-    } catch {
-      /* already closed */
-    }
-  }
+  for (const source of releasableMaskSources) releaseMaskSource(source);
   releasableMaskSources.clear();
+
+  for (const sourcePromise of maskSourceCache.values()) {
+    sourcePromise
+      .then((textureSource) => {
+        try {
+          textureSource.destroy();
+        } catch {
+          /* context lost */
+        }
+      })
+      .catch(() => {
+        /* promise rejected during initialization; nothing to destroy */
+      });
+  }
   maskSourceCache.clear();
 
   if (observer) {

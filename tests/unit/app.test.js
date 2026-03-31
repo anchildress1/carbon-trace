@@ -303,7 +303,7 @@ import {
   connectAnalysisAudio as connectEffectsAnalysisAudio,
   startAnalysisPlayback as startEffectsAnalysisPlayback,
 } from '../../src/effects-canvas.js';
-import { clearScene, drawFallback, loadImage } from '../../src/canvas.js';
+import { clearScene, drawFallback, drawImage, loadImage } from '../../src/canvas.js';
 import { setCaptionsEnabled, areCaptionsEnabled, syncCaptionsToTime, clearCaptionElements } from '../../src/captions.js';
 import { initOverlay, focusActiveDot } from '../../src/overlay.js';
 import { preloadFirstFrameAudio } from '../../src/loader.js';
@@ -1250,6 +1250,40 @@ describe('app.js', () => {
       // Ambient crossfade is now handled by scheduleAudioCues
       expect(scheduleAudioCues).toHaveBeenCalled();
     });
+
+    it('waits for scene image readiness before landing on frame', async () => {
+      globalThis.matchMedia.mockReturnValue({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      });
+      // Prevent first-frame image from being cached during init.
+      loadImage.mockResolvedValue(null);
+      app = createApp();
+      await flush();
+
+      const delayedImage = new Image();
+      loadImage.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve(delayedImage), 500)),
+      );
+
+      app.togglePause(); // resume so advance() uses transition path
+      vi.clearAllMocks();
+
+      app.advance();
+      expect(app.getState()).toBe('TRANSITIONING');
+
+      vi.advanceTimersByTime(300);
+      await flush();
+      expect(document.getElementById('transition-loader').hidden).toBe(false);
+      expect(app.getState()).toBe('TRANSITIONING');
+
+      vi.advanceTimersByTime(200);
+      await flush();
+      expect(document.getElementById('transition-loader').hidden).toBe(true);
+      expect(app.getState()).toBe('SCENE_ACTIVE');
+      expect(drawImage).toHaveBeenCalledWith(delayedImage);
+    });
   });
 
   // ── registerAudio ──────────────────────────────────────────────────
@@ -1293,6 +1327,113 @@ describe('app.js', () => {
       vi.advanceTimersByTime(200); // total 500ms, image loads
       await flush();
       expect(document.getElementById('transition-loader').hidden).toBe(true);
+    });
+  });
+
+  // ── non-blocking instant-cut navigation ─────────────────────────────
+
+  describe('non-blocking instant-cut navigation', () => {
+    it('hard-jump completes synchronously without waiting for image', async () => {
+      loadImage.mockResolvedValue(null);
+      app = createApp();
+      await flush();
+
+      // Override: image takes 500ms (would block if whenImageReady were used)
+      loadImage.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve(new Image()), 500)),
+      );
+
+      // Pause, then advance → hard-jump path
+      app.togglePause(); // resume
+      app.togglePause(); // pause
+      vi.clearAllMocks();
+
+      app.advance(); // hard-jump: title → scene-01
+
+      // Transition completes synchronously — spinner never shows
+      expect(document.getElementById('transition-loader').hidden).toBe(true);
+      // Frame was shown immediately (fallback rendered)
+      expect(drawFallback).toHaveBeenCalled();
+    });
+
+    it('click-jump completes synchronously without waiting for image', async () => {
+      let dotClickCb;
+      initOverlay.mockImplementation((count, cb) => {
+        dotClickCb = cb;
+      });
+
+      loadImage.mockResolvedValue(null);
+      app = createApp();
+      await flush();
+
+      loadImage.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve(new Image()), 500)),
+      );
+
+      app.togglePause(); // resume so dot click follows click-jump path
+      vi.clearAllMocks();
+
+      dotClickCb(2); // scene index 2 maps to frame index 1 (scene-01)
+
+      // Transition completes synchronously — spinner never shows
+      expect(document.getElementById('transition-loader').hidden).toBe(true);
+      // Frame was shown immediately (fallback rendered)
+      expect(drawFallback).toHaveBeenCalled();
+    });
+
+    it('scheduleImageArrival redraws scene when image arrives on same frame', async () => {
+      loadImage.mockResolvedValue(null);
+      app = createApp();
+      await flush();
+
+      // Setup: image resolves after advance
+      const mockImg = new Image();
+      loadImage.mockResolvedValue(mockImg);
+
+      app.togglePause(); // resume
+      app.togglePause(); // pause
+      vi.clearAllMocks();
+
+      app.advance(); // hard-jump: title → scene-01
+      // drawFallback called synchronously since image not in app.imageCache
+      expect(drawFallback).toHaveBeenCalled();
+
+      // Let scheduleImageArrival's loadImage promise resolve
+      await flush();
+
+      // Image arrived while still on the same frame — drawImage called
+      expect(drawImage).toHaveBeenCalledWith(mockImg);
+    });
+
+    it('scheduleImageArrival skips redraw when user navigated away', async () => {
+      loadImage.mockResolvedValue(null);
+      app = createApp();
+      await flush();
+
+      // Setup: slow image for scene-01
+      let resolveImage;
+      loadImage.mockImplementation(
+        () => new Promise((resolve) => { resolveImage = resolve; }),
+      );
+
+      app.togglePause(); // resume
+      app.togglePause(); // pause
+      vi.clearAllMocks();
+
+      app.advance(); // hard-jump: title → scene-01
+      expect(drawFallback).toHaveBeenCalled();
+
+      // Navigate away before image arrives
+      loadImage.mockResolvedValue(null);
+      app.advance(); // hard-jump: scene-01 → scene-02
+      vi.clearAllMocks();
+
+      // Now resolve the original scene-01 image
+      resolveImage(new Image());
+      await flush();
+
+      // drawImage should NOT be called for the stale scene-01 image
+      expect(drawImage).not.toHaveBeenCalled();
     });
   });
 
