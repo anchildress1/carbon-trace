@@ -111,6 +111,16 @@ The primary bottleneck was **LCP (Largest Contentful Paint) at 4.4s**, with 90% 
 
 **Files:** `public/assets/fonts/`, `src/styles.css`, `index.html`
 
+### 6. Deferred PixiJS Import and Effects/Shimmer Init (commit `ec9faf5`)
+
+**Problem:** The dynamic `import('./effects-canvas.js')` fired at top-level module evaluation, putting ~330 KB of PixiJS JS on the critical rendering path. `initEffectsCanvas()` and `initShimmer()` ran at the start of `initApp()`, adding TBT before LCP.
+
+**Solution:** The dynamic import is deferred until after the loading prompt becomes visible (post-LCP). `initEffectsCanvas()` and `initShimmer()` are moved to the same post-LCP point. Frame 0 has no effects or shimmer, so nothing visual is lost. The import begins while the user reads the prompt and is ready before they advance to frame 1.
+
+**Impact:** Mobile TBT reduced from ~50ms to 0-19ms under simulated throttling.
+
+**Files:** `src/app.js`
+
 ---
 
 ## 012.4 Post-Optimization Results
@@ -193,19 +203,24 @@ The `scripts/run-perf.mjs` orchestrator runs all suites in sequence: desktop Lig
 
 ## 012.6 Remaining Limitations
 
-### Mobile Performance Headroom
+### Mobile Performance Hard Ceiling: CSS Animation Delay
 
-Mobile is at the 90% threshold with minimal headroom. The remaining LCP time is dominated by:
+Mobile is at the 90% threshold. The remaining LCP time (3.5s, 87% "Render Delay") is **not caused by fonts, JS, or network** — it's caused by the intentional CSS animation on `.loading-title`:
 
-1. **WebGL context creation + shader compilation:** PixiJS `Application.init()` is inherently expensive on throttled mobile CPU. This runs after user click (not on critical path for LCP), but contributes to TBT.
+```css
+.loading-title {
+  color: rgba(232, 220, 195, 0);           /* starts fully transparent */
+  animation: title-emerge 1.8s ease 1.2s forwards;  /* 1.2s delay + 1.8s fade */
+}
+```
 
-2. **Total JS payload:** Even after tree-shaking, PixiJS WebGL renderer (147 KB) + GSAP (69 KB) + Howler (36 KB) + app code (70 KB) + PixiJS core (~130 KB across FilterSystem, FederatedEventTarget, Geometry) = ~450 KB JS. Under 4x CPU throttle, parse/compile time is significant.
+The LCP element ("Carbon Trace" title) is invisible for ~3s due to the 1.2s animation delay plus the time for opacity to reach a measurable level. Under 4x CPU throttle, Lighthouse measures LCP at the point the text becomes visually present — which is the animation timing, not any resource bottleneck.
 
-3. **Font rendering:** WOFF2 conversion reduced transfer time substantially, but `font-display: swap` still causes Lighthouse to measure LCP at font swap time. Changing to `font-display: optional` would improve LCP but risk invisible text on slow connections — a UX tradeoff not taken.
+**To push above 90%, the title animation would need to start visible or have a shorter delay.** This is a UX decision — the slow fade-in is an intentional part of the immersive loading experience.
 
-### Deferred Optimization
+### Evaluated and Rejected: `font-display: optional`
 
-Deferring `initEffectsCanvas()` and `initShimmer()` until after the loading prompt is visible was evaluated but not implemented. Since frame 0 has no effects or shimmer, this would reduce TBT on the critical path. However, the 90% target is met without it, and the risk of effects not being ready when the user clicks to begin (especially on fast interactions) outweighs the marginal benefit.
+`font-display: optional` was tested but provides no benefit here. Since the LCP text is invisible for 3s due to the CSS animation, the font loading strategy doesn't affect when LCP is measured. Additionally, `optional` risks permanently showing the Georgia fallback font instead of Lora italic on slow connections — unacceptable for an art piece.
 
 ---
 
