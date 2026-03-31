@@ -57,7 +57,6 @@ export async function measureLoadingScreenDismissLatencyMs(page, timeoutMs = 300
 
     if (!loadingScreen.hidden) {
       await new Promise((resolve, reject) => {
-        let timerId;
         const observer = new MutationObserver(() => {
           if (loadingScreen.hidden) {
             observer.disconnect();
@@ -66,11 +65,11 @@ export async function measureLoadingScreenDismissLatencyMs(page, timeoutMs = 300
           }
         });
 
-        observer.observe(loadingScreen, { attributes: true, attributeFilter: ['hidden'] });
-        timerId = setTimeout(() => {
+        const timerId = setTimeout(() => {
           observer.disconnect();
           reject(new Error('Timed out waiting for loading screen to hide'));
         }, maxWaitMs);
+        observer.observe(loadingScreen, { attributes: true, attributeFilter: ['hidden'] });
       });
     }
 
