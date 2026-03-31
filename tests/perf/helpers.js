@@ -194,7 +194,10 @@ export function percentile(samples, p) {
 
 /**
  * Emulate a Pixel 3a-class device with 4x CPU throttle via CDP.
- * Returns the CDP session (caller must clean up in a finally block).
+ * Returns the CDP session. Callers must reset in a finally block:
+ *   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+ *   await cdp.send('Emulation.clearDeviceMetricsOverride');
+ *   await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false });
  */
 export async function emulatePixelClassProxy(page) {
   const cdp = await page.context().newCDPSession(page);

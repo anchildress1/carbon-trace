@@ -193,6 +193,7 @@ test.describe('ADR-011 outstanding validation checks', () => {
     } finally {
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
       await cdp.send('Emulation.clearDeviceMetricsOverride');
+      await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false });
     }
   });
 });

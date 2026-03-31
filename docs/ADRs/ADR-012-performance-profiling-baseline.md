@@ -163,7 +163,7 @@ Mobile performance verified across 3 consecutive runs at 90%.
 
 | Flow                             | Metrics Captured                         |
 | -------------------------------- | ---------------------------------------- |
-| Page load → loading prompt       | FCP, LCP, long tasks, CLS                |
+| Page load → loading prompt       | FCP, long tasks, navigation timing       |
 | Click-to-begin → scene 1         | Transition latency, long tasks           |
 | Forward navigation (3 advances)  | Per-transition latency, long tasks       |
 | Backward navigation (3 retreats) | Per-transition latency, long tasks       |
@@ -182,7 +182,7 @@ FPS and memory tests are chromium-only (skip on mobile-chrome project).
 - `dismissLoadingScreen(page)` — click through loading screen
 - `measureAdvanceLatencyMs(page)` / `measureRetreatLatencyMs(page)` — scene transition timing
 - `injectLongTaskObserver(page)` / `collectLongTasks(page)` — PerformanceObserver for long tasks
-- `collectPaintMetrics(page)` — FCP/LCP extraction
+- `collectPaintMetrics(page)` — FCP/FP extraction via paint timing entries
 - `sampleRafStats(page, durationMs)` — rAF-based FPS sampling
 - `percentile(arr, p)` — statistical percentile calculation
 - `emulatePixelClassProxy(page)` — CSS class proxy for pixel-ratio-dependent tests
