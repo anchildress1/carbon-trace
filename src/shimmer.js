@@ -472,6 +472,11 @@ export function init(canvasEl) {
 }
 
 export async function loadScene(config) {
+  // No canvas yet — init() has not been called. Nothing to render.
+  if (!canvas || !ctx) {
+    return;
+  }
+
   const gen = ++loadGeneration;
 
   if (rafId) {
