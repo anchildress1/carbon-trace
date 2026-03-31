@@ -116,6 +116,9 @@ try {
 
   await runCommand('pnpm', ['perf:lighthouse:desktop']);
   await runCommand('pnpm', ['perf:lighthouse:mobile']);
+  await runCommand('pnpm', ['perf:baseline'], {
+    PERF_EXTERNAL_SERVER: '1',
+  });
   await runCommand('pnpm', ['perf:runtime'], {
     PERF_EXTERNAL_SERVER: '1',
   });
