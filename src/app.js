@@ -46,16 +46,22 @@ import {
   cleanupCredits,
 } from './credits.js';
 
-// Lazy-load pixi.js effects to keep it off the critical rendering path.
-// The dynamic import starts immediately but doesn't block initial paint,
-// reducing Total Blocking Time on slower CI runners.
-const effectsLoaded = import('./effects-canvas.js');
+// Lazy-load pixi.js effects — the dynamic import is deferred until after
+// the loading prompt is visible (post-LCP) so ~330 KB of PixiJS JS never
+// lands on the critical path. The import starts while the user reads the
+// prompt and is typically ready before they click "begin experience".
+let effectsLoaded = null;
 let effectsMod = null;
+function startEffectsLoad() {
+  effectsLoaded ??= import('./effects-canvas.js');
+}
 async function initEffectsCanvas(el) {
+  startEffectsLoad();
   effectsMod ??= await effectsLoaded;
   return effectsMod.init(el);
 }
 async function loadEffectsScene(...args) {
+  startEffectsLoad();
   effectsMod ??= await effectsLoaded;
   return effectsMod.loadScene(...args);
 }
@@ -989,14 +995,6 @@ function toggleCaptions(app) {
 
 function initApp(app) {
   initSceneCanvas(app.els.sceneCanvas);
-  initEffectsCanvas(app.els.effectsCanvas).catch((err) =>
-    console.error('Effects canvas init failed:', err.message),
-  );
-  try {
-    initShimmer(app.els.traceOverlay);
-  } catch (err) {
-    console.error('Shimmer init failed:', err.message);
-  }
 
   preloadFirstFrameAudio(app.frames, (result) => registerAudio(app, result));
   onNarrationBufferChange((isBuffering) => handleBufferChange(app, isBuffering));
@@ -1022,6 +1020,20 @@ function initApp(app) {
       app.els.loadingPrompt.hidden = false;
       app.els.loadingPrompt.classList.add('visible');
       app.els.loadingScreen.classList.add('ready');
+
+      // Defer effects and shimmer init until after LCP. Frame 0 has no
+      // effects or shimmer, so starting these now (while the user reads
+      // the prompt) avoids TBT on the critical path while ensuring they
+      // are ready before the user advances to frame 1.
+      startEffectsLoad();
+      initEffectsCanvas(app.els.effectsCanvas).catch((err) =>
+        console.error('Effects canvas init failed:', err.message),
+      );
+      try {
+        initShimmer(app.els.traceOverlay);
+      } catch (err) {
+        console.error('Shimmer init failed:', err.message);
+      }
 
       app.state = State.SCENE_ACTIVE;
       doPause(app);
