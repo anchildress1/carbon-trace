@@ -1,13 +1,13 @@
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 
-const PREVIEW_URL = 'http://localhost:4173';
+const PREVIEW_URL = 'http://127.0.0.1:4173';
 const PREVIEW_ARGS = [
   'exec',
   'vite',
   'preview',
   '--host',
-  'localhost',
+  '127.0.0.1',
   '--port',
   '4173',
   '--strictPort',
