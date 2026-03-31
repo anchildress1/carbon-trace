@@ -184,26 +184,55 @@ test.describe('baseline performance profiles', () => {
     // Advance to scene 1 so playback is active
     await measureAdvanceLatencyMs(page);
 
-    const pauseBtn = page.locator('#btn-pause');
+    // Measure pause and resume latency entirely in-page to avoid
+    // Playwright protocol overhead inflating the numbers.
+    const pauseLatencyMs = await page.evaluate(
+      (maxWaitMs) =>
+        new Promise((resolve, reject) => {
+          const btn = document.getElementById('btn-pause');
+          const start = performance.now();
 
-    // Measure pause latency
-    const pauseStart = Date.now();
-    await page.keyboard.press('Space');
-    await pauseBtn.waitFor({ state: 'visible', timeout: 2000 });
-    await page.waitForFunction(
-      () => document.getElementById('btn-pause')?.getAttribute('aria-pressed') === 'true',
-      { timeout: 2000 },
-    );
-    const pauseLatencyMs = Date.now() - pauseStart;
+          const observer = new MutationObserver(() => {
+            if (btn.getAttribute('aria-pressed') === 'true') {
+              observer.disconnect();
+              clearTimeout(timerId);
+              resolve(performance.now() - start);
+            }
+          });
 
-    // Measure resume latency
-    const resumeStart = Date.now();
-    await page.keyboard.press('Space');
-    await page.waitForFunction(
-      () => document.getElementById('btn-pause')?.getAttribute('aria-pressed') === 'false',
-      { timeout: 2000 },
+          const timerId = setTimeout(() => {
+            observer.disconnect();
+            reject(new Error('Timed out waiting for pause'));
+          }, maxWaitMs);
+          observer.observe(btn, { attributes: true, attributeFilter: ['aria-pressed'] });
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+        }),
+      2000,
     );
-    const resumeLatencyMs = Date.now() - resumeStart;
+
+    const resumeLatencyMs = await page.evaluate(
+      (maxWaitMs) =>
+        new Promise((resolve, reject) => {
+          const btn = document.getElementById('btn-pause');
+          const start = performance.now();
+
+          const observer = new MutationObserver(() => {
+            if (btn.getAttribute('aria-pressed') === 'false') {
+              observer.disconnect();
+              clearTimeout(timerId);
+              resolve(performance.now() - start);
+            }
+          });
+
+          const timerId = setTimeout(() => {
+            observer.disconnect();
+            reject(new Error('Timed out waiting for resume'));
+          }, maxWaitMs);
+          observer.observe(btn, { attributes: true, attributeFilter: ['aria-pressed'] });
+          document.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+        }),
+      2000,
+    );
 
     await attachJson(testInfo, 'pause-resume-profile', {
       pauseLatencyMs,
