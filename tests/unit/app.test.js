@@ -149,7 +149,7 @@ vi.mock('../../src/scenes.json', () => ({
 
         holdAfterNarration: 2000,
         narration: {
-          lines: [{ text: 'Opening line', enter: 0, exit: 3000 }],
+          lines: [{ text: 'Opening line', enter: 0, exit: 3000, x: 50, y: 55 }],
           captions: [{ text: 'Opening line', start: 0, end: 3000 }],
         },
         audioCues: [
@@ -168,7 +168,7 @@ vi.mock('../../src/scenes.json', () => ({
         image: 'scene-01.webp',
         traceOverlay: { mask: 'mask-01.png', opacity: 0.3, color: [232, 200, 120], dotCount: 10, dotSpeed: 0.8 },
         narration: {
-          lines: [{ text: 'Hello', enter: 0, exit: 2000 }],
+          lines: [{ text: 'Hello', enter: 0, exit: 2000, x: 40, y: 60 }],
           captions: [{ text: 'Hello', start: 0, end: 2000 }],
         },
         audioCues: [
