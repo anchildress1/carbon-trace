@@ -14,6 +14,9 @@ let ctx = null;
 let canvasEl = null;
 let observer = null;
 let currentImg = null;
+let cssWidth = 0;
+let cssHeight = 0;
+let lastDpr = 1;
 
 const imageCache = new Map();
 
@@ -22,9 +25,12 @@ function sizeCanvas() {
 
   const dpr = globalThis.devicePixelRatio || 1;
   const rect = canvasEl.getBoundingClientRect();
+  cssWidth = rect.width;
+  cssHeight = rect.height;
+  lastDpr = dpr;
 
-  canvasEl.width = rect.width * dpr;
-  canvasEl.height = rect.height * dpr;
+  canvasEl.width = cssWidth * dpr;
+  canvasEl.height = cssHeight * dpr;
 
   if (ctx) {
     ctx.resetTransform();
@@ -57,8 +63,12 @@ function coverFit(img, cw, ch) {
 }
 
 function cssSize() {
+  if (!canvasEl) return { w: 0, h: 0 };
   const dpr = globalThis.devicePixelRatio || 1;
-  return { w: canvasEl.width / dpr, h: canvasEl.height / dpr };
+  if (Math.abs(dpr - lastDpr) > 0.001) {
+    sizeCanvas();
+  }
+  return { w: cssWidth, h: cssHeight };
 }
 
 function drawCurrent() {
@@ -126,6 +136,9 @@ export function destroySceneCanvas() {
   ctx = null;
   canvasEl = null;
   currentImg = null;
+  cssWidth = 0;
+  cssHeight = 0;
+  lastDpr = 1;
 }
 
 export function getSceneContext() {

@@ -540,23 +540,28 @@ describe('shimmer.js', () => {
       shimmer.init(mockCanvas);
       await shimmer.loadScene({ mask: 'test.png', opacity: 0.5, dotCount: 1 });
 
-      // Tick once — dots should move (reduced motion is false)
+      // Tick once before toggle so render path is warm
       const tick1 = rafCallbacks[rafCallbacks.length - 1];
+      mockCtx.drawImage.mockClear();
       tick1(1000);
-      const posAfterFirst = mockCtx.createRadialGradient.mock.calls.map(c => [c[0], c[1]]);
+      expect(mockCtx.drawImage.mock.calls[1]).toBeDefined();
 
       // Simulate reduced-motion toggle mid-session
       changeHandler({ matches: true });
 
-      mockCtx.createRadialGradient.mockClear();
+      mockCtx.drawImage.mockClear();
       const tick2 = rafCallbacks[rafCallbacks.length - 1];
       tick2(2000);
-      const posAfterToggle = mockCtx.createRadialGradient.mock.calls.map(c => [c[0], c[1]]);
+      const firstReducedMotionPos = mockCtx.drawImage.mock.calls[1];
+      expect(firstReducedMotionPos).toBeDefined();
+      const posAfterToggle = [firstReducedMotionPos[1], firstReducedMotionPos[2]];
 
-      mockCtx.createRadialGradient.mockClear();
+      mockCtx.drawImage.mockClear();
       const tick3 = rafCallbacks[rafCallbacks.length - 1];
       tick3(3000);
-      const posAfterSecond = mockCtx.createRadialGradient.mock.calls.map(c => [c[0], c[1]]);
+      const secondReducedMotionPos = mockCtx.drawImage.mock.calls[1];
+      expect(secondReducedMotionPos).toBeDefined();
+      const posAfterSecond = [secondReducedMotionPos[1], secondReducedMotionPos[2]];
 
       // After toggling to reduced motion, positions should stop changing
       expect(posAfterToggle).toEqual(posAfterSecond);
@@ -737,10 +742,11 @@ describe('shimmer.js', () => {
 
       // Tick — should render traceImage but no dots (none could spawn)
       const tick = rafCallbacks[rafCallbacks.length - 1];
+      mockCtx.drawImage.mockClear();
       tick(1000);
 
-      expect(mockCtx.drawImage).toHaveBeenCalled(); // traceImage (empty but drawn)
-      expect(mockCtx.createRadialGradient).not.toHaveBeenCalled(); // no dots
+      // Only traceImage should draw; no glow/core sprites without walkable pixels
+      expect(mockCtx.drawImage).toHaveBeenCalledTimes(1);
     });
   });
 
