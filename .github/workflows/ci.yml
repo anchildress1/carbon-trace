@@ -80,7 +80,7 @@ jobs:
         run: pnpm exec playwright test --project=chromium
 
       - name: Run Performance / Lighthouse Tests
-        run: pnpm exec lhci autorun
+        run: pnpm exec node scripts/lhci-autorun-ci.mjs
 
       - name: Run Mobile Lighthouse Tests
         run: pnpm exec node scripts/lhci-autorun-ci.mjs --config=.lighthouserc.mobile.json
@@ -131,6 +131,12 @@ jobs:
         with:
           name: coverage-report
           path: coverage/
+
+      - name: Warn if SONAR_TOKEN is missing
+        if: env.SONAR_TOKEN == ''
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: echo "::warning::SONAR_TOKEN is not set — SonarQube scan will be skipped"
 
       - name: SonarQube Scan
         if: env.SONAR_TOKEN != ''
