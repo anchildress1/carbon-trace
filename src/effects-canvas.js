@@ -17,7 +17,7 @@
 // use CSP-safe alternatives, required by script-src 'self' policy.
 import 'pixi.js/unsafe-eval';
 import { Application, Container, Sprite, Texture, TextureSource } from 'pixi.js';
-import { createEffect, noiseFreeTypes, overlayTypes, rayOverlayTypes } from './effects.js';
+import { createEffect, noiseFreeTypes, overlayTypes } from './effects.js';
 
 let pixiApp = null;
 let canvasEl = null;
@@ -323,25 +323,16 @@ function tickerUpdate(ticker) {
  * Set up a single region's effect: load noise sprite (if needed), create
  * the effect filter, and wire it into the stage.
  *
- * Three rendering modes:
+ * Two rendering modes:
  * - Displacement (water/heat/dust/shockwave): scene texture clipped by mask.
  * - Overlay (glow): mask texture IS the content sprite. GlowFilter needs
  *   alpha edges to radiate outward — a full-screen opaque sprite has none.
  *   The mask shape's own transparency provides those edges.
- * - Ray overlay (godray): full-screen black sprite with GodrayFilter,
- *   composited additively. No mask — atmospheric rays cover the full scene.
  *
- * Every region except ray overlay types must have a mask (ADR-007).
+ * Every region must have a mask (ADR-007 addendum).
  * Returns the effect object, or null if the factory declined.
  */
 async function applyRegionEffect(region, sceneTexture, gen) {
-  // Ray overlay effects render full-screen — no mask needed.
-  if (rayOverlayTypes.has(region.type)) {
-    const effect = createEffect(region.type, null, region);
-    if (!effect) return null;
-    return applyRayEffect(effect);
-  }
-
   if (!region.mask) {
     console.warn(`Skipping region "${region.type}": mask is required`);
     return null;
@@ -411,30 +402,6 @@ function applyOverlayEffect(effect, maskTexture, region) {
 
   screenSizedSprites.push(effectSprite);
   pixiApp.stage.addChild(effectSprite);
-
-  return effect;
-}
-
-/**
- * Ray overlay rendering: full-screen black sprite filtered by GodrayFilter,
- * composited additively. The black input contributes no color — GodrayFilter's
- * output is pure Perlin noise rays. Additive blend lets the scene image show
- * through while rays brighten it. No mask — godrays are atmospheric full-screen
- * effects; masking to a region shape creates harsh cutout edges.
- */
-function applyRayEffect(effect) {
-  const effectSprite = new Sprite(Texture.WHITE);
-  effectSprite.width = pixiApp.screen.width;
-  effectSprite.height = pixiApp.screen.height;
-  effectSprite.tint = 0x000000;
-  effectSprite.filters = [effect.filter];
-
-  screenSizedSprites.push(effectSprite);
-
-  const container = new Container();
-  container.addChild(effectSprite);
-  container.blendMode = 'add';
-  pixiApp.stage.addChild(container);
 
   return effect;
 }

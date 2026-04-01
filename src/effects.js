@@ -9,7 +9,7 @@
  */
 
 import { DisplacementFilter } from 'pixi.js';
-import { GlowFilter, GodrayFilter, ShockwaveFilter } from 'pixi-filters';
+import { GlowFilter, ShockwaveFilter } from 'pixi-filters';
 
 const factories = Object.create(null);
 
@@ -37,7 +37,7 @@ export function hasEffectType(type) {
 }
 
 /** Effect types that don't need a displacement noise sprite. */
-export const noiseFreeTypes = new Set(['glow', 'godray', 'shockwave']);
+export const noiseFreeTypes = new Set(['glow', 'shockwave']);
 
 /**
  * Overlay effect types render the mask as content (not a clipping mask).
@@ -48,14 +48,6 @@ export const noiseFreeTypes = new Set(['glow', 'godray', 'shockwave']);
  * transitions it needs to radiate outward.
  */
 export const overlayTypes = new Set(['glow']);
-
-/**
- * Ray overlay effect types render the filter output over a black sprite
- * (contributing no color), masked to the region shape, and composited
- * additively so the scene image shows through. GodrayFilter adds Perlin
- * noise rays to its input — a black input means the output is pure rays.
- */
-export const rayOverlayTypes = new Set(['godray']);
 
 // --- Displacement-based effect factories ---
 // Each receives a PixiJS Sprite (noise texture) and region params.
@@ -151,41 +143,6 @@ registerEffect('glow', (_sprite, params = {}) => {
       t += pulseSpeed;
       const pulse = 1 + Math.sin(t) * pulseDepth;
       filter.outerStrength = outerStrength * pulse;
-    },
-  };
-});
-
-/**
- * Godray: volumetric light rays via Perlin noise. Parallel rays drift
- * slowly for atmospheric window-light or storm-light effects. The mask
- * defines where rays are visible — overlay rendering (like glow) uses
- * the mask as sprite content so rays only appear in the masked region.
- */
-registerEffect('godray', (_sprite, params = {}) => {
-  const {
-    angle = 30,
-    gain = 0.5,
-    lacunarity = 2.5,
-    speed = 0.01,
-    alpha = 1,
-    parallel = true,
-    center = { x: 0, y: 0 },
-  } = params;
-
-  const filter = new GodrayFilter({
-    angle,
-    gain,
-    lacunarity,
-    parallel,
-    center,
-    alpha,
-    time: 0,
-  });
-
-  return {
-    filter,
-    update(dt) {
-      filter.time += speed * dt;
     },
   };
 });

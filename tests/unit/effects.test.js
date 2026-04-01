@@ -26,16 +26,6 @@ vi.mock('pixi-filters', () => ({
     this.alpha = alpha;
     this.enabled = true;
   }),
-  GodrayFilter: vi.fn(function ({ angle, gain, lacunarity, parallel, center, alpha, time }) {
-    this.angle = angle;
-    this.gain = gain;
-    this.lacunarity = lacunarity;
-    this.parallel = parallel;
-    this.center = center;
-    this.alpha = alpha;
-    this.time = time;
-    this.enabled = true;
-  }),
   ShockwaveFilter: vi.fn(function ({ center, amplitude, wavelength, speed, radius }) {
     this.center = center;
     this.amplitude = amplitude;
@@ -62,10 +52,8 @@ describe('effects.js — factory registry', () => {
   let hasEffectType;
   let noiseFreeTypes;
   let overlayTypes;
-  let rayOverlayTypes;
   let DisplacementFilter;
   let GlowFilter;
-  let GodrayFilter;
   let ShockwaveFilter;
 
   beforeEach(async () => {
@@ -73,14 +61,13 @@ describe('effects.js — factory registry', () => {
     vi.clearAllMocks();
 
     ({ DisplacementFilter } = await import('pixi.js'));
-    ({ GlowFilter, GodrayFilter, ShockwaveFilter } = await import('pixi-filters'));
+    ({ GlowFilter, ShockwaveFilter } = await import('pixi-filters'));
     ({
       registerEffect,
       createEffect,
       hasEffectType,
       noiseFreeTypes,
       overlayTypes,
-      rayOverlayTypes,
     } = await import('../../src/effects.js'));
   });
 
@@ -90,7 +77,6 @@ describe('effects.js — factory registry', () => {
       expect(hasEffectType('heat')).toBe(true);
       expect(hasEffectType('dust')).toBe(true);
       expect(hasEffectType('glow')).toBe(true);
-      expect(hasEffectType('godray')).toBe(true);
       expect(hasEffectType('shockwave')).toBe(true);
     });
 
@@ -138,16 +124,9 @@ describe('effects.js — factory registry', () => {
   describe('type sets', () => {
     it('exports noiseFreeTypes and overlayTypes', () => {
       expect(noiseFreeTypes.has('glow')).toBe(true);
-      expect(noiseFreeTypes.has('godray')).toBe(true);
       expect(noiseFreeTypes.has('shockwave')).toBe(true);
       expect(overlayTypes.has('glow')).toBe(true);
-      expect(overlayTypes.has('godray')).toBe(false);
       expect(overlayTypes.has('shockwave')).toBe(false);
-    });
-
-    it('exports rayOverlayTypes with godray', () => {
-      expect(rayOverlayTypes.has('godray')).toBe(true);
-      expect(rayOverlayTypes.has('glow')).toBe(false);
     });
   });
 
@@ -288,53 +267,6 @@ describe('effects.js — factory registry', () => {
       const initial = effect.filter.outerStrength;
       effect.update();
       expect(effect.filter.outerStrength).not.toBe(initial);
-    });
-
-    it('godray effect passes constructor params', () => {
-      const effect = createEffect('godray', null, {
-        angle: 25,
-        gain: 0.3,
-        lacunarity: 2.0,
-        speed: 0.004,
-        alpha: 0.25,
-        parallel: true,
-      });
-
-      expect(GodrayFilter).toHaveBeenCalledWith({
-        angle: 25,
-        gain: 0.3,
-        lacunarity: 2.0,
-        parallel: true,
-        center: { x: 0, y: 0 },
-        alpha: 0.25,
-        time: 0,
-      });
-      expect(effect.filter.time).toBe(0);
-    });
-
-    it('godray effect defaults match expected values', () => {
-      const effect = createEffect('godray', null);
-
-      expect(GodrayFilter).toHaveBeenCalledWith({
-        angle: 30,
-        gain: 0.5,
-        lacunarity: 2.5,
-        parallel: true,
-        center: { x: 0, y: 0 },
-        alpha: 1,
-        time: 0,
-      });
-      expect(effect.filter.parallel).toBe(true);
-    });
-
-    it('godray time advances proportional to speed and dt', () => {
-      const effect = createEffect('godray', null, { speed: 0.01 });
-
-      effect.update(1); // 1 second
-      expect(effect.filter.time).toBeCloseTo(0.01);
-
-      effect.update(0.5);
-      expect(effect.filter.time).toBeCloseTo(0.015);
     });
 
     it('shockwave effect passes constructor params and initializes time to cycleDuration', () => {
