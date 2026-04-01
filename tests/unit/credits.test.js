@@ -145,7 +145,7 @@ describe('credits.js', () => {
       expect(panel.hidden).toBe(true);
 
       let hiddenWhenSetCalled = null;
-      gsap.set.mockImplementationOnce((el, props) => {
+      gsap.set.mockImplementationOnce((_el, _props) => {
         // Capture hidden state at the moment gsap.set is called
         hiddenWhenSetCalled = panel.hidden;
       });

@@ -1214,49 +1214,56 @@ export function createApp() {
 
   initApp(app);
 
-  return {
+  const api = {
     advance: () => advance(app),
     toggleMute: () => toggleMute(app),
     togglePause: () => togglePause(app),
     getState: () => app.state,
-    /* v8 ignore start -- E2E harness methods: exercised by Playwright, not unit tests */
-    forceNarrationEndForTesting: () => {
-      const frame = app.frames[app.currentIndex];
-      if (!frame) return;
-      const holdAfterNarration = getHoldAfterNarration(frame);
-      makeNarrationEndCallback(app, frame, holdAfterNarration)();
-    },
-    forceCreditsRevealForTesting: () => {
-      const frame = app.frames[app.currentIndex];
-      if (!frame?.credits) return;
-      if (app.creditsRevealTimer) {
-        app.creditsRevealTimer.cancel();
-        app.creditsRevealTimer = null;
-      }
-      // Pause canvas effects and shimmer to free the main thread —
-      // on CI runners, rAF loops from PixiJS/shimmer/canvas starve
-      // Playwright's CDP communication and cause test timeouts.
-      pauseEffects();
-      pauseShimmer();
-      revealCreditsPanel(app.els.creditsPanel, app.els.creditsScrollContent, frame.credits, {
-        reducedMotion: prefersReducedMotion(),
-      });
-    },
-    _debugCreditsState: () => ({
-      currentIndex: app.currentIndex,
-      frameCount: app.frames.length,
-      state: app.state,
-      paused: app.paused,
-      generation: app.generation,
-      hasCreditsTimer: app.creditsRevealTimer !== null,
-      creditsTimerActive: app.creditsRevealTimer?.isActive ?? null,
-      creditsTimerPaused: app.creditsRevealTimer?.isPaused ?? null,
-      panelHidden: app.els.creditsPanel?.hidden,
-      frameHasCredits: !!app.frames[app.currentIndex]?.credits,
-    }),
-    forceBufferStateForTesting: (isBuffering) => {
-      handleBufferChange(app, isBuffering);
-    },
-    /* v8 ignore stop */
   };
+
+  if (import.meta.env.VITE_E2E === '1') {
+    /* v8 ignore start -- E2E harness methods: exercised by Playwright, not unit tests */
+    Object.assign(api, {
+      forceNarrationEndForTesting: () => {
+        const frame = app.frames[app.currentIndex];
+        if (!frame) return;
+        const holdAfterNarration = getHoldAfterNarration(frame);
+        makeNarrationEndCallback(app, frame, holdAfterNarration)();
+      },
+      forceCreditsRevealForTesting: () => {
+        const frame = app.frames[app.currentIndex];
+        if (!frame?.credits) return;
+        if (app.creditsRevealTimer) {
+          app.creditsRevealTimer.cancel();
+          app.creditsRevealTimer = null;
+        }
+        // Pause canvas effects and shimmer to free the main thread —
+        // on CI runners, rAF loops from PixiJS/shimmer/canvas starve
+        // Playwright's CDP communication and cause test timeouts.
+        pauseEffects();
+        pauseShimmer();
+        revealCreditsPanel(app.els.creditsPanel, app.els.creditsScrollContent, frame.credits, {
+          reducedMotion: prefersReducedMotion(),
+        });
+      },
+      _debugCreditsState: () => ({
+        currentIndex: app.currentIndex,
+        frameCount: app.frames.length,
+        state: app.state,
+        paused: app.paused,
+        generation: app.generation,
+        hasCreditsTimer: app.creditsRevealTimer !== null,
+        creditsTimerActive: app.creditsRevealTimer?.isActive ?? null,
+        creditsTimerPaused: app.creditsRevealTimer?.isPaused ?? null,
+        panelHidden: app.els.creditsPanel?.hidden,
+        frameHasCredits: !!app.frames[app.currentIndex]?.credits,
+      }),
+      forceBufferStateForTesting: (isBuffering) => {
+        handleBufferChange(app, isBuffering);
+      },
+    });
+    /* v8 ignore stop */
+  }
+
+  return api;
 }

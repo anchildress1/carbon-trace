@@ -1878,9 +1878,7 @@ describe('effects-canvas.js — mask validation errors', () => {
 
   it('skips region when 2D context creation fails for mask processing', async () => {
     // First Image (scene texture) succeeds, second (mask) needs 2D context
-    let imgCount = 0;
     globalThis.Image = vi.fn(function () {
-      imgCount++;
       this.width = 256;
       this.height = 256;
       this.naturalWidth = 256;

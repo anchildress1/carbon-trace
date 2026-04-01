@@ -74,21 +74,6 @@ async function forceCreditsReveal(page) {
   });
 }
 
-async function waitForCreditsVisible(page, panel, timeout = 5000) {
-  try {
-    await expect(panel).toBeVisible({ timeout });
-  } catch (err) {
-    const state = await page.evaluate(
-      () => globalThis.__ctE2EApp?._debugCreditsState?.() ?? 'no debug',
-    );
-    const stateStr = JSON.stringify(state);
-    // eslint-disable-next-line no-console
-    console.error('[E2E] Credits panel not visible! App state:', stateStr);
-    err.message += `\n\n[E2E DIAG] App state at timeout: ${stateStr}`;
-    throw err;
-  }
-}
-
 async function getCreditsTranslateY(page) {
   return page.locator('#credits-scroll-content').evaluate((el) => {
     const transform = getComputedStyle(el).transform;

@@ -321,13 +321,10 @@ describe('shimmer.js', () => {
     });
 
     it('removes matchMedia listener on destroy', () => {
-      let removeHandler;
       const mockQuery = {
         matches: false,
         addEventListener: vi.fn(),
-        removeEventListener: vi.fn((_event, handler) => {
-          removeHandler = handler;
-        }),
+        removeEventListener: vi.fn(),
       };
       vi.stubGlobal('matchMedia', vi.fn(() => mockQuery));
       vi.resetModules();
