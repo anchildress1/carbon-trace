@@ -3,9 +3,10 @@
  *
  * Captures quantitative metrics for all major functional flows. Each test
  * attaches a JSON artifact to the Playwright report for comparison across runs.
- * No thresholds are enforced — this is observational profiling only.
+ * Guardrails are intentionally broad: this suite remains primarily
+ * observational, but now fails on clear regressions.
  */
-import { test } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import {
   dismissLoadingScreen,
   measureAdvanceLatencyMs,
@@ -18,6 +19,17 @@ import {
   sampleRafStats,
   percentile,
 } from './helpers.js';
+
+const PERF_GUARDRAILS = Object.freeze({
+  pageLoadPromptVisibleMs: 12000,
+  clickToBeginMs: 2500,
+  navLatencyMs: 4500,
+  pauseResumeMs: 1800,
+  maxLongTaskMs: 2000,
+  minAverageFps: 20,
+  maxP95FrameMs: 45,
+  maxDroppedFramePercent: 75,
+});
 
 function attachJson(testInfo, name, data) {
   return testInfo.attach(name, {
@@ -62,6 +74,14 @@ test.describe('baseline performance profiles', () => {
       return { count: resources.length, totalTransferBytes, totalDurationMs, byType };
     });
 
+    expect(promptVisibleMs).toBeLessThan(PERF_GUARDRAILS.pageLoadPromptVisibleMs);
+    expect(navTiming).not.toBeNull();
+    if (navTiming) {
+      expect(navTiming.domContentLoadedMs).toBeGreaterThanOrEqual(0);
+      expect(navTiming.loadEventMs).toBeGreaterThanOrEqual(0);
+      expect(navTiming.domInteractiveMs).toBeGreaterThanOrEqual(0);
+    }
+
     await attachJson(testInfo, 'page-load-profile', {
       promptVisibleMs,
       paintMetrics,
@@ -80,6 +100,8 @@ test.describe('baseline performance profiles', () => {
     const clickToVisibleMs = await measureLoadingScreenDismissLatencyMs(page);
 
     const sceneLabel = await page.locator('#scene-stage').getAttribute('aria-label');
+    expect(clickToVisibleMs).toBeLessThan(PERF_GUARDRAILS.clickToBeginMs);
+    expect(sceneLabel).toBeTruthy();
 
     await attachJson(testInfo, 'click-to-begin-profile', {
       clickToVisibleMs,
@@ -100,11 +122,16 @@ test.describe('baseline performance profiles', () => {
     }
 
     const longTasks = await collectLongTasks(page);
+    const maxLatencyMs = Math.max(...latenciesMs);
+    const avgLatencyMs = latenciesMs.reduce((s, v) => s + v, 0) / latenciesMs.length;
+    const veryLongTasks = longTasks.filter((duration) => duration > PERF_GUARDRAILS.maxLongTaskMs);
+    expect(maxLatencyMs).toBeLessThan(PERF_GUARDRAILS.navLatencyMs);
+    expect(veryLongTasks).toHaveLength(0);
 
     await attachJson(testInfo, 'forward-nav-profile', {
       latenciesMs,
-      maxLatencyMs: Math.max(...latenciesMs),
-      avgLatencyMs: latenciesMs.reduce((s, v) => s + v, 0) / latenciesMs.length,
+      maxLatencyMs,
+      avgLatencyMs,
       longTaskCount: longTasks.length,
       longTaskDurationsMs: longTasks,
     });
@@ -132,11 +159,16 @@ test.describe('baseline performance profiles', () => {
     }
 
     const longTasks = await collectLongTasks(page);
+    const maxLatencyMs = Math.max(...latenciesMs);
+    const avgLatencyMs = latenciesMs.reduce((s, v) => s + v, 0) / latenciesMs.length;
+    const veryLongTasks = longTasks.filter((duration) => duration > PERF_GUARDRAILS.maxLongTaskMs);
+    expect(maxLatencyMs).toBeLessThan(PERF_GUARDRAILS.navLatencyMs);
+    expect(veryLongTasks).toHaveLength(0);
 
     await attachJson(testInfo, 'backward-nav-profile', {
       latenciesMs,
-      maxLatencyMs: Math.max(...latenciesMs),
-      avgLatencyMs: latenciesMs.reduce((s, v) => s + v, 0) / latenciesMs.length,
+      maxLatencyMs,
+      avgLatencyMs,
       longTaskCount: longTasks.length,
       longTaskDurationsMs: longTasks,
     });
@@ -164,6 +196,9 @@ test.describe('baseline performance profiles', () => {
 
     const stats = await sampleRafStats(page, 3000);
     const p95FrameMs = percentile(stats.intervalsMs, 0.95);
+    expect(stats.averageFps).toBeGreaterThanOrEqual(PERF_GUARDRAILS.minAverageFps);
+    expect(p95FrameMs).toBeLessThan(PERF_GUARDRAILS.maxP95FrameMs);
+    expect(stats.droppedFramePercent).toBeLessThan(PERF_GUARDRAILS.maxDroppedFramePercent);
 
     await attachJson(testInfo, 'effects-fps-profile', {
       scene: 'scene-05-rinse (water+glow)',
@@ -233,6 +268,8 @@ test.describe('baseline performance profiles', () => {
         }),
       2000,
     );
+    expect(pauseLatencyMs).toBeLessThan(PERF_GUARDRAILS.pauseResumeMs);
+    expect(resumeLatencyMs).toBeLessThan(PERF_GUARDRAILS.pauseResumeMs);
 
     await attachJson(testInfo, 'pause-resume-profile', {
       pauseLatencyMs,
@@ -260,6 +297,8 @@ test.describe('baseline performance profiles', () => {
     }
 
     const longTasks = await collectLongTasks(page);
+    const veryLongTasks = longTasks.filter((duration) => duration > PERF_GUARDRAILS.maxLongTaskMs);
+    expect(veryLongTasks).toHaveLength(0);
 
     // Attempt memory measurement (may not be available in all contexts)
     const memoryInfo = await page.evaluate(async () => {
@@ -284,6 +323,9 @@ test.describe('baseline performance profiles', () => {
       }
       return null;
     });
+    if (memoryInfo) {
+      expect(memoryInfo.bytes).toBeGreaterThan(0);
+    }
 
     await attachJson(testInfo, 'full-cycle-profile', {
       totalLongTasks: longTasks.length,
