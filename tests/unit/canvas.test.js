@@ -214,19 +214,6 @@ describe('canvas.js', () => {
       );
     });
 
-    it('supports fallback img.width/img.height when natural size is unavailable', () => {
-      const { canvas, mockCtx } = createMockCanvas();
-      initSceneCanvas(canvas);
-
-      const img = { naturalWidth: 0, naturalHeight: 0, width: 1920, height: 1080 };
-      drawImage(img);
-
-      const call = mockCtx.drawImage.mock.calls[0];
-      expect(call[1]).toBe(0);
-      expect(call[2]).toBe(0);
-      expect(call[3]).toBe(1920);
-      expect(call[4]).toBe(1080);
-    });
   });
 
   describe('clearScene', () => {

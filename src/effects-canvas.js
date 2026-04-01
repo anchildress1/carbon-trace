@@ -71,7 +71,6 @@ function releaseMaskSource(source) {
 
 function getMotionQuery() {
   if (motionQuery) return motionQuery;
-  if (typeof globalThis.matchMedia !== 'function') return null;
   motionQuery = globalThis.matchMedia(REDUCED_MOTION_MEDIA_QUERY);
   reducedMotionEnabled = motionQuery.matches;
   return motionQuery;
@@ -476,7 +475,7 @@ async function doInit(el) {
     el.addEventListener('webglcontextrestored', handleContextRestored);
 
     const query = getMotionQuery();
-    query?.addEventListener?.('change', handleMotionChange);
+    query.addEventListener('change', handleMotionChange);
 
     observer = new ResizeObserver(() => {
       if (pixiApp?.renderer) {
@@ -830,7 +829,7 @@ export function destroy() {
   }
 
   if (motionQuery) {
-    motionQuery.removeEventListener?.('change', handleMotionChange);
+    motionQuery.removeEventListener('change', handleMotionChange);
     motionQuery = null;
   }
   reducedMotionEnabled = false;
