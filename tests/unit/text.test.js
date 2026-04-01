@@ -93,13 +93,22 @@ describe('text.js', () => {
 
     it('throws when x/y are missing', () => {
       expect(() => createLineElement('Default', container)).toThrow(
-        'createLineElement requires numeric x and y positions',
+        'createLineElement requires finite numeric x and y positions',
       );
       expect(() => createLineElement('Only X', container, { x: 10 })).toThrow(
-        'createLineElement requires numeric x and y positions',
+        'createLineElement requires finite numeric x and y positions',
       );
       expect(() => createLineElement('Only Y', container, { y: 10 })).toThrow(
-        'createLineElement requires numeric x and y positions',
+        'createLineElement requires finite numeric x and y positions',
+      );
+    });
+
+    it('throws on NaN and Infinity positions', () => {
+      expect(() => createLineElement('NaN', container, { x: NaN, y: 10 })).toThrow(
+        'createLineElement requires finite numeric x and y positions',
+      );
+      expect(() => createLineElement('Inf', container, { x: 10, y: Infinity })).toThrow(
+        'createLineElement requires finite numeric x and y positions',
       );
     });
 
@@ -257,7 +266,7 @@ describe('text.js', () => {
       const lines = [{ text: 'No position', enter: 0, exit: 1000 }];
 
       expect(() => buildNarrationTimeline(lines, container)).toThrow(
-        'createLineElement requires numeric x and y positions',
+        'createLineElement requires finite numeric x and y positions',
       );
     });
 
@@ -310,7 +319,7 @@ describe('text.js', () => {
       ];
 
       expect(() => buildNarrationTimeline(lines, container)).toThrow(
-        'createLineElement requires numeric x and y positions',
+        'createLineElement requires finite numeric x and y positions',
       );
     });
 

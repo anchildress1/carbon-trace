@@ -6,8 +6,8 @@ export function createLineElement(text, container, options = {}) {
   el.textContent = text;
 
   const { x, y } = options;
-  if (typeof x !== 'number' || typeof y !== 'number') {
-    throw new TypeError('createLineElement requires numeric x and y positions');
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    throw new TypeError('createLineElement requires finite numeric x and y positions');
   }
   el.classList.add('narration-line--positioned');
   el.style.position = 'absolute';
