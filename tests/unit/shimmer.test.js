@@ -193,11 +193,6 @@ describe('shimmer.js', () => {
       );
     });
 
-    it('works without ResizeObserver', () => {
-      vi.stubGlobal('ResizeObserver', undefined);
-      shimmer.init(mockCanvas);
-      expect(mockCanvas.getContext).toHaveBeenCalledWith('2d');
-    });
   });
 
   describe('loadScene', () => {

@@ -330,7 +330,11 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
       const canvas = createMockCanvas();
       await init(canvas);
 
-      globalThis.matchMedia = vi.fn().mockReturnValue({ matches: true });
+      globalThis.matchMedia = vi.fn().mockReturnValue({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      });
       resume();
 
       // Should not have called ticker.start
@@ -1755,7 +1759,11 @@ describe('effects-canvas — dedicated analysis element (ADR-008 Approach B)', (
     const createdEl = ctx.createMediaElementSource.mock.calls[0][0];
     createdEl.play = vi.fn().mockResolvedValue(undefined);
 
-    globalThis.matchMedia = vi.fn().mockReturnValue({ matches: true });
+    globalThis.matchMedia = vi.fn().mockReturnValue({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    });
 
     resume();
     expect(createdEl.play).not.toHaveBeenCalled();
