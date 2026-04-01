@@ -17,7 +17,7 @@
 // use CSP-safe alternatives, required by script-src 'self' policy.
 import 'pixi.js/unsafe-eval';
 import { Application, Container, Sprite, Texture, TextureSource } from 'pixi.js';
-import { createEffect, noiseFreeTypes, overlayTypes } from './effects.js';
+import { createEffect, noiseFreeTypes, overlayTypes, rayOverlayTypes } from './effects.js';
 
 let pixiApp = null;
 let canvasEl = null;
@@ -384,6 +384,9 @@ async function applyRegionEffect(region, sceneTexture, gen) {
   if (overlayTypes.has(region.type)) {
     return applyOverlayEffect(effect, maskTexture, region);
   }
+  if (rayOverlayTypes.has(region.type)) {
+    return applyRayEffect(effect, maskTexture);
+  }
   return applyMaskedEffect(effect, maskTexture, sceneTexture);
 }
 
@@ -402,6 +405,35 @@ function applyOverlayEffect(effect, maskTexture, region) {
 
   screenSizedSprites.push(effectSprite);
   pixiApp.stage.addChild(effectSprite);
+
+  return effect;
+}
+
+/**
+ * Ray overlay rendering: black sprite filtered by GodrayFilter, masked
+ * to the region shape, composited additively. The black input contributes
+ * no color — GodrayFilter's output is pure Perlin noise rays. Additive
+ * blend lets the scene image show through while rays brighten it.
+ */
+function applyRayEffect(effect, maskTexture) {
+  const effectSprite = new Sprite(Texture.WHITE);
+  effectSprite.width = pixiApp.screen.width;
+  effectSprite.height = pixiApp.screen.height;
+  effectSprite.tint = 0x000000;
+  effectSprite.filters = [effect.filter];
+
+  const maskSprite = new Sprite(maskTexture);
+  maskSprite.width = pixiApp.screen.width;
+  maskSprite.height = pixiApp.screen.height;
+
+  screenSizedSprites.push(effectSprite, maskSprite);
+
+  const container = new Container();
+  container.addChild(effectSprite);
+  container.blendMode = 'add';
+  pixiApp.stage.addChild(maskSprite);
+  container.setMask({ mask: maskSprite });
+  pixiApp.stage.addChild(container);
 
   return effect;
 }

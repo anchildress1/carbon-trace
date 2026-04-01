@@ -62,6 +62,7 @@ describe('effects.js — factory registry', () => {
   let hasEffectType;
   let noiseFreeTypes;
   let overlayTypes;
+  let rayOverlayTypes;
   let DisplacementFilter;
   let GlowFilter;
   let GodrayFilter;
@@ -79,6 +80,7 @@ describe('effects.js — factory registry', () => {
       hasEffectType,
       noiseFreeTypes,
       overlayTypes,
+      rayOverlayTypes,
     } = await import('../../src/effects.js'));
   });
 
@@ -139,8 +141,13 @@ describe('effects.js — factory registry', () => {
       expect(noiseFreeTypes.has('godray')).toBe(true);
       expect(noiseFreeTypes.has('shockwave')).toBe(true);
       expect(overlayTypes.has('glow')).toBe(true);
-      expect(overlayTypes.has('godray')).toBe(true);
+      expect(overlayTypes.has('godray')).toBe(false);
       expect(overlayTypes.has('shockwave')).toBe(false);
+    });
+
+    it('exports rayOverlayTypes with godray', () => {
+      expect(rayOverlayTypes.has('godray')).toBe(true);
+      expect(rayOverlayTypes.has('glow')).toBe(false);
     });
   });
 

@@ -47,7 +47,15 @@ export const noiseFreeTypes = new Set(['glow', 'godray', 'shockwave']);
  * background) becomes the sprite content, giving GlowFilter the alpha
  * transitions it needs to radiate outward.
  */
-export const overlayTypes = new Set(['glow', 'godray']);
+export const overlayTypes = new Set(['glow']);
+
+/**
+ * Ray overlay effect types render the filter output over a black sprite
+ * (contributing no color), masked to the region shape, and composited
+ * additively so the scene image shows through. GodrayFilter adds Perlin
+ * noise rays to its input — a black input means the output is pure rays.
+ */
+export const rayOverlayTypes = new Set(['godray']);
 
 // --- Displacement-based effect factories ---
 // Each receives a PixiJS Sprite (noise texture) and region params.

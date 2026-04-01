@@ -98,7 +98,8 @@ vi.mock('../../src/effects.js', () => ({
     update: vi.fn(),
   })),
   noiseFreeTypes: new Set(['glow', 'godray', 'shockwave']),
-  overlayTypes: new Set(['glow', 'godray']),
+  overlayTypes: new Set(['glow']),
+  rayOverlayTypes: new Set(['godray']),
 }));
 
 import {
