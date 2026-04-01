@@ -354,6 +354,9 @@ function buildDotSprites(scale) {
   glowOff.width = glowSize;
   glowOff.height = glowSize;
   const glowCtx = glowOff.getContext('2d');
+  if (!glowCtx) {
+    throw new Error('shimmer: failed to acquire offscreen 2D context for glow sprite');
+  }
   const glow = glowCtx.createRadialGradient(
     glowRadius,
     glowRadius,
@@ -376,6 +379,9 @@ function buildDotSprites(scale) {
   coreOff.width = coreSize;
   coreOff.height = coreSize;
   const coreCtx = coreOff.getContext('2d');
+  if (!coreCtx) {
+    throw new Error('shimmer: failed to acquire offscreen 2D context for core sprite');
+  }
   const core = coreCtx.createRadialGradient(
     coreRadius,
     coreRadius,

@@ -508,16 +508,21 @@ describe('shimmer.js', () => {
         configurable: true,
       });
 
+      const traceOpacity = 0.5; // matches config.opacity above
+
       const tick = rafCallbacks[rafCallbacks.length - 1];
       tick(1000);
-      const firstDotAlpha = globalAlphaValues.find(v => v !== 1 && v > 0 && v < 1);
+      // Skip the trace-layer alpha (config.opacity) and the reset-to-1 values
+      const firstDotAlpha = globalAlphaValues.find(v => v !== 1 && v !== traceOpacity && v > 0 && v < 1);
 
       globalAlphaValues.length = 0;
       const tick2 = rafCallbacks[rafCallbacks.length - 1];
       tick2(5000);
-      const secondDotAlpha = globalAlphaValues.find(v => v !== 1 && v > 0 && v < 1);
+      const secondDotAlpha = globalAlphaValues.find(v => v !== 1 && v !== traceOpacity && v > 0 && v < 1);
 
-      // Under reduced motion, pulse is fixed at 0.6 — alpha should be identical
+      // Under reduced motion, pulse is fixed at 0.6 — dot alpha should be identical
+      // regardless of time (no wave oscillation)
+      expect(firstDotAlpha).toBeDefined();
       expect(firstDotAlpha).toBe(secondDotAlpha);
     });
 
