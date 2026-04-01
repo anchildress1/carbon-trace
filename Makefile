@@ -20,7 +20,7 @@ format-check:
 	@echo "Checking formatting..."
 	pnpm format:check
 
-# Lint code
+# Lint source and test files
 lint:
 	@echo "Linting code..."
 	pnpm lint

@@ -126,7 +126,7 @@ Full system design: `docs/carbon-trace-system-design.md` and `docs/ADRs/*.md`
 | `make e2e`       | Build, then run Playwright E2E tests             |
 | `make test`      | Run all tests (unit + E2E + performance)         |
 | `make build`     | Production build                                 |
-| `make lint`      | Lint source files                                |
+| `make lint`      | Lint source and test files                       |
 | `make ai-checks` | Run secret-scan, format check, and lint (for AI) |
 | `make deploy`    | Deploy to Cloud Run via `deploy.sh`              |
 
