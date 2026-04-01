@@ -264,7 +264,7 @@ Frosted glass overlay on frame 11. Triggered by `makeNarrationEndCallback` after
 
 Every frame has identical shape via `meta.frameDefaults` merge. `null` = feature not active on this frame. Applies uniformly to all optional keys: `narration: null`, `audioCues: null`, `traceOverlay: null`, `effects: null`.
 
-Startup performs strict config validation and fails fast on invalid narration line schema. Each `narration.lines[]` entry must provide `text` (string) plus finite numeric `enter`, `exit`, `x`, and `y` values. Invalid config aborts initialization, keeps the on-page error generic, and logs a sanitized diagnostic message to the console.
+Startup performs strict config validation (`validateScenesConfig`) and fails fast on invalid narration line schema. Each `narration.lines[]` entry must provide `text` (string) plus finite numeric `enter`, `exit`, `x`, and `y` values. Invalid config throws from `createApp()`, which is caught by the top-level error boundary in `main.js` — the on-page message stays generic while the full error is logged to the console. `createLineElement()` enforces the same finite-numeric contract at render time as a second safety layer.
 
 ```jsonc
 {
