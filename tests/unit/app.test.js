@@ -139,9 +139,8 @@ vi.mock('../../src/scenes.json', () => ({
     meta: {
       title: 'test',
       aspectRatio: '16:9',
-      defaultTransition: { type: 'fade', duration: 400 },
+      defaultTransition: { duration: 400 },
       defaultHoldAfterNarration: 2000,
-      frameDefaults: { textMode: 'ghost-drift' },
     },
     frames: [
       {
@@ -154,11 +153,11 @@ vi.mock('../../src/scenes.json', () => ({
           captions: [{ text: 'Opening line', start: 0, end: 3000 }],
         },
         audioCues: [
-          { id: 'narration', type: 'narration', src: 'title-narration.m4a', enter: 0, volume: 1, loop: false, fadeIn: 0, fadeOut: 0 },
+          { id: 'narration', type: 'narration', src: 'title-narration.m4a', enter: 0, volume: 1, loop: false, fadeIn: 0 },
         ],
         effects: null,
         traceOverlay: null,
-        transition: { type: 'fade', duration: 400 },
+        transition: { duration: 400 },
 
       },
       {
@@ -173,12 +172,12 @@ vi.mock('../../src/scenes.json', () => ({
           captions: [{ text: 'Hello', start: 0, end: 2000 }],
         },
         audioCues: [
-          { id: 'narration', type: 'narration', src: 'narration.mp3', enter: 500, volume: 1, loop: false, fadeIn: 0, fadeOut: 0 },
-          { id: 'ambient-01', type: 'ambient', src: 'ambient.mp3', enter: 0, volume: 0.5, loop: true, fadeIn: 1000, fadeOut: null },
-          { id: 'end-song', type: 'ambient', src: 'credits-music.mp3', enter: { ref: 'narration', offset: -1000 }, volume: 0.5, loop: true, fadeIn: 2000, fadeOut: null },
+          { id: 'narration', type: 'narration', src: 'narration.mp3', enter: 500, volume: 1, loop: false, fadeIn: 0 },
+          { id: 'ambient-01', type: 'ambient', src: 'ambient.mp3', enter: 0, volume: 0.5, loop: true, fadeIn: 1000 },
+          { id: 'end-song', type: 'ambient', src: 'credits-music.mp3', enter: { ref: 'narration', offset: -1000 }, volume: 0.5, loop: true, fadeIn: 2000 },
         ],
         effects: { regions: [{ type: 'shockwave', mask: 'diamond.png', audioReactive: { band: 'bass', trigger: { threshold: 1.5, cooldown: 0.08 } } }], analyserCueId: 'end-song' },
-        transition: { type: 'fade', duration: 400 },
+        transition: { duration: 400 },
 
       },
       {
@@ -193,7 +192,7 @@ vi.mock('../../src/scenes.json', () => ({
         },
         audioCues: null,
         effects: null,
-        transition: { type: 'fade', duration: 400 },
+        transition: { duration: 400 },
 
       },
       {
@@ -204,11 +203,11 @@ vi.mock('../../src/scenes.json', () => ({
         image: 'scene-bad.webp',
         narration: null,
         audioCues: [
-          { id: 'narration', type: 'narration', src: 'bad-narration.mp3', enter: 0, volume: 1, loop: false, fadeIn: 0, fadeOut: 0 },
+          { id: 'narration', type: 'narration', src: 'bad-narration.mp3', enter: 0, volume: 1, loop: false, fadeIn: 0 },
         ],
         // analyserCueId 'missing-cue' has no matching audioCue — triggers warn
         effects: { regions: [{ type: 'shockwave', mask: 'bad.png', audioReactive: { band: 'bass' } }], analyserCueId: 'missing-cue' },
-        transition: { type: 'fade', duration: 400 },
+        transition: { duration: 400 },
       },
       {
         // Frame for testing multi-hop anchor ref warn path
@@ -219,11 +218,11 @@ vi.mock('../../src/scenes.json', () => ({
         narration: { lines: null, captions: null },
         audioCues: [
           // narration.enter is a non-numeric ref — triggers warn in resolveAnalyserCueEnter
-          { id: 'narration', type: 'narration', src: 'multihop-narration.mp3', enter: { ref: 'ambient', offset: 0 }, volume: 1, loop: false, fadeIn: 0, fadeOut: 0 },
-          { id: 'end-song-ref', type: 'ambient', src: 'multihop-music.mp3', enter: { ref: 'narration', offset: -1000 }, volume: 0.5, loop: true, fadeIn: 0, fadeOut: null },
+          { id: 'narration', type: 'narration', src: 'multihop-narration.mp3', enter: { ref: 'ambient', offset: 0 }, volume: 1, loop: false, fadeIn: 0 },
+          { id: 'end-song-ref', type: 'ambient', src: 'multihop-music.mp3', enter: { ref: 'narration', offset: -1000 }, volume: 0.5, loop: true, fadeIn: 0 },
         ],
         effects: { regions: [{ type: 'shockwave', mask: 'multihop.png', audioReactive: { band: 'bass' } }], analyserCueId: 'end-song-ref' },
-        transition: { type: 'fade', duration: 400 },
+        transition: { duration: 400 },
       },
       {
         id: 'credits',
@@ -248,9 +247,9 @@ vi.mock('../../src/scenes.json', () => ({
           ],
         },
         audioCues: [
-          { id: 'narration', type: 'narration', src: 'credits-narration.m4a', enter: 500, volume: 1, loop: false, fadeIn: 0, fadeOut: 0 },
-          { id: 'ambient-credits', type: 'ambient', src: 'credits-vinyl.m4a', enter: 0, volume: 0.1, loop: true, fadeIn: 1500, fadeOut: 1000 },
-          { id: 'end-song', type: 'ambient', src: 'credits-music.mp3', enter: { ref: 'narration', offset: -12000 }, volume: 0.15, volumeAfterNarration: 0.75, fadeAfterNarration: 3000, loop: true, fadeIn: 8000, fadeOut: null },
+          { id: 'narration', type: 'narration', src: 'credits-narration.m4a', enter: 500, volume: 1, loop: false, fadeIn: 0 },
+          { id: 'ambient-credits', type: 'ambient', src: 'credits-vinyl.m4a', enter: 0, volume: 0.1, loop: true, fadeIn: 1500 },
+          { id: 'end-song', type: 'ambient', src: 'credits-music.mp3', enter: { ref: 'narration', offset: -12000 }, volume: 0.15, volumeAfterNarration: 0.75, fadeAfterNarration: 3000, loop: true, fadeIn: 8000 },
         ],
         effects: {
           analyserCueId: 'end-song',
@@ -259,7 +258,7 @@ vi.mock('../../src/scenes.json', () => ({
             { type: 'glow', mask: 'credits-diamond.png' },
           ],
         },
-        transition: { type: 'fade', duration: 1500 },
+        transition: { duration: 1500 },
 
       },
     ],
