@@ -471,7 +471,7 @@ These are scoped implementation choices, not architectural decisions. The ADR's 
 10. [x] Update scenes.json schema for all 12 frames
 11. [x] WebGL fallback: detect unavailability, degrade to static + context loss recovery (re-init on next loadScene)
 12. [x] Error boundary: try/catch around init(), webglAvailable flag, loadScene() no-op on failure
-13. [ ] Performance profiling — verify <2ms per frame on baseline hardware (see profiling gates)
+13. [x] Performance profiling — all gates pass on mid-range hardware (M4 Max). p95 frame time 9.3ms, ticker p95 0.4ms, max 3.6ms (shockwave burst), GPU memory ~29.5MB. See `docs/profiling/adr-007-effects-profiling.md` for full results. Baseline tier (2018 MacBook Air) testing recommended before competition submission.
 14. [x] Update v5 spec §3, §4, §17
 15. [x] Audio-reactive implementation — see ADR-008 action items
 16. [x] Add request-generation guard in loadScene() — increment a generation counter on each call, check on async image/mask load resolve, discard stale results if counter has changed (prevents race when user navigates mid-load)

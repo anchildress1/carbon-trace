@@ -238,11 +238,12 @@ describe('shimmer.js', () => {
       shimmer.init(mockCanvas);
       await shimmer.loadScene({ mask: 'test.png', opacity: 0.5, dotCount: 3 });
 
-      // Trigger a tick and count gradient calls — each dot draws 2 gradients (glow + core)
+      // Trigger a tick and count drawImage calls — traceImage + 2 sprites per dot (glow + core)
       const lastTick = rafCallbacks[rafCallbacks.length - 1];
+      mockCtx.drawImage.mockClear();
       lastTick(1000);
-      const gradientCalls = mockCtx.createRadialGradient.mock.calls.length;
-      expect(gradientCalls).toBe(3 * 2); // 3 dots × 2 gradients each
+      // 1 traceImage + 3 dots × 2 sprites each = 7
+      expect(mockCtx.drawImage.mock.calls.length).toBe(1 + 3 * 2);
     });
 
     it('spawns zero dots when dotCount is 0', async () => {
@@ -250,10 +251,10 @@ describe('shimmer.js', () => {
       await shimmer.loadScene({ mask: 'test.png', opacity: 0.5, dotCount: 0 });
 
       const lastTick = rafCallbacks[rafCallbacks.length - 1];
+      mockCtx.drawImage.mockClear();
       lastTick(1000);
-      // With 0 dots: render draws traceImage but no gradients
-      expect(mockCtx.drawImage).toHaveBeenCalled(); // traceImage
-      expect(mockCtx.createRadialGradient).not.toHaveBeenCalled();
+      // With 0 dots: render draws only traceImage (1 drawImage call, no sprites)
+      expect(mockCtx.drawImage).toHaveBeenCalledTimes(1);
     });
 
     it('cancels previous rAF on new loadScene', async () => {
@@ -422,18 +423,16 @@ describe('shimmer.js', () => {
       expect(drawCall[4]).toBe(mockCanvas.height);
     });
 
-    it('draws glow and core gradients for each dot', async () => {
+    it('draws glow and core sprites for each dot', async () => {
       shimmer.init(mockCanvas);
       await shimmer.loadScene({ mask: 'test.png', opacity: 0.5, dotCount: 2 });
 
       const tick = rafCallbacks[rafCallbacks.length - 1];
+      mockCtx.drawImage.mockClear();
       tick(1000);
 
-      // Each dot gets 2 createRadialGradient calls (glow + core)
-      expect(mockCtx.createRadialGradient).toHaveBeenCalledTimes(4);
-      // Each gradient gets 3 color stops
-      const gradient = mockCtx.createRadialGradient.mock.results[0].value;
-      expect(gradient.addColorStop).toHaveBeenCalledTimes(3);
+      // 1 traceImage + 2 dots × 2 sprites (glow + core) = 5 drawImage calls
+      expect(mockCtx.drawImage.mock.calls.length).toBe(1 + 2 * 2);
     });
 
     it('returns early without drawing when opacity is 0', async () => {
@@ -469,19 +468,21 @@ describe('shimmer.js', () => {
       shimmer.init(mockCanvas);
       await shimmer.loadScene({ mask: 'test.png', opacity: 0.5, dotCount: 2 });
 
-      // Record dot positions by capturing gradient center coordinates
+      // Record dot positions by capturing drawImage sprite positions
       const tick = rafCallbacks[rafCallbacks.length - 1];
+      mockCtx.drawImage.mockClear();
       tick(1000);
-      const firstCallPositions = mockCtx.createRadialGradient.mock.calls.map(c => [c[0], c[1]]);
+      // Skip traceImage (index 0), then pairs of (glow, core) per dot
+      const firstPositions = mockCtx.drawImage.mock.calls.slice(1).map(c => [c[1], c[2]]);
 
-      mockCtx.createRadialGradient.mockClear();
+      mockCtx.drawImage.mockClear();
       // Tick again — positions should NOT change (stepDot skipped under reduced motion)
       const tick2 = rafCallbacks[rafCallbacks.length - 1];
       tick2(2000);
-      const secondCallPositions = mockCtx.createRadialGradient.mock.calls.map(c => [c[0], c[1]]);
+      const secondPositions = mockCtx.drawImage.mock.calls.slice(1).map(c => [c[1], c[2]]);
 
       // Dot positions are identical (no movement)
-      expect(firstCallPositions).toEqual(secondCallPositions);
+      expect(firstPositions).toEqual(secondPositions);
     });
 
     it('uses reduced-motion pulse value of 0.6', async () => {
@@ -495,22 +496,34 @@ describe('shimmer.js', () => {
       shimmer.init(mockCanvas);
       await shimmer.loadScene({ mask: 'test.png', opacity: 0.5, dotCount: 1 });
 
-      const tick = rafCallbacks[rafCallbacks.length - 1];
-      // Tick at two different times — pulse should be constant at 0.6
-      tick(1000);
-      const firstGlow = mockCtx.createRadialGradient.mock.results[0].value;
-      const firstAlphaArg = firstGlow.addColorStop.mock.calls[0][1];
+      // Tick at two different times — globalAlpha should be constant
+      // because pulse is fixed at 0.6 under reduced motion
+      const globalAlphaValues = [];
+      const origSetter = Object.getOwnPropertyDescriptor(mockCtx, 'globalAlpha')?.set
+        || ((v) => { mockCtx._globalAlpha = v; });
+      const alphaTracker = vi.fn((v) => { globalAlphaValues.push(v); origSetter(v); });
+      Object.defineProperty(mockCtx, 'globalAlpha', {
+        get: () => mockCtx._globalAlpha ?? 1,
+        set: alphaTracker,
+        configurable: true,
+      });
 
-      mockCtx.createRadialGradient.mockClear();
-      mockCtx.createRadialGradient.mockReturnValue({ addColorStop: vi.fn() });
+      const traceOpacity = 0.5; // matches config.opacity above
+
+      const tick = rafCallbacks[rafCallbacks.length - 1];
+      tick(1000);
+      // Skip the trace-layer alpha (config.opacity) and the reset-to-1 values
+      const firstDotAlpha = globalAlphaValues.find(v => v !== 1 && v !== traceOpacity && v > 0 && v < 1);
+
+      globalAlphaValues.length = 0;
       const tick2 = rafCallbacks[rafCallbacks.length - 1];
       tick2(5000);
-      const secondGlow = mockCtx.createRadialGradient.mock.results[0].value;
-      const secondAlphaArg = secondGlow.addColorStop.mock.calls[0][1];
+      const secondDotAlpha = globalAlphaValues.find(v => v !== 1 && v !== traceOpacity && v > 0 && v < 1);
 
-      // Under reduced motion, pulse is fixed at 0.6 — alpha strings should be identical
+      // Under reduced motion, pulse is fixed at 0.6 — dot alpha should be identical
       // regardless of time (no wave oscillation)
-      expect(firstAlphaArg).toBe(secondAlphaArg);
+      expect(firstDotAlpha).toBeDefined();
+      expect(firstDotAlpha).toBe(secondDotAlpha);
     });
 
     it('updates reducedMotion flag on matchMedia change event', async () => {
@@ -563,22 +576,29 @@ describe('shimmer.js', () => {
       shimmer.init(mockCanvas);
       await shimmer.loadScene({ mask: 'test.png', opacity: 0.5, dotCount: 1 });
 
-      // Record initial position
+      // Record initial position from drawImage calls (skip traceImage at index 0)
       const tick1 = rafCallbacks[rafCallbacks.length - 1];
+      mockCtx.drawImage.mockClear();
       tick1(0);
-      const initialPos = [...mockCtx.createRadialGradient.mock.calls[0].slice(0, 2)];
+      // drawImage calls: [traceImage, glowSprite, coreSprite]
+      // glowSprite call args: (sprite, x - r, y - r) — extract x position
+      const initialGlow = mockCtx.drawImage.mock.calls[1];
+      const initialX = initialGlow[1];
+      const initialY = initialGlow[2];
 
       // Run several ticks to let the dot move
       for (let t = 1; t <= 5; t++) {
-        mockCtx.createRadialGradient.mockClear();
+        mockCtx.drawImage.mockClear();
         const nextTick = rafCallbacks[rafCallbacks.length - 1];
         nextTick(t * 16);
       }
 
-      const movedPos = [...mockCtx.createRadialGradient.mock.calls[0].slice(0, 2)];
+      const movedGlow = mockCtx.drawImage.mock.calls[1];
+      const movedX = movedGlow[1];
+      const movedY = movedGlow[2];
 
       // Dot should have moved — at least one coordinate changed
-      const hasMoved = initialPos[0] !== movedPos[0] || initialPos[1] !== movedPos[1];
+      const hasMoved = initialX !== movedX || initialY !== movedY;
       expect(hasMoved).toBe(true);
     });
 
@@ -609,8 +629,8 @@ describe('shimmer.js', () => {
 
       // The dot should survive many ticks via respawn without errors
       expect(noError).toBe(true);
-      // Verify dots are still being rendered
-      expect(mockCtx.createRadialGradient).toHaveBeenCalled();
+      // Verify dots are still being rendered (traceImage + sprite draws)
+      expect(mockCtx.drawImage).toHaveBeenCalled();
     });
   });
 
@@ -703,7 +723,8 @@ describe('shimmer.js', () => {
       tick(1000);
 
       // All 3 dots should spawn at the only walkable position and render
-      expect(mockCtx.createRadialGradient).toHaveBeenCalledTimes(6); // 3 dots × 2 gradients
+      // 1 traceImage + 3 dots × 2 sprites = 7 drawImage calls
+      expect(mockCtx.drawImage.mock.calls.length).toBe(1 + 3 * 2);
     });
 
     it('handles mask with no walkable pixels', async () => {

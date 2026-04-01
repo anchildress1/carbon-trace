@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
+import { chromium } from '@playwright/test';
 
 const PREVIEW_URL = 'http://127.0.0.1:4173';
 const PREVIEW_ARGS = [
@@ -123,8 +124,9 @@ function attachSignalHandlers() {
 attachSignalHandlers();
 
 try {
-  await runCommand('pnpm', ['perf:lighthouse:desktop']);
-  await runCommand('pnpm', ['perf:lighthouse:mobile']);
+  const chromePath = chromium.executablePath();
+  await runCommand('pnpm', ['perf:lighthouse:desktop'], { CHROME_PATH: chromePath });
+  await runCommand('pnpm', ['perf:lighthouse:mobile'], { CHROME_PATH: chromePath });
 
   startPreviewServer();
   await waitForPreviewServer();

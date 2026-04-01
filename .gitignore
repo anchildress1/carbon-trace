@@ -39,5 +39,8 @@ Thumbs.db
 # Logs
 *.log
 
+# Profiling traces (large binary artifacts, regenerated on demand)
+/profiling/
+
 # Originals (high-res source images, not deployed)
 originals/
