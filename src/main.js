@@ -1,11 +1,5 @@
 import { createApp } from './app.js';
 
-// Activate preloaded Google Fonts stylesheet without blocking render.
-const fontLink = document.querySelector('link[rel="preload"][as="style"]');
-if (fontLink) {
-  fontLink.rel = 'stylesheet';
-}
-
 if (!globalThis.__carbonTraceInitialized) {
   globalThis.__carbonTraceInitialized = true;
 

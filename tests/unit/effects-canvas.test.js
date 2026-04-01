@@ -109,7 +109,6 @@ import {
   pause,
   resume,
   destroy,
-  isRunning,
   setAnalyser,
   connectAnalysisAudio,
   startAnalysisPlayback,
@@ -319,10 +318,6 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
   });
 
   describe('pause / resume', () => {
-    it('isRunning returns false before init', () => {
-      expect(isRunning()).toBe(false);
-    });
-
     it('pause does not throw before init', () => {
       expect(() => pause()).not.toThrow();
     });

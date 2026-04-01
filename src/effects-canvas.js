@@ -876,7 +876,3 @@ export function destroy() {
   isPaused = false;
   initPromise = null;
 }
-
-export function isRunning() {
-  return pixiApp?.ticker?.started ?? false;
-}
