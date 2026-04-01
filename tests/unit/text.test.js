@@ -253,19 +253,12 @@ describe('text.js', () => {
       expect(second.style.left).toBe('50%');
     });
 
-    it('skips lines without position data', () => {
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    it('throws when a line is missing x/y positioning', () => {
       const lines = [{ text: 'No position', enter: 0, exit: 1000 }];
 
-      const { timeline: tl } = buildNarrationTimeline(lines, container);
-
-      expect(container.children.length).toBe(0);
-      expect(tl.fromTo).not.toHaveBeenCalled();
-      expect(errorSpy).toHaveBeenCalledWith(
-        'Narration line 0 has invalid x/y positioning:',
-        expect.objectContaining({ text: 'No position' }),
+      expect(() => buildNarrationTimeline(lines, container)).toThrow(
+        'createLineElement requires numeric x and y positions',
       );
-      errorSpy.mockRestore();
     });
 
     it('skips lines with missing enter timing', () => {
@@ -310,22 +303,15 @@ describe('text.js', () => {
       errorSpy.mockRestore();
     });
 
-    it('skips mixed lines that are missing x/y while rendering valid positioned lines', () => {
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    it('throws on second line when it is missing x/y positioning', () => {
       const lines = [
         { text: 'Positioned', enter: 0, exit: 1000, x: 10, y: 70 },
         { text: 'Default', enter: 500, exit: 2000 },
       ];
 
-      buildNarrationTimeline(lines, container);
-
-      expect(container.children[0].classList.contains('narration-line--positioned')).toBe(true);
-      expect(container.children.length).toBe(1);
-      expect(errorSpy).toHaveBeenCalledWith(
-        'Narration line 1 has invalid x/y positioning:',
-        expect.objectContaining({ text: 'Default' }),
+      expect(() => buildNarrationTimeline(lines, container)).toThrow(
+        'createLineElement requires numeric x and y positions',
       );
-      errorSpy.mockRestore();
     });
 
     it('returns empty captionEntries when no captions provided', () => {

@@ -37,11 +37,6 @@ export function buildNarrationTimeline(lines, container, opts = {}) {
       console.error(`Narration line ${i} has invalid enter/exit timing:`, line);
       return;
     }
-    if (typeof line.x !== 'number' || typeof line.y !== 'number') {
-      console.error(`Narration line ${i} has invalid x/y positioning:`, line);
-      return;
-    }
-
     const el = createLineElement(line.text, container, {
       x: line.x,
       y: line.y,
