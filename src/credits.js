@@ -36,7 +36,7 @@ function clearScrollTransform(scrollContentEl) {
  * Populate the scroll content container with credits HTML.
  * Idempotent — no-op if the element already has child content.
  */
-export function initCreditsContent(scrollContentEl) {
+function initCreditsContent(scrollContentEl) {
   if (scrollContentEl.children.length > 0) return;
   // SAFE: creditsHtml is a static build-time import (credits-content.html?raw),
   // not user-controlled input — no XSS risk.

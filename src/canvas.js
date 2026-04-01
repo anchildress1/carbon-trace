@@ -168,6 +168,6 @@ export function loadImage(src) {
   return promise;
 }
 
-export function getImageCache() {
-  return imageCache;
+export function resetImageCache() {
+  imageCache.clear();
 }

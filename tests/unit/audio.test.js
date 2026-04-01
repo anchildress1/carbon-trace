@@ -73,16 +73,9 @@ import {
   cancelAudioCues,
   pauseAudioCues,
   resumeAudioCues,
-  cueAudioCues,
-  cancelCue,
-  restartNarrationCue,
-  reCueCue,
-  getNarrationCue,
   setMuted,
   onNarrationBufferChange,
-  isNarrationBuffering,
   preloadNarrationAhead,
-  clearNarrationCache,
   trimNarrationCache,
   wrapOnNarrationEndWithBoost,
   getAnalyserNode,
@@ -116,7 +109,7 @@ describe('audio.js — unified cue API (ADR-005)', () => {
     mockNode.duration = 60;
     mockNode.src = '';
     cancelAudioCues();
-    clearNarrationCache();
+    trimNarrationCache([]);
   });
 
   afterEach(() => {
@@ -318,7 +311,6 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       cancelAudioCues();
 
       expect(howl.unload).toHaveBeenCalled();
-      expect(getNarrationCue()).toBeNull();
     });
 
     it('cancels pending timers', () => {
@@ -692,143 +684,6 @@ describe('audio.js — unified cue API (ADR-005)', () => {
     });
   });
 
-  describe('cueAudioCues', () => {
-    it('loads but does not play cues', () => {
-      cueAudioCues([makeCue()]);
-
-      expect(Howl).toHaveBeenCalledWith(
-        expect.objectContaining({ preload: true }),
-      );
-      const howl = Howl.mock.results[0].value;
-      expect(howl.play).not.toHaveBeenCalled();
-    });
-
-    it('handles null cues', () => {
-      expect(() => cueAudioCues(null)).not.toThrow();
-      expect(() => cueAudioCues([])).not.toThrow();
-    });
-
-    it('uses narration cache when available', () => {
-      preloadNarrationAhead('test.m4a');
-      const cachedHowl = Howl.mock.results[0].value;
-      vi.clearAllMocks();
-
-      cueAudioCues([makeCue()]);
-
-      // Should reuse cached howl, no new Howl created
-      expect(Howl).not.toHaveBeenCalled();
-      expect(getNarrationCue()).toBe(cachedHowl);
-    });
-  });
-
-  describe('cancelCue / reCueCue', () => {
-    it('cancels a specific cue without affecting others', () => {
-      const cue1 = makeCue({ id: 'narration' });
-      const cue2 = makeCue({ id: 'ambient-1', type: 'ambient', src: 'bg.mp3' });
-      scheduleAudioCues([cue1, cue2]);
-
-      const narrationHowl = Howl.mock.results[0].value;
-      cancelCue('narration');
-
-      expect(narrationHowl.unload).toHaveBeenCalled();
-      // ambient still exists
-      expect(getNarrationCue()).toBeNull();
-    });
-
-    it('reCueCue replaces a cue with a loaded-but-not-playing Howl', () => {
-      scheduleAudioCues([makeCue()]);
-      const oldHowl = Howl.mock.results[0].value;
-
-      vi.clearAllMocks();
-      const newCue = makeCue({ src: 'new.m4a' });
-      const result = reCueCue('narration', newCue);
-
-      // Old howl unloaded (via cancelCue)
-      expect(oldHowl.unload).toHaveBeenCalled();
-      // New howl created with preload but not played
-      expect(Howl).toHaveBeenCalledWith(
-        expect.objectContaining({ src: ['new.m4a'], preload: true }),
-      );
-      expect(result).toBeDefined();
-    });
-
-    it('cancelCue is safe on nonexistent id', () => {
-      expect(() => cancelCue('nonexistent')).not.toThrow();
-    });
-  });
-
-  describe('restartNarrationCue', () => {
-    it('reuses existing Howl — stop + play instead of unload + new', () => {
-      scheduleAudioCues([makeCue()]);
-      const howl = Howl.mock.results[0].value;
-      vi.clearAllMocks();
-
-      const onEnd = vi.fn();
-      const result = restartNarrationCue(makeCue(), {
-        onNarrationEnd: onEnd,
-        maxNarrationDurationMs: 5000,
-      });
-
-      expect(result).toBe(true);
-      expect(howl.stop).toHaveBeenCalled();
-      expect(howl.play).toHaveBeenCalled();
-      // No new Howl created — same instance reused
-      expect(Howl).not.toHaveBeenCalled();
-      expect(howl.unload).not.toHaveBeenCalled();
-    });
-
-    it('removes old event handlers before re-wiring', () => {
-      scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn(), maxNarrationDurationMs: 5000 });
-      const howl = Howl.mock.results[0].value;
-      vi.clearAllMocks();
-
-      restartNarrationCue(makeCue(), {
-        onNarrationEnd: vi.fn(),
-        maxNarrationDurationMs: 5000,
-      });
-
-      // Old handlers cleared
-      expect(howl.off).toHaveBeenCalledWith('end');
-      expect(howl.off).toHaveBeenCalledWith('loaderror');
-      expect(howl.off).toHaveBeenCalledWith('playerror');
-      // New handler wired
-      expect(howl.once).toHaveBeenCalledWith('end', expect.any(Function));
-    });
-
-    it('returns false when no narration entry exists', () => {
-      const result = restartNarrationCue(makeCue(), { onNarrationEnd: vi.fn() });
-      expect(result).toBe(false);
-    });
-
-    it('cancels pending safety timer before restarting', () => {
-      scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn(), maxNarrationDurationMs: 10000 });
-      const howl = getNarrationCue();
-      vi.clearAllMocks();
-
-      restartNarrationCue(makeCue(), {
-        onNarrationEnd: vi.fn(),
-        maxNarrationDurationMs: 10000,
-      });
-
-      // Old handlers cleared and new safety handler wired via wireNarrationEnd
-      expect(howl.stop).toHaveBeenCalled();
-      expect(howl.once).toHaveBeenCalledWith('end', expect.any(Function));
-    });
-  });
-
-  describe('getNarrationCue', () => {
-    it('returns narration Howl when scheduled', () => {
-      scheduleAudioCues([makeCue()]);
-      const howl = Howl.mock.results[0].value;
-
-      expect(getNarrationCue()).toBe(howl);
-    });
-
-    it('returns null when no narration is active', () => {
-      expect(getNarrationCue()).toBeNull();
-    });
-  });
-
   describe('setMuted', () => {
     it('mutes all active cue Howls', () => {
       scheduleAudioCues([makeCue()]);
@@ -860,17 +715,6 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       preloadNarrationAhead('ahead.m4a');
 
       expect(Howl).toHaveBeenCalledTimes(1);
-    });
-
-    it('clearNarrationCache unloads all cached Howls', () => {
-      preloadNarrationAhead('a.m4a');
-      preloadNarrationAhead('b.m4a');
-      const howl1 = Howl.mock.results[0].value;
-      const howl2 = Howl.mock.results[1].value;
-
-      clearNarrationCache();
-      expect(howl1.unload).toHaveBeenCalled();
-      expect(howl2.unload).toHaveBeenCalled();
     });
 
     it('trimNarrationCache keeps only requested src entries', () => {
@@ -919,7 +763,6 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       const cb = vi.fn();
       onNarrationBufferChange(cb);
 
-      expect(isNarrationBuffering()).toBe(false);
     });
 
     it('triggers buffer change on waiting event', () => {
@@ -934,7 +777,6 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       expect(waitingCall).toBeDefined();
       waitingCall[1]();
       expect(cb).toHaveBeenCalledWith(true);
-      expect(isNarrationBuffering()).toBe(true);
     });
 
     it('clears buffer state on playing event', () => {
@@ -956,7 +798,6 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       cb.mockClear();
       playingCall[1]();
       expect(cb).toHaveBeenCalledWith(false);
-      expect(isNarrationBuffering()).toBe(false);
     });
 
     it('buffer exhaustion triggers onExhaustion callback', () => {
@@ -1030,7 +871,7 @@ describe('audio.js — buffer recovery paths', () => {
     mockNode.duration = 60;
     mockNode.src = '';
     cancelAudioCues();
-    clearNarrationCache();
+    trimNarrationCache([]);
   });
 
   afterEach(() => {
@@ -1219,7 +1060,7 @@ describe('audio.js — monitorNarrationBuffer edge cases', () => {
     mockNode.duration = 60;
     mockNode.src = '';
     cancelAudioCues();
-    clearNarrationCache();
+    trimNarrationCache([]);
   });
 
   afterEach(() => {
@@ -1270,7 +1111,7 @@ describe('audio.js — anchor duration unknown fallback', () => {
     vi.clearAllMocks();
     lastHowlOptions = null;
     cancelAudioCues();
-    clearNarrationCache();
+    trimNarrationCache([]);
   });
 
   afterEach(() => {
@@ -1312,7 +1153,7 @@ describe('audio.js — crossfade cleanup and ambient sweep', () => {
     mockNode.duration = 60;
     mockNode.src = '';
     cancelAudioCues();
-    clearNarrationCache();
+    trimNarrationCache([]);
   });
 
   afterEach(() => {

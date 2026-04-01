@@ -30,10 +30,6 @@ export function onNarrationBufferChange(cb) {
   bufferChangeCallback = cb;
 }
 
-export function isNarrationBuffering() {
-  return narrationBuffering;
-}
-
 function getBufferedEnd(node) {
   if (!node.buffered || node.buffered.length === 0) return 0;
   return node.buffered.end(node.buffered.length - 1);
@@ -180,13 +176,6 @@ export function preloadNarrationAhead(src) {
     },
   });
   narrationCache.set(src, howl);
-}
-
-export function clearNarrationCache() {
-  for (const [src, howl] of narrationCache.entries()) {
-    howl.unload();
-    narrationCache.delete(src);
-  }
 }
 
 export function trimNarrationCache(keepSrcs = []) {
@@ -581,97 +570,6 @@ export function resumeAudioCues() {
       entry.howl.play();
     }
   }
-}
-
-export function cueAudioCues(cues) {
-  if (!cues || cues.length === 0) return;
-  for (const cue of cues) {
-    let howl = null;
-    if (cue.type === 'narration' && narrationCache.has(cue.src)) {
-      howl = narrationCache.get(cue.src);
-      narrationCache.delete(cue.src);
-      howl.mute(globalMuted);
-    } else {
-      howl = new Howl({
-        src: [cue.src],
-        volume: cue.volume,
-        html5: true,
-        preload: true,
-        mute: globalMuted,
-      });
-    }
-    activeCues.set(cue.id, { howl, timer: null, type: cue.type, state: 'cued' });
-  }
-}
-
-export function cancelCue(cueId) {
-  const entry = activeCues.get(cueId);
-  if (!entry) return;
-  entry.timer?.cancel();
-  entry.howl?.unload();
-  activeCues.delete(cueId);
-  if (entry.type === 'narration') cleanupBufferMonitoring();
-}
-
-/**
- * Restart narration using the existing Howl instance (stop → play from 0).
- * Avoids allocating a new HTML5 Audio element, preventing pool exhaustion
- * on rapid replay clicks.
- * Returns true if an existing Howl was restarted, false if caller must
- * fall back to cancelCue + scheduleAudioCues.
- */
-export function restartNarrationCue(cue, opts) {
-  const entry = activeCues.get('narration');
-  if (!entry?.howl) return false;
-
-  // Cancel pending scheduling delay or safety timer
-  if (entry.timer) {
-    entry.timer.cancel();
-    entry.timer = null;
-  }
-
-  cleanupBufferMonitoring();
-
-  // Remove old event handlers so stale safeEnd doesn't fire.
-  // Blanket .off() is safe: Howl instances live in the module-private
-  // activeCues Map, so audio.js is the sole listener owner. Targeted
-  // removal (storing handler refs) would add complexity defending against
-  // an architecture violation, not a realistic code path.
-  entry.howl.off('end');
-  entry.howl.off('loaderror');
-  entry.howl.off('playerror');
-
-  // Restart from beginning — reuses the same <audio> element
-  entry.howl.stop();
-  entry.howl.play();
-  entry.state = 'playing';
-
-  // Re-wire narration end with fresh callbacks
-  if (opts?.onNarrationEnd) {
-    wireNarrationEnd(entry, { ...cue, resolvedEnter: 0 }, opts);
-  }
-
-  return true;
-}
-
-export function reCueCue(cueId, cue) {
-  cancelCue(cueId);
-  const howl = new Howl({
-    src: [cue.src],
-    volume: cue.volume,
-    html5: true,
-    mute: globalMuted,
-    preload: true,
-  });
-  activeCues.set(cueId, { howl, timer: null, type: cue.type, state: 'cued' });
-  return howl;
-}
-
-export function getNarrationCue() {
-  for (const [, entry] of activeCues) {
-    if (entry.type === 'narration') return entry.howl;
-  }
-  return null;
 }
 
 export function setMuted(muted) {
