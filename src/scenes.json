@@ -1155,7 +1155,6 @@
         "regions": [
           {
             "type": "godray",
-            "mask": "assets/masks/mask-07-missing-godray-a44fb620.png",
             "angle": 25,
             "gain": 0.3,
             "lacunarity": 2.0,
@@ -1234,7 +1233,6 @@
         "regions": [
           {
             "type": "godray",
-            "mask": "assets/masks/mask-08-empty-godray-ca3c5183.png",
             "angle": 35,
             "gain": 0.4,
             "lacunarity": 2.2,

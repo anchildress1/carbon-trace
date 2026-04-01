@@ -106,7 +106,7 @@ Canvas 2D remains useful         │ drawFallback() before images load, future
 2. For each region: create a Sprite from the shared texture, place it inside a masked Container, apply the filter to the sprite, add the Container to the stage
 3. The stage contains ONLY masked Containers — no unmasked full-screen geometry
 
-**Full-scene effects:** If a future effect needs to cover the entire scene without a mask, use a full-white mask in a Container. The architecture handles it identically — no special case needed.
+**Full-scene effects:** Ray overlay types (godray) render full-screen without a mask — the effect factory is called with no noise sprite and the result is composited additively over the stage. Other full-scene effects can use a full-white mask in a Container.
 
 **PixiJS init timing:** `effectsCanvas.init()` is called during `showFrame()` on first use (lazy), aligned to image display. The PixiJS Application is created once and reused across scenes. `loadScene()` swaps sprites/filters per scene; `init()` is not called again. If `frame.effects` is null, `init()` is skipped — no WebGL context created until a scene actually needs effects.
 
@@ -152,6 +152,13 @@ Canvas 2D remains useful         │ drawFallback() before images load, future
 - Cycles between burst phase and rest phase for repeating pulse
 - No manual noise sprite scaling — ShockwaveFilter handles the radial displacement natively
 - Parameters: `speed`, `amplitude`, `wavelength`, `radius`, `cyclePause`
+
+**godray** — Volumetric light rays (GodrayFilter from `pixi-filters`)
+- Perlin noise parallel rays drifting slowly for atmospheric light effects
+- Rendered full-screen without masking — atmospheric volumetric rays cover the entire scene. Masking godrays to a region shape creates harsh cutout edges that destroy the volumetric illusion.
+- Black input sprite + GodrayFilter output = pure Perlin noise mist. Additive blend composites rays over the scene so the image shows through while rays brighten it.
+- No displacement sprite needed (`noiseFreeTypes`). No mask needed (`rayOverlayTypes`).
+- Parameters: `angle`, `gain`, `lacunarity`, `speed`, `alpha`, `parallel`, `center`
 
 **Future effects** — PixiJS supports:
 - Custom GLSL fragment shaders (caustics, refraction, chromatic aberration)
@@ -210,7 +217,7 @@ registerEffect(type, factoryFn)  — register a named effect type
 createEffect(type, displacementSprite, params)  — create PixiJS filter for this type
 ```
 
-Built-in registrations: `water`, `heat`, `dust`, `glow`, `shockwave`. Displacement types (water, heat, dust) return a DisplacementFilter. Glow returns a GlowFilter (`pixi-filters`). Shockwave returns a ShockwaveFilter (`pixi-filters`).
+Built-in registrations: `water`, `heat`, `dust`, `glow`, `godray`, `shockwave`. Displacement types (water, heat, dust) return a DisplacementFilter. Glow returns a GlowFilter (`pixi-filters`). Godray returns a GodrayFilter (`pixi-filters`). Shockwave returns a ShockwaveFilter (`pixi-filters`).
 
 **effects-canvas.js** — gains PixiJS lifecycle:
 ```
@@ -224,7 +231,7 @@ pause() / resume()                     — stop/start PixiJS ticker (WCAG 2.2.2)
 
 **New dependencies:**
 - `pixi.js` v8 — added to package.json (pinned to exact minor version), bundled by Vite (no CDN). ~150KB gzipped. Tree-shake via `import { Application, Container, Sprite, Texture } from 'pixi.js'` (effects-canvas.js) and `import { DisplacementFilter } from 'pixi.js'` (effects.js). Also imports `pixi.js/unsafe-eval` for CSP-safe shader compilation.
-- `pixi-filters` v6 — community filter collection, compatible with PixiJS v8. Provides `GlowFilter` and `ShockwaveFilter` as dedicated, GPU-optimized implementations. Tree-shake via individual imports: `import { GlowFilter } from 'pixi-filters'`, `import { ShockwaveFilter } from 'pixi-filters'`. Pinned to exact minor version. **Bundle impact:** only the imported filters are included (Vite tree-shakes the rest). Verify final bundle size during profiling — the full `pixi-filters` package is large (~2.7MB unshaken) but individual filter imports should add minimal overhead.
+- `pixi-filters` v6 — community filter collection, compatible with PixiJS v8. Provides `GlowFilter`, `GodrayFilter`, and `ShockwaveFilter` as dedicated, GPU-optimized implementations. Tree-shake via individual imports: `import { GlowFilter, GodrayFilter, ShockwaveFilter } from 'pixi-filters'`. Pinned to exact minor version. **Bundle impact:** only the imported filters are included (Vite tree-shakes the rest). Verify final bundle size during profiling — the full `pixi-filters` package is large (~2.7MB unshaken) but individual filter imports should add minimal overhead.
 - No particle emitter package needed — displacement effect types (water, heat, dust) use DisplacementFilter exclusively.
 
 **app.js** — showFrame() call site:
