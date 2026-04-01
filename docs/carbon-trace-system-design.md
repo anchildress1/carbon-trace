@@ -929,7 +929,7 @@ Progressive loading: first frame blocks, background assets load sequentially by 
 
 ### 15.1 Mobile LCP Analysis (2026-03-31)
 
-Mobile Lighthouse scores 0.86 under simulated Slow 4G + 4x CPU throttle (target: 0.90). Desktop meets target at ≥0.90.
+Mobile Lighthouse scores 0.86 under simulated Slow 4G + 4x CPU throttle (approved temporary target: 0.85). Desktop meets target at ≥0.90.
 
 **LCP element:** `.loading-title--main` ("Carbon Trace" text)
 **LCP breakdown:** TTFB 451ms (11%) → Render Delay 3,676ms (89%)

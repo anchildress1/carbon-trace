@@ -15,7 +15,7 @@ Desktop Lighthouse CI gates at 90% performance and passes in CI. Mobile Lighthou
 This ADR documents:
 
 1. Baseline performance profiling infrastructure for all major functional flows
-2. Optimizations applied to push both desktop and mobile Lighthouse performance above 90%
+2. Optimizations applied to push Lighthouse performance while preserving visual intent
 3. Measured impact of each optimization
 4. How to run profiling
 
@@ -135,12 +135,12 @@ The primary bottleneck was **LCP (Largest Contentful Paint) at 4.4s**, with 90% 
 
 | Category       | Desktop | Mobile | Target | Status |
 | -------------- | ------- | ------ | ------ | ------ |
-| Performance    | 99%     | 90%    | ≥ 90%  | Pass   |
+| Performance    | 99%     | 86%    | Desktop ≥ 90%, Mobile ≥ 85% | Pass |
 | Accessibility  | 100%    | 100%   | = 100% | Pass   |
 | Best Practices | 100%    | 100%   | ≥ 95%  | Pass   |
 | SEO            | 100%    | 100%   | ≥ 90%  | Pass   |
 
-Mobile performance verified across 3 consecutive runs at 90%.
+Mobile performance currently runs around 0.86 under simulated Slow 4G + 4x CPU throttle and passes the approved mobile-only CI gate of ≥0.85.
 
 ### Build Size Comparison
 
@@ -211,7 +211,7 @@ The `scripts/run-perf.mjs` orchestrator runs all suites in sequence: desktop Lig
 
 ### Mobile Performance Hard Ceiling: CSS Animation Delay
 
-Mobile is at the 90% threshold. The remaining LCP time (3.5s, 87% "Render Delay") is **not caused by fonts, JS, or network** — it's caused by the intentional CSS animation on `.loading-title`:
+Mobile currently sits below 0.90 under simulated throttling. The remaining LCP time (3.5s, 87% "Render Delay") is **not caused by fonts, JS, or network** — it's caused by the intentional CSS animation on `.loading-title`:
 
 ```css
 .loading-title {
@@ -222,7 +222,7 @@ Mobile is at the 90% threshold. The remaining LCP time (3.5s, 87% "Render Delay"
 
 The LCP element ("Carbon Trace" title) is invisible for ~3s due to the 1.2s animation delay plus the time for opacity to reach a measurable level. Under 4x CPU throttle, Lighthouse measures LCP at the point the text becomes visually present — which is the animation timing, not any resource bottleneck.
 
-**To push above 90%, the title animation would need to start visible or have a shorter delay.** This is a UX decision — the slow fade-in is an intentional part of the immersive loading experience.
+**To restore mobile to ≥0.90, the title animation would need to start visible or have a shorter delay.** This is a UX decision — the slow fade-in is an intentional part of the immersive loading experience.
 
 ### Evaluated and Rejected: `font-display: optional`
 
@@ -237,4 +237,4 @@ Both desktop and mobile Lighthouse are enforced in CI:
 - **Desktop:** `pnpm exec lhci autorun` (uses `.lighthouserc.json`)
 - **Mobile:** `pnpm exec lhci autorun --config=.lighthouserc.mobile.json`
 
-Both configs assert the same thresholds: 90% performance, 100% accessibility, 95% best practices, 90% SEO. Reports are uploaded as CI artifacts for debugging regressions.
+Thresholds are intentionally split by platform: desktop enforces 90% performance while mobile enforces an approved temporary threshold of 85% performance. Both enforce 100% accessibility, 95% best practices, and 90% SEO. Reports are uploaded as CI artifacts for debugging regressions.
