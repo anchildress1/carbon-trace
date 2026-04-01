@@ -7,7 +7,7 @@ import {
   destroySceneCanvas,
   getSceneContext,
   loadImage,
-  getImageCache,
+  resetImageCache,
 } from '../../src/canvas.js';
 
 function createMockCanvas(initialRect = { width: 1920, height: 1080 }) {
@@ -51,7 +51,7 @@ describe('canvas.js', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     destroySceneCanvas();
-    getImageCache().clear();
+    resetImageCache();
     imageCtorCount = 0;
     resizeObserverInstances = [];
 
@@ -90,7 +90,7 @@ describe('canvas.js', () => {
   afterEach(() => {
     vi.useRealTimers();
     destroySceneCanvas();
-    getImageCache().clear();
+    resetImageCache();
     globalThis.Image = originalImage;
     vi.restoreAllMocks();
   });
@@ -214,19 +214,6 @@ describe('canvas.js', () => {
       );
     });
 
-    it('supports fallback img.width/img.height when natural size is unavailable', () => {
-      const { canvas, mockCtx } = createMockCanvas();
-      initSceneCanvas(canvas);
-
-      const img = { naturalWidth: 0, naturalHeight: 0, width: 1920, height: 1080 };
-      drawImage(img);
-
-      const call = mockCtx.drawImage.mock.calls[0];
-      expect(call[1]).toBe(0);
-      expect(call[2]).toBe(0);
-      expect(call[3]).toBe(1920);
-      expect(call[4]).toBe(1080);
-    });
   });
 
   describe('clearScene', () => {
@@ -314,8 +301,9 @@ describe('canvas.js', () => {
       vi.advanceTimersByTime(1);
       const img = await p;
       expect(img).toBeNull();
-      // Failed load should be evicted so retry is possible
-      expect(getImageCache().has('bad://fail.webp')).toBe(false);
+      // Failed load should be evicted so retry creates a new request
+      const p2 = loadImage('bad://fail.webp');
+      expect(p2).not.toBe(p);
     });
 
     it('deduplicates concurrent in-flight loads to one Image allocation', async () => {

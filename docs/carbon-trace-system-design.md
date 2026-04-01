@@ -57,8 +57,7 @@ carbon-trace/
 │   #   shasum -a 256 <file> | cut -c1-8
 │   # Rename file, update references in scenes.json / styles.css.
 ├── Dockerfile
-├── nginx.conf
-└── .github/workflows/deploy.yml
+└── nginx.conf
 ```
 
 ---
@@ -106,8 +105,8 @@ loadScene(effectsConfig, sceneImageUrl) → clearAll() + load scene texture (sha
                                          PixiJS layer is transparent outside effect regions (ADR-007 addendum).
 setAnalyser(analyserNode)              → store Web Audio AnalyserNode reference. Ticker reads FFT
                                          data each frame for regions with audioReactive config (ADR-008).
-clearAll()                             → destroy sprites/filters/textures via .destroy(true)
-                                         (frees GPU backing store). Ticker stays running.
+clearAll()                             → destroy sprites/filters/textures via .destroy(false)
+                                         (retains TextureSources for deferred GC). Ticker stays running.
 pause() / resume()                     → stop/start PixiJS ticker (WCAG 2.2.2).
                                          Only pause()/resume() control ticker lifecycle.
 ```
@@ -264,6 +263,8 @@ Frosted glass overlay on frame 11. Triggered by `makeNarrationEndCallback` after
 ### 4.1 Schema
 
 Every frame has identical shape via `meta.frameDefaults` merge. `null` = feature not active on this frame. Applies uniformly to all optional keys: `narration: null`, `audioCues: null`, `traceOverlay: null`, `effects: null`.
+
+Startup performs strict config validation (`validateScenesConfig`) and fails fast on invalid narration line schema. Each `narration.lines[]` entry must provide `text` (string) plus finite numeric `enter`, `exit`, `x`, and `y` values. Invalid config throws from `createApp()`, which is caught by the top-level error boundary in `main.js` — the on-page message stays generic while the full error is logged to the console. `createLineElement()` enforces the same finite-numeric contract at render time as a second safety layer.
 
 ```jsonc
 {

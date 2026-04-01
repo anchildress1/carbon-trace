@@ -139,9 +139,8 @@ vi.mock('../../src/scenes.json', () => ({
     meta: {
       title: 'test',
       aspectRatio: '16:9',
-      defaultTransition: { type: 'fade', duration: 400 },
+      defaultTransition: { duration: 400 },
       defaultHoldAfterNarration: 2000,
-      frameDefaults: { textMode: 'ghost-drift' },
     },
     frames: [
       {
@@ -150,15 +149,15 @@ vi.mock('../../src/scenes.json', () => ({
 
         holdAfterNarration: 2000,
         narration: {
-          lines: [{ text: 'Opening line', enter: 0, exit: 3000 }],
+          lines: [{ text: 'Opening line', enter: 0, exit: 3000, x: 50, y: 55 }],
           captions: [{ text: 'Opening line', start: 0, end: 3000 }],
         },
         audioCues: [
-          { id: 'narration', type: 'narration', src: 'title-narration.m4a', enter: 0, volume: 1, loop: false, fadeIn: 0, fadeOut: 0 },
+          { id: 'narration', type: 'narration', src: 'title-narration.m4a', enter: 0, volume: 1, loop: false, fadeIn: 0 },
         ],
         effects: null,
         traceOverlay: null,
-        transition: { type: 'fade', duration: 400 },
+        transition: { duration: 400 },
 
       },
       {
@@ -169,16 +168,16 @@ vi.mock('../../src/scenes.json', () => ({
         image: 'scene-01.webp',
         traceOverlay: { mask: 'mask-01.png', opacity: 0.3, color: [232, 200, 120], dotCount: 10, dotSpeed: 0.8 },
         narration: {
-          lines: [{ text: 'Hello', enter: 0, exit: 2000 }],
+          lines: [{ text: 'Hello', enter: 0, exit: 2000, x: 40, y: 60 }],
           captions: [{ text: 'Hello', start: 0, end: 2000 }],
         },
         audioCues: [
-          { id: 'narration', type: 'narration', src: 'narration.mp3', enter: 500, volume: 1, loop: false, fadeIn: 0, fadeOut: 0 },
-          { id: 'ambient-01', type: 'ambient', src: 'ambient.mp3', enter: 0, volume: 0.5, loop: true, fadeIn: 1000, fadeOut: null },
-          { id: 'end-song', type: 'ambient', src: 'credits-music.mp3', enter: { ref: 'narration', offset: -1000 }, volume: 0.5, loop: true, fadeIn: 2000, fadeOut: null },
+          { id: 'narration', type: 'narration', src: 'narration.mp3', enter: 500, volume: 1, loop: false, fadeIn: 0 },
+          { id: 'ambient-01', type: 'ambient', src: 'ambient.mp3', enter: 0, volume: 0.5, loop: true, fadeIn: 1000 },
+          { id: 'end-song', type: 'ambient', src: 'credits-music.mp3', enter: { ref: 'narration', offset: -1000 }, volume: 0.5, loop: true, fadeIn: 2000 },
         ],
         effects: { regions: [{ type: 'shockwave', mask: 'diamond.png', audioReactive: { band: 'bass', trigger: { threshold: 1.5, cooldown: 0.08 } } }], analyserCueId: 'end-song' },
-        transition: { type: 'fade', duration: 400 },
+        transition: { duration: 400 },
 
       },
       {
@@ -193,7 +192,7 @@ vi.mock('../../src/scenes.json', () => ({
         },
         audioCues: null,
         effects: null,
-        transition: { type: 'fade', duration: 400 },
+        transition: { duration: 400 },
 
       },
       {
@@ -204,11 +203,11 @@ vi.mock('../../src/scenes.json', () => ({
         image: 'scene-bad.webp',
         narration: null,
         audioCues: [
-          { id: 'narration', type: 'narration', src: 'bad-narration.mp3', enter: 0, volume: 1, loop: false, fadeIn: 0, fadeOut: 0 },
+          { id: 'narration', type: 'narration', src: 'bad-narration.mp3', enter: 0, volume: 1, loop: false, fadeIn: 0 },
         ],
         // analyserCueId 'missing-cue' has no matching audioCue — triggers warn
         effects: { regions: [{ type: 'shockwave', mask: 'bad.png', audioReactive: { band: 'bass' } }], analyserCueId: 'missing-cue' },
-        transition: { type: 'fade', duration: 400 },
+        transition: { duration: 400 },
       },
       {
         // Frame for testing multi-hop anchor ref warn path
@@ -219,11 +218,11 @@ vi.mock('../../src/scenes.json', () => ({
         narration: { lines: null, captions: null },
         audioCues: [
           // narration.enter is a non-numeric ref — triggers warn in resolveAnalyserCueEnter
-          { id: 'narration', type: 'narration', src: 'multihop-narration.mp3', enter: { ref: 'ambient', offset: 0 }, volume: 1, loop: false, fadeIn: 0, fadeOut: 0 },
-          { id: 'end-song-ref', type: 'ambient', src: 'multihop-music.mp3', enter: { ref: 'narration', offset: -1000 }, volume: 0.5, loop: true, fadeIn: 0, fadeOut: null },
+          { id: 'narration', type: 'narration', src: 'multihop-narration.mp3', enter: { ref: 'ambient', offset: 0 }, volume: 1, loop: false, fadeIn: 0 },
+          { id: 'end-song-ref', type: 'ambient', src: 'multihop-music.mp3', enter: { ref: 'narration', offset: -1000 }, volume: 0.5, loop: true, fadeIn: 0 },
         ],
         effects: { regions: [{ type: 'shockwave', mask: 'multihop.png', audioReactive: { band: 'bass' } }], analyserCueId: 'end-song-ref' },
-        transition: { type: 'fade', duration: 400 },
+        transition: { duration: 400 },
       },
       {
         id: 'credits',
@@ -248,9 +247,9 @@ vi.mock('../../src/scenes.json', () => ({
           ],
         },
         audioCues: [
-          { id: 'narration', type: 'narration', src: 'credits-narration.m4a', enter: 500, volume: 1, loop: false, fadeIn: 0, fadeOut: 0 },
-          { id: 'ambient-credits', type: 'ambient', src: 'credits-vinyl.m4a', enter: 0, volume: 0.1, loop: true, fadeIn: 1500, fadeOut: 1000 },
-          { id: 'end-song', type: 'ambient', src: 'credits-music.mp3', enter: { ref: 'narration', offset: -12000 }, volume: 0.15, volumeAfterNarration: 0.75, fadeAfterNarration: 3000, loop: true, fadeIn: 8000, fadeOut: null },
+          { id: 'narration', type: 'narration', src: 'credits-narration.m4a', enter: 500, volume: 1, loop: false, fadeIn: 0 },
+          { id: 'ambient-credits', type: 'ambient', src: 'credits-vinyl.m4a', enter: 0, volume: 0.1, loop: true, fadeIn: 1500 },
+          { id: 'end-song', type: 'ambient', src: 'credits-music.mp3', enter: { ref: 'narration', offset: -12000 }, volume: 0.15, volumeAfterNarration: 0.75, fadeAfterNarration: 3000, loop: true, fadeIn: 8000 },
         ],
         effects: {
           analyserCueId: 'end-song',
@@ -259,7 +258,7 @@ vi.mock('../../src/scenes.json', () => ({
             { type: 'glow', mask: 'credits-diamond.png' },
           ],
         },
-        transition: { type: 'fade', duration: 1500 },
+        transition: { duration: 1500 },
 
       },
     ],
@@ -280,6 +279,7 @@ function runNextGsapCompletion() {
 }
 
 import { createApp } from '../../src/app.js';
+import scenesData from '../../src/scenes.json';
 import {
   scheduleAudioCues,
   cancelAudioCues,
@@ -418,6 +418,71 @@ describe('app.js', () => {
     it('starts in LOADING state', () => {
       app = createApp();
       expect(app.getState()).toBe('LOADING');
+    });
+
+    it('fails fast when narration line positioning is invalid in scenes config', () => {
+      const originalLine = { ...scenesData.frames[0].narration.lines[0] };
+      scenesData.frames[0].narration.lines[0] = { ...originalLine, x: null };
+
+      try {
+        expect(() => createApp()).toThrow(
+          'Invalid scenes config at frames[0].narration.lines[0].x: expected finite number, received null',
+        );
+      } finally {
+        scenesData.frames[0].narration.lines[0] = originalLine;
+      }
+    });
+
+    it('rejects narration lines that are not objects', () => {
+      const originalLines = scenesData.frames[0].narration.lines;
+      scenesData.frames[0].narration.lines = ['not-an-object'];
+
+      try {
+        expect(() => createApp()).toThrow(
+          'Invalid scenes config at frames[0].narration.lines[0]: expected object, received string',
+        );
+      } finally {
+        scenesData.frames[0].narration.lines = originalLines;
+      }
+    });
+
+    it('rejects narration lines with non-string text', () => {
+      const originalLine = { ...scenesData.frames[0].narration.lines[0] };
+      scenesData.frames[0].narration.lines[0] = { ...originalLine, text: 42 };
+
+      try {
+        expect(() => createApp()).toThrow(
+          'Invalid scenes config at frames[0].narration.lines[0].text: expected string, received number',
+        );
+      } finally {
+        scenesData.frames[0].narration.lines[0] = originalLine;
+      }
+    });
+
+    it('rejects narration lines with array text payloads', () => {
+      const originalLine = { ...scenesData.frames[0].narration.lines[0] };
+      scenesData.frames[0].narration.lines[0] = { ...originalLine, text: [] };
+
+      try {
+        expect(() => createApp()).toThrow(
+          'Invalid scenes config at frames[0].narration.lines[0].text: expected string, received array',
+        );
+      } finally {
+        scenesData.frames[0].narration.lines[0] = originalLine;
+      }
+    });
+
+    it('rejects narration.lines when it is not an array', () => {
+      const originalNarration = { ...scenesData.frames[0].narration };
+      scenesData.frames[0].narration = { ...originalNarration, lines: 'bad' };
+
+      try {
+        expect(() => createApp()).toThrow(
+          'Invalid scenes config at frames[0].narration.lines: expected array, received string',
+        );
+      } finally {
+        scenesData.frames[0].narration = originalNarration;
+      }
     });
 
     it('transitions to PAUSED after image preload completes', async () => {

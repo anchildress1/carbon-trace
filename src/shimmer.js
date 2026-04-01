@@ -45,7 +45,6 @@ const WALK_RADIUS = 3; // pixels — tolerance for staying on thin lines
 const LOOKAHEAD = 25; // how far ahead to scan for runway
 
 function checkReducedMotion() {
-  if (typeof globalThis.matchMedia !== 'function') return false;
   if (!motionQuery) {
     motionQuery = globalThis.matchMedia(REDUCED_MOTION_QUERY);
     motionHandler = (e) => {
@@ -59,8 +58,8 @@ function checkReducedMotion() {
 
 function buildWalkMap(img) {
   const off = document.createElement('canvas');
-  off.width = img.naturalWidth || img.width;
-  off.height = img.naturalHeight || img.height;
+  off.width = img.naturalWidth;
+  off.height = img.naturalHeight;
   if (off.width === 0 || off.height === 0) {
     throw new Error(`shimmer: mask image has zero dimensions (${off.width}×${off.height})`);
   }
@@ -458,7 +457,7 @@ function tick(time) {
 
 function handleResize() {
   if (!canvas) return;
-  const dpr = globalThis.devicePixelRatio || 1;
+  const dpr = globalThis.devicePixelRatio;
   const rect = canvas.getBoundingClientRect();
   const w = Math.round(rect.width * dpr);
   const h = Math.round(rect.height * dpr);
@@ -524,10 +523,8 @@ export function init(canvasEl) {
   checkReducedMotion();
   handleResize();
 
-  if (typeof ResizeObserver === 'function') {
-    observer = new ResizeObserver(() => handleResize());
-    observer.observe(canvas);
-  }
+  observer = new ResizeObserver(() => handleResize());
+  observer.observe(canvas);
 }
 
 export async function loadScene(config) {

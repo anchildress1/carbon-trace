@@ -116,7 +116,7 @@ Full system design: `docs/carbon-trace-system-design.md` and `docs/ADRs/*.md`
 - Prettier for formatting, ESLint for linting.
 - No class hierarchies — flat modules with focused functions.
 - One orchestrator (`app.js`) manages state; other modules are pure utilities.
-- `src/scenes.json` narration text is written in Appalachian dialect — never correct spelling, grammar, or phrasing in this file.
+- `src/scenes.json` `text` fields are authored narration in Appalachian dialect — never modify, add, remove, or reword any `"text"` value for any reason. Only numeric/structural fields (`start`, `end`, `x`, `y`, etc.) may be changed.
 
 ## Development Commands
 
@@ -126,7 +126,7 @@ Full system design: `docs/carbon-trace-system-design.md` and `docs/ADRs/*.md`
 | `make e2e`       | Build, then run Playwright E2E tests             |
 | `make test`      | Run all tests (unit + E2E + performance)         |
 | `make build`     | Production build                                 |
-| `make lint`      | Lint source files                                |
+| `make lint`      | Lint source and test files                       |
 | `make ai-checks` | Run secret-scan, format check, and lint (for AI) |
 | `make deploy`    | Deploy to Cloud Run via `deploy.sh`              |
 

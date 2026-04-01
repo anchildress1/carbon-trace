@@ -23,7 +23,7 @@ const imageCache = new Map();
 function sizeCanvas() {
   if (!canvasEl) return;
 
-  const dpr = globalThis.devicePixelRatio || 1;
+  const dpr = globalThis.devicePixelRatio;
   const rect = canvasEl.getBoundingClientRect();
   cssWidth = rect.width;
   cssHeight = rect.height;
@@ -39,8 +39,8 @@ function sizeCanvas() {
 }
 
 function coverFit(img, cw, ch) {
-  const iw = img.naturalWidth || img.width;
-  const ih = img.naturalHeight || img.height;
+  const iw = img.naturalWidth;
+  const ih = img.naturalHeight;
   if (!iw || !ih) return { sx: 0, sy: 0, sw: iw, sh: ih, dx: 0, dy: 0, dw: cw, dh: ch };
 
   const canvasRatio = cw / ch;
@@ -64,7 +64,7 @@ function coverFit(img, cw, ch) {
 
 function cssSize() {
   if (!canvasEl) return { w: 0, h: 0 };
-  const dpr = globalThis.devicePixelRatio || 1;
+  const dpr = globalThis.devicePixelRatio;
   if (Math.abs(dpr - lastDpr) > 0.001) {
     sizeCanvas();
   }
@@ -168,6 +168,6 @@ export function loadImage(src) {
   return promise;
 }
 
-export function getImageCache() {
-  return imageCache;
+export function resetImageCache() {
+  imageCache.clear();
 }

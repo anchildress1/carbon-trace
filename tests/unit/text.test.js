@@ -26,6 +26,12 @@ import { gsap } from 'gsap';
 
 describe('text.js', () => {
   let container;
+  const withPositions = (lines) =>
+    lines.map((line, idx) => ({
+      x: 50,
+      y: 45 + idx * 5,
+      ...line,
+    }));
 
   beforeEach(() => {
     container = document.createElement('div');
@@ -35,36 +41,36 @@ describe('text.js', () => {
 
   describe('createLineElement', () => {
     it('creates a paragraph element with narration-line class', () => {
-      const el = createLineElement('Hello world', container);
+      const el = createLineElement('Hello world', container, { x: 50, y: 50 });
 
       expect(el.tagName).toBe('P');
-      expect(el.className).toBe('narration-line');
+      expect(el.classList.contains('narration-line')).toBe(true);
       expect(el.textContent).toBe('Hello world');
     });
 
     it('appends element to container', () => {
-      createLineElement('Test', container);
+      createLineElement('Test', container, { x: 50, y: 50 });
 
       expect(container.children.length).toBe(1);
     });
 
     it('handles empty string', () => {
-      const el = createLineElement('', container);
+      const el = createLineElement('', container, { x: 50, y: 50 });
 
       expect(el.textContent).toBe('');
     });
 
     it('preserves HTML special characters as text content', () => {
-      const el = createLineElement('<b>bold</b> & "quoted"', container);
+      const el = createLineElement('<b>bold</b> & "quoted"', container, { x: 50, y: 50 });
 
       expect(el.textContent).toBe('<b>bold</b> & "quoted"');
       expect(el.children.length).toBe(0);
     });
 
     it('appends multiple elements sequentially', () => {
-      createLineElement('First', container);
-      createLineElement('Second', container);
-      createLineElement('Third', container);
+      createLineElement('First', container, { x: 10, y: 10 });
+      createLineElement('Second', container, { x: 20, y: 20 });
+      createLineElement('Third', container, { x: 30, y: 30 });
 
       expect(container.children.length).toBe(3);
       expect(container.children[2].textContent).toBe('Third');
@@ -85,27 +91,25 @@ describe('text.js', () => {
       expect(el.style.transform).toBe('translateY(-50%)');
     });
 
-    it('does not apply positioning when x/y are not provided', () => {
-      const el = createLineElement('Default', container);
-
-      expect(el.style.position).toBe('');
-      expect(el.classList.contains('narration-line--positioned')).toBe(false);
+    it('throws when x/y are missing', () => {
+      expect(() => createLineElement('Default', container)).toThrow(
+        'createLineElement requires finite numeric x and y positions',
+      );
+      expect(() => createLineElement('Only X', container, { x: 10 })).toThrow(
+        'createLineElement requires finite numeric x and y positions',
+      );
+      expect(() => createLineElement('Only Y', container, { y: 10 })).toThrow(
+        'createLineElement requires finite numeric x and y positions',
+      );
     });
 
-    it('does not apply positioning when options is empty object', () => {
-      const el = createLineElement('Default', container, {});
-
-      expect(el.style.position).toBe('');
-    });
-
-    it('does not apply positioning when x or y is missing', () => {
-      const onlyX = createLineElement('Only X', container, { x: 10, y: null });
-      const onlyY = createLineElement('Only Y', container, { x: null, y: 10 });
-
-      expect(onlyX.style.position).toBe('');
-      expect(onlyY.style.position).toBe('');
-      expect(onlyX.classList.contains('narration-line--positioned')).toBe(false);
-      expect(onlyY.classList.contains('narration-line--positioned')).toBe(false);
+    it('throws on NaN and Infinity positions', () => {
+      expect(() => createLineElement('NaN', container, { x: NaN, y: 10 })).toThrow(
+        'createLineElement requires finite numeric x and y positions',
+      );
+      expect(() => createLineElement('Inf', container, { x: 10, y: Infinity })).toThrow(
+        'createLineElement requires finite numeric x and y positions',
+      );
     });
 
     it('handles x=0 and y=0 as valid positions', () => {
@@ -131,7 +135,7 @@ describe('text.js', () => {
         { text: 'Line two', enter: 2000, exit: 6000 },
       ];
 
-      const { timeline: tl } = buildNarrationTimeline(lines, container);
+      const { timeline: tl } = buildNarrationTimeline(withPositions(lines), container);
 
       expect(gsap.timeline).toHaveBeenCalledWith({ paused: true });
       expect(container.children.length).toBe(2);
@@ -141,21 +145,10 @@ describe('text.js', () => {
 
     it('creates independent GSAP timelines per invocation', () => {
       const lines = [{ text: 'First', enter: 0, exit: 1000 }];
-      const firstResult = buildNarrationTimeline(lines, container);
+      const firstResult = buildNarrationTimeline(withPositions(lines), container);
 
       const secondContainer = document.createElement('div');
-      const secondResult = buildNarrationTimeline(lines, secondContainer);
-
-      expect(firstResult.timeline).not.toBe(secondResult.timeline);
-      expect(timelineInstances).toHaveLength(2);
-    });
-
-    it('creates independent GSAP timelines per invocation', () => {
-      const lines = [{ text: 'First', enter: 0, exit: 1000 }];
-      const firstResult = buildNarrationTimeline(lines, container);
-
-      const secondContainer = document.createElement('div');
-      const secondResult = buildNarrationTimeline(lines, secondContainer);
+      const secondResult = buildNarrationTimeline(withPositions(lines), secondContainer);
 
       expect(firstResult.timeline).not.toBe(secondResult.timeline);
       expect(timelineInstances).toHaveLength(2);
@@ -164,7 +157,7 @@ describe('text.js', () => {
     it('uses reduced motion styles when flag is true', () => {
       const lines = [{ text: 'Reduced', enter: 0, exit: 1000 }];
 
-      const { timeline: tl } = buildNarrationTimeline(lines, container, { reducedMotion: true });
+      const { timeline: tl } = buildNarrationTimeline(withPositions(lines), container, { reducedMotion: true });
 
       const fromToCall = tl.fromTo.mock.calls[0];
       expect(fromToCall[1]).toEqual({ opacity: 0 });
@@ -174,7 +167,7 @@ describe('text.js', () => {
     it('uses ghost-drift styles when reduced motion is false', () => {
       const lines = [{ text: 'Drift', enter: 0, exit: 1000 }];
 
-      const { timeline: tl } = buildNarrationTimeline(lines, container, { reducedMotion: false });
+      const { timeline: tl } = buildNarrationTimeline(withPositions(lines), container, { reducedMotion: false });
 
       const fromToCall = tl.fromTo.mock.calls[0];
       expect(fromToCall[1]).toEqual({ opacity: 0, y: -20, filter: 'blur(4px)' });
@@ -186,7 +179,7 @@ describe('text.js', () => {
       container.appendChild(document.createElement('p'));
 
       const lines = [{ text: 'New line', enter: 0, exit: 1000 }];
-      buildNarrationTimeline(lines, container);
+      buildNarrationTimeline(withPositions(lines), container);
 
       expect(container.children.length).toBe(1);
     });
@@ -201,7 +194,7 @@ describe('text.js', () => {
     it('converts enter/exit ms to seconds for GSAP', () => {
       const lines = [{ text: 'Timed', enter: 2000, exit: 5000 }];
 
-      const { timeline: tl } = buildNarrationTimeline(lines, container);
+      const { timeline: tl } = buildNarrationTimeline(withPositions(lines), container);
 
       const fromToCall = tl.fromTo.mock.calls[0];
       expect(fromToCall[3]).toBe(2);
@@ -213,7 +206,7 @@ describe('text.js', () => {
     it('converts zero enter/exit to 0 seconds', () => {
       const lines = [{ text: 'Instant', enter: 0, exit: 0 }];
 
-      const { timeline: tl } = buildNarrationTimeline(lines, container);
+      const { timeline: tl } = buildNarrationTimeline(withPositions(lines), container);
 
       expect(tl.fromTo.mock.calls[0][3]).toBe(0);
       expect(tl.to.mock.calls[0][2]).toBe(0);
@@ -221,7 +214,7 @@ describe('text.js', () => {
 
     it('passes negative enter/exit values through to timeline positions', () => {
       const lines = [{ text: 'Negative', enter: -500, exit: -100 }];
-      const { timeline: tl } = buildNarrationTimeline(lines, container);
+      const { timeline: tl } = buildNarrationTimeline(withPositions(lines), container);
 
       expect(tl.fromTo.mock.calls[0][3]).toBe(-0.5);
       expect(tl.to.mock.calls[0][2]).toBe(-0.1);
@@ -230,7 +223,7 @@ describe('text.js', () => {
     it('uses reduced motion exit animation with short duration', () => {
       const lines = [{ text: 'Exit test', enter: 0, exit: 3000 }];
 
-      const { timeline: tl } = buildNarrationTimeline(lines, container, { reducedMotion: true });
+      const { timeline: tl } = buildNarrationTimeline(withPositions(lines), container, { reducedMotion: true });
 
       const toCall = tl.to.mock.calls[0];
       expect(toCall[1]).toMatchObject({ opacity: 0, duration: 0.3, ease: 'none' });
@@ -239,7 +232,7 @@ describe('text.js', () => {
     it('uses ghost-drift exit animation with y offset and blur', () => {
       const lines = [{ text: 'Exit drift', enter: 0, exit: 3000 }];
 
-      const { timeline: tl } = buildNarrationTimeline(lines, container, { reducedMotion: false });
+      const { timeline: tl } = buildNarrationTimeline(withPositions(lines), container, { reducedMotion: false });
 
       const toCall = tl.to.mock.calls[0];
       expect(toCall[1]).toMatchObject({
@@ -258,7 +251,7 @@ describe('text.js', () => {
         { text: 'Centered', enter: 500, exit: 2000, x: 50, y: 50 },
       ];
 
-      buildNarrationTimeline(lines, container);
+      buildNarrationTimeline(withPositions(lines), container);
 
       const first = container.children[0];
       expect(first.style.position).toBe('absolute');
@@ -269,14 +262,12 @@ describe('text.js', () => {
       expect(second.style.left).toBe('50%');
     });
 
-    it('handles lines without position data (backward-compatible)', () => {
+    it('throws when a line is missing x/y positioning', () => {
       const lines = [{ text: 'No position', enter: 0, exit: 1000 }];
 
-      buildNarrationTimeline(lines, container);
-
-      const el = container.children[0];
-      expect(el.style.position).toBe('');
-      expect(el.classList.contains('narration-line--positioned')).toBe(false);
+      expect(() => buildNarrationTimeline(lines, container)).toThrow(
+        'createLineElement requires finite numeric x and y positions',
+      );
     });
 
     it('skips lines with missing enter timing', () => {
@@ -287,7 +278,7 @@ describe('text.js', () => {
         { text: 'Also valid', enter: 1000, exit: 3000 },
       ];
 
-      const { timeline: tl } = buildNarrationTimeline(lines, container);
+      const { timeline: tl } = buildNarrationTimeline(withPositions(lines), container);
 
       expect(container.children.length).toBe(2);
       expect(tl.fromTo).toHaveBeenCalledTimes(2);
@@ -302,7 +293,7 @@ describe('text.js', () => {
       const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const lines = [{ text: 'No exit', enter: 500 }];
 
-      const { timeline: tl } = buildNarrationTimeline(lines, container);
+      const { timeline: tl } = buildNarrationTimeline(withPositions(lines), container);
 
       expect(container.children.length).toBe(0);
       expect(tl.fromTo).not.toHaveBeenCalled();
@@ -314,29 +305,28 @@ describe('text.js', () => {
       const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const lines = [{ text: 'Bad timing', enter: 'foo', exit: 'bar' }];
 
-      buildNarrationTimeline(lines, container);
+      buildNarrationTimeline(withPositions(lines), container);
 
       expect(container.children.length).toBe(0);
       expect(errorSpy).toHaveBeenCalled();
       errorSpy.mockRestore();
     });
 
-    it('handles mixed positioned and non-positioned lines', () => {
+    it('throws on second line when it is missing x/y positioning', () => {
       const lines = [
         { text: 'Positioned', enter: 0, exit: 1000, x: 10, y: 70 },
         { text: 'Default', enter: 500, exit: 2000 },
       ];
 
-      buildNarrationTimeline(lines, container);
-
-      expect(container.children[0].classList.contains('narration-line--positioned')).toBe(true);
-      expect(container.children[1].classList.contains('narration-line--positioned')).toBe(false);
+      expect(() => buildNarrationTimeline(lines, container)).toThrow(
+        'createLineElement requires finite numeric x and y positions',
+      );
     });
 
     it('returns empty captionEntries when no captions provided', () => {
       const lines = [{ text: 'Line', enter: 0, exit: 1000 }];
 
-      const { captionEntries } = buildNarrationTimeline(lines, container);
+      const { captionEntries } = buildNarrationTimeline(withPositions(lines), container);
 
       expect(captionEntries).toEqual([]);
     });
@@ -345,7 +335,7 @@ describe('text.js', () => {
       const lines = [{ text: 'Line', enter: 0, exit: 1000 }];
       const captionContainer = document.createElement('div');
 
-      const { timeline: tl, captionEntries } = buildNarrationTimeline(lines, container, {
+      const { timeline: tl, captionEntries } = buildNarrationTimeline(withPositions(lines), container, {
         captions: [],
         captionContainer,
       });
@@ -358,7 +348,7 @@ describe('text.js', () => {
       const lines = [{ text: 'Line', enter: 0, exit: 1000 }];
       const captionContainer = document.createElement('div');
 
-      const { timeline: tl, captionEntries } = buildNarrationTimeline(lines, container, {
+      const { timeline: tl, captionEntries } = buildNarrationTimeline(withPositions(lines), container, {
         captions: null,
         captionContainer,
       });
@@ -375,7 +365,7 @@ describe('text.js', () => {
       ];
       const captionContainer = document.createElement('div');
 
-      const { timeline: tl, captionEntries } = buildNarrationTimeline(lines, container, {
+      const { timeline: tl, captionEntries } = buildNarrationTimeline(withPositions(lines), container, {
         captions,
         captionContainer,
         captionDelay: 1000,
@@ -406,7 +396,7 @@ describe('text.js', () => {
       const captionContainer = document.createElement('div');
       const isEnabled = vi.fn().mockReturnValue(false);
 
-      const { timeline: tl } = buildNarrationTimeline(lines, container, {
+      const { timeline: tl } = buildNarrationTimeline(withPositions(lines), container, {
         captions,
         captionContainer,
         isCaptionEnabled: isEnabled,
@@ -432,7 +422,7 @@ describe('text.js', () => {
       const captions = [{ text: 'Ungated', start: 0, end: 1000 }];
       const captionContainer = document.createElement('div');
 
-      const { timeline: tl } = buildNarrationTimeline(lines, container, {
+      const { timeline: tl } = buildNarrationTimeline(withPositions(lines), container, {
         captions,
         captionContainer,
       });
@@ -449,7 +439,7 @@ describe('text.js', () => {
       const captions = [{ text: 'Removable', start: 0, end: 2000 }];
       const captionContainer = document.createElement('div');
 
-      const { timeline: tl, captionEntries } = buildNarrationTimeline(lines, container, {
+      const { timeline: tl, captionEntries } = buildNarrationTimeline(withPositions(lines), container, {
         captions,
         captionContainer,
         isCaptionEnabled: () => true,
@@ -473,7 +463,7 @@ describe('text.js', () => {
       const captions = [{ text: 'Already gone', start: 0, end: 2000 }];
       const captionContainer = document.createElement('div');
 
-      const { timeline: tl, captionEntries } = buildNarrationTimeline(lines, container, {
+      const { timeline: tl, captionEntries } = buildNarrationTimeline(withPositions(lines), container, {
         captions,
         captionContainer,
         isCaptionEnabled: () => true,
@@ -490,7 +480,7 @@ describe('text.js', () => {
       const captions = [{ text: 'Duplicate-safe', start: 0, end: 2000 }];
       const captionContainer = document.createElement('div');
 
-      const { timeline: tl, captionEntries } = buildNarrationTimeline(lines, container, {
+      const { timeline: tl, captionEntries } = buildNarrationTimeline(withPositions(lines), container, {
         captions,
         captionContainer,
         isCaptionEnabled: () => true,
@@ -512,7 +502,7 @@ describe('text.js', () => {
       const captions = [{ text: 'Delayless', start: 500, end: 900 }];
       const captionContainer = document.createElement('div');
 
-      const { timeline: tl, captionEntries } = buildNarrationTimeline(lines, container, {
+      const { timeline: tl, captionEntries } = buildNarrationTimeline(withPositions(lines), container, {
         captions,
         captionContainer,
       });
@@ -527,7 +517,7 @@ describe('text.js', () => {
       const lines = [{ text: 'Line', enter: 0, exit: 1000 }];
       const captions = [{ text: 'Orphan', start: 0, end: 1000 }];
 
-      const { timeline: tl, captionEntries } = buildNarrationTimeline(lines, container, {
+      const { timeline: tl, captionEntries } = buildNarrationTimeline(withPositions(lines), container, {
         captions,
       });
 

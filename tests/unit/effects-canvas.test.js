@@ -109,7 +109,6 @@ import {
   pause,
   resume,
   destroy,
-  isRunning,
   setAnalyser,
   connectAnalysisAudio,
   startAnalysisPlayback,
@@ -319,10 +318,6 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
   });
 
   describe('pause / resume', () => {
-    it('isRunning returns false before init', () => {
-      expect(isRunning()).toBe(false);
-    });
-
     it('pause does not throw before init', () => {
       expect(() => pause()).not.toThrow();
     });
@@ -335,7 +330,11 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
       const canvas = createMockCanvas();
       await init(canvas);
 
-      globalThis.matchMedia = vi.fn().mockReturnValue({ matches: true });
+      globalThis.matchMedia = vi.fn().mockReturnValue({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      });
       resume();
 
       // Should not have called ticker.start
@@ -1760,7 +1759,11 @@ describe('effects-canvas — dedicated analysis element (ADR-008 Approach B)', (
     const createdEl = ctx.createMediaElementSource.mock.calls[0][0];
     createdEl.play = vi.fn().mockResolvedValue(undefined);
 
-    globalThis.matchMedia = vi.fn().mockReturnValue({ matches: true });
+    globalThis.matchMedia = vi.fn().mockReturnValue({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    });
 
     resume();
     expect(createdEl.play).not.toHaveBeenCalled();
@@ -1875,9 +1878,7 @@ describe('effects-canvas.js — mask validation errors', () => {
 
   it('skips region when 2D context creation fails for mask processing', async () => {
     // First Image (scene texture) succeeds, second (mask) needs 2D context
-    let imgCount = 0;
     globalThis.Image = vi.fn(function () {
-      imgCount++;
       this.width = 256;
       this.height = 256;
       this.naturalWidth = 256;

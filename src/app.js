@@ -110,6 +110,49 @@ function applyFrameDefaults(scenesJson) {
   return scenesJson.frames.map((frame) => ({ ...defaults, ...frame }));
 }
 
+function failScenesConfig(path, expected, value) {
+  let actualType = typeof value;
+  if (value === null) actualType = 'null';
+  else if (Array.isArray(value)) actualType = 'array';
+  throw new Error(`Invalid scenes config at ${path}: expected ${expected}, received ${actualType}`);
+}
+
+function assertFiniteNumber(value, path) {
+  if (!Number.isFinite(value)) {
+    failScenesConfig(path, 'finite number', value);
+  }
+}
+
+function validateScenesConfig(frames) {
+  if (!Array.isArray(frames)) {
+    failScenesConfig('frames', 'array', frames);
+  }
+
+  frames.forEach((frame, frameIndex) => {
+    const lines = frame.narration?.lines;
+    if (lines === null || lines === undefined) return;
+
+    if (!Array.isArray(lines)) {
+      failScenesConfig(`frames[${frameIndex}].narration.lines`, 'array', lines);
+    }
+
+    lines.forEach((line, lineIndex) => {
+      const linePath = `frames[${frameIndex}].narration.lines[${lineIndex}]`;
+      if (!line || typeof line !== 'object' || Array.isArray(line)) {
+        failScenesConfig(linePath, 'object', line);
+      }
+
+      if (typeof line.text !== 'string') {
+        failScenesConfig(`${linePath}.text`, 'string', line.text);
+      }
+      assertFiniteNumber(line.enter, `${linePath}.enter`);
+      assertFiniteNumber(line.exit, `${linePath}.exit`);
+      assertFiniteNumber(line.x, `${linePath}.x`);
+      assertFiniteNumber(line.y, `${linePath}.y`);
+    });
+  });
+}
+
 function prefersReducedMotion() {
   return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
@@ -1152,6 +1195,7 @@ export function createApp() {
   }
 
   const frames = applyFrameDefaults(scenesData);
+  validateScenesConfig(frames);
 
   const app = {
     frames,
@@ -1214,49 +1258,56 @@ export function createApp() {
 
   initApp(app);
 
-  return {
+  const api = {
     advance: () => advance(app),
     toggleMute: () => toggleMute(app),
     togglePause: () => togglePause(app),
     getState: () => app.state,
-    /* v8 ignore start -- E2E harness methods: exercised by Playwright, not unit tests */
-    forceNarrationEndForTesting: () => {
-      const frame = app.frames[app.currentIndex];
-      if (!frame) return;
-      const holdAfterNarration = getHoldAfterNarration(frame);
-      makeNarrationEndCallback(app, frame, holdAfterNarration)();
-    },
-    forceCreditsRevealForTesting: () => {
-      const frame = app.frames[app.currentIndex];
-      if (!frame?.credits) return;
-      if (app.creditsRevealTimer) {
-        app.creditsRevealTimer.cancel();
-        app.creditsRevealTimer = null;
-      }
-      // Pause canvas effects and shimmer to free the main thread —
-      // on CI runners, rAF loops from PixiJS/shimmer/canvas starve
-      // Playwright's CDP communication and cause test timeouts.
-      pauseEffects();
-      pauseShimmer();
-      revealCreditsPanel(app.els.creditsPanel, app.els.creditsScrollContent, frame.credits, {
-        reducedMotion: prefersReducedMotion(),
-      });
-    },
-    _debugCreditsState: () => ({
-      currentIndex: app.currentIndex,
-      frameCount: app.frames.length,
-      state: app.state,
-      paused: app.paused,
-      generation: app.generation,
-      hasCreditsTimer: app.creditsRevealTimer !== null,
-      creditsTimerActive: app.creditsRevealTimer?.isActive ?? null,
-      creditsTimerPaused: app.creditsRevealTimer?.isPaused ?? null,
-      panelHidden: app.els.creditsPanel?.hidden,
-      frameHasCredits: !!app.frames[app.currentIndex]?.credits,
-    }),
-    forceBufferStateForTesting: (isBuffering) => {
-      handleBufferChange(app, isBuffering);
-    },
-    /* v8 ignore stop */
   };
+
+  if (import.meta.env.VITE_E2E === '1') {
+    /* v8 ignore start -- E2E harness methods: exercised by Playwright, not unit tests */
+    Object.assign(api, {
+      forceNarrationEndForTesting: () => {
+        const frame = app.frames[app.currentIndex];
+        if (!frame) return;
+        const holdAfterNarration = getHoldAfterNarration(frame);
+        makeNarrationEndCallback(app, frame, holdAfterNarration)();
+      },
+      forceCreditsRevealForTesting: () => {
+        const frame = app.frames[app.currentIndex];
+        if (!frame?.credits) return;
+        if (app.creditsRevealTimer) {
+          app.creditsRevealTimer.cancel();
+          app.creditsRevealTimer = null;
+        }
+        // Pause canvas effects and shimmer to free the main thread —
+        // on CI runners, rAF loops from PixiJS/shimmer/canvas starve
+        // Playwright's CDP communication and cause test timeouts.
+        pauseEffects();
+        pauseShimmer();
+        revealCreditsPanel(app.els.creditsPanel, app.els.creditsScrollContent, frame.credits, {
+          reducedMotion: prefersReducedMotion(),
+        });
+      },
+      _debugCreditsState: () => ({
+        currentIndex: app.currentIndex,
+        frameCount: app.frames.length,
+        state: app.state,
+        paused: app.paused,
+        generation: app.generation,
+        hasCreditsTimer: app.creditsRevealTimer !== null,
+        creditsTimerActive: app.creditsRevealTimer?.isActive ?? null,
+        creditsTimerPaused: app.creditsRevealTimer?.isPaused ?? null,
+        panelHidden: app.els.creditsPanel?.hidden,
+        frameHasCredits: !!app.frames[app.currentIndex]?.credits,
+      }),
+      forceBufferStateForTesting: (isBuffering) => {
+        handleBufferChange(app, isBuffering);
+      },
+    });
+    /* v8 ignore stop */
+  }
+
+  return api;
 }

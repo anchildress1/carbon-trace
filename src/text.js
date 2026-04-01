@@ -6,14 +6,14 @@ export function createLineElement(text, container, options = {}) {
   el.textContent = text;
 
   const { x, y } = options;
-
-  if (x !== undefined && x !== null && y !== undefined && y !== null) {
-    el.classList.add('narration-line--positioned');
-    el.style.position = 'absolute';
-    el.style.left = `${x}%`;
-    el.style.top = `${y}%`;
-    el.style.transform = 'translateY(-50%)';
+  if (!Number.isFinite(x) || !Number.isFinite(y)) {
+    throw new TypeError('createLineElement requires finite numeric x and y positions');
   }
+  el.classList.add('narration-line--positioned');
+  el.style.position = 'absolute';
+  el.style.left = `${x}%`;
+  el.style.top = `${y}%`;
+  el.style.transform = 'translateY(-50%)';
 
   container.appendChild(el);
   return el;
@@ -37,7 +37,6 @@ export function buildNarrationTimeline(lines, container, opts = {}) {
       console.error(`Narration line ${i} has invalid enter/exit timing:`, line);
       return;
     }
-
     const el = createLineElement(line.text, container, {
       x: line.x,
       y: line.y,

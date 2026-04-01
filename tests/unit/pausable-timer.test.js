@@ -353,11 +353,10 @@ describe('PausableTimer', () => {
     });
 
     it('callback can call cancel on its own timer without invalid state', () => {
-      let timer;
       const cb = vi.fn(() => {
         timer.cancel();
       });
-      timer = new PausableTimer(cb, 10);
+      const timer = new PausableTimer(cb, 10);
 
       vi.advanceTimersByTime(10);
 
@@ -367,11 +366,10 @@ describe('PausableTimer', () => {
     });
 
     it('callback can call pause on its own timer without entering paused state', () => {
-      let timer;
       const cb = vi.fn(() => {
         timer.pause();
       });
-      timer = new PausableTimer(cb, 10);
+      const timer = new PausableTimer(cb, 10);
 
       vi.advanceTimersByTime(10);
 
