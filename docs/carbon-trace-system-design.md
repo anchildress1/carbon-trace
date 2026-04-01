@@ -57,8 +57,7 @@ carbon-trace/
 │   #   shasum -a 256 <file> | cut -c1-8
 │   # Rename file, update references in scenes.json / styles.css.
 ├── Dockerfile
-├── nginx.conf
-└── .github/workflows/deploy.yml
+└── nginx.conf
 ```
 
 ---
@@ -106,7 +105,7 @@ loadScene(effectsConfig, sceneImageUrl) → clearAll() + load scene texture (sha
                                          PixiJS layer is transparent outside effect regions (ADR-007 addendum).
 setAnalyser(analyserNode)              → store Web Audio AnalyserNode reference. Ticker reads FFT
                                          data each frame for regions with audioReactive config (ADR-008).
-clearAll()                             → destroy sprites/filters/textures via .destroy(true)
+clearAll()                             → destroy sprites/filters/textures via .destroy(false)
                                          (frees GPU backing store). Ticker stays running.
 pause() / resume()                     → stop/start PixiJS ticker (WCAG 2.2.2).
                                          Only pause()/resume() control ticker lifecycle.
