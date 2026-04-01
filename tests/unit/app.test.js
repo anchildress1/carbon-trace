@@ -279,6 +279,7 @@ function runNextGsapCompletion() {
 }
 
 import { createApp } from '../../src/app.js';
+import scenesData from '../../src/scenes.json';
 import {
   scheduleAudioCues,
   cancelAudioCues,
@@ -417,6 +418,58 @@ describe('app.js', () => {
     it('starts in LOADING state', () => {
       app = createApp();
       expect(app.getState()).toBe('LOADING');
+    });
+
+    it('fails fast when narration line positioning is invalid in scenes config', () => {
+      const originalLine = { ...scenesData.frames[0].narration.lines[0] };
+      scenesData.frames[0].narration.lines[0] = { ...originalLine, x: null };
+
+      try {
+        expect(() => createApp()).toThrow(
+          'Invalid scenes config at frames[0].narration.lines[0].x: expected finite number, received null',
+        );
+      } finally {
+        scenesData.frames[0].narration.lines[0] = originalLine;
+      }
+    });
+
+    it('rejects narration lines that are not objects', () => {
+      const originalLines = scenesData.frames[0].narration.lines;
+      scenesData.frames[0].narration.lines = ['not-an-object'];
+
+      try {
+        expect(() => createApp()).toThrow(
+          'Invalid scenes config at frames[0].narration.lines[0]: expected object, received string',
+        );
+      } finally {
+        scenesData.frames[0].narration.lines = originalLines;
+      }
+    });
+
+    it('rejects narration lines with non-string text', () => {
+      const originalLine = { ...scenesData.frames[0].narration.lines[0] };
+      scenesData.frames[0].narration.lines[0] = { ...originalLine, text: 42 };
+
+      try {
+        expect(() => createApp()).toThrow(
+          'Invalid scenes config at frames[0].narration.lines[0].text: expected string, received number',
+        );
+      } finally {
+        scenesData.frames[0].narration.lines[0] = originalLine;
+      }
+    });
+
+    it('rejects narration.lines when it is not an array', () => {
+      const originalNarration = { ...scenesData.frames[0].narration };
+      scenesData.frames[0].narration = { ...originalNarration, lines: 'bad' };
+
+      try {
+        expect(() => createApp()).toThrow(
+          'Invalid scenes config at frames[0].narration.lines: expected array, received string',
+        );
+      } finally {
+        scenesData.frames[0].narration = originalNarration;
+      }
     });
 
     it('transitions to PAUSED after image preload completes', async () => {

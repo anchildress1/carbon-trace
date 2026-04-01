@@ -110,6 +110,49 @@ function applyFrameDefaults(scenesJson) {
   return scenesJson.frames.map((frame) => ({ ...defaults, ...frame }));
 }
 
+function failScenesConfig(path, expected, value) {
+  let actualType = typeof value;
+  if (value === null) actualType = 'null';
+  else if (Array.isArray(value)) actualType = 'array';
+  throw new Error(`Invalid scenes config at ${path}: expected ${expected}, received ${actualType}`);
+}
+
+function assertFiniteNumber(value, path) {
+  if (!Number.isFinite(value)) {
+    failScenesConfig(path, 'finite number', value);
+  }
+}
+
+function validateScenesConfig(frames) {
+  if (!Array.isArray(frames)) {
+    failScenesConfig('frames', 'array', frames);
+  }
+
+  frames.forEach((frame, frameIndex) => {
+    const lines = frame.narration?.lines;
+    if (lines === null || lines === undefined) return;
+
+    if (!Array.isArray(lines)) {
+      failScenesConfig(`frames[${frameIndex}].narration.lines`, 'array', lines);
+    }
+
+    lines.forEach((line, lineIndex) => {
+      const linePath = `frames[${frameIndex}].narration.lines[${lineIndex}]`;
+      if (!line || typeof line !== 'object' || Array.isArray(line)) {
+        failScenesConfig(linePath, 'object', line);
+      }
+
+      if (typeof line.text !== 'string') {
+        failScenesConfig(`${linePath}.text`, 'string', line.text);
+      }
+      assertFiniteNumber(line.enter, `${linePath}.enter`);
+      assertFiniteNumber(line.exit, `${linePath}.exit`);
+      assertFiniteNumber(line.x, `${linePath}.x`);
+      assertFiniteNumber(line.y, `${linePath}.y`);
+    });
+  });
+}
+
 function prefersReducedMotion() {
   return globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
@@ -1152,6 +1195,7 @@ export function createApp() {
   }
 
   const frames = applyFrameDefaults(scenesData);
+  validateScenesConfig(frames);
 
   const app = {
     frames,
