@@ -99,7 +99,6 @@ function makeCue(overrides = {}) {
     volume: 1,
     loop: false,
     fadeIn: 0,
-    fadeOut: 0,
     ...overrides,
   };
 }

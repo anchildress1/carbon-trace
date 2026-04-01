@@ -4,13 +4,9 @@
     "author": "Ashley Childress",
     "aspectRatio": "16:9",
     "defaultTransition": {
-      "type": "fade",
       "duration": 1200
     },
-    "defaultHoldAfterNarration": 2000,
-    "frameDefaults": {
-      "textMode": "ghost-drift"
-    }
+    "defaultHoldAfterNarration": 2000
   },
   "frames": [
     {
@@ -75,7 +71,6 @@
       },
       "effects": null,
       "transition": {
-        "type": "fade",
         "duration": 1500
       },
       "audioCues": [
@@ -86,8 +81,7 @@
           "enter": 0,
           "volume": 1,
           "loop": false,
-          "fadeIn": 0,
-          "fadeOut": 0
+          "fadeIn": 0
         }
       ]
     },
@@ -202,12 +196,7 @@
         ]
       },
       "transition": {
-        "type": "zoom-in",
-        "duration": 1200,
-        "scale": {
-          "from": 1,
-          "to": 1.15
-        }
+        "duration": 1200
       },
       "audioCues": [
         {
@@ -217,8 +206,7 @@
           "enter": 500,
           "volume": 1,
           "loop": false,
-          "fadeIn": 0,
-          "fadeOut": 0
+          "fadeIn": 0
         },
         {
           "id": "ambient-01",
@@ -227,8 +215,7 @@
           "enter": 4300,
           "volume": 0.15,
           "loop": true,
-          "fadeIn": 500,
-          "fadeOut": 1000
+          "fadeIn": 500
         }
       ]
     },
@@ -367,7 +354,6 @@
         ]
       },
       "transition": {
-        "type": "fade",
         "duration": 1200
       },
       "audioCues": [
@@ -378,8 +364,7 @@
           "enter": 500,
           "volume": 1,
           "loop": false,
-          "fadeIn": 0,
-          "fadeOut": 0
+          "fadeIn": 0
         },
         {
           "id": "ambient-02",
@@ -388,8 +373,7 @@
           "enter": 0,
           "volume": 0.28,
           "loop": true,
-          "fadeIn": 4500,
-          "fadeOut": 1500
+          "fadeIn": 4500
         }
       ]
     },
@@ -527,7 +511,6 @@
         ]
       },
       "transition": {
-        "type": "fade",
         "duration": 1200
       },
       "audioCues": [
@@ -538,8 +521,7 @@
           "enter": 500,
           "volume": 1,
           "loop": false,
-          "fadeIn": 0,
-          "fadeOut": 0
+          "fadeIn": 0
         },
         {
           "id": "ambient-03",
@@ -548,8 +530,7 @@
           "enter": 0,
           "volume": 0.35,
           "loop": true,
-          "fadeIn": 1500,
-          "fadeOut": 1500
+          "fadeIn": 1500
         }
       ]
     },
@@ -693,7 +674,6 @@
         ]
       },
       "transition": {
-        "type": "fade",
         "duration": 1200
       },
       "audioCues": [
@@ -704,8 +684,7 @@
           "enter": 500,
           "volume": 1,
           "loop": false,
-          "fadeIn": 0,
-          "fadeOut": 0
+          "fadeIn": 0
         },
         {
           "id": "ambient-04",
@@ -714,8 +693,7 @@
           "enter": 0,
           "volume": 0.15,
           "loop": true,
-          "fadeIn": 500,
-          "fadeOut": 500
+          "fadeIn": 500
         }
       ]
     },
@@ -863,7 +841,6 @@
         ]
       },
       "transition": {
-        "type": "fade",
         "duration": 1200
       },
       "audioCues": [
@@ -874,8 +851,7 @@
           "enter": 500,
           "volume": 1,
           "loop": false,
-          "fadeIn": 0,
-          "fadeOut": 0
+          "fadeIn": 0
         },
         {
           "id": "ambient-05",
@@ -884,8 +860,7 @@
           "enter": 0,
           "volume": 0.2,
           "loop": true,
-          "fadeIn": 1500,
-          "fadeOut": 500
+          "fadeIn": 1500
         }
       ]
     },
@@ -1022,7 +997,6 @@
         ]
       },
       "transition": {
-        "type": "fade",
         "duration": 1200
       },
       "audioCues": [
@@ -1033,8 +1007,7 @@
           "enter": 500,
           "volume": 1,
           "loop": false,
-          "fadeIn": 0,
-          "fadeOut": 0
+          "fadeIn": 0
         },
         {
           "id": "ambient-06",
@@ -1043,8 +1016,7 @@
           "enter": 0,
           "volume": 0.15,
           "loop": true,
-          "fadeIn": 1500,
-          "fadeOut": 1500
+          "fadeIn": 1500
         }
       ]
     },
@@ -1153,7 +1125,6 @@
       },
       "effects": null,
       "transition": {
-        "type": "fade",
         "duration": 1200
       },
       "audioCues": [
@@ -1164,8 +1135,7 @@
           "enter": 500,
           "volume": 1,
           "loop": false,
-          "fadeIn": 0,
-          "fadeOut": 0
+          "fadeIn": 0
         },
         {
           "id": "ambient-07",
@@ -1174,8 +1144,7 @@
           "enter": 0,
           "volume": 0.2,
           "loop": true,
-          "fadeIn": 1500,
-          "fadeOut": 1000
+          "fadeIn": 1500
         }
       ]
     },
@@ -1219,7 +1188,6 @@
       },
       "effects": null,
       "transition": {
-        "type": "fade",
         "duration": 1200
       },
       "audioCues": [
@@ -1230,8 +1198,7 @@
           "enter": 0,
           "volume": 0.9,
           "loop": true,
-          "fadeIn": 1500,
-          "fadeOut": 1500
+          "fadeIn": 1500
         }
       ]
     },
@@ -1353,7 +1320,6 @@
         ]
       },
       "transition": {
-        "type": "fade",
         "duration": 1200
       },
       "audioCues": [
@@ -1364,8 +1330,7 @@
           "enter": 500,
           "volume": 1,
           "loop": false,
-          "fadeIn": 0,
-          "fadeOut": 0
+          "fadeIn": 0
         },
         {
           "id": "ambient-09",
@@ -1374,8 +1339,7 @@
           "enter": 0,
           "volume": 0.15,
           "loop": true,
-          "fadeIn": 1500,
-          "fadeOut": 1000
+          "fadeIn": 1500
         }
       ]
     },
@@ -1490,7 +1454,6 @@
         ]
       },
       "transition": {
-        "type": "fade",
         "duration": 1200
       },
       "audioCues": [
@@ -1501,8 +1464,7 @@
           "enter": 500,
           "volume": 1,
           "loop": false,
-          "fadeIn": 0,
-          "fadeOut": 0
+          "fadeIn": 0
         },
         {
           "id": "ambient-10",
@@ -1511,8 +1473,7 @@
           "enter": 0,
           "volume": 0.15,
           "loop": true,
-          "fadeIn": 1500,
-          "fadeOut": 1000
+          "fadeIn": 1500
         }
       ]
     },
@@ -1532,7 +1493,7 @@
         "mask": "assets/masks/mask-11-music-circuit-04b20cb7.png",
         "opacity": 0.6,
         "dotCount": 60,
-        "dotSpeed": 1.0
+        "dotSpeed": 1
       },
       "narration": {
         "lines": [
@@ -1627,7 +1588,7 @@
               "range": [10, 30],
               "smoothing": 0.3,
               "trigger": {
-                "threshold": 3.0,
+                "threshold": 3,
                 "cooldown": 0.08,
                 "minEnergy": 0.815
               }
@@ -1646,7 +1607,6 @@
         ]
       },
       "transition": {
-        "type": "fade",
         "duration": 1500
       },
       "audioCues": [
@@ -1657,8 +1617,7 @@
           "enter": 500,
           "volume": 1,
           "loop": false,
-          "fadeIn": 0,
-          "fadeOut": 0
+          "fadeIn": 0
         },
         {
           "id": "ambient-11",
@@ -1667,8 +1626,7 @@
           "enter": 0,
           "volume": 0.15,
           "loop": true,
-          "fadeIn": 1500,
-          "fadeOut": 1000
+          "fadeIn": 1500
         },
         {
           "id": "end-song",
@@ -1682,8 +1640,7 @@
           "volumeAfterNarration": 0.75,
           "fadeAfterNarration": 3000,
           "loop": true,
-          "fadeIn": 8000,
-          "fadeOut": null
+          "fadeIn": 8000
         }
       ]
     }
