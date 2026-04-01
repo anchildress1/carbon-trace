@@ -516,6 +516,7 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
       expect(effectSprite.tint).toBe(0xffee33);
       expect(effectSprite.filters).toEqual([{ enabled: true }]);
     });
+
   });
 
   describe('generation guard', () => {
