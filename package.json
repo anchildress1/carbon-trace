@@ -15,7 +15,7 @@
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
     "lint": "eslint src/ tests/ --max-warnings 0",
-    "lint:fix": "eslint src/ tests/ --fix",
+    "lint:fix": "eslint src/ tests/ --fix --max-warnings 0",
     "format": "prettier --write 'src/**/*.{js,css,html,json}' '*.{js,json,html,yml,yaml,md}'",
     "format:check": "prettier --check 'src/**/*.{js,css,html,json}' '*.{js,json,html,yml,yaml,md}'",
     "perf:lighthouse:desktop": "lhci autorun --config=.lighthouserc.json",
