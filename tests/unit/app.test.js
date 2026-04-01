@@ -459,6 +459,19 @@ describe('app.js', () => {
       }
     });
 
+    it('rejects narration lines with array text payloads', () => {
+      const originalLine = { ...scenesData.frames[0].narration.lines[0] };
+      scenesData.frames[0].narration.lines[0] = { ...originalLine, text: [] };
+
+      try {
+        expect(() => createApp()).toThrow(
+          'Invalid scenes config at frames[0].narration.lines[0].text: expected string, received array',
+        );
+      } finally {
+        scenesData.frames[0].narration.lines[0] = originalLine;
+      }
+    });
+
     it('rejects narration.lines when it is not an array', () => {
       const originalNarration = { ...scenesData.frames[0].narration };
       scenesData.frames[0].narration = { ...originalNarration, lines: 'bad' };
