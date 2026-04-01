@@ -7,7 +7,7 @@ import {
   destroySceneCanvas,
   getSceneContext,
   loadImage,
-  getImageCache,
+  resetImageCache,
 } from '../../src/canvas.js';
 
 function createMockCanvas(initialRect = { width: 1920, height: 1080 }) {
@@ -51,7 +51,7 @@ describe('canvas.js', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     destroySceneCanvas();
-    getImageCache().clear();
+    resetImageCache();
     imageCtorCount = 0;
     resizeObserverInstances = [];
 
@@ -90,7 +90,7 @@ describe('canvas.js', () => {
   afterEach(() => {
     vi.useRealTimers();
     destroySceneCanvas();
-    getImageCache().clear();
+    resetImageCache();
     globalThis.Image = originalImage;
     vi.restoreAllMocks();
   });
@@ -314,8 +314,9 @@ describe('canvas.js', () => {
       vi.advanceTimersByTime(1);
       const img = await p;
       expect(img).toBeNull();
-      // Failed load should be evicted so retry is possible
-      expect(getImageCache().has('bad://fail.webp')).toBe(false);
+      // Failed load should be evicted so retry creates a new request
+      const p2 = loadImage('bad://fail.webp');
+      expect(p2).not.toBe(p);
     });
 
     it('deduplicates concurrent in-flight loads to one Image allocation', async () => {

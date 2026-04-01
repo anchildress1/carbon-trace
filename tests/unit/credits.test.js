@@ -58,7 +58,6 @@ vi.mock('../../src/credits-content.html?raw', () => ({
 
 // Import after mocks
 import {
-  initCreditsContent,
   revealCreditsPanel,
   pauseCreditsScroll,
   resumeCreditsScroll,
@@ -125,24 +124,6 @@ describe('credits.js', () => {
     vi.useRealTimers();
     vi.restoreAllMocks();
     document.body.replaceChildren();
-  });
-
-  // -- initCreditsContent --
-
-  describe('initCreditsContent', () => {
-    it('populates content with credits HTML on first call', () => {
-      initCreditsContent(scrollContent);
-      expect(scrollContent.textContent).toContain('Test Credit');
-      expect(scrollContent.querySelector('.credits-link')).not.toBeNull();
-    });
-
-    it('is idempotent — does not repopulate when children already exist', () => {
-      initCreditsContent(scrollContent);
-      // Mutate a child — initCreditsContent should not overwrite
-      scrollContent.querySelector('.credits-heading').textContent = 'Modified';
-      initCreditsContent(scrollContent);
-      expect(scrollContent.querySelector('.credits-heading').textContent).toBe('Modified');
-    });
   });
 
   // -- revealCreditsPanel (normal motion) --
