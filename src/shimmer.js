@@ -27,6 +27,9 @@ let traceImage = null;
 let activeColor = [232, 200, 120]; // current scene's glow color
 let activeDotSpeed = 0.8; // current scene's dot speed
 let loadGeneration = 0; // monotonic counter — guards against stale async loads
+let glowSprite = null; // pre-rendered glow halo canvas
+let coreSprite = null; // pre-rendered bright core canvas
+let spriteScale = 0; // scale factor sprites were built for
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
@@ -336,6 +339,67 @@ function stepDot(dot) {
   }
 }
 
+/**
+ * Build offscreen sprite canvases for glow halo and bright core at the
+ * current scale. Called once per scene load (and on resize), replacing
+ * 30 createRadialGradient() calls per frame with drawImage() blits.
+ */
+function buildDotSprites(scale) {
+  const [cr, cg, cb] = activeColor;
+
+  // Glow halo sprite
+  const glowRadius = Math.ceil(DOT_RADIUS * 7 * scale);
+  const glowSize = glowRadius * 2;
+  const glowOff = document.createElement('canvas');
+  glowOff.width = glowSize;
+  glowOff.height = glowSize;
+  const glowCtx = glowOff.getContext('2d');
+  if (!glowCtx) {
+    throw new Error('shimmer: failed to acquire offscreen 2D context for glow sprite');
+  }
+  const glow = glowCtx.createRadialGradient(
+    glowRadius,
+    glowRadius,
+    0,
+    glowRadius,
+    glowRadius,
+    glowRadius,
+  );
+  glow.addColorStop(0, `rgba(${cr}, ${cg}, ${cb}, 0.6)`);
+  glow.addColorStop(0.35, `rgba(${cr}, ${cg}, ${cb}, 0.2)`);
+  glow.addColorStop(1, `rgba(${cr}, ${cg}, ${cb}, 0)`);
+  glowCtx.fillStyle = glow;
+  glowCtx.fillRect(0, 0, glowSize, glowSize);
+  glowSprite = glowOff;
+
+  // Bright core sprite
+  const coreRadius = Math.ceil(DOT_RADIUS * 2 * scale);
+  const coreSize = coreRadius * 2;
+  const coreOff = document.createElement('canvas');
+  coreOff.width = coreSize;
+  coreOff.height = coreSize;
+  const coreCtx = coreOff.getContext('2d');
+  if (!coreCtx) {
+    throw new Error('shimmer: failed to acquire offscreen 2D context for core sprite');
+  }
+  const core = coreCtx.createRadialGradient(
+    coreRadius,
+    coreRadius,
+    0,
+    coreRadius,
+    coreRadius,
+    coreRadius,
+  );
+  core.addColorStop(0, `rgba(255, 248, 225, 1)`);
+  core.addColorStop(0.4, `rgba(${cr}, ${cg}, ${cb}, 0.5)`);
+  core.addColorStop(1, `rgba(${cr}, ${cg}, ${cb}, 0)`);
+  coreCtx.fillStyle = core;
+  coreCtx.fillRect(0, 0, coreSize, coreSize);
+  coreSprite = coreOff;
+
+  spriteScale = scale;
+}
+
 function render(time) {
   if (!ctx || !canvas) return;
 
@@ -356,7 +420,14 @@ function render(time) {
   const sx = cw / mapW;
   const sy = ch / mapH;
   const scale = Math.max(sx, sy);
-  const [cr, cg, cb] = activeColor;
+
+  // Rebuild sprites if scale changed (e.g., after resize)
+  if (!glowSprite || Math.abs(scale - spriteScale) > 0.01) {
+    buildDotSprites(scale);
+  }
+
+  const glowR = glowSprite.width / 2;
+  const coreR = coreSprite.width / 2;
 
   for (const dot of dots) {
     if (!reducedMotion) {
@@ -371,24 +442,12 @@ function render(time) {
     const pulse = reducedMotion ? 0.6 : 0.1 + 0.9 * wave;
     const alpha = Math.min(1, opacity * DOT_ALPHA_BOOST) * pulse;
 
-    // Glow halo
-    const glowRadius = DOT_RADIUS * 7 * scale;
-    const glow = ctx.createRadialGradient(px, py, 0, px, py, glowRadius);
-    glow.addColorStop(0, `rgba(${cr}, ${cg}, ${cb}, ${alpha * 0.6})`);
-    glow.addColorStop(0.35, `rgba(${cr}, ${cg}, ${cb}, ${alpha * 0.2})`);
-    glow.addColorStop(1, `rgba(${cr}, ${cg}, ${cb}, 0)`);
-    ctx.fillStyle = glow;
-    ctx.fillRect(px - glowRadius, py - glowRadius, glowRadius * 2, glowRadius * 2);
-
-    // Bright core
-    const coreRadius = DOT_RADIUS * 2 * scale;
-    const core = ctx.createRadialGradient(px, py, 0, px, py, coreRadius);
-    core.addColorStop(0, `rgba(255, 248, 225, ${alpha})`);
-    core.addColorStop(0.4, `rgba(${cr}, ${cg}, ${cb}, ${alpha * 0.5})`);
-    core.addColorStop(1, `rgba(${cr}, ${cg}, ${cb}, 0)`);
-    ctx.fillStyle = core;
-    ctx.fillRect(px - coreRadius, py - coreRadius, coreRadius * 2, coreRadius * 2);
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(glowSprite, px - glowR, py - glowR);
+    ctx.drawImage(coreSprite, px - coreR, py - coreR);
   }
+
+  ctx.globalAlpha = 1;
 }
 
 function tick(time) {
@@ -487,6 +546,9 @@ export async function loadScene(config) {
   walkMap = null;
   walkPositions = [];
   traceImage = null;
+  glowSprite = null;
+  coreSprite = null;
+  spriteScale = 0;
 
   if (!config) {
     opacity = 0;
@@ -562,6 +624,9 @@ export function destroy() {
   walkMap = null;
   walkPositions = [];
   traceImage = null;
+  glowSprite = null;
+  coreSprite = null;
+  spriteScale = 0;
   dots = [];
   canvas = null;
   ctx = null;

@@ -132,14 +132,24 @@ Full system design: `docs/carbon-trace-system-design.md` and `docs/ADRs/*.md`
 
 ## Test Standards
 
-- **Coverage thresholds**: 85% lines/functions/statements, 80% branches (enforced in vitest.config.js).
+- **Coverage thresholds**: 97% lines, 98% functions, 95% statements, 88% branches (enforced in vitest.config.js).
 - Every new module or utility must ship with positive, negative, and edge-case tests.
 - GSAP and Howler are mocked in unit tests; E2E tests exercise the real DOM.
 - Canvas context is mocked in unit tests via a `getContext('2d')` stub.
 
 ## Performance / Lighthouse
 
-- **Targets** (enforced in `.lighthouserc.json` and `.lighthouserc.mobile.json`): ≥90% performance, 100% accessibility, ≥95% best-practices, ≥90% SEO.
+- **Targets** (enforced in `.lighthouserc.json` and `.lighthouserc.mobile.json`):
+  Desktop: ≥90% performance, 100% accessibility, ≥95% best-practices, ≥90% SEO.
+  Mobile: ≥85% performance (approved temporary exception), 100% accessibility, ≥95% best-practices, ≥90% SEO.
+- **Mobile performance known gap**: Mobile Lighthouse scores 0.86 under simulated
+  Slow 4G + 4x CPU throttle (approved threshold 0.85). Root cause is a 3.7s LCP render delay —
+  the initial JS module graph (~175KB uncompressed: GSAP, Howler, entry bundle) blocks
+  the main thread from painting the `.loading-title` LCP element. PixiJS is already
+  lazy-loaded via dynamic `import()`. Restoring mobile to ≥0.90 requires deferring GSAP/Howler
+  behind dynamic imports — a moderate refactor of `app.js` import structure. Desktop
+  scores ≥0.90.
+- **Mask textures**: Gray+alpha (2-channel, 16bpp) PNG format. Total mask payload ~3.3MB.
 - Images are WebP, 16:9, 2x resolution. Total asset budget <35MB.
 - All asset filenames in `public/assets/` carry an 8-char SHA-256 content
   hash suffix for cache busting (ADR-010). When adding or updating any asset,

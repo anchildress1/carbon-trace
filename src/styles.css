@@ -627,6 +627,10 @@ body {
   .narration-line:not(.narration-line--positioned) {
     bottom: 14%;
   }
+
+  .loading-title {
+    animation: title-emerge 0.8s ease 0.2s forwards;
+  }
 }
 
 /* Desktop: larger control button icons */

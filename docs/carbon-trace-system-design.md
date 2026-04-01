@@ -566,7 +566,7 @@ const onend = () => {
 Experience starts paused behind the loading screen (`#loading-screen`), which doubles as the start gate. After assets load, a "begin experience" prompt appears inside the loading screen button. This serves two purposes:
 
 1. **Mobile audio context unlock:** The first user gesture enables the AudioContext via Howler's internal unlock.
-2. **LCP optimization:** The loading-screen prompt text serves as the Lighthouse LCP element.
+2. **LCP optimization:** The `.loading-title--main` text serves as the Lighthouse LCP element. On mobile (≤480px), the title-emerge animation uses a 0.2s delay / 0.8s duration (vs 1.2s / 1.8s desktop) to reduce LCP render delay under throttled conditions. See §15.1 for full analysis.
 
 On click: `togglePause()` → `doResume()` → fade-out loading screen (CSS transition, respects `prefers-reduced-motion`) → `handleFirstPlay()` which triggers narration and auto-advance for the first frame.
 
@@ -917,7 +917,7 @@ First paint         │ <2s (loading screen)
 First frame visible │ <4s (first image + audio metadata)
 Background preload  │ Deferred 4s after first frame
 Total images        │ ~2-5MB (12 WebP at 1536×824)
-Total masks         │ ~4MB worst case (26 PNG scene masks + 1 shared noise sprite) (ADR-007)
+Total masks         │ ~3.3MB (24 gray+alpha PNG scene masks + 1 noise sprite)
 Total audio         │ TBD (narration .m4a + end song .mp3)
 JS bundle (vendor)  │ ~150KB gzipped PixiJS v8 + tree-shaken pixi-filters (GlowFilter,
                     │ ShockwaveFilter) (ADR-007). Verify final size during profiling.
@@ -926,6 +926,19 @@ Transition          │ ~0.6-0.75s (half of transition duration, each direction)
 ```
 
 Progressive loading: first frame blocks, background assets load sequentially by scene, narration pre-buffered one scene ahead.
+
+### 15.1 Mobile LCP Analysis (2026-03-31)
+
+Mobile Lighthouse scores 0.86 under simulated Slow 4G + 4x CPU throttle (approved temporary target: 0.85). Desktop meets target at ≥0.90.
+
+**LCP element:** `.loading-title--main` ("Carbon Trace" text)
+**LCP breakdown:** TTFB 451ms (11%) → Render Delay 3,676ms (89%)
+
+Root cause: the initial JS module graph (~175KB uncompressed: GSAP 69KB, Howler 36KB, entry bundle 71KB) blocks the main thread under 4x CPU throttle, preventing the browser from painting the LCP text element. PixiJS is already deferred via dynamic `import()` and does not contribute to LCP.
+
+On viewports ≤480px, the `.loading-title` CSS animation uses a shortened delay (0.2s vs 1.2s desktop) and faster duration (0.8s vs 1.8s) to reduce mobile render delay.
+
+**Resolution path:** Defer GSAP and Howler behind dynamic `import()` in `app.js`, similar to the existing PixiJS lazy-load pattern. This is a moderate refactor — GSAP is used immediately for text timelines and Howler for audio cues, so the deferred imports must resolve before the first scene plays (after the user clicks "begin experience").
 
 ---
 

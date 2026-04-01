@@ -14,6 +14,9 @@ let ctx = null;
 let canvasEl = null;
 let observer = null;
 let currentImg = null;
+let cssWidth = 0;
+let cssHeight = 0;
+let lastDpr = 1;
 
 const imageCache = new Map();
 
@@ -22,9 +25,12 @@ function sizeCanvas() {
 
   const dpr = globalThis.devicePixelRatio || 1;
   const rect = canvasEl.getBoundingClientRect();
+  cssWidth = rect.width;
+  cssHeight = rect.height;
+  lastDpr = dpr;
 
-  canvasEl.width = rect.width * dpr;
-  canvasEl.height = rect.height * dpr;
+  canvasEl.width = cssWidth * dpr;
+  canvasEl.height = cssHeight * dpr;
 
   if (ctx) {
     ctx.resetTransform();
@@ -56,11 +62,20 @@ function coverFit(img, cw, ch) {
   return { sx, sy, sw, sh, dx: 0, dy: 0, dw: cw, dh: ch };
 }
 
+function cssSize() {
+  if (!canvasEl) return { w: 0, h: 0 };
+  const dpr = globalThis.devicePixelRatio || 1;
+  if (Math.abs(dpr - lastDpr) > 0.001) {
+    sizeCanvas();
+  }
+  return { w: cssWidth, h: cssHeight };
+}
+
 function drawCurrent() {
   if (!ctx || !canvasEl || !currentImg) return;
-  const rect = canvasEl.getBoundingClientRect();
-  const fit = coverFit(currentImg, rect.width, rect.height);
-  ctx.clearRect(0, 0, rect.width, rect.height);
+  const { w, h } = cssSize();
+  const fit = coverFit(currentImg, w, h);
+  ctx.clearRect(0, 0, w, h);
   ctx.drawImage(currentImg, fit.sx, fit.sy, fit.sw, fit.sh, fit.dx, fit.dy, fit.dw, fit.dh);
 }
 
@@ -101,16 +116,16 @@ export function drawImage(img) {
 export function clearScene() {
   currentImg = null;
   if (ctx && canvasEl) {
-    const rect = canvasEl.getBoundingClientRect();
-    ctx.clearRect(0, 0, rect.width, rect.height);
+    const { w, h } = cssSize();
+    ctx.clearRect(0, 0, w, h);
   }
 }
 
 export function drawFallback() {
   if (!ctx || !canvasEl) return;
-  const rect = canvasEl.getBoundingClientRect();
+  const { w, h } = cssSize();
   ctx.fillStyle = 'rgba(18, 18, 24, 0.92)';
-  ctx.fillRect(0, 0, rect.width, rect.height);
+  ctx.fillRect(0, 0, w, h);
 }
 
 export function destroySceneCanvas() {
@@ -121,6 +136,9 @@ export function destroySceneCanvas() {
   ctx = null;
   canvasEl = null;
   currentImg = null;
+  cssWidth = 0;
+  cssHeight = 0;
+  lastDpr = 1;
 }
 
 export function getSceneContext() {
