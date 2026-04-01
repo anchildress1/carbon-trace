@@ -85,6 +85,7 @@ vi.mock('pixi.js', () => ({
         frame: null,
         destroy: vi.fn(),
       })),
+      WHITE: { _isWhite: true, source: { style: {} }, destroy: vi.fn() },
     },
   ),
   TextureSource: {
@@ -517,6 +518,33 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
       const effectSprite = spriteInstances[0];
       expect(effectSprite.tint).toBe(0xffee33);
       expect(effectSprite.filters).toEqual([{ enabled: true }]);
+    });
+
+    it('godray regions use ray overlay rendering (black sprite, additive blend, masked)', async () => {
+      const canvas = createMockCanvas();
+      await init(canvas);
+
+      const { Sprite, Container, Texture } = await import('pixi.js');
+      Sprite.mockClear();
+      Container.mockClear();
+
+      await loadScene(
+        { regions: [{ type: 'godray', mask: 'godray.png', alpha: 0.25 }] },
+        'scene.png',
+      );
+
+      // Ray overlay mode: one Sprite from Texture.WHITE (effectSprite) +
+      // one Sprite for the mask. Both wrapped in a Container with additive blend.
+      const spriteInstances = Sprite.mock.instances;
+      const effectSprite = spriteInstances.find(s => s.texture === Texture.WHITE);
+      expect(effectSprite).toBeDefined();
+      expect(effectSprite.tint).toBe(0x000000);
+      expect(effectSprite.filters).toEqual([{ enabled: true }]);
+
+      const containerInstances = Container.mock.instances;
+      const container = containerInstances[containerInstances.length - 1];
+      expect(container.blendMode).toBe('add');
+      expect(container.setMask).toHaveBeenCalled();
     });
   });
 
