@@ -1151,7 +1151,20 @@
           }
         ]
       },
-      "effects": null,
+      "effects": {
+        "regions": [
+          {
+            "type": "godray",
+            "mask": "assets/masks/mask-07-missing-godray-a44fb620.png",
+            "angle": 25,
+            "gain": 0.3,
+            "lacunarity": 2.0,
+            "speed": 0.004,
+            "alpha": 0.25,
+            "parallel": true
+          }
+        ]
+      },
       "transition": {
         "type": "fade",
         "duration": 1200
@@ -1217,7 +1230,20 @@
           }
         ]
       },
-      "effects": null,
+      "effects": {
+        "regions": [
+          {
+            "type": "godray",
+            "mask": "assets/masks/mask-08-empty-godray-ca3c5183.png",
+            "angle": 35,
+            "gain": 0.4,
+            "lacunarity": 2.2,
+            "speed": 0.006,
+            "alpha": 0.4,
+            "parallel": true
+          }
+        ]
+      },
       "transition": {
         "type": "fade",
         "duration": 1200

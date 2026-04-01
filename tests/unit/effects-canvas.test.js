@@ -97,8 +97,8 @@ vi.mock('../../src/effects.js', () => ({
     filter: { enabled: true },
     update: vi.fn(),
   })),
-  noiseFreeTypes: new Set(['glow', 'shockwave']),
-  overlayTypes: new Set(['glow']),
+  noiseFreeTypes: new Set(['glow', 'godray', 'shockwave']),
+  overlayTypes: new Set(['glow', 'godray']),
 }));
 
 import {
