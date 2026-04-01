@@ -106,7 +106,7 @@ loadScene(effectsConfig, sceneImageUrl) → clearAll() + load scene texture (sha
 setAnalyser(analyserNode)              → store Web Audio AnalyserNode reference. Ticker reads FFT
                                          data each frame for regions with audioReactive config (ADR-008).
 clearAll()                             → destroy sprites/filters/textures via .destroy(false)
-                                         (retains TextureSources for deferred GC). Ticker stays running.
+                                         (frees GPU backing store). Ticker stays running.
 pause() / resume()                     → stop/start PixiJS ticker (WCAG 2.2.2).
                                          Only pause()/resume() control ticker lifecycle.
 ```
