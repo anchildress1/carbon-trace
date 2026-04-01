@@ -6,14 +6,14 @@ export function createLineElement(text, container, options = {}) {
   el.textContent = text;
 
   const { x, y } = options;
-
-  if (x !== undefined && x !== null && y !== undefined && y !== null) {
-    el.classList.add('narration-line--positioned');
-    el.style.position = 'absolute';
-    el.style.left = `${x}%`;
-    el.style.top = `${y}%`;
-    el.style.transform = 'translateY(-50%)';
+  if (typeof x !== 'number' || typeof y !== 'number') {
+    throw new TypeError('createLineElement requires numeric x and y positions');
   }
+  el.classList.add('narration-line--positioned');
+  el.style.position = 'absolute';
+  el.style.left = `${x}%`;
+  el.style.top = `${y}%`;
+  el.style.transform = 'translateY(-50%)';
 
   container.appendChild(el);
   return el;
@@ -35,6 +35,10 @@ export function buildNarrationTimeline(lines, container, opts = {}) {
   lines.forEach((line, i) => {
     if (typeof line.enter !== 'number' || typeof line.exit !== 'number') {
       console.error(`Narration line ${i} has invalid enter/exit timing:`, line);
+      return;
+    }
+    if (typeof line.x !== 'number' || typeof line.y !== 'number') {
+      console.error(`Narration line ${i} has invalid x/y positioning:`, line);
       return;
     }
 
