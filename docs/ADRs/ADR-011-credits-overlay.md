@@ -546,10 +546,12 @@ Nav back + return = restart?                      │ Yes
 
 ### 010.13.1 Validation Evidence (March 29, 2026)
 
-- Added `tests/perf/adr11-credits.spec.js` with:
+- Added split ADR-011 perf coverage with:
+  - `tests/perf/adr11-credits.webkit.spec.js`
+  - `tests/perf/adr11-credits.chromium.spec.js`
   - WebKit compositing check for credits mask/backdrop stack and controls interactivity
   - Pixel-class proxy FPS check on credits frame under full layer load
 - Added opt-in runtime command: `pnpm perf:runtime:adr11`
-- Latest run result: `2 passed, 4 skipped` (project-targeted skips are expected)
+- Latest run result: `2 passed, 0 skipped`
 
 **Note:** Physical Safari/Pixel hardware spot-checks are still useful before final release, but the ADR's previously unchecked regression targets now have automated coverage in repo.
