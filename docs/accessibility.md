@@ -94,7 +94,7 @@ flowchart TD
     A{prefers-reduced-motion?} -->|reduce| B[Simple fade animations]
     A -->|no-preference| C[Full ghost-drift + effects]
 
-    B --> D["Text: 0.3s opacity fade"]
+    B --> D["Text: 0.7s gentle opacity crossfade"]
     B --> E["Transitions: instant (no GSAP fade)"]
     B --> F["Effects: static (no displacement/animation, audioReactive ignored)"]
 
@@ -105,7 +105,7 @@ flowchart TD
 
 | Feature                   | Normal                                        | Reduced Motion                                                |
 | ------------------------- | --------------------------------------------- | ------------------------------------------------------------- |
-| Ghost-drift text          | Blur + y offset + opacity (1.2s in, 0.9s out) | Opacity only (0.3s)                                           |
+| Ghost-drift text          | Blur + y offset + opacity (1.2s in, 0.9s out) | Gentle opacity crossfade (0.7s in/out, eased)                 |
 | Scene transitions         | Two-phase GSAP fade                           | Instant swap                                                  |
 | Visual effects            | Full displacement + particle effects          | Static: no displacement, no animation (ADR-007)               |
 | Audio-reactive modulation | Effect parameters driven by music FFT data    | Ignored — base parameter values used, no modulation (ADR-008) |

@@ -837,7 +837,7 @@ runtime style attributes in `text.js` (per-line x/y coordinates).
 - DOM: `aria-live="polite"` narration region populated from caption text
 - Keyboard: Arrow ←/→ navigate, Space toggle pause, Escape pause, Enter advance, Tab to controls
 - Play/pause button satisfies WCAG 2.2.2 (Pause, Stop, Hide)
-- `prefers-reduced-motion`: ghost-drift → opacity fade, transitions → instant, effects static (no displacement/animation, audioReactive ignored — see ADR-007, ADR-008), loading animation disabled
+- `prefers-reduced-motion`: ghost-drift → gentle opacity crossfade (0.7s, eased), transitions → instant, effects static (no displacement/animation, audioReactive ignored — see ADR-007, ADR-008), loading animation disabled
 - All buttons: `aria-label`, `aria-pressed` where stateful, `aria-disabled` when inactive
 - Focus-visible outlines on all interactive elements
 - Captions available as alternative to audio narration

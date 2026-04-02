@@ -161,7 +161,7 @@ describe('text.js', () => {
 
       const fromToCall = tl.fromTo.mock.calls[0];
       expect(fromToCall[1]).toEqual({ opacity: 0 });
-      expect(fromToCall[2]).toMatchObject({ duration: 0.3, ease: 'none' });
+      expect(fromToCall[2]).toMatchObject({ duration: 0.7, ease: 'power1.out' });
     });
 
     it('uses ghost-drift styles when reduced motion is false', () => {
@@ -226,7 +226,7 @@ describe('text.js', () => {
       const { timeline: tl } = buildNarrationTimeline(withPositions(lines), container, { reducedMotion: true });
 
       const toCall = tl.to.mock.calls[0];
-      expect(toCall[1]).toMatchObject({ opacity: 0, duration: 0.3, ease: 'none' });
+      expect(toCall[1]).toMatchObject({ opacity: 0, duration: 0.7, ease: 'power1.in' });
     });
 
     it('uses ghost-drift exit animation with y offset and blur', () => {

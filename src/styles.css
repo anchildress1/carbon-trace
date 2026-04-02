@@ -647,7 +647,7 @@ body {
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .narration-line {
-    transition: opacity 0.3s ease;
+    transition: opacity 0.7s ease;
   }
 
   .caption-text {
