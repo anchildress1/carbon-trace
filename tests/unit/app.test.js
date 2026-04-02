@@ -485,6 +485,48 @@ describe('app.js', () => {
       }
     });
 
+    it('rejects when scenes.frames is not an array', () => {
+      const originalFrames = scenesData.frames;
+      scenesData.frames = null;
+
+      try {
+        expect(() => createApp()).toThrow(
+          'Invalid scenes config at frames: expected array, received null',
+        );
+      } finally {
+        scenesData.frames = originalFrames;
+      }
+    });
+
+    it('fails initialization when frame 0 declares deferred overlays', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const originalTraceOverlay = scenesData.frames[0].traceOverlay;
+      scenesData.frames[0].traceOverlay = {
+        mask: 'title-mask.png',
+        opacity: 0.2,
+        color: [232, 200, 120],
+        dotCount: 1,
+        dotSpeed: 0.5,
+      };
+
+      try {
+        app = createApp();
+        await flush();
+        expect(errorSpy).toHaveBeenCalledWith(
+          'Failed to initialize:',
+          expect.objectContaining({
+            message: expect.stringContaining('Frame 0 declares effects or traceOverlay'),
+          }),
+        );
+        expect(document.getElementById('loading-screen').textContent).toBe(
+          'Something went wrong. Please refresh.',
+        );
+      } finally {
+        scenesData.frames[0].traceOverlay = originalTraceOverlay;
+        errorSpy.mockRestore();
+      }
+    });
+
     it('transitions to PAUSED after image preload completes', async () => {
       app = createApp();
       await flush();
@@ -874,6 +916,58 @@ describe('app.js', () => {
       // scene-01 has an image key but load rejected — not cached
       // waitForImage catches rejection, showFrame draws fallback
       expect(drawFallback).toHaveBeenCalled();
+    });
+
+    it('warns when first frame image preload fails', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const originalImage = scenesData.frames[0].image;
+      scenesData.frames[0].image = 'title.webp';
+      loadImage.mockRejectedValueOnce(new Error('title fail'));
+
+      try {
+        app = createApp();
+        await flush();
+        expect(warnSpy).toHaveBeenCalledWith('First frame image preload failed:', 'title fail');
+      } finally {
+        scenesData.frames[0].image = originalImage;
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('warns when background image preload fails', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      loadImage.mockRejectedValue(new Error('background fail'));
+
+      app = createApp();
+      await flush();
+
+      vi.advanceTimersByTime(4000);
+      await flush();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Background image preload failed for'),
+        'background fail',
+      );
+      warnSpy.mockRestore();
+    });
+
+    it('uses fallback when cache contains a non-Image value', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      loadImage.mockResolvedValue(undefined);
+
+      app = createApp();
+      await flush();
+      app.togglePause();
+      vi.clearAllMocks();
+
+      app.advance();
+      await flush();
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Image cache invariant violated for scene-01.webp',
+      );
+      expect(drawFallback).toHaveBeenCalled();
+      errorSpy.mockRestore();
     });
   });
 

@@ -111,7 +111,11 @@ function frameState(frame) {
 const DEFAULT_MAX_NARRATION_MS = 60000;
 
 function applyFrameDefaults(scenesJson) {
-  return scenesJson.frames.map((frame) => ({ ...frame }));
+  if (!Array.isArray(scenesJson.frames)) {
+    failScenesConfig('frames', 'array', scenesJson.frames);
+  }
+  const defaults = scenesJson.meta.frameDefaults || {};
+  return scenesJson.frames.map((frame) => ({ ...defaults, ...frame }));
 }
 
 function failScenesConfig(path, expected, value) {
@@ -187,14 +191,12 @@ function computeProjectMaxCaptionMs(frames) {
 }
 
 function registerAudio(app, result) {
-  if (result?.src) {
-    app.availableAudio.add(result.src);
-    if (result.duration > 0) {
-      app.audioDurations.set(result.src, result.duration);
-    }
-    if (app.availableAudio.size === 1) {
-      app.els.btnMute.removeAttribute('aria-disabled');
-    }
+  app.availableAudio.add(result.src);
+  if (result.duration > 0) {
+    app.audioDurations.set(result.src, result.duration);
+  }
+  if (app.availableAudio.size === 1) {
+    app.els.btnMute.removeAttribute('aria-disabled');
   }
 }
 
@@ -460,8 +462,12 @@ function buildSceneIndexMap(frames) {
 function renderSceneImage(app, frame) {
   if (frame.image && app.imageCache.has(frame.image)) {
     const img = app.imageCache.get(frame.image);
-    if (img) drawSceneImage(img);
-    else drawFallback();
+    if (!(img instanceof Image)) {
+      console.error(`Image cache invariant violated for ${frame.image}`);
+      drawFallback();
+      return;
+    }
+    drawSceneImage(img);
   } else if (frame.image) {
     drawFallback();
   } else {

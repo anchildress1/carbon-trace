@@ -132,7 +132,7 @@ Full system design: `docs/carbon-trace-system-design.md` and `docs/ADRs/*.md`
 
 ## Test Standards
 
-- **Coverage thresholds**: 90% lines, 90% functions, 90% statements, 88% branches (enforced in vitest.config.js).
+- **Coverage thresholds**: 96% lines, 98% functions, 95% statements, 89% branches (enforced in vitest.config.js).
 - Every new module or utility must ship with positive, negative, and edge-case tests.
 - GSAP and Howler are mocked in unit tests; E2E tests exercise the real DOM.
 - Canvas context is mocked in unit tests via a `getContext('2d')` stub.

@@ -759,10 +759,21 @@ describe('audio.js — unified cue API (ADR-005)', () => {
   });
 
   describe('buffer monitoring', () => {
-    it('onNarrationBufferChange registers callback', () => {
-      const cb = vi.fn();
-      onNarrationBufferChange(cb);
+    it('onNarrationBufferChange replaces previous callback', () => {
+      const firstCb = vi.fn();
+      const secondCb = vi.fn();
 
+      onNarrationBufferChange(firstCb);
+      onNarrationBufferChange(secondCb);
+      scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn() });
+
+      const waitingCall = mockNode.addEventListener.mock.calls.find(
+        ([event]) => event === 'waiting',
+      );
+      expect(waitingCall).toBeDefined();
+      waitingCall[1]();
+      expect(firstCb).not.toHaveBeenCalled();
+      expect(secondCb).toHaveBeenCalledWith(true);
     });
 
     it('triggers buffer change on waiting event', () => {
