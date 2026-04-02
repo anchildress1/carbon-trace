@@ -767,7 +767,13 @@ function doClickJump(app, toIndex, toFrame, prevFrame) {
     app.state = frameState(prevFrame);
     return;
   }
-  startFramePlayback(app, toFrame);
+  if (app.pendingPause) {
+    app.pendingPause = false;
+    app.deferFrameAudioUntilResume = true;
+    doPause(app);
+  } else {
+    startFramePlayback(app, toFrame);
+  }
   manageFocusAfterTransition(app);
   completePendingNav(app);
 }
@@ -923,6 +929,11 @@ function updateNavButtons(app) {
 
 function handleFirstPlay(app) {
   app.firstPlayCompleted = true;
+  // Loading-screen click handler doesn't set userHasInteracted (it
+  // stopPropagates before the sceneStage handler). Set it here so
+  // prebufferNextScene's preloadNarrationAhead gate is satisfied on
+  // the very first auto-advance.
+  app.userHasInteracted = true;
   // If the user navigated from the loading screen before first play, a hard
   // jump may have set deferFrameAudioUntilResume=true. First play must clear
   // that latch so audio/timeline start from one boundary.

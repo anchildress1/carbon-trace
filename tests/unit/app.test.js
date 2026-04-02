@@ -739,6 +739,8 @@ describe('app.js', () => {
       expect(callOrder).toEqual(['schedule', 'play']);
       expect(app.getState()).toBe('SCENE_ACTIVE');
     });
+
+
   });
 
   // ── pendingPause ───────────────────────────────────────────────────
