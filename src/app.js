@@ -106,8 +106,7 @@ function frameState(frame) {
 const DEFAULT_MAX_NARRATION_MS = 60000;
 
 function applyFrameDefaults(scenesJson) {
-  const defaults = scenesJson.meta.frameDefaults || {};
-  return scenesJson.frames.map((frame) => ({ ...defaults, ...frame }));
+  return scenesJson.frames.map((frame) => ({ ...frame }));
 }
 
 function failScenesConfig(path, expected, value) {
@@ -1105,7 +1104,7 @@ function initApp(app) {
         ]).catch((err) => console.error('Background asset preload failed:', err));
       }, 4000);
 
-      app.cleanupKeyboard = initKeyboard((action) => {
+      initKeyboard((action) => {
         app.userHasInteracted = true;
         switch (action) {
           case 'togglePause':
@@ -1222,6 +1221,7 @@ export function createApp() {
     generation: 0,
     deferFrameAudioUntilResume: false,
     pendingPause: false,
+    lastNavSource: null,
     buffering: false,
     effectsReady: null,
     shimmerReady: null,
@@ -1238,7 +1238,6 @@ export function createApp() {
       narrationLayer: document.getElementById('narration-layer'),
       captionLayer: document.getElementById('caption-layer'),
       accessibleNarration: document.getElementById('accessible-narration'),
-      controls: document.getElementById('overlay-controls'),
       btnPrev: document.getElementById('btn-prev'),
       btnNext: document.getElementById('btn-next'),
       btnReplay: document.getElementById('btn-replay'),
