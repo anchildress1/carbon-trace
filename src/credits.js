@@ -20,6 +20,7 @@ let touchstartHandler = null;
 let touchmoveHandler = null;
 let touchendHandler = null;
 let lastTouchY = null;
+let pointermoveHandler = null;
 let pointeroverHandler = null;
 let pointeroutHandler = null;
 let focusinHandler = null;
@@ -183,6 +184,15 @@ function attachScrollListeners(panelEl, scrollContentEl, config) {
     }
   };
 
+  // Pause scroll while the pointer is actively moving inside the panel so
+  // content is stationary for reading. Resume after an idle delay.
+  // Link hover (pointerover/pointerout below) locks pause independently.
+  pointermoveHandler = () => {
+    if (!scrollTimeline || hoveredLink) return;
+    scrollTimeline.pause();
+    scheduleScrollResume(config.resumeDelay);
+  };
+
   pointeroverHandler = (e) => {
     if (!e.target.closest('a, button')) return;
     hoveredLink = true;
@@ -206,6 +216,7 @@ function attachScrollListeners(panelEl, scrollContentEl, config) {
   panelEl.addEventListener('touchcancel', touchendHandler);
   panelEl.addEventListener('focusin', focusinHandler);
   panelEl.addEventListener('focusout', focusoutHandler);
+  panelEl.addEventListener('pointermove', pointermoveHandler);
   panelEl.addEventListener('pointerover', pointeroverHandler);
   panelEl.addEventListener('pointerout', pointeroutHandler);
 }
@@ -246,6 +257,10 @@ function removeScrollListeners(panelEl) {
   if (focusoutHandler) {
     panelEl.removeEventListener('focusout', focusoutHandler);
     focusoutHandler = null;
+  }
+  if (pointermoveHandler) {
+    panelEl.removeEventListener('pointermove', pointermoveHandler);
+    pointermoveHandler = null;
   }
   if (pointeroverHandler) {
     panelEl.removeEventListener('pointerover', pointeroverHandler);
