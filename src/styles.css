@@ -225,6 +225,7 @@ body {
   justify-content: center;
   background: radial-gradient(ellipse at 50% 40%, #1a1816, #12100e);
   contain: strict;
+  cursor: pointer;
 }
 
 .scene-canvas {

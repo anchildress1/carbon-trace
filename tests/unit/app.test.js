@@ -906,6 +906,36 @@ describe('app.js', () => {
     });
   });
 
+  // ── scene stage click ──────────────────────────────────────────────
+
+  describe('scene stage click', () => {
+    beforeEach(async () => {
+      app = createApp();
+      await flush();
+    });
+
+    it('toggles pause when clicking the scene stage', () => {
+      const stage = document.getElementById('scene-stage');
+      expect(app.getState()).toBe('PAUSED');
+      stage.click();
+      expect(app.getState()).toBe('SCENE_ACTIVE');
+      stage.click();
+      expect(app.getState()).toBe('PAUSED');
+    });
+
+    it('does not toggle pause when clicking inside credits-panel', () => {
+      const creditsPanel = document.getElementById('credits-panel');
+      creditsPanel.hidden = false;
+      const inner = document.createElement('div');
+      creditsPanel.appendChild(inner);
+
+      expect(app.getState()).toBe('PAUSED');
+      inner.click();
+      expect(app.getState()).toBe('PAUSED');
+    });
+
+  });
+
   // ── cleanup ────────────────────────────────────────────────────────
 
   describe('cleanup', () => {

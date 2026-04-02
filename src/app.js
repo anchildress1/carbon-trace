@@ -1155,6 +1155,11 @@ function initApp(app) {
         e.stopPropagation();
         togglePause(app);
       });
+      app.els.sceneStage.addEventListener('click', (e) => {
+        if (e.target.closest('#credits-panel')) return;
+        app.userHasInteracted = true;
+        togglePause(app);
+      });
     })
     .catch((err) => {
       console.error('Failed to initialize:', err);
