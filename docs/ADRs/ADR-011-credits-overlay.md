@@ -117,14 +117,15 @@ Credits panel sits inside `#scene-stage`. `overlay-controls` is a **sibling** of
 #credits-panel {
   position: absolute;
   inset: 8% 12%;
-  overflow: hidden; /* GSAP translateY drives scroll */
+  overflow: clip; /* stronger than hidden — prevents GSAP-transformed children escaping */
+  contain: paint; /* reinforces clip boundary across compositing layers */
   opacity: 0; /* GSAP fade-in after narration */
-  mask-image: linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, black 8%, black 97%, transparent 100%);
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent 0%,
-    black 10%,
-    black 90%,
+    black 8%,
+    black 97%,
     transparent 100%
   );
   z-index: 7;
