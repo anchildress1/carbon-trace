@@ -567,6 +567,23 @@ describe('credits.js', () => {
       expect(scrollTl.play).toHaveBeenCalled();
     });
 
+    it('ignores pointerout when moving within the panel', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      const scrollTl = gsapMockState.lastTimeline;
+
+      panel.dispatchEvent(new Event('pointerover', { bubbles: true }));
+      scrollTl.play.mockClear();
+
+      // Pointer moves to another element inside the panel — should NOT resume
+      const innerTarget = scrollContent.querySelector('.credits-text');
+      const pointeroutEvent = new Event('pointerout', { bubbles: true });
+      Object.defineProperty(pointeroutEvent, 'relatedTarget', { value: innerTarget });
+      panel.dispatchEvent(pointeroutEvent);
+
+      vi.advanceTimersByTime(5000);
+      expect(scrollTl.play).not.toHaveBeenCalled();
+    });
+
     it('does not resume while both focus and hover are active', () => {
       revealCreditsPanel(panel, scrollContent, defaultConfig);
       const scrollTl = gsapMockState.lastTimeline;
@@ -599,7 +616,7 @@ describe('credits.js', () => {
       expect(scrollTl.pause).not.toHaveBeenCalled();
     });
 
-    it('ignores pointerover on non-interactive elements', () => {
+    it('pauses scroll on pointerover anywhere in panel', () => {
       revealCreditsPanel(panel, scrollContent, defaultConfig);
       const scrollTl = gsapMockState.lastTimeline;
       scrollTl.pause.mockClear();
@@ -607,7 +624,7 @@ describe('credits.js', () => {
       const textEl = scrollContent.querySelector('.credits-text');
       textEl.dispatchEvent(new Event('pointerover', { bubbles: true }));
 
-      expect(scrollTl.pause).not.toHaveBeenCalled();
+      expect(scrollTl.pause).toHaveBeenCalled();
     });
   });
 

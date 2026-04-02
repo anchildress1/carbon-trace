@@ -183,21 +183,22 @@ function attachScrollListeners(panelEl, scrollContentEl, config) {
     }
   };
 
-  pointeroverHandler = (e) => {
-    if (e.target.closest('a, button')) {
-      hoveredLink = true;
-      scrollTimeline?.pause();
-      scrollResumeTimer?.cancel();
-      scrollResumeTimer = null;
-    }
+  // Pause scroll when the pointer enters the panel area — not just when
+  // hovering a specific link. This ensures content is stationary so links
+  // are reliably clickable while GSAP scrolls the content.
+  pointeroverHandler = () => {
+    hoveredLink = true;
+    scrollTimeline?.pause();
+    scrollResumeTimer?.cancel();
+    scrollResumeTimer = null;
   };
 
   pointeroutHandler = (e) => {
-    if (e.target.closest('a, button')) {
-      hoveredLink = false;
-      if (!focusedLink) {
-        scheduleScrollResume(config.resumeDelay);
-      }
+    // Only resume when the pointer fully leaves the panel
+    if (e.relatedTarget && panelEl.contains(e.relatedTarget)) return;
+    hoveredLink = false;
+    if (!focusedLink) {
+      scheduleScrollResume(config.resumeDelay);
     }
   };
 
