@@ -65,8 +65,7 @@ describe('loader.js', () => {
       expect(result).toEqual({ src: 'nan.m4a', duration: 0 });
     });
 
-    it('resolves with { src: null, duration: 0 } on audio error', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    it('rejects on audio error', async () => {
       globalThis.Audio = class MockAudio {
         set preload(_v) {}
         set src(v) {
@@ -78,22 +77,15 @@ describe('loader.js', () => {
 
       const p = preloadAudio('bad.m4a');
       vi.advanceTimersByTime(1);
-      const result = await p;
-
-      expect(result).toEqual({ src: null, duration: 0 });
-      expect(warnSpy).toHaveBeenCalledWith('Failed to preload audio: bad.m4a');
-      warnSpy.mockRestore();
+      await expect(p).rejects.toThrow('Failed to preload audio: bad.m4a');
     });
 
-    it('resolves with { src: null, duration: 0 } on timeout', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    it('rejects on timeout', async () => {
       const p = preloadAudio('slow.m4a');
 
       vi.advanceTimersByTime(5000);
 
-      const result = await p;
-      expect(result).toEqual({ src: null, duration: 0 });
-      warnSpy.mockRestore();
+      await expect(p).rejects.toThrow('Audio preload timed out: slow.m4a');
     });
 
     it('cleans up handlers and src on timeout', async () => {
@@ -104,11 +96,10 @@ describe('loader.js', () => {
         set src(v) { this._src = v; }
         get src() { return this._src; }
       };
-      vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       const p = preloadAudio('stall.m4a');
       vi.advanceTimersByTime(5000);
-      await p;
+      await expect(p).rejects.toThrow();
 
       expect(audioInstance.onloadedmetadata).toBeNull();
       expect(audioInstance.onerror).toBeNull();
@@ -237,8 +228,8 @@ describe('loader.js', () => {
   });
 
   describe('preloadFirstFrameAudio — error handling', () => {
-    it('reports timeout fallback when metadata never loads', async () => {
-      vi.spyOn(console, 'warn').mockImplementation(() => {});
+    it('logs warning and skips onLoaded when metadata never loads', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const origAudio = globalThis.Audio;
       globalThis.Audio = class MockAudio {
         set preload(_v) {}
@@ -254,12 +245,32 @@ describe('loader.js', () => {
       vi.advanceTimersByTime(5000);
       await vi.runAllTimersAsync();
 
-      expect(onLoaded).toHaveBeenCalledWith({ src: null, duration: 0 });
+      expect(onLoaded).not.toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith('Audio preload timed out: fail.m4a');
       globalThis.Audio = origAudio;
     });
   });
 
   describe('preloadBackgroundAudio', () => {
+    let originalAudio;
+
+    beforeEach(() => {
+      originalAudio = globalThis.Audio;
+      globalThis.Audio = class MockAudio {
+        duration = 5;
+        set preload(_v) {}
+        set src(v) {
+          this._src = v;
+          setTimeout(() => this.onloadedmetadata?.(), 0);
+        }
+        get src() { return this._src; }
+      };
+    });
+
+    afterEach(() => {
+      globalThis.Audio = originalAudio;
+    });
+
     it('skips first frame audio sources to avoid duplicates', async () => {
       const onLoaded = vi.fn();
       const frames = [
@@ -268,7 +279,7 @@ describe('loader.js', () => {
       ];
 
       const p = preloadBackgroundAudio(frames, onLoaded);
-      vi.advanceTimersByTime(5000);
+      vi.advanceTimersByTime(1);
       await vi.runAllTimersAsync();
       await p;
 
@@ -283,7 +294,7 @@ describe('loader.js', () => {
       ];
 
       const p = preloadBackgroundAudio(frames, onLoaded);
-      vi.advanceTimersByTime(5000);
+      vi.advanceTimersByTime(1);
       await vi.runAllTimersAsync();
       await p;
 
