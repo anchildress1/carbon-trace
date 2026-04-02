@@ -114,7 +114,7 @@ vi.mock('../../src/canvas.js', () => ({
   drawImage: vi.fn(),
   clearScene: vi.fn(),
   drawFallback: vi.fn(),
-  loadImage: vi.fn().mockResolvedValue(null),
+  loadImage: vi.fn().mockRejectedValue(new Error('no image')),
   getImageCache: vi.fn(() => new Map()),
 }));
 
@@ -482,6 +482,48 @@ describe('app.js', () => {
         );
       } finally {
         scenesData.frames[0].narration = originalNarration;
+      }
+    });
+
+    it('rejects when scenes.frames is not an array', () => {
+      const originalFrames = scenesData.frames;
+      scenesData.frames = null;
+
+      try {
+        expect(() => createApp()).toThrow(
+          'Invalid scenes config at frames: expected array, received null',
+        );
+      } finally {
+        scenesData.frames = originalFrames;
+      }
+    });
+
+    it('fails initialization when frame 0 declares deferred overlays', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const originalTraceOverlay = scenesData.frames[0].traceOverlay;
+      scenesData.frames[0].traceOverlay = {
+        mask: 'title-mask.png',
+        opacity: 0.2,
+        color: [232, 200, 120],
+        dotCount: 1,
+        dotSpeed: 0.5,
+      };
+
+      try {
+        app = createApp();
+        await flush();
+        expect(errorSpy).toHaveBeenCalledWith(
+          'Failed to initialize:',
+          expect.objectContaining({
+            message: expect.stringContaining('Frame 0 declares effects or traceOverlay'),
+          }),
+        );
+        expect(document.getElementById('loading-screen').textContent).toBe(
+          'Something went wrong. Please refresh.',
+        );
+      } finally {
+        scenesData.frames[0].traceOverlay = originalTraceOverlay;
+        errorSpy.mockRestore();
       }
     });
 
@@ -853,7 +895,7 @@ describe('app.js', () => {
 
   describe('error handling', () => {
     it('draws fallback when image fails to load for a scene with image', async () => {
-      loadImage.mockResolvedValue(null);
+      loadImage.mockRejectedValue(new Error('no image'));
       app = createApp();
       await flush();
       expect(app.getState()).toBe('PAUSED');
@@ -861,9 +903,9 @@ describe('app.js', () => {
       expect(clearScene).toHaveBeenCalled();
     });
 
-    it('draws fallback when image load resolves null', async () => {
+    it('draws fallback when image load rejects', async () => {
       // All image loads fail
-      loadImage.mockResolvedValue(null);
+      loadImage.mockRejectedValue(new Error('no image'));
       app = createApp();
       await flush();
       app.togglePause();
@@ -871,9 +913,61 @@ describe('app.js', () => {
       vi.clearAllMocks();
       app.advance();
       await flush();
-      // scene-01 has an image key but load failed (null in cache)
-      // waitForImage stores null, showFrame draws fallback
+      // scene-01 has an image key but load rejected — not cached
+      // waitForImage catches rejection, showFrame draws fallback
       expect(drawFallback).toHaveBeenCalled();
+    });
+
+    it('warns when first frame image preload fails', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const originalImage = scenesData.frames[0].image;
+      scenesData.frames[0].image = 'title.webp';
+      loadImage.mockRejectedValueOnce(new Error('title fail'));
+
+      try {
+        app = createApp();
+        await flush();
+        expect(warnSpy).toHaveBeenCalledWith('First frame image preload failed:', expect.any(Error));
+      } finally {
+        scenesData.frames[0].image = originalImage;
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('warns when background image preload fails', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      loadImage.mockRejectedValue(new Error('background fail'));
+
+      app = createApp();
+      await flush();
+
+      vi.advanceTimersByTime(4000);
+      await flush();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Background image preload failed for'),
+        expect.any(Error),
+      );
+      warnSpy.mockRestore();
+    });
+
+    it('uses fallback when cache contains a non-Image value', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      loadImage.mockResolvedValue(undefined);
+
+      app = createApp();
+      await flush();
+      app.togglePause();
+      vi.clearAllMocks();
+
+      app.advance();
+      await flush();
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Image cache invariant violated for scene-01.webp',
+      );
+      expect(drawFallback).toHaveBeenCalled();
+      errorSpy.mockRestore();
     });
   });
 
@@ -904,6 +998,36 @@ describe('app.js', () => {
       document.getElementById('loading-screen').click();
       expect(btn.disabled).toBe(false);
     });
+  });
+
+  // ── scene stage click ──────────────────────────────────────────────
+
+  describe('scene stage click', () => {
+    beforeEach(async () => {
+      app = createApp();
+      await flush();
+    });
+
+    it('toggles pause when clicking the scene stage', () => {
+      const stage = document.getElementById('scene-stage');
+      expect(app.getState()).toBe('PAUSED');
+      stage.click();
+      expect(app.getState()).toBe('SCENE_ACTIVE');
+      stage.click();
+      expect(app.getState()).toBe('PAUSED');
+    });
+
+    it('does not toggle pause when clicking inside credits-panel', () => {
+      const creditsPanel = document.getElementById('credits-panel');
+      creditsPanel.hidden = false;
+      const inner = document.createElement('div');
+      creditsPanel.appendChild(inner);
+
+      expect(app.getState()).toBe('PAUSED');
+      inner.click();
+      expect(app.getState()).toBe('PAUSED');
+    });
+
   });
 
   // ── cleanup ────────────────────────────────────────────────────────
@@ -1174,6 +1298,21 @@ describe('app.js', () => {
       expect(scheduleAudioCues).toHaveBeenCalled();
       expect(resumeAudioCues).not.toHaveBeenCalled();
     });
+
+    it('catches and logs error when showFrame throws during replay', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const { clearNarrationLayer: clearNarMock } = await import('../../src/text.js');
+      clearNarMock.mockImplementationOnce(() => {
+        throw new Error('replay boom');
+      });
+
+      document.getElementById('btn-replay').click();
+
+      expect(errorSpy).toHaveBeenCalledWith('Error during replay:', expect.any(Error));
+      // State should be restored to SCENE_ACTIVE (the frame's state)
+      expect(app.getState()).toBe('SCENE_ACTIVE');
+      errorSpy.mockRestore();
+    });
   });
 
   // ── captions toggle ────────────────────────────────────────────────
@@ -1323,7 +1462,7 @@ describe('app.js', () => {
         removeEventListener: vi.fn(),
       });
       // Prevent first-frame image from being cached during init.
-      loadImage.mockResolvedValue(null);
+      loadImage.mockRejectedValue(new Error('no image'));
       app = createApp();
       await flush();
 
@@ -1374,7 +1513,7 @@ describe('app.js', () => {
   describe('waitForImage', () => {
     it('shows spinner when image takes long to load', async () => {
       // Prevent images from caching during init
-      loadImage.mockResolvedValue(null);
+      loadImage.mockRejectedValue(new Error('no image'));
       app = createApp();
       await flush();
 
@@ -1399,7 +1538,7 @@ describe('app.js', () => {
 
   describe('non-blocking instant-cut navigation', () => {
     it('hard-jump completes synchronously without waiting for image', async () => {
-      loadImage.mockResolvedValue(null);
+      loadImage.mockRejectedValue(new Error('no image'));
       app = createApp();
       await flush();
 
@@ -1427,7 +1566,7 @@ describe('app.js', () => {
         dotClickCb = cb;
       });
 
-      loadImage.mockResolvedValue(null);
+      loadImage.mockRejectedValue(new Error('no image'));
       app = createApp();
       await flush();
 
@@ -1447,7 +1586,7 @@ describe('app.js', () => {
     });
 
     it('scheduleImageArrival redraws scene when image arrives on same frame', async () => {
-      loadImage.mockResolvedValue(null);
+      loadImage.mockRejectedValue(new Error('no image'));
       app = createApp();
       await flush();
 
@@ -1471,7 +1610,7 @@ describe('app.js', () => {
     });
 
     it('scheduleImageArrival skips redraw when user navigated away', async () => {
-      loadImage.mockResolvedValue(null);
+      loadImage.mockRejectedValue(new Error('no image'));
       app = createApp();
       await flush();
 
@@ -1489,7 +1628,7 @@ describe('app.js', () => {
       expect(drawFallback).toHaveBeenCalled();
 
       // Navigate away before image arrives
-      loadImage.mockResolvedValue(null);
+      loadImage.mockRejectedValue(new Error('no image'));
       app.advance(); // hard-jump: scene-01 → scene-02
       vi.clearAllMocks();
 
@@ -2574,7 +2713,7 @@ describe('app.js', () => {
 
       expect(errorSpy).toHaveBeenCalledWith(
         'Effects load failed:',
-        'WebGL context lost',
+        expect.objectContaining({ message: 'WebGL context lost' }),
       );
       errorSpy.mockRestore();
     });
@@ -2618,24 +2757,24 @@ describe('app.js', () => {
 
       expect(errorSpy).toHaveBeenCalledWith(
         'Effects canvas init failed:',
-        'WebGL unavailable',
+        expect.any(Error),
       );
       errorSpy.mockRestore();
     });
   });
 
-  // ── fallback: renderSceneImage when cache has null ──────────────────
+  // ── fallback: renderSceneImage when image load fails ────────────────
 
   describe('fallback: renderSceneImage edge cases', () => {
-    it('draws fallback when image cache entry is falsy', async () => {
-      loadImage.mockResolvedValue(null);
+    it('draws fallback when image load rejects', async () => {
+      loadImage.mockRejectedValue(new Error('no image'));
       app = createApp();
       await flush();
       app.togglePause();
       app.advance(); // to scene-01
       await flush();
 
-      // scene-01 has image key, waitForImage stores null → drawFallback
+      // scene-01 has image key, load rejected — not in cache → drawFallback
       expect(drawFallback).toHaveBeenCalled();
     });
   });
@@ -2794,6 +2933,33 @@ describe('app.js', () => {
     });
   });
 
+  // ── error: doClickJump showFrame throws ─────────────────────────────
+
+  describe('error: click-jump showFrame throws', () => {
+    it('reverts state on showFrame error during click-based transition', async () => {
+      const { clearNarrationLayer: clearNarMock } = await import('../../src/text.js');
+
+      app = createApp();
+      await flush();
+      app.togglePause(); // resume → SCENE_ACTIVE
+
+      // Make showFrame throw synchronously via clearNarrationLayer
+      clearNarMock.mockImplementationOnce(() => { throw new Error('DOM error'); });
+
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      // Click btn-next while playing — sets lastNavSource='click', triggers doClickJump
+      document.getElementById('btn-next').click();
+      await flush();
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Error during scene transition:',
+        expect.any(Error),
+      );
+      errorSpy.mockRestore();
+    });
+  });
+
   // ── error: unhandled error in transition onComplete ──────────────────
 
   describe('error: unhandled error in transition fadeIn', () => {
@@ -2828,7 +2994,44 @@ describe('app.js', () => {
       // The effectsReady.catch in showFrame should have caught the error
       expect(errorSpy).toHaveBeenCalledWith(
         'Effects load failed:',
-        'GPU crash',
+        expect.objectContaining({ message: 'GPU crash' }),
+      );
+      errorSpy.mockRestore();
+    });
+  });
+
+  // ── error: fadeIn catch during animated transition ─────────────────
+
+  describe('error: fadeIn gsap.to throws during animated transition', () => {
+    it('catches error in fadeIn and still lands on frame', async () => {
+      const { gsap } = await import('gsap');
+      let toCallCount = 0;
+      const onCompletes = [];
+      gsap.to.mockImplementation((_target, opts) => {
+        toCallCount++;
+        if (toCallCount >= 2) {
+          // Second gsap.to call is the fade-in — throw to trigger fadeIn catch
+          throw new Error('GPU context lost');
+        }
+        onCompletes.push(opts.onComplete);
+        return { kill: vi.fn() };
+      });
+
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      app = createApp();
+      await flush();
+      app.togglePause(); // resume → SCENE_ACTIVE
+
+      app.advance(); // starts fade-out transition
+
+      // Fire fade-out onComplete → triggers async fadeIn → gsap.to throws
+      if (onCompletes[0]) onCompletes[0]();
+      await flush();
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Unhandled error in transition onComplete:',
+        expect.any(Error),
       );
       errorSpy.mockRestore();
     });
@@ -2926,7 +3129,7 @@ describe('app.js', () => {
   describe('reduced motion transition with uncached image', () => {
     it('waits for image before showing frame under reduced motion', async () => {
       globalThis.matchMedia.mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() });
-      loadImage.mockResolvedValue(null);
+      loadImage.mockRejectedValue(new Error('no image'));
 
       app = createApp();
       await flush();
@@ -3454,7 +3657,7 @@ describe('app.js', () => {
 
       expect(consoleSpy).toHaveBeenCalledWith(
         'Shimmer init failed:',
-        'shimmer: init() requires an HTMLCanvasElement',
+        expect.any(Error),
       );
       // App continues to function despite shimmer init failure
       expect(app.getState()).toBeTruthy();
@@ -3462,15 +3665,20 @@ describe('app.js', () => {
     });
 
     it('recovers gracefully when loadShimmerScene rejects', async () => {
-      loadShimmerScene.mockRejectedValueOnce(new Error('mask load failed'));
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       app = createApp();
       await flush();
       app.togglePause();
+
+      // Set rejection AFTER createApp has consumed frame-0's loadShimmerScene(null).
+      // The next advance() goes to scene-01 (which has traceOverlay), hitting the
+      // .catch() on line 597-599 of app.js.
+      loadShimmerScene.mockRejectedValueOnce(new Error('mask load failed'));
       app.advance(); // to scene-01 with traceOverlay
       await flush();
 
+      expect(consoleSpy).toHaveBeenCalledWith('Shimmer load failed:', expect.any(Error));
       // App should not crash — state remains SCENE_ACTIVE
       expect(app.getState()).toBe('SCENE_ACTIVE');
       consoleSpy.mockRestore();

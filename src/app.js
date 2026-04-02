@@ -53,7 +53,12 @@ import {
 let effectsLoaded = null;
 let effectsMod = null;
 function startEffectsLoad() {
-  effectsLoaded ??= import('./effects-canvas.js');
+  if (!effectsLoaded) {
+    effectsLoaded = import('./effects-canvas.js').catch((err) => {
+      effectsLoaded = null;
+      throw err;
+    });
+  }
 }
 async function initEffectsCanvas(el) {
   startEffectsLoad();
@@ -106,6 +111,9 @@ function frameState(frame) {
 const DEFAULT_MAX_NARRATION_MS = 60000;
 
 function applyFrameDefaults(scenesJson) {
+  if (!Array.isArray(scenesJson.frames)) {
+    failScenesConfig('frames', 'array', scenesJson.frames);
+  }
   const defaults = scenesJson.meta.frameDefaults || {};
   return scenesJson.frames.map((frame) => ({ ...defaults, ...frame }));
 }
@@ -183,29 +191,35 @@ function computeProjectMaxCaptionMs(frames) {
 }
 
 function registerAudio(app, result) {
-  if (result?.src) {
-    app.availableAudio.add(result.src);
-    if (result.duration > 0) {
-      app.audioDurations.set(result.src, result.duration);
-    }
-    if (app.availableAudio.size === 1) {
-      app.els.btnMute.removeAttribute('aria-disabled');
-    }
+  app.availableAudio.add(result.src);
+  if (result.duration > 0) {
+    app.audioDurations.set(result.src, result.duration);
+  }
+  if (app.availableAudio.size === 1) {
+    app.els.btnMute.removeAttribute('aria-disabled');
   }
 }
 
 async function preloadFirstFrameImage(app) {
   const firstFrame = app.frames[0];
   if (!firstFrame?.image) return;
-  const img = await loadImage(firstFrame.image);
-  if (img) app.imageCache.set(firstFrame.image, img);
+  try {
+    const img = await loadImage(firstFrame.image);
+    app.imageCache.set(firstFrame.image, img);
+  } catch (err) {
+    console.warn('First frame image preload failed:', err);
+  }
 }
 
 async function preloadBackgroundImages(app) {
   for (const frame of app.frames.slice(1)) {
     if (frame.image && !app.imageCache.has(frame.image)) {
-      const img = await loadImage(frame.image);
-      if (img) app.imageCache.set(frame.image, img);
+      try {
+        const img = await loadImage(frame.image);
+        app.imageCache.set(frame.image, img);
+      } catch (err) {
+        console.warn(`Background image preload failed for ${frame.image}:`, err);
+      }
     }
   }
 }
@@ -448,8 +462,12 @@ function buildSceneIndexMap(frames) {
 function renderSceneImage(app, frame) {
   if (frame.image && app.imageCache.has(frame.image)) {
     const img = app.imageCache.get(frame.image);
-    if (img) drawSceneImage(img);
-    else drawFallback();
+    if (!(img instanceof Image)) {
+      console.error(`Image cache invariant violated for ${frame.image}`);
+      drawFallback();
+      return;
+    }
+    drawSceneImage(img);
   } else if (frame.image) {
     drawFallback();
   } else {
@@ -466,12 +484,15 @@ function renderSceneImage(app, frame) {
 function scheduleImageArrival(app, frame, index) {
   if (!frame.image || app.imageCache.has(frame.image)) return;
   const arrivalGeneration = app.generation;
-  loadImage(frame.image).then((img) => {
-    if (!img) return;
-    app.imageCache.set(frame.image, img);
-    if (app.generation !== arrivalGeneration || app.currentIndex !== index) return;
-    drawSceneImage(img);
-  });
+  loadImage(frame.image)
+    .then((img) => {
+      app.imageCache.set(frame.image, img);
+      if (app.generation !== arrivalGeneration || app.currentIndex !== index) return;
+      drawSceneImage(img);
+    })
+    .catch((err) => {
+      console.warn(`Late image arrival failed for frame ${index}:`, err);
+    });
 }
 
 function prebufferNextScene(app, index) {
@@ -486,9 +507,13 @@ function prebufferNextScene(app, index) {
   trimNarrationCache([currentNarrationCue?.src, nextNarrationCue?.src]);
 
   if (nextFrame?.image && !app.imageCache.has(nextFrame.image)) {
-    loadImage(nextFrame.image).then((img) => {
-      if (img) app.imageCache.set(nextFrame.image, img);
-    });
+    loadImage(nextFrame.image)
+      .then((img) => {
+        app.imageCache.set(nextFrame.image, img);
+      })
+      .catch((err) => {
+        console.warn(`Next-scene image prebuffer failed for ${nextFrame.image}:`, err);
+      });
   }
   // Only preload narration via Howler after user interaction — Howler's
   // HTML5 Audio pool is empty until the browser unlocks audio on first
@@ -559,7 +584,7 @@ function showFrame(app, index) {
           if (analyser) setEffectsAnalyser(analyser);
         }
       })
-      .catch((err) => console.error('Effects load failed:', err.message));
+      .catch((err) => console.error('Effects load failed:', err));
   } else {
     cancelPendingLoad();
     clearEffects();
@@ -641,7 +666,10 @@ function waitForImage(app, src) {
 
     loadImage(src)
       .then((img) => {
-        if (img) app.imageCache.set(src, img);
+        app.imageCache.set(src, img);
+      })
+      .catch((err) => {
+        console.warn(`Image load failed during transition: ${src}`, err);
       })
       .finally(() => {
         clearTimeout(spinnerTimer);
@@ -1001,16 +1029,21 @@ function replayNarration(app) {
   // showFrame reloads effects, rebuilds text, and schedules all audio fresh.
   cleanupCurrentScene(app);
 
-  if (app.paused) {
-    app.deferFrameAudioUntilResume = true;
-    showFrame(app, app.currentIndex);
-    const frame = app.frames[app.currentIndex];
-    app.state = frameState(frame);
-    doPause(app);
-  } else {
-    showFrame(app, app.currentIndex);
-    if (app.textTimeline) app.textTimeline.play(0);
-    setupAutoAdvance(app);
+  const prevFrame = app.frames[app.currentIndex];
+  try {
+    if (app.paused) {
+      app.deferFrameAudioUntilResume = true;
+      showFrame(app, app.currentIndex);
+      app.state = frameState(prevFrame);
+      doPause(app);
+    } else {
+      showFrame(app, app.currentIndex);
+      if (app.textTimeline) app.textTimeline.play(0);
+      setupAutoAdvance(app);
+    }
+  } catch (err) {
+    console.error('Error during replay:', err);
+    app.state = frameState(prevFrame);
   }
 }
 
@@ -1084,12 +1117,12 @@ function initApp(app) {
       // ready before the user advances to frame 1.
       startEffectsLoad();
       initEffectsCanvas(app.els.effectsCanvas).catch((err) =>
-        console.error('Effects canvas init failed:', err.message),
+        console.error('Effects canvas init failed:', err),
       );
       try {
         initShimmer(app.els.traceOverlay);
       } catch (err) {
-        console.error('Shimmer init failed:', err.message);
+        console.error('Shimmer init failed:', err);
       }
 
       app.state = State.SCENE_ACTIVE;
@@ -1105,7 +1138,7 @@ function initApp(app) {
         ]).catch((err) => console.error('Background asset preload failed:', err));
       }, 4000);
 
-      app.cleanupKeyboard = initKeyboard((action) => {
+      initKeyboard((action) => {
         app.userHasInteracted = true;
         switch (action) {
           case 'togglePause':
@@ -1153,6 +1186,11 @@ function initApp(app) {
       });
       app.els.loadingScreen.addEventListener('click', (e) => {
         e.stopPropagation();
+        togglePause(app);
+      });
+      app.els.sceneStage.addEventListener('click', (e) => {
+        if (e.target.closest('#credits-panel')) return;
+        app.userHasInteracted = true;
         togglePause(app);
       });
     })
@@ -1217,6 +1255,7 @@ export function createApp() {
     generation: 0,
     deferFrameAudioUntilResume: false,
     pendingPause: false,
+    lastNavSource: null,
     buffering: false,
     effectsReady: null,
     shimmerReady: null,
@@ -1233,7 +1272,6 @@ export function createApp() {
       narrationLayer: document.getElementById('narration-layer'),
       captionLayer: document.getElementById('caption-layer'),
       accessibleNarration: document.getElementById('accessible-narration'),
-      controls: document.getElementById('overlay-controls'),
       btnPrev: document.getElementById('btn-prev'),
       btnNext: document.getElementById('btn-next'),
       btnReplay: document.getElementById('btn-replay'),

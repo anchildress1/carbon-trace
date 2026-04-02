@@ -44,6 +44,7 @@ The narration drives the pacing—scenes auto-advance when narration ends. You c
 
 | Control                 | Action                                               |
 | ----------------------- | ---------------------------------------------------- |
+| **Click/Tap scene**     | Toggle play/pause                                    |
 | **Prev / Next** buttons | Navigate between scenes                              |
 | **Arrow Left / Right**  | Navigate between scenes                              |
 | **Space**               | Toggle play/pause                                    |

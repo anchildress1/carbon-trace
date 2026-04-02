@@ -7,11 +7,11 @@
  * scene list.
  *
  * Image preloading is handled by canvas.js's loadImage which caches
- * promises and resolves with Image objects.
+ * promises and rejects on failure.
  */
 
 export function preloadAudio(src) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const audio = new Audio();
     audio.preload = 'metadata';
 
@@ -23,8 +23,7 @@ export function preloadAudio(src) {
 
     const timeout = setTimeout(() => {
       cleanup();
-      console.warn(`Audio preload timed out: ${src}`);
-      resolve({ src: null, duration: 0 });
+      reject(new Error(`Audio preload timed out: ${src}`));
     }, 5000);
 
     audio.onloadedmetadata = () => {
@@ -35,9 +34,8 @@ export function preloadAudio(src) {
     };
     audio.onerror = () => {
       clearTimeout(timeout);
-      console.warn(`Failed to preload audio: ${src}`);
       cleanup();
-      resolve({ src: null, duration: 0 });
+      reject(new Error(`Failed to preload audio: ${src}`));
     };
     audio.src = src;
   });
@@ -52,7 +50,9 @@ export function preloadFirstFrameAudio(frames, onLoaded) {
   if (!frames.length) return;
   const srcs = audioSrcsFromEntry(frames[0]);
   for (const src of srcs) {
-    preloadAudio(src).then((result) => onLoaded(result));
+    preloadAudio(src)
+      .then((result) => onLoaded(result))
+      .catch((err) => console.warn(err.message));
   }
 }
 
@@ -63,8 +63,12 @@ export async function preloadBackgroundAudio(frames, onLoaded) {
   for (const frame of frames.slice(1)) {
     for (const src of audioSrcsFromEntry(frame)) {
       if (!firstFrameSrcs.has(src)) {
-        const result = await preloadAudio(src);
-        onLoaded(result);
+        try {
+          const result = await preloadAudio(src);
+          onLoaded(result);
+        } catch (err) {
+          console.warn(err.message);
+        }
       }
     }
   }

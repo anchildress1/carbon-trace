@@ -225,6 +225,7 @@ body {
   justify-content: center;
   background: radial-gradient(ellipse at 50% 40%, #1a1816, #12100e);
   contain: strict;
+  cursor: pointer;
 }
 
 .scene-canvas {
@@ -515,6 +516,7 @@ body {
   position: absolute;
   inset: 8% 12%;
   overflow: hidden;
+  cursor: default;
   opacity: 0;
   mask-image: linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%);
   -webkit-mask-image: linear-gradient(
@@ -539,6 +541,7 @@ body {
   backdrop-filter: blur(16px) saturate(1.2);
   -webkit-backdrop-filter: blur(16px) saturate(1.2);
   background: rgba(0, 0, 0, 0.75);
+  pointer-events: none;
 }
 
 #credits-scroll-content {
