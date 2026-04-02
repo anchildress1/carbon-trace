@@ -1298,6 +1298,21 @@ describe('app.js', () => {
       expect(scheduleAudioCues).toHaveBeenCalled();
       expect(resumeAudioCues).not.toHaveBeenCalled();
     });
+
+    it('catches and logs error when showFrame throws during replay', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const { clearNarrationLayer: clearNarMock } = await import('../../src/text.js');
+      clearNarMock.mockImplementationOnce(() => {
+        throw new Error('replay boom');
+      });
+
+      document.getElementById('btn-replay').click();
+
+      expect(errorSpy).toHaveBeenCalledWith('Error during replay:', expect.any(Error));
+      // State should be restored to SCENE_ACTIVE (the frame's state)
+      expect(app.getState()).toBe('SCENE_ACTIVE');
+      errorSpy.mockRestore();
+    });
   });
 
   // ── captions toggle ────────────────────────────────────────────────
@@ -3586,15 +3601,20 @@ describe('app.js', () => {
     });
 
     it('recovers gracefully when loadShimmerScene rejects', async () => {
-      loadShimmerScene.mockRejectedValueOnce(new Error('mask load failed'));
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       app = createApp();
       await flush();
       app.togglePause();
+
+      // Set rejection AFTER createApp has consumed frame-0's loadShimmerScene(null).
+      // The next advance() goes to scene-01 (which has traceOverlay), hitting the
+      // .catch() on line 597-599 of app.js.
+      loadShimmerScene.mockRejectedValueOnce(new Error('mask load failed'));
       app.advance(); // to scene-01 with traceOverlay
       await flush();
 
+      expect(consoleSpy).toHaveBeenCalledWith('Shimmer load failed:', expect.any(Error));
       // App should not crash — state remains SCENE_ACTIVE
       expect(app.getState()).toBe('SCENE_ACTIVE');
       consoleSpy.mockRestore();
