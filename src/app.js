@@ -767,13 +767,7 @@ function doClickJump(app, toIndex, toFrame, prevFrame) {
     app.state = frameState(prevFrame);
     return;
   }
-  if (app.pendingPause) {
-    app.pendingPause = false;
-    app.deferFrameAudioUntilResume = true;
-    doPause(app);
-  } else {
-    startFramePlayback(app, toFrame);
-  }
+  startFramePlayback(app, toFrame);
   manageFocusAfterTransition(app);
   completePendingNav(app);
 }
@@ -929,6 +923,10 @@ function updateNavButtons(app) {
 
 function handleFirstPlay(app) {
   app.firstPlayCompleted = true;
+  // If the user navigated from the loading screen before first play, a hard
+  // jump may have set deferFrameAudioUntilResume=true. First play must clear
+  // that latch so audio/timeline start from one boundary.
+  app.deferFrameAudioUntilResume = false;
   const frame = app.frames[app.currentIndex];
   app.els.btnReplay.disabled = !(
     (Array.isArray(frame.narration?.lines) && frame.narration.lines.length > 0) ||

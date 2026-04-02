@@ -39,16 +39,9 @@ vi.mock('../../src/audio.js', () => ({
   cancelAudioCues: vi.fn(),
   pauseAudioCues: vi.fn(),
   resumeAudioCues: vi.fn(),
-  cueAudioCues: vi.fn(),
-  cancelCue: vi.fn(),
-  restartNarrationCue: vi.fn().mockReturnValue(true),
-  reCueCue: vi.fn(),
-  getNarrationCue: vi.fn(),
   setMuted: vi.fn(),
   onNarrationBufferChange: vi.fn(),
-  isNarrationBuffering: vi.fn().mockReturnValue(false),
   preloadNarrationAhead: vi.fn(),
-  clearNarrationCache: vi.fn(),
   trimNarrationCache: vi.fn(),
   resolveCueEnters: vi.fn((cues = []) =>
     cues.map((cue) => ({
@@ -115,7 +108,6 @@ vi.mock('../../src/canvas.js', () => ({
   clearScene: vi.fn(),
   drawFallback: vi.fn(),
   loadImage: vi.fn().mockRejectedValue(new Error('no image')),
-  getImageCache: vi.fn(() => new Map()),
 }));
 
 vi.mock('../../src/loader.js', () => ({
@@ -285,7 +277,6 @@ import {
   cancelAudioCues,
   pauseAudioCues,
   resumeAudioCues,
-  cueAudioCues,
   onNarrationBufferChange,
   getAnalyserNode,
   resolveCueEnters,
@@ -644,7 +635,6 @@ describe('app.js', () => {
       app.advance();
       await flush();
       expect(cancelAudioCues).toHaveBeenCalled();
-      expect(cueAudioCues).not.toHaveBeenCalled();
       expect(scheduleAudioCues).not.toHaveBeenCalled();
     });
 
@@ -705,6 +695,49 @@ describe('app.js', () => {
       expect(btn.getAttribute('aria-label')).toBe('Unmute audio');
       btn.click();
       expect(btn.getAttribute('aria-label')).toBe('Mute audio');
+    });
+  });
+
+  // ── first-play + hard jump ──────────────────────────────────────────
+
+  describe('first play after loading-screen hard jump', () => {
+    beforeEach(async () => {
+      app = createApp();
+      await flush();
+      expect(app.getState()).toBe('PAUSED');
+    });
+
+    it('starts scene audio and narration timeline on first unpause', async () => {
+      const callOrder = [];
+      const sceneTimeline = {
+        play: vi.fn(() => callOrder.push('play')),
+        pause: vi.fn(),
+        resume: vi.fn(),
+        kill: vi.fn(),
+        time: vi.fn().mockReturnValue(0),
+      };
+      buildNarrationTimeline.mockReturnValueOnce({
+        timeline: sceneTimeline,
+        captionEntries: [],
+      });
+
+      app.advance();
+      await flush();
+      expect(app.getState()).toBe('PAUSED');
+      expect(scheduleAudioCues).not.toHaveBeenCalled();
+      expect(sceneTimeline.play).not.toHaveBeenCalled();
+
+      vi.clearAllMocks();
+      callOrder.length = 0;
+      scheduleAudioCues.mockImplementationOnce(() => callOrder.push('schedule'));
+
+      app.togglePause();
+      await flush();
+
+      expect(scheduleAudioCues).toHaveBeenCalledTimes(1);
+      expect(sceneTimeline.play).toHaveBeenCalledWith(0);
+      expect(callOrder).toEqual(['schedule', 'play']);
+      expect(app.getState()).toBe('SCENE_ACTIVE');
     });
   });
 

@@ -139,6 +139,7 @@ export function destroySceneCanvas() {
   cssWidth = 0;
   cssHeight = 0;
   lastDpr = 1;
+  imageCache.clear();
 }
 
 export function getSceneContext() {
@@ -165,8 +166,4 @@ export function loadImage(src) {
 
   imageCache.set(src, promise);
   return promise;
-}
-
-export function resetImageCache() {
-  imageCache.clear();
 }

@@ -32,10 +32,6 @@ export function createEffect(type, displacementSprite, params) {
   return fn(displacementSprite, params);
 }
 
-export function hasEffectType(type) {
-  return typeof type === 'string' && Object.hasOwn(factories, type);
-}
-
 /** Effect types that don't need a displacement noise sprite. */
 export const noiseFreeTypes = new Set(['glow', 'shockwave']);
 
