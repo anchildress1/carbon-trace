@@ -153,13 +153,12 @@ export function getSceneContext() {
 export function loadImage(src) {
   if (imageCache.has(src)) return imageCache.get(src);
 
-  const promise = new Promise((resolve) => {
+  const promise = new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
     img.onerror = () => {
       imageCache.delete(src);
-      console.warn(`Failed to load image: ${src}`);
-      resolve(null);
+      reject(new Error(`Failed to load image: ${src}`));
     };
     img.src = src;
   });

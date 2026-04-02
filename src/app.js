@@ -196,15 +196,23 @@ function registerAudio(app, result) {
 async function preloadFirstFrameImage(app) {
   const firstFrame = app.frames[0];
   if (!firstFrame?.image) return;
-  const img = await loadImage(firstFrame.image);
-  if (img) app.imageCache.set(firstFrame.image, img);
+  try {
+    const img = await loadImage(firstFrame.image);
+    app.imageCache.set(firstFrame.image, img);
+  } catch (err) {
+    console.warn('First frame image preload failed:', err.message);
+  }
 }
 
 async function preloadBackgroundImages(app) {
   for (const frame of app.frames.slice(1)) {
     if (frame.image && !app.imageCache.has(frame.image)) {
-      const img = await loadImage(frame.image);
-      if (img) app.imageCache.set(frame.image, img);
+      try {
+        const img = await loadImage(frame.image);
+        app.imageCache.set(frame.image, img);
+      } catch (err) {
+        console.warn(`Background image preload failed for ${frame.image}:`, err.message);
+      }
     }
   }
 }
@@ -465,12 +473,15 @@ function renderSceneImage(app, frame) {
 function scheduleImageArrival(app, frame, index) {
   if (!frame.image || app.imageCache.has(frame.image)) return;
   const arrivalGeneration = app.generation;
-  loadImage(frame.image).then((img) => {
-    if (!img) return;
-    app.imageCache.set(frame.image, img);
-    if (app.generation !== arrivalGeneration || app.currentIndex !== index) return;
-    drawSceneImage(img);
-  });
+  loadImage(frame.image)
+    .then((img) => {
+      app.imageCache.set(frame.image, img);
+      if (app.generation !== arrivalGeneration || app.currentIndex !== index) return;
+      drawSceneImage(img);
+    })
+    .catch((err) => {
+      console.warn(`Late image arrival failed for frame ${index}:`, err.message);
+    });
 }
 
 function prebufferNextScene(app, index) {
@@ -485,9 +496,13 @@ function prebufferNextScene(app, index) {
   trimNarrationCache([currentNarrationCue?.src, nextNarrationCue?.src]);
 
   if (nextFrame?.image && !app.imageCache.has(nextFrame.image)) {
-    loadImage(nextFrame.image).then((img) => {
-      if (img) app.imageCache.set(nextFrame.image, img);
-    });
+    loadImage(nextFrame.image)
+      .then((img) => {
+        app.imageCache.set(nextFrame.image, img);
+      })
+      .catch((err) => {
+        console.warn(`Next-scene image prebuffer failed for ${nextFrame.image}:`, err.message);
+      });
   }
   // Only preload narration via Howler after user interaction — Howler's
   // HTML5 Audio pool is empty until the browser unlocks audio on first
@@ -640,7 +655,10 @@ function waitForImage(app, src) {
 
     loadImage(src)
       .then((img) => {
-        if (img) app.imageCache.set(src, img);
+        app.imageCache.set(src, img);
+      })
+      .catch((err) => {
+        console.warn(`Image load failed during transition: ${src}`, err.message);
       })
       .finally(() => {
         clearTimeout(spinnerTimer);

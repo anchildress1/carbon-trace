@@ -295,12 +295,10 @@ describe('canvas.js', () => {
       expect(p1).toBe(p2);
     });
 
-    it('resolves with null on error and evicts from cache', async () => {
-      vi.spyOn(console, 'warn').mockImplementation(() => {});
+    it('rejects on error and evicts from cache', async () => {
       const p = loadImage('bad://fail.webp');
       vi.advanceTimersByTime(1);
-      const img = await p;
-      expect(img).toBeNull();
+      await expect(p).rejects.toThrow('Failed to load image: bad://fail.webp');
       // Failed load should be evicted so retry creates a new request
       const p2 = loadImage('bad://fail.webp');
       expect(p2).not.toBe(p);

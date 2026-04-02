@@ -114,7 +114,7 @@ vi.mock('../../src/canvas.js', () => ({
   drawImage: vi.fn(),
   clearScene: vi.fn(),
   drawFallback: vi.fn(),
-  loadImage: vi.fn().mockResolvedValue(null),
+  loadImage: vi.fn().mockRejectedValue(new Error('no image')),
   getImageCache: vi.fn(() => new Map()),
 }));
 
@@ -853,7 +853,7 @@ describe('app.js', () => {
 
   describe('error handling', () => {
     it('draws fallback when image fails to load for a scene with image', async () => {
-      loadImage.mockResolvedValue(null);
+      loadImage.mockRejectedValue(new Error('no image'));
       app = createApp();
       await flush();
       expect(app.getState()).toBe('PAUSED');
@@ -861,9 +861,9 @@ describe('app.js', () => {
       expect(clearScene).toHaveBeenCalled();
     });
 
-    it('draws fallback when image load resolves null', async () => {
+    it('draws fallback when image load rejects', async () => {
       // All image loads fail
-      loadImage.mockResolvedValue(null);
+      loadImage.mockRejectedValue(new Error('no image'));
       app = createApp();
       await flush();
       app.togglePause();
@@ -871,8 +871,8 @@ describe('app.js', () => {
       vi.clearAllMocks();
       app.advance();
       await flush();
-      // scene-01 has an image key but load failed (null in cache)
-      // waitForImage stores null, showFrame draws fallback
+      // scene-01 has an image key but load rejected — not cached
+      // waitForImage catches rejection, showFrame draws fallback
       expect(drawFallback).toHaveBeenCalled();
     });
   });
@@ -1353,7 +1353,7 @@ describe('app.js', () => {
         removeEventListener: vi.fn(),
       });
       // Prevent first-frame image from being cached during init.
-      loadImage.mockResolvedValue(null);
+      loadImage.mockRejectedValue(new Error('no image'));
       app = createApp();
       await flush();
 
@@ -1404,7 +1404,7 @@ describe('app.js', () => {
   describe('waitForImage', () => {
     it('shows spinner when image takes long to load', async () => {
       // Prevent images from caching during init
-      loadImage.mockResolvedValue(null);
+      loadImage.mockRejectedValue(new Error('no image'));
       app = createApp();
       await flush();
 
@@ -1429,7 +1429,7 @@ describe('app.js', () => {
 
   describe('non-blocking instant-cut navigation', () => {
     it('hard-jump completes synchronously without waiting for image', async () => {
-      loadImage.mockResolvedValue(null);
+      loadImage.mockRejectedValue(new Error('no image'));
       app = createApp();
       await flush();
 
@@ -1457,7 +1457,7 @@ describe('app.js', () => {
         dotClickCb = cb;
       });
 
-      loadImage.mockResolvedValue(null);
+      loadImage.mockRejectedValue(new Error('no image'));
       app = createApp();
       await flush();
 
@@ -1477,7 +1477,7 @@ describe('app.js', () => {
     });
 
     it('scheduleImageArrival redraws scene when image arrives on same frame', async () => {
-      loadImage.mockResolvedValue(null);
+      loadImage.mockRejectedValue(new Error('no image'));
       app = createApp();
       await flush();
 
@@ -1501,7 +1501,7 @@ describe('app.js', () => {
     });
 
     it('scheduleImageArrival skips redraw when user navigated away', async () => {
-      loadImage.mockResolvedValue(null);
+      loadImage.mockRejectedValue(new Error('no image'));
       app = createApp();
       await flush();
 
@@ -1519,7 +1519,7 @@ describe('app.js', () => {
       expect(drawFallback).toHaveBeenCalled();
 
       // Navigate away before image arrives
-      loadImage.mockResolvedValue(null);
+      loadImage.mockRejectedValue(new Error('no image'));
       app.advance(); // hard-jump: scene-01 → scene-02
       vi.clearAllMocks();
 
@@ -2654,18 +2654,18 @@ describe('app.js', () => {
     });
   });
 
-  // ── fallback: renderSceneImage when cache has null ──────────────────
+  // ── fallback: renderSceneImage when image load fails ────────────────
 
   describe('fallback: renderSceneImage edge cases', () => {
-    it('draws fallback when image cache entry is falsy', async () => {
-      loadImage.mockResolvedValue(null);
+    it('draws fallback when image load rejects', async () => {
+      loadImage.mockRejectedValue(new Error('no image'));
       app = createApp();
       await flush();
       app.togglePause();
       app.advance(); // to scene-01
       await flush();
 
-      // scene-01 has image key, waitForImage stores null → drawFallback
+      // scene-01 has image key, load rejected — not in cache → drawFallback
       expect(drawFallback).toHaveBeenCalled();
     });
   });
@@ -2956,7 +2956,7 @@ describe('app.js', () => {
   describe('reduced motion transition with uncached image', () => {
     it('waits for image before showing frame under reduced motion', async () => {
       globalThis.matchMedia.mockReturnValue({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() });
-      loadImage.mockResolvedValue(null);
+      loadImage.mockRejectedValue(new Error('no image'));
 
       app = createApp();
       await flush();
