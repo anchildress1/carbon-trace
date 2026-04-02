@@ -65,7 +65,7 @@ function releaseMaskSource(source) {
   try {
     source?.close?.();
   } catch (err) {
-    console.warn('releaseMaskSource: close threw (likely already closed):', err.message);
+    console.warn('releaseMaskSource: close threw (likely already closed):', err);
   }
 }
 
@@ -161,7 +161,7 @@ async function createLuminanceMaskSource(url, requestToken) {
       return bitmap;
     } catch (err) {
       if (isStaleMaskLoadError(err)) throw err;
-      console.warn(`createImageBitmap failed for ${url}:`, err.message);
+      console.warn(`createImageBitmap failed for ${url}:`, err);
     }
   }
 
@@ -493,14 +493,14 @@ async function doInit(el) {
     });
     observer.observe(el);
   } catch (err) {
-    console.error('WebGL unavailable — effects disabled:', err.message);
+    console.error('WebGL unavailable — effects disabled:', err);
     webglAvailable = false;
     pixiApp = null;
     if (app) {
       try {
         app.destroy(true, { children: true });
       } catch (err) {
-        console.warn('doInit: partial destroy threw:', err.message);
+        console.warn('doInit: partial destroy threw:', err);
       }
     }
   } finally {
@@ -524,7 +524,7 @@ async function loadRegionEffects(regions, sceneTexture, gen) {
       }
     } catch (err) {
       if (isStaleMaskLoadError(err)) continue;
-      console.warn(`Skipping effect region "${region.type}":`, err.message);
+      console.warn(`Skipping effect region "${region.type}":`, err);
     }
   }
   return true;
@@ -570,7 +570,7 @@ export async function loadScene(effectsConfig, sceneImageUrl) {
     try {
       await reinit();
     } catch (err) {
-      console.error('WebGL reinit failed — effects permanently disabled:', err.message);
+      console.error('WebGL reinit failed — effects permanently disabled:', err);
       webglAvailable = false;
       return false;
     }
@@ -595,7 +595,7 @@ export async function loadScene(effectsConfig, sceneImageUrl) {
     startOrRenderOnce();
     return true;
   } catch (err) {
-    console.error('Failed to load scene effects:', err.message);
+    console.error('Failed to load scene effects:', err);
     if (gen === loadGeneration) clearAll();
     return false;
   }
@@ -645,11 +645,11 @@ export function clearAll() {
         }
         child.destroy({ children: true, texture: false });
       } catch (err) {
-        console.warn('clearAll: child destroy threw (context lost):', err.message);
+        console.warn('clearAll: child destroy threw (context lost):', err);
       }
     }
   } catch (err) {
-    console.warn('clearAll: stage access threw (context lost):', err.message);
+    console.warn('clearAll: stage access threw (context lost):', err);
   }
 
   // Destroy textures WITHOUT destroying the underlying TextureSource.
@@ -662,7 +662,7 @@ export function clearAll() {
     try {
       tex.destroy(false);
     } catch (err) {
-      console.warn('clearAll: texture destroy threw (context lost):', err.message);
+      console.warn('clearAll: texture destroy threw (context lost):', err);
     }
   }
   disposableTextures = [];
@@ -673,7 +673,7 @@ export function clearAll() {
   try {
     pixiApp.render();
   } catch (err) {
-    console.warn('clearAll: render flush threw (context lost):', err.message);
+    console.warn('clearAll: render flush threw (context lost):', err);
   }
 }
 
@@ -713,13 +713,13 @@ function cleanupAnalysisElement() {
       try {
         analysisAnalyserRef.disconnect(analysisSilentGain);
       } catch (err) {
-        console.warn('cleanupAnalysisElement: analyser disconnect threw:', err.message);
+        console.warn('cleanupAnalysisElement: analyser disconnect threw:', err);
       }
     }
     try {
       analysisSilentGain.disconnect();
     } catch (err) {
-      console.warn('cleanupAnalysisElement: gain disconnect threw:', err.message);
+      console.warn('cleanupAnalysisElement: gain disconnect threw:', err);
     }
     analysisSilentGain = null;
   }
@@ -728,7 +728,7 @@ function cleanupAnalysisElement() {
     try {
       analysisSource.disconnect();
     } catch (err) {
-      console.warn('cleanupAnalysisElement: source disconnect threw:', err.message);
+      console.warn('cleanupAnalysisElement: source disconnect threw:', err);
     }
     analysisSource = null;
   }
@@ -784,7 +784,7 @@ export function connectAnalysisAudio(audioSrc, analyserNode, loop = false) {
       fftData = new Uint8Array(analyserNode.frequencyBinCount);
     }
   } catch (err) {
-    console.warn('Failed to create analysis audio source:', err.message);
+    console.warn('Failed to create analysis audio source:', err);
     el.removeAttribute('src');
   }
 }
@@ -797,7 +797,7 @@ export function connectAnalysisAudio(audioSrc, analyserNode, loop = false) {
 export function startAnalysisPlayback() {
   if (!analysisElement) return;
   analysisElement.play().catch((err) => {
-    console.warn('Analysis audio play failed:', err.message);
+    console.warn('Analysis audio play failed:', err);
   });
 }
 
@@ -812,7 +812,7 @@ export function resume() {
   isPaused = false;
   if (analysisElement && !reducedMotion()) {
     analysisElement.play().catch((err) => {
-      console.warn('Analysis audio resume failed:', err.message);
+      console.warn('Analysis audio resume failed:', err);
     });
   }
   if (!webglAvailable || !pixiApp || reducedMotion()) return;
@@ -846,7 +846,7 @@ export function destroy() {
         try {
           textureSource.destroy();
         } catch (err) {
-          console.warn('destroy: texture source destroy threw (context lost):', err.message);
+          console.warn('destroy: texture source destroy threw (context lost):', err);
         }
       })
       .catch(() => {
@@ -865,7 +865,7 @@ export function destroy() {
       pixiApp.destroy(false, { children: true, texture: true, textureSource: true });
     }
   } catch (err) {
-    console.warn('destroy: pixiApp destroy threw (context lost):', err.message);
+    console.warn('destroy: pixiApp destroy threw (context lost):', err);
   }
 
   pixiApp = null;

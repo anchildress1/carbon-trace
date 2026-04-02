@@ -207,7 +207,7 @@ async function preloadFirstFrameImage(app) {
     const img = await loadImage(firstFrame.image);
     app.imageCache.set(firstFrame.image, img);
   } catch (err) {
-    console.warn('First frame image preload failed:', err.message);
+    console.warn('First frame image preload failed:', err);
   }
 }
 
@@ -218,7 +218,7 @@ async function preloadBackgroundImages(app) {
         const img = await loadImage(frame.image);
         app.imageCache.set(frame.image, img);
       } catch (err) {
-        console.warn(`Background image preload failed for ${frame.image}:`, err.message);
+        console.warn(`Background image preload failed for ${frame.image}:`, err);
       }
     }
   }
@@ -491,7 +491,7 @@ function scheduleImageArrival(app, frame, index) {
       drawSceneImage(img);
     })
     .catch((err) => {
-      console.warn(`Late image arrival failed for frame ${index}:`, err.message);
+      console.warn(`Late image arrival failed for frame ${index}:`, err);
     });
 }
 
@@ -512,7 +512,7 @@ function prebufferNextScene(app, index) {
         app.imageCache.set(nextFrame.image, img);
       })
       .catch((err) => {
-        console.warn(`Next-scene image prebuffer failed for ${nextFrame.image}:`, err.message);
+        console.warn(`Next-scene image prebuffer failed for ${nextFrame.image}:`, err);
       });
   }
   // Only preload narration via Howler after user interaction — Howler's
@@ -669,7 +669,7 @@ function waitForImage(app, src) {
         app.imageCache.set(src, img);
       })
       .catch((err) => {
-        console.warn(`Image load failed during transition: ${src}`, err.message);
+        console.warn(`Image load failed during transition: ${src}`, err);
       })
       .finally(() => {
         clearTimeout(spinnerTimer);
@@ -1117,12 +1117,12 @@ function initApp(app) {
       // ready before the user advances to frame 1.
       startEffectsLoad();
       initEffectsCanvas(app.els.effectsCanvas).catch((err) =>
-        console.error('Effects canvas init failed:', err.message),
+        console.error('Effects canvas init failed:', err),
       );
       try {
         initShimmer(app.els.traceOverlay);
       } catch (err) {
-        console.error('Shimmer init failed:', err.message);
+        console.error('Shimmer init failed:', err);
       }
 
       app.state = State.SCENE_ACTIVE;

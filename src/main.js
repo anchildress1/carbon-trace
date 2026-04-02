@@ -8,10 +8,10 @@ function sanitizeStartupError(err) {
     };
   }
 
-  const collapsedMessage = err.message.replace(/\s+/g, ' ').trim();
+  const collapsedMessage = err.message.replaceAll(/\s+/g, ' ').trim();
   const scrubbedMessage = collapsedMessage
-    .replace(/https?:\/\/\S+/gi, '[redacted-url]')
-    .replace(/([A-Za-z]:)?[\\/][^\s]+/g, '[redacted-path]')
+    .replaceAll(/https?:\/\/\S+/gi, '[redacted-url]')
+    .replaceAll(/([A-Za-z]:)?[\\/][^\s]+/g, '[redacted-path]')
     .slice(0, 160);
 
   return {

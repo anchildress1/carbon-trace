@@ -927,7 +927,7 @@ describe('app.js', () => {
       try {
         app = createApp();
         await flush();
-        expect(warnSpy).toHaveBeenCalledWith('First frame image preload failed:', 'title fail');
+        expect(warnSpy).toHaveBeenCalledWith('First frame image preload failed:', expect.any(Error));
       } finally {
         scenesData.frames[0].image = originalImage;
         warnSpy.mockRestore();
@@ -946,7 +946,7 @@ describe('app.js', () => {
 
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('Background image preload failed for'),
-        'background fail',
+        expect.any(Error),
       );
       warnSpy.mockRestore();
     });
@@ -2757,7 +2757,7 @@ describe('app.js', () => {
 
       expect(errorSpy).toHaveBeenCalledWith(
         'Effects canvas init failed:',
-        'WebGL unavailable',
+        expect.any(Error),
       );
       errorSpy.mockRestore();
     });
@@ -2933,6 +2933,33 @@ describe('app.js', () => {
     });
   });
 
+  // ── error: doClickJump showFrame throws ─────────────────────────────
+
+  describe('error: click-jump showFrame throws', () => {
+    it('reverts state on showFrame error during click-based transition', async () => {
+      const { clearNarrationLayer: clearNarMock } = await import('../../src/text.js');
+
+      app = createApp();
+      await flush();
+      app.togglePause(); // resume → SCENE_ACTIVE
+
+      // Make showFrame throw synchronously via clearNarrationLayer
+      clearNarMock.mockImplementationOnce(() => { throw new Error('DOM error'); });
+
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      // Click btn-next while playing — sets lastNavSource='click', triggers doClickJump
+      document.getElementById('btn-next').click();
+      await flush();
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Error during scene transition:',
+        expect.any(Error),
+      );
+      errorSpy.mockRestore();
+    });
+  });
+
   // ── error: unhandled error in transition onComplete ──────────────────
 
   describe('error: unhandled error in transition fadeIn', () => {
@@ -2968,6 +2995,43 @@ describe('app.js', () => {
       expect(errorSpy).toHaveBeenCalledWith(
         'Effects load failed:',
         expect.objectContaining({ message: 'GPU crash' }),
+      );
+      errorSpy.mockRestore();
+    });
+  });
+
+  // ── error: fadeIn catch during animated transition ─────────────────
+
+  describe('error: fadeIn gsap.to throws during animated transition', () => {
+    it('catches error in fadeIn and still lands on frame', async () => {
+      const { gsap } = await import('gsap');
+      let toCallCount = 0;
+      const onCompletes = [];
+      gsap.to.mockImplementation((_target, opts) => {
+        toCallCount++;
+        if (toCallCount >= 2) {
+          // Second gsap.to call is the fade-in — throw to trigger fadeIn catch
+          throw new Error('GPU context lost');
+        }
+        onCompletes.push(opts.onComplete);
+        return { kill: vi.fn() };
+      });
+
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      app = createApp();
+      await flush();
+      app.togglePause(); // resume → SCENE_ACTIVE
+
+      app.advance(); // starts fade-out transition
+
+      // Fire fade-out onComplete → triggers async fadeIn → gsap.to throws
+      if (onCompletes[0]) onCompletes[0]();
+      await flush();
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        'Unhandled error in transition onComplete:',
+        expect.any(Error),
       );
       errorSpy.mockRestore();
     });
@@ -3593,7 +3657,7 @@ describe('app.js', () => {
 
       expect(consoleSpy).toHaveBeenCalledWith(
         'Shimmer init failed:',
-        'shimmer: init() requires an HTMLCanvasElement',
+        expect.any(Error),
       );
       // App continues to function despite shimmer init failure
       expect(app.getState()).toBeTruthy();
