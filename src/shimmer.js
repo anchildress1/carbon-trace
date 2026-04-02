@@ -30,6 +30,8 @@ let loadGeneration = 0; // monotonic counter — guards against stale async load
 let glowSprite = null; // pre-rendered glow halo canvas
 let coreSprite = null; // pre-rendered bright core canvas
 let spriteScale = 0; // scale factor sprites were built for
+let animTime = 0; // cumulative animation time — freezes during pause
+let lastTickTime = 0; // previous rAF timestamp — 0 means "first frame after resume"
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
@@ -451,7 +453,11 @@ function render(time) {
 
 function tick(time) {
   if (paused) return;
-  render(time);
+  if (lastTickTime > 0) {
+    animTime += time - lastTickTime;
+  }
+  lastTickTime = time;
+  render(animTime);
   rafId = requestAnimationFrame(tick);
 }
 
@@ -546,6 +552,8 @@ export async function loadScene(config) {
   glowSprite = null;
   coreSprite = null;
   spriteScale = 0;
+  animTime = 0;
+  lastTickTime = 0;
 
   if (!config) {
     opacity = 0;
@@ -585,6 +593,7 @@ export async function loadScene(config) {
 
 export function pause() {
   paused = true;
+  lastTickTime = 0;
   if (rafId) {
     cancelAnimationFrame(rafId);
     rafId = null;
@@ -624,6 +633,8 @@ export function destroy() {
   glowSprite = null;
   coreSprite = null;
   spriteScale = 0;
+  animTime = 0;
+  lastTickTime = 0;
   dots = [];
   canvas = null;
   ctx = null;

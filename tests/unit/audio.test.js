@@ -226,7 +226,7 @@ describe('audio.js — unified cue API (ADR-005)', () => {
     });
 
     it('falls back to enter: 0 when anchor ref is unknown', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const cue = makeCue({
         id: 'mystery',
         type: 'sfx',
@@ -236,10 +236,10 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       scheduleAudioCues([cue]);
       // resolvedEnter = 0, so Howl created immediately
       expect(Howl).toHaveBeenCalled();
-      expect(warnSpy).toHaveBeenCalledWith(
+      expect(errorSpy).toHaveBeenCalledWith(
         expect.stringContaining('Anchor ref "nonexistent"'),
       );
-      warnSpy.mockRestore();
+      errorSpy.mockRestore();
     });
 
     it('resolves chained anchors across multiple iterations', () => {
@@ -276,7 +276,7 @@ describe('audio.js — unified cue API (ADR-005)', () => {
     });
 
     it('detects circular anchor references and falls back to enter: 0', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const cueX = makeCue({
         id: 'x',
         type: 'sfx',
@@ -295,10 +295,10 @@ describe('audio.js — unified cue API (ADR-005)', () => {
 
       // Both fire immediately (resolvedEnter = 0 due to circular fallback)
       expect(Howl).toHaveBeenCalledTimes(2);
-      expect(warnSpy).toHaveBeenCalledWith(
+      expect(errorSpy).toHaveBeenCalledWith(
         expect.stringContaining('unresolvable'),
       );
-      warnSpy.mockRestore();
+      errorSpy.mockRestore();
     });
   });
 
@@ -759,9 +759,21 @@ describe('audio.js — unified cue API (ADR-005)', () => {
   });
 
   describe('buffer monitoring', () => {
-    it('onNarrationBufferChange registers callback', () => {
-      const cb = vi.fn();
-      expect(() => onNarrationBufferChange(cb)).not.toThrow();
+    it('onNarrationBufferChange replaces previous callback', () => {
+      const firstCb = vi.fn();
+      const secondCb = vi.fn();
+
+      onNarrationBufferChange(firstCb);
+      onNarrationBufferChange(secondCb);
+      scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn() });
+
+      const waitingCall = mockNode.addEventListener.mock.calls.find(
+        ([event]) => event === 'waiting',
+      );
+      expect(waitingCall).toBeDefined();
+      waitingCall[1]();
+      expect(firstCb).not.toHaveBeenCalled();
+      expect(secondCb).toHaveBeenCalledWith(true);
     });
 
     it('triggers buffer change on waiting event', () => {
@@ -1117,8 +1129,8 @@ describe('audio.js — anchor duration unknown fallback', () => {
     vi.useRealTimers();
   });
 
-  it('warns and falls back to 0 when ref duration is unknown', () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  it('errors and falls back to 0 when ref duration is unknown', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const cueA = makeCue({ id: 'a', enter: 0 });
     const cueB = makeCue({
@@ -1131,12 +1143,12 @@ describe('audio.js — anchor duration unknown fallback', () => {
     // No audioDurations → ref 'a' duration unknown → cueB falls back to enter: 0
     scheduleAudioCues([cueA, cueB]);
 
-    expect(warnSpy).toHaveBeenCalledWith(
+    expect(errorSpy).toHaveBeenCalledWith(
       expect.stringContaining('Anchor ref "a" duration unknown'),
     );
     // Both fire immediately (cueA at 0, cueB fell back to 0)
     expect(Howl).toHaveBeenCalledTimes(2);
-    warnSpy.mockRestore();
+    errorSpy.mockRestore();
   });
 });
 

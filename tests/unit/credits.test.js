@@ -611,6 +611,55 @@ describe('credits.js', () => {
     });
   });
 
+  // -- pointermove idle detection --
+
+  describe('pointermove pauses scroll during movement, resumes on idle', () => {
+    it('pauses scroll on pointermove and resumes after idle delay', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      const scrollTl = gsapMockState.lastTimeline;
+
+      panel.dispatchEvent(new Event('pointermove', { bubbles: true }));
+      expect(scrollTl.pause).toHaveBeenCalled();
+
+      scrollTl.play.mockClear();
+      vi.advanceTimersByTime(2000);
+      expect(scrollTl.play).toHaveBeenCalled();
+    });
+
+    it('resets idle timer on each pointermove', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      const scrollTl = gsapMockState.lastTimeline;
+
+      panel.dispatchEvent(new Event('pointermove', { bubbles: true }));
+      vi.advanceTimersByTime(1500);
+      // Move again before timer fires — resets the delay
+      panel.dispatchEvent(new Event('pointermove', { bubbles: true }));
+
+      scrollTl.play.mockClear();
+      vi.advanceTimersByTime(1500);
+      // Only 1500ms since last move — not enough
+      expect(scrollTl.play).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(500);
+      // Now 2000ms since last move — resumes
+      expect(scrollTl.play).toHaveBeenCalled();
+    });
+
+    it('skips pointermove pause while hovering a link', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      const scrollTl = gsapMockState.lastTimeline;
+
+      // Hover a link first
+      const link = scrollContent.querySelector('a');
+      link.dispatchEvent(new Event('pointerover', { bubbles: true }));
+      scrollTl.pause.mockClear();
+
+      // pointermove while on link — should be a no-op
+      panel.dispatchEvent(new Event('pointermove', { bubbles: true }));
+      expect(scrollTl.pause).not.toHaveBeenCalled();
+    });
+  });
+
   // -- pause prevents auto-resume but allows interaction --
 
   describe('isPaused prevents auto-resume, allows wheel scrub', () => {

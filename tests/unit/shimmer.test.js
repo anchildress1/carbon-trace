@@ -291,6 +291,47 @@ describe('shimmer.js', () => {
       // No rAF should be requested without walkMap data
       expect(requestAnimationFrame).not.toHaveBeenCalled();
     });
+
+    it('pulse phase is continuous across pause/resume (no time jump)', async () => {
+      shimmer.init(mockCanvas);
+      await shimmer.loadScene({ mask: 'test.png', opacity: 0.5, dotCount: 1 });
+
+      // Capture globalAlpha values to observe pulse phase
+      const alphaValues = [];
+      const origSetter = Object.getOwnPropertyDescriptor(mockCtx, 'globalAlpha')?.set
+        || ((v) => { mockCtx._globalAlpha = v; });
+      Object.defineProperty(mockCtx, 'globalAlpha', {
+        get: () => mockCtx._globalAlpha ?? 1,
+        set: vi.fn((v) => { alphaValues.push(v); origSetter(v); }),
+        configurable: true,
+      });
+
+      const traceOpacity = 0.5;
+      const getDotAlpha = () =>
+        alphaValues.find((v) => v !== 1 && v !== traceOpacity && v > 0 && v < 1);
+
+      // Tick at t=1000, record dot alpha
+      let tick = rafCallbacks[rafCallbacks.length - 1];
+      tick(1000);
+      const alphaBeforePause = getDotAlpha();
+
+      // Pause, then wait 10 seconds of wall-clock time
+      shimmer.pause();
+      alphaValues.length = 0;
+
+      shimmer.resume();
+      tick = rafCallbacks[rafCallbacks.length - 1];
+      // Wall-clock jumps to t=11000, but animation time should only advance
+      // by the delta from the next frame (e.g. 16ms), not the full gap.
+      tick(11000);
+      const alphaAfterResume = getDotAlpha();
+
+      // The pulse alpha should be nearly identical — animation time didn't
+      // advance during the 10s pause. Allow small delta for one frame step.
+      expect(alphaBeforePause).toBeDefined();
+      expect(alphaAfterResume).toBeDefined();
+      expect(Math.abs(alphaBeforePause - alphaAfterResume)).toBeLessThan(0.05);
+    });
   });
 
   describe('destroy', () => {
