@@ -762,6 +762,45 @@ describe('app.js', () => {
       await flush();
       expect(app.getState()).toBe('SCENE_ACTIVE');
     });
+
+    it('starts scene audio and narration timeline together when transition lands', async () => {
+      gsapMockState.autoComplete = false;
+      vi.clearAllMocks();
+
+      const callOrder = [];
+      const sceneTimeline = {
+        play: vi.fn(() => callOrder.push('play')),
+        pause: vi.fn(),
+        resume: vi.fn(),
+        kill: vi.fn(),
+        time: vi.fn().mockReturnValue(0),
+      };
+      buildNarrationTimeline.mockReturnValueOnce({
+        timeline: sceneTimeline,
+        captionEntries: [],
+      });
+      scheduleAudioCues.mockImplementation(() => callOrder.push('schedule'));
+
+      app.advance();
+      await flush();
+
+      // Before transition completes, nothing should start.
+      expect(scheduleAudioCues).not.toHaveBeenCalled();
+      expect(sceneTimeline.play).not.toHaveBeenCalled();
+
+      // Fade-out completion runs showFrame() and builds timeline, but playback should still wait.
+      runNextGsapCompletion();
+      await flush();
+      expect(scheduleAudioCues).not.toHaveBeenCalled();
+      expect(sceneTimeline.play).not.toHaveBeenCalled();
+
+      // Fade-in completion lands on frame and starts both from the same boundary.
+      runNextGsapCompletion();
+      await flush();
+      expect(scheduleAudioCues).toHaveBeenCalledTimes(1);
+      expect(sceneTimeline.play).toHaveBeenCalledWith(0);
+      expect(callOrder).toEqual(['schedule', 'play']);
+    });
   });
 
   // ── keyboard handling ──────────────────────────────────────────────

@@ -491,7 +491,7 @@ transition(toIndex):
   else if prefersReducedMotion:
     instantSwap(toIndex)          // no animation, immediate showFrame + land
   else:
-    gsapFade(toIndex)             // fade out → showFrame → fade in → land
+    gsapFade(toIndex)             // fade out → showFrame → fade in → land + startFramePlayback
 ```
 
 **Animated transition (playing):**
@@ -504,6 +504,7 @@ showFrame          ░░░░░░░░░░░░█░░░░░░░�
 GSAP fade in       ░░░░░░░░░░░░████████████░░░░░░░░
 land on frame      ░░░░░░░░░░░░░░░░░░░░░░░░█░░░░░░
   → set state      ░░░░░░░░░░░░░░░░░░░░░░░░█░░░░░░
+  → schedule audio ░░░░░░░░░░░░░░░░░░░░░░░░█░░░░░░
   → play text tl   ░░░░░░░░░░░░░░░░░░░░░░░░█░░░░░░
   → auto-advance   ░░░░░░░░░░░░░░░░░░░░░░░░█░░░░░░
   → pending pause  ░░░░░░░░░░░░░░░░░░░░░░░░█░░░░░░
@@ -511,6 +512,7 @@ land on frame      ░░░░░░░░░░░░░░░░░░░░�
 ```
 
 Transition uses GSAP opacity fade on the `#scene-stage` container — NOT offscreen canvas compositing. The container fades to 0, frame content swaps, container fades back to 1. Simpler than v4's planned offscreen approach, works correctly with DOM overlay.
+`showFrame()` is render/setup only; `startFramePlayback()` runs on `landOnFrame()` so audio, narration text, and captions share one start boundary after fade and overlay readiness waits.
 
 **Image wait:** If the target frame's image isn't cached, a debounced spinner appears after 300ms. Preload-ahead usually prevents this.
 
@@ -619,7 +621,7 @@ textTimeline.resume()
 
 ### 5.8 replayNarration() — ADR-004
 
-Full scene reset — identical to hard-jump navigation. `cleanupCurrentScene` kills all audio, effects, text, captions, analyser. `showFrame` reloads effects, rebuilds text, and schedules all audio fresh.
+Full scene reset — identical to hard-jump navigation. `cleanupCurrentScene` kills all audio, effects, text, captions, analyser. `showFrame` reloads effects and rebuilds text; `startFramePlayback` re-schedules audio and restarts timeline/auto-advance when not paused.
 
 ```
 replayNarration(app):
@@ -635,8 +637,7 @@ replayNarration(app):
     doPause(app)
   else:
     showFrame(app, currentIndex)
-    textTimeline.play(0)
-    setupAutoAdvance(app)
+    startFramePlayback(app, frame)
 ```
 
 **Key rule:** While paused, replay is a hard jump — same as paused navigation. No unpause, no audio playback, no auto-advance. The scene resets to its starting state and waits for the user to press play. See ADR-004 for full rationale.

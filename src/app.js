@@ -371,6 +371,18 @@ function scheduleFrameAudio(app, frame) {
   });
 }
 
+function startFramePlayback(app, frame) {
+  if (app.deferFrameAudioUntilResume) return;
+
+  scheduleFrameAudio(app, frame);
+  if (frame.effects?.analyserCueId) {
+    const analyser = getAnalyserNode();
+    if (analyser) wireAnalysisAudio(app, frame, analyser);
+  }
+  app.textTimeline?.play(0);
+  setupAutoAdvance(app);
+}
+
 function resumeDeferredFrameAudio(app, { cancelExisting = false } = {}) {
   if (!app.deferFrameAudioUntilResume) return false;
 
@@ -608,16 +620,8 @@ function showFrame(app, index) {
 
   buildNarration(app, frame);
 
-  if (!app.deferFrameAudioUntilResume) {
-    if (app.userHasInteracted) {
-      scheduleFrameAudio(app, frame);
-      if (frame.effects?.analyserCueId) {
-        const analyser = getAnalyserNode();
-        if (analyser) wireAnalysisAudio(app, frame, analyser);
-      }
-    } else {
-      app.els.btnReplay.disabled = true;
-    }
+  if (!app.firstPlayCompleted) {
+    app.els.btnReplay.disabled = true;
   }
 
   prebufferNextScene(app, index);
@@ -765,10 +769,10 @@ function doClickJump(app, toIndex, toFrame, prevFrame) {
   }
   if (app.pendingPause) {
     app.pendingPause = false;
+    app.deferFrameAudioUntilResume = true;
     doPause(app);
   } else {
-    app.textTimeline?.play(0);
-    setupAutoAdvance(app);
+    startFramePlayback(app, toFrame);
   }
   manageFocusAfterTransition(app);
   completePendingNav(app);
@@ -804,10 +808,10 @@ function landOnFrame(app, toFrame) {
   app.state = frameState(toFrame);
   if (app.pendingPause) {
     app.pendingPause = false;
+    app.deferFrameAudioUntilResume = true;
     doPause(app);
   } else {
-    app.textTimeline?.play(0);
-    setupAutoAdvance(app);
+    startFramePlayback(app, toFrame);
   }
   manageFocusAfterTransition(app);
   completePendingNav(app);
@@ -930,11 +934,7 @@ function handleFirstPlay(app) {
     (Array.isArray(frame.narration?.lines) && frame.narration.lines.length > 0) ||
     getNarrationCueFromFrame(frame)
   );
-  scheduleFrameAudio(app, frame);
-  if (app.textTimeline) {
-    app.textTimeline.play(0);
-  }
-  setupAutoAdvance(app);
+  startFramePlayback(app, frame);
 }
 
 function doResume(app) {
@@ -950,8 +950,8 @@ function doResume(app) {
     // activate an unintended control (e.g., btn-next) after the loading
     // screen loses focus.
     app.els.btnPause.focus();
-    // Clear stranded audio entries from showFrame's scheduleFrameAudio call —
-    // handleFirstPlay will schedule audio fresh via scheduleFrameAudio.
+    // Clear any stranded audio entries, then start first-play audio/timeline
+    // from one boundary via handleFirstPlay/startFramePlayback.
     cancelAudioCues();
     handleFirstPlay(app);
   } else {
@@ -1026,7 +1026,7 @@ function replayNarration(app) {
 
   // Full scene reset — identical to hard-jump navigation (ADR-004 addendum).
   // cleanupCurrentScene kills all audio, effects, text, captions, analyser.
-  // showFrame reloads effects, rebuilds text, and schedules all audio fresh.
+  // showFrame reloads effects/rebuilds text; startFramePlayback restarts audio.
   cleanupCurrentScene(app);
 
   const prevFrame = app.frames[app.currentIndex];
@@ -1038,8 +1038,7 @@ function replayNarration(app) {
       doPause(app);
     } else {
       showFrame(app, app.currentIndex);
-      if (app.textTimeline) app.textTimeline.play(0);
-      setupAutoAdvance(app);
+      startFramePlayback(app, prevFrame);
     }
   } catch (err) {
     console.error('Error during replay:', err);
