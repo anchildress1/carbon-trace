@@ -64,8 +64,8 @@ function releaseMaskSource(source) {
   releasableMaskSources.delete(source);
   try {
     source?.close?.();
-  } catch {
-    /* already closed */
+  } catch (err) {
+    console.warn('releaseMaskSource: close threw (likely already closed):', err.message);
   }
 }
 
@@ -499,8 +499,8 @@ async function doInit(el) {
     if (app) {
       try {
         app.destroy(true, { children: true });
-      } catch {
-        /* destroy may fail if init was incomplete */
+      } catch (err) {
+        console.warn('doInit: partial destroy threw:', err.message);
       }
     }
   } finally {
@@ -569,7 +569,8 @@ export async function loadScene(effectsConfig, sceneImageUrl) {
   if (needsReinit) {
     try {
       await reinit();
-    } catch {
+    } catch (err) {
+      console.error('WebGL reinit failed — effects permanently disabled:', err.message);
       webglAvailable = false;
       return false;
     }
@@ -643,12 +644,12 @@ export function clearAll() {
           child.mask = null;
         }
         child.destroy({ children: true, texture: false });
-      } catch {
-        // Context lost — destroy may throw, continue cleanup
+      } catch (err) {
+        console.warn('clearAll: child destroy threw (context lost):', err.message);
       }
     }
-  } catch {
-    // Stage access failed — context lost
+  } catch (err) {
+    console.warn('clearAll: stage access threw (context lost):', err.message);
   }
 
   // Destroy textures WITHOUT destroying the underlying TextureSource.
@@ -660,8 +661,8 @@ export function clearAll() {
   for (const tex of disposableTextures) {
     try {
       tex.destroy(false);
-    } catch {
-      // Context lost
+    } catch (err) {
+      console.warn('clearAll: texture destroy threw (context lost):', err.message);
     }
   }
   disposableTextures = [];
@@ -671,8 +672,8 @@ export function clearAll() {
   // ticker is stopped and no re-render occurs before the next scene fades in.
   try {
     pixiApp.render();
-  } catch {
-    // Context lost
+  } catch (err) {
+    console.warn('clearAll: render flush threw (context lost):', err.message);
   }
 }
 
@@ -711,14 +712,14 @@ function cleanupAnalysisElement() {
     if (analysisAnalyserRef) {
       try {
         analysisAnalyserRef.disconnect(analysisSilentGain);
-      } catch {
-        /* already disconnected */
+      } catch (err) {
+        console.warn('cleanupAnalysisElement: analyser disconnect threw:', err.message);
       }
     }
     try {
       analysisSilentGain.disconnect();
-    } catch {
-      /* already disconnected */
+    } catch (err) {
+      console.warn('cleanupAnalysisElement: gain disconnect threw:', err.message);
     }
     analysisSilentGain = null;
   }
@@ -726,8 +727,8 @@ function cleanupAnalysisElement() {
   if (analysisSource) {
     try {
       analysisSource.disconnect();
-    } catch {
-      /* already disconnected */
+    } catch (err) {
+      console.warn('cleanupAnalysisElement: source disconnect threw:', err.message);
     }
     analysisSource = null;
   }
@@ -810,7 +811,9 @@ export function pause() {
 export function resume() {
   isPaused = false;
   if (analysisElement && !reducedMotion()) {
-    analysisElement.play().catch(() => {});
+    analysisElement.play().catch((err) => {
+      console.warn('Analysis audio resume failed:', err.message);
+    });
   }
   if (!webglAvailable || !pixiApp || reducedMotion()) return;
   if (activeEffects.length > 0) {
@@ -842,8 +845,8 @@ export function destroy() {
       .then((textureSource) => {
         try {
           textureSource.destroy();
-        } catch {
-          /* context lost */
+        } catch (err) {
+          console.warn('destroy: texture source destroy threw (context lost):', err.message);
         }
       })
       .catch(() => {
@@ -861,8 +864,8 @@ export function destroy() {
     if (pixiApp) {
       pixiApp.destroy(false, { children: true, texture: true, textureSource: true });
     }
-  } catch {
-    // Context already lost
+  } catch (err) {
+    console.warn('destroy: pixiApp destroy threw (context lost):', err.message);
   }
 
   pixiApp = null;
