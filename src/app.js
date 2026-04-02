@@ -53,7 +53,12 @@ import {
 let effectsLoaded = null;
 let effectsMod = null;
 function startEffectsLoad() {
-  effectsLoaded ??= import('./effects-canvas.js');
+  if (!effectsLoaded) {
+    effectsLoaded = import('./effects-canvas.js').catch((err) => {
+      effectsLoaded = null;
+      throw err;
+    });
+  }
 }
 async function initEffectsCanvas(el) {
   startEffectsLoad();
