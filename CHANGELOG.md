@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.0.8](https://github.com/anchildress1/carbon-trace/compare/v0.0.7...v0.0.8) (2026-04-02)
+
+
+### Bug Fixes
+
+* cache CSS dimensions in sizeCanvas and update remaining gradient tests ([16f8818](https://github.com/anchildress1/carbon-trace/commit/16f88186c07c8b1f688645a51bb86cbcda4d83c3))
+* cache TextureSource directly to eliminate PixiJS Cache leak ([#46](https://github.com/anchildress1/carbon-trace/issues/46)) ([a0dc52d](https://github.com/anchildress1/carbon-trace/commit/a0dc52d4ce89850f1adbe686e66a920397e1d3f3))
+
+
+### Performance Improvements
+
+* ADR-007 profiling, grayscale masks, and render optimizations ([#50](https://github.com/anchildress1/carbon-trace/issues/50)) ([66395d5](https://github.com/anchildress1/carbon-trace/commit/66395d5234c35c0d3e989948562745a1f8847d6a))
+* baseline profiling and mobile Lighthouse optimization ([#48](https://github.com/anchildress1/carbon-trace/issues/48)) ([80a8fb2](https://github.com/anchildress1/carbon-trace/commit/80a8fb2213a177ae82872d602f50475b8668a2af))
+
 ## [0.0.7](https://github.com/anchildress1/carbon-trace/compare/v0.0.6...v0.0.7) (2026-03-29)
 
 
