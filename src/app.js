@@ -578,7 +578,7 @@ function showFrame(app, index) {
           if (analyser) setEffectsAnalyser(analyser);
         }
       })
-      .catch((err) => console.error('Effects load failed:', err.message));
+      .catch((err) => console.error('Effects load failed:', err));
   } else {
     cancelPendingLoad();
     clearEffects();
@@ -1023,16 +1023,21 @@ function replayNarration(app) {
   // showFrame reloads effects, rebuilds text, and schedules all audio fresh.
   cleanupCurrentScene(app);
 
-  if (app.paused) {
-    app.deferFrameAudioUntilResume = true;
-    showFrame(app, app.currentIndex);
-    const frame = app.frames[app.currentIndex];
-    app.state = frameState(frame);
-    doPause(app);
-  } else {
-    showFrame(app, app.currentIndex);
-    if (app.textTimeline) app.textTimeline.play(0);
-    setupAutoAdvance(app);
+  const prevFrame = app.frames[app.currentIndex];
+  try {
+    if (app.paused) {
+      app.deferFrameAudioUntilResume = true;
+      showFrame(app, app.currentIndex);
+      app.state = frameState(prevFrame);
+      doPause(app);
+    } else {
+      showFrame(app, app.currentIndex);
+      if (app.textTimeline) app.textTimeline.play(0);
+      setupAutoAdvance(app);
+    }
+  } catch (err) {
+    console.error('Error during replay:', err);
+    app.state = frameState(prevFrame);
   }
 }
 

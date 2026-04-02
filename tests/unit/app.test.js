@@ -2604,7 +2604,7 @@ describe('app.js', () => {
 
       expect(errorSpy).toHaveBeenCalledWith(
         'Effects load failed:',
-        'WebGL context lost',
+        expect.objectContaining({ message: 'WebGL context lost' }),
       );
       errorSpy.mockRestore();
     });
@@ -2858,7 +2858,7 @@ describe('app.js', () => {
       // The effectsReady.catch in showFrame should have caught the error
       expect(errorSpy).toHaveBeenCalledWith(
         'Effects load failed:',
-        'GPU crash',
+        expect.objectContaining({ message: 'GPU crash' }),
       );
       errorSpy.mockRestore();
     });
