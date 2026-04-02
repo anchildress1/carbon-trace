@@ -148,7 +148,7 @@ describe('text.js', () => {
       const firstResult = buildNarrationTimeline(withPositions(lines), container);
 
       const secondContainer = document.createElement('div');
-      const secondResult = buildNarrationTimeline(lines, secondContainer);
+      const secondResult = buildNarrationTimeline(withPositions(lines), secondContainer);
 
       expect(firstResult.timeline).not.toBe(secondResult.timeline);
       expect(timelineInstances).toHaveLength(2);
