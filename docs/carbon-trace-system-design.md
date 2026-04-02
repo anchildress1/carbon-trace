@@ -123,7 +123,7 @@ scheduleAudioCues(cues, opts)    → schedule all cues for a frame
   opts.crossfadeDurationMs       → ambient crossfade duration (default 800)
   opts.audioDurations            → metadata durations map for generic anchor resolution
 cancelAudioCues(opts)            → stop all Howls, cancel all timers, clear map
-  opts.skipCrossfade             → skip ambient crossfade unload (for hard cleanup)
+  opts.preserveAmbient           → keep playing/fading ambient cues alive (for crossfade continuity)
 pauseAudioCues()                 → pause all active Howls + freeze all pending timers
 resumeAudioCues()                → resume all paused Howls + reschedule all frozen timers
 
