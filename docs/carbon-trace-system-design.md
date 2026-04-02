@@ -106,7 +106,7 @@ loadScene(effectsConfig, sceneImageUrl) → clearAll() + load scene texture (sha
 setAnalyser(analyserNode)              → store Web Audio AnalyserNode reference. Ticker reads FFT
                                          data each frame for regions with audioReactive config (ADR-008).
 clearAll()                             → destroy sprites/filters/textures via .destroy(false)
-                                         (retains TextureSources for deferred GC). Ticker stays running.
+                                         (frees GPU backing store). Ticker stays running.
 pause() / resume()                     → stop/start PixiJS ticker (WCAG 2.2.2).
                                          Only pause()/resume() control ticker lifecycle.
 ```
@@ -122,31 +122,29 @@ scheduleAudioCues(cues, opts)    → schedule all cues for a frame
   opts.maxNarrationDurationMs    → safety timeout (caption-derived)
   opts.crossfadeDurationMs       → ambient crossfade duration (default 800)
   opts.audioDurations            → metadata durations map for generic anchor resolution
-cancelAudioCues()                → stop all Howls, cancel all timers, clear map
+cancelAudioCues(opts)            → stop all Howls, cancel all timers, clear map
+  opts.preserveAmbient           → keep playing/fading ambient cues alive (for crossfade continuity)
 pauseAudioCues()                 → pause all active Howls + freeze all pending timers
 resumeAudioCues()                → resume all paused Howls + reschedule all frozen timers
 
-// Cueing (targeted reset / preload flows)
-cueAudioCues(cues)               → load all, seek to 0, do NOT play
-cancelCue(cueId)                 → stop + cancel one specific cue (for replay reset)
-reCueCue(cueId, cue)             → cancel + re-cue a single cue without touching others
+// Anchor resolution
+resolveCueEnters(cues, opts)     → compute resolvedEnter for all cues (iterative anchor resolution)
 
-// Query
-getNarrationCue()                → returns active narration Howl (for replay)
-restartNarrationCue(cue, opts)   → stop + play existing narration Howl from 0 (avoids Audio pool exhaustion on rapid replay)
+// Narration boost
+wrapOnNarrationEndWithBoost(cues, onNarrationEnd) → wrap callback to fade volumeAfterNarration cues
 
 // Global
 setMuted(bool)                   → global mute (affects volume, not playback)
 onNarrationBufferChange(callback) → register buffer state listener
-isNarrationBuffering()           → returns current buffer stall state
-preloadNarrationAhead(src)        → pre-create Howl for next scene
-clearNarrationCache()             → unload ahead-of-time cache
+preloadNarrationAhead(src)       → pre-create Howl for next scene
+trimNarrationCache(keepSrcs)     → unload all cached Howls except keepSrcs
 
 // Audio analysis (ADR-008 audio-reactive)
 getAnalyserNode()                → lazy-create AnalyserNode on Howler's AudioContext,
                                    connect to Howler.masterGain(). Returns same instance on
                                    subsequent calls. fftSize: 2048. See ADR-008 for
                                    CORS/html5-mode verification requirements.
+disconnectAnalyserSource()       → disconnect source node (for cleanup between scenes)
 ```
 
 Internal state uses `activeCues = new Map<cueId, { howl, timer, type, state }>`. No hardcoded timer variables — each cue gets its own `PausableTimer` entry. All Howl instances use `html5: true` for streaming.
@@ -362,7 +360,9 @@ enter    │ number | object     │ ms after scene entry, OR anchor { ref, offs
 volume   │ number              │ Target volume (0.0–1.0)
 loop     │ boolean             │ Loop playback
 fadeIn   │ number              │ ms fade-in duration from 0 to target volume
-fadeOut  │ number | null       │ ms fade-out at end. null = no auto-fade.
+fadeOut              │ number | null       │ ms fade-out at end. null = no auto-fade.
+volumeAfterNarration │ number             │ Target volume after narration ends (faded via wrapOnNarrationEndWithBoost)
+fadeAfterNarration   │ number             │ ms fade duration to volumeAfterNarration (default 3000)
 ```
 
 `audioCues: null` = no audio for this frame.
@@ -450,7 +450,6 @@ const app = {
   userHasInteracted: false,  // loading-screen interaction flag
   generation: 0,             // incremented on every navigation — guards stale callbacks
   deferFrameAudioUntilResume: false, // true after paused hardJump — next resume schedules frame audio fresh
-  replayPending: false,      // replay happened while paused — doResume schedules fresh narration
   pendingPause: false,       // pause queued during transition
   pendingNavIndex: null,     // navigation queued during transition
   buffering: false,          // narration buffer stall active
@@ -461,10 +460,13 @@ const app = {
   audioDurations: new Map(), // src → duration in seconds (from loader.js metadata preload)
   projectMaxCaptionMs: 0,    // max caption end time across all frames (computed at startup)
 
+  lastNavSource: null,         // 'click' | 'keyboard' | null — guards focus management after navigation
+
   // Timers — PausableTimer instances (state machine concerns, stay in app.js)
   // All audio timers (narration delay, music enter/exit) are internal to audio.js (ADR-005)
   autoAdvanceTimer: null,       // PausableTimer | null
   creditsRevealTimer: null,     // PausableTimer | null — holdAfterNarration delay before credits reveal (ADR-011)
+  analysisStartTimer: null,     // PausableTimer | null — delays audio analyser start (ADR-008)
   els: { /* DOM element references — see createApp() */ },
 };
 ```
@@ -525,23 +527,28 @@ doPause()                       → freeze everything
 
 No lock. No timer. No animation. Scene lands paused and frozen. On resume, audio enters through the normal `scheduleFrameAudio()` path so delayed and anchored cues keep one authoritative timing model.
 
-### 5.5 setupAutoAdvance
+### 5.5 setupAutoAdvance (ADR-009)
 
 ```js
 function setupAutoAdvance(app) {
-  clearAutoAdvance(app);
   const frame = app.frames[app.currentIndex];
-  if (!shouldAutoAdvance(app, frame)) return;
+  if (!shouldAutoAdvance(app)) {
+    clearAutoAdvance(app);
+    return;
+  }
 
-  const holdAfterNarration = frame.holdAfterNarration
-    ?? scenesData.meta.defaultHoldAfterNarration ?? 2000;
+  const holdAfterNarration = getHoldAfterNarration(frame);
 
   const hasNarrationAudio = frame.audioCues?.some(c => c.type === 'narration');
-  if (!hasNarrationAudio) {
-    // No narration audio — schedule immediately on landing
+  if (hasNarrationAudio) {
+    // Full scene timer: narration enter delay + max duration + hold.
+    // onNarrationEnd shortens this when narration ends normally (ADR-009).
+    const maxMs = getMaxNarrationDuration(frame, app.audioDurations, app.projectMaxCaptionMs);
+    const enterDelay = getNarrationEnterDelay(frame, app.audioDurations, maxMs);
+    scheduleAutoAdvance(app, enterDelay + maxMs + holdAfterNarration);
+  } else {
     scheduleAutoAdvance(app, holdAfterNarration);
   }
-  // With narration audio — onNarrationEnd callback triggers scheduleAutoAdvance
 }
 
 function shouldAutoAdvance(app) {
@@ -598,25 +605,12 @@ else:
 - `creditsRevealTimer?.resume()`, `resumeCreditsScroll()` — clears isPaused, resumes scroll (ADR-011)
 
 ```
-if replayPending:
-  replayPending = false
-  if deferFrameAudioUntilResume:
-    deferFrameAudioUntilResume = false
-    cancelAudioCues()
-    scheduleFrameAudio(app, currentFrame)    // full frame fresh after paused hardJump
-  else:
-    cancelCue('narration')
-    resumeAudioCues()                        // resume remaining cues (ambient, etc.)
-    scheduleAudioCues([narrationCue], { onNarrationEnd, maxNarrationDurationMs, audioDurations })
-  textTimeline.play(0)                       // restart from beginning
-  setupAutoAdvance()
+if deferFrameAudioUntilResume:
+  deferFrameAudioUntilResume = false
+  scheduleFrameAudio(app, currentFrame)    // first real start after paused hardJump or replay
 else:
-  if deferFrameAudioUntilResume:
-    deferFrameAudioUntilResume = false
-    scheduleFrameAudio(app, currentFrame)    // first real start after paused hardJump
-  else:
-    resumeAudioCues()                        // resume all audio + pending timers
-  textTimeline.resume()
+  resumeAudioCues()                        // resume all audio + pending timers
+textTimeline.resume()
 ```
 
 - Resume effects canvas
@@ -625,30 +619,24 @@ else:
 
 ### 5.8 replayNarration() — ADR-004
 
+Full scene reset — identical to hard-jump navigation. `cleanupCurrentScene` kills all audio, effects, text, captions, analyser. `showFrame` reloads effects, rebuilds text, and schedules all audio fresh.
+
 ```
 replayNarration(app):
   if TRANSITIONING or LOADING: return
 
   userHasInteracted = true
+  cleanupCurrentScene(app)
 
   if paused:
-    clearAutoAdvance()
-    cancelCue('narration')
-    reCueCue('narration', narrationCue)
-    buildNarration(app, frame)      // rebuild text, stay paused at the start
-    replayPending = true            // doResume schedules fresh narration with onend
-    if textTimeline: textTimeline.pause(0)   // reset to start, stay paused
-
-    // Stay paused. No state change. User presses play to hear.
-    return
-
-  // --- Playing path (unchanged) ---
-  clearAutoAdvance()
-  clear narration timer
-  buildNarration(app, frame)        // plays audio immediately
-  if textTimeline: textTimeline.play(0)
-  setupAutoAdvance(app)
-  run entry effect (if defined)
+    deferFrameAudioUntilResume = true
+    showFrame(app, currentIndex)
+    state = frameState(frame)
+    doPause(app)
+  else:
+    showFrame(app, currentIndex)
+    textTimeline.play(0)
+    setupAutoAdvance(app)
 ```
 
 **Key rule:** While paused, replay is a hard jump — same as paused navigation. No unpause, no audio playback, no auto-advance. The scene resets to its starting state and waits for the user to press play. See ADR-004 for full rationale.
@@ -670,7 +658,7 @@ When narration audio stalls mid-playback:
 ```
 INPUT              │ DESKTOP              │ MOBILE             │ EFFECT
 ───────────────────┼──────────────────────┼────────────────────┼─────────────────────
-Scene interaction  │ Click / hover stage  │ Tap on stage       │ reserved for interactive triggers (v2 parallax)
+Scene interaction  │ Click stage          │ Tap stage          │ togglePause()
 Navigate to scene  │ Click dot            │ Tap dot            │ transition(dotFrameIdx)
 Forward            │ Click ► / Arrow → / Enter │ Tap ►         │ advance(cur+1)
 Back               │ Click ◄ / Arrow ←    │ Tap ◄              │ retreat(cur-1)
@@ -683,7 +671,7 @@ Tab to controls    │ Tab                  │ —                  │ focus m
 Auto-advance       │ (internal)           │ (internal)         │ advance(cur+1)
 ```
 
-- **Stage click/tap does NOT navigate** — reserved for v2 interactive triggers (hover parallax, particle triggers). Ambient effects (water, heat, dust, glow) run automatically without interaction (ADR-007). Navigation is exclusively via buttons, dots, and keyboard.
+- **Stage click/tap → `togglePause()`** — clicking/tapping the scene stage toggles play/pause. Navigation is exclusively via buttons, dots, and keyboard.
 - TRANSITIONING: navigation queued as pendingNavIndex, pause queued as pendingPause
 - PAUSED: hardJump — no lock, rapid dot-clicking works
 - CREDITS: advance disabled (last frame + CREDITS state)
@@ -875,10 +863,9 @@ Scene 8 + playing                   │ Auto-advances after 8s hold.
 Credits (Scene 11)                  │ Last frame + CREDITS state. No advance. Music plays.
 Replay while playing                │ Restart narration + text. Clear timer.
                                     │ 'end' re-arms auto-advance. (ADR-004)
-Replay while paused                 │ Hard jump reset. Narration cued (loaded,
-                                    │ not playing). Text timeline at 0, paused.
-                                    │ replayPending = true. State stays PAUSED.
-                                    │ doResume schedules fresh narration. (ADR-004)
+Replay while paused                 │ Full scene reset via cleanupCurrentScene +
+                                    │ showFrame. Audio deferred until resume.
+                                    │ State stays PAUSED. (ADR-004)
 Image load failure                  │ Fallback solid color. Evict from cache.
 Audio load failure                  │ onloaderror/onplayerror call onend.
                                     │ Auto-advance chain continues.

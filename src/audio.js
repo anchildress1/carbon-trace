@@ -214,7 +214,7 @@ function tryResolveAnchor(cue, resolvedEnters, durations) {
   if (durations.has(cue.enter.ref)) {
     resolvedEnters.set(cue.id, refEnter + durations.get(cue.enter.ref) + cue.enter.offset);
   } else {
-    console.warn(`Anchor ref "${cue.enter.ref}" duration unknown — falling back to enter: 0`);
+    console.error(`Anchor ref "${cue.enter.ref}" duration unknown — falling back to enter: 0`);
     resolvedEnters.set(cue.id, 0);
   }
   return true;
@@ -242,7 +242,7 @@ export function resolveCueEnters(cues, opts) {
 
   for (const cue of cues) {
     if (!resolvedEnters.has(cue.id)) {
-      console.warn(
+      console.error(
         `Anchor ref "${cue.enter.ref}" unresolvable (circular or missing) — falling back to enter: 0`,
       );
       resolvedEnters.set(cue.id, 0);
@@ -285,6 +285,9 @@ function playCue(cue) {
     });
   }
 
+  howl.once('playerror', (_id, err) => {
+    console.warn(`Playback failed for "${cue.src}" (${cue.type}):`, err);
+  });
   howl.play();
 
   if (cue.fadeIn > 0) {

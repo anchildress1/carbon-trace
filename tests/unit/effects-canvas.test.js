@@ -311,7 +311,7 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
 
       expect(errorSpy).toHaveBeenCalledWith(
         'WebGL unavailable — effects disabled:',
-        expect.any(String),
+        expect.any(Error),
       );
       errorSpy.mockRestore();
     });
@@ -937,7 +937,7 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
 
       expect(errorSpy).toHaveBeenCalledWith(
         'Failed to load scene effects:',
-        expect.any(String),
+        expect.any(Error),
       );
       errorSpy.mockRestore();
     });
@@ -989,7 +989,7 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
       // First region should fail (mask load error) but second should succeed
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('Skipping effect region'),
-        expect.any(String),
+        expect.any(Error),
       );
 
       globalThis.Image = originalImage;
@@ -1653,7 +1653,7 @@ describe('effects-canvas — dedicated analysis element (ADR-008 Approach B)', (
 
     expect(warnSpy).toHaveBeenCalledWith(
       'Failed to create analysis audio source:',
-      expect.any(String),
+      expect.any(Error),
     );
     warnSpy.mockRestore();
 
@@ -1781,7 +1781,7 @@ describe('effects-canvas — dedicated analysis element (ADR-008 Approach B)', (
     startAnalysisPlayback();
     expect(createdEl.play).toHaveBeenCalled();
     await Promise.resolve(); // flush microtask so .catch() handler runs
-    expect(warnSpy).toHaveBeenCalledWith('Analysis audio play failed:', 'autoplay blocked');
+    expect(warnSpy).toHaveBeenCalledWith('Analysis audio play failed:', expect.any(Error));
     warnSpy.mockRestore();
   });
 });
@@ -1869,7 +1869,7 @@ describe('effects-canvas.js — mask validation errors', () => {
     // Per-region error caught by loadRegionEffects → console.warn
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('Skipping effect region'),
-      expect.stringContaining('zero dimensions'),
+      expect.objectContaining({ message: expect.stringContaining('zero dimensions') }),
     );
     // loadScene still returns true (region skipped, not fatal)
     expect(result).toBe(true);
@@ -1906,7 +1906,7 @@ describe('effects-canvas.js — mask validation errors', () => {
 
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('Skipping effect region'),
-      expect.stringContaining('2D context'),
+      expect.objectContaining({ message: expect.stringContaining('2D context') }),
     );
     expect(result).toBe(true);
     warnSpy.mockRestore();
@@ -2339,7 +2339,7 @@ describe('effects-canvas.js — createImageBitmap fallback', () => {
     expect(result).toBe(true);
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('createImageBitmap failed'),
-      expect.any(String),
+      expect.any(Error),
     );
 
     warnSpy.mockRestore();

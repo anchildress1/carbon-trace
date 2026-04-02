@@ -8,9 +8,9 @@ const scenesData = JSON.parse(readFileSync(resolve(__dirname, '../../src/scenes.
 const stylesCss = readFileSync(resolve(__dirname, '../../src/styles.css'), 'utf8');
 const FRAME_TYPES_WITH_DOTS = new Set(['title', 'scene', 'credits']);
 const sceneFrames = scenesData.frames.filter((frame) => FRAME_TYPES_WITH_DOTS.has(frame.frameType));
-export const creditsDotIndex = sceneFrames.findIndex((frame) => frame.frameType === 'credits');
+const creditsDotIndex = sceneFrames.findIndex((frame) => frame.frameType === 'credits');
 export const creditsFrame = sceneFrames[creditsDotIndex];
-export const holdAfterNarrationMs = creditsFrame?.holdAfterNarration ?? 3000;
+const holdAfterNarrationMs = creditsFrame?.holdAfterNarration ?? 3000;
 export const hasCreditsBackdropBlurRule =
   /#credits-backdrop[\s\S]*backdrop-filter:\s*blur\(/.test(stylesCss) &&
   /#credits-backdrop[\s\S]*-webkit-backdrop-filter:\s*blur\(/.test(stylesCss);

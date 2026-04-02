@@ -496,7 +496,7 @@ UNCHANGED:
   ✓ Keyboard/accessibility — shimmer is decorative, aria-hidden
   ✓ Deployment — no new dependencies
 
-CHANGED (not yet applied to code — implementation pending path authoring):
+CHANGED (implemented):
   ✓ index.html — #trace-overlay: <div> → <canvas>, move above #effects-canvas (ADR-007 z-swap)
   ✓ app.js showFrame() — one line: style.opacity → shimmer.loadScene()
   ✓ app.js createApp() — add shimmer.init(app.els.traceOverlay) call
