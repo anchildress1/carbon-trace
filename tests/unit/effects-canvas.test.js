@@ -2111,7 +2111,7 @@ describe('effects-canvas.js — tickerUpdate error handling', () => {
     expect(() => tickerCb({ deltaMS: 16.67 })).not.toThrow();
 
     expect(errorSpy).toHaveBeenCalledWith(
-      'Effect update failed:',
+      'Effect update failed — evicting:',
       expect.any(Error),
     );
     errorSpy.mockRestore();
