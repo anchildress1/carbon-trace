@@ -88,7 +88,11 @@ export function revealCreditsPanel(panelEl, scrollContentEl, config, opts = {}) 
     ease: 'power2.out',
     onComplete: () => {
       fadeInTween = null;
-      startAutoScroll(panelEl, scrollContentEl, config);
+      try {
+        startAutoScroll(panelEl, scrollContentEl, config);
+      } catch (err) {
+        console.error('Credits auto-scroll failed:', err);
+      }
     },
   });
 }
