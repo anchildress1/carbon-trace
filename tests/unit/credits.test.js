@@ -614,6 +614,23 @@ describe('credits.js', () => {
   // -- visibilitychange reconciliation --
 
   describe('visibilitychange reconciles stale hover/focus after tab switch', () => {
+    const savedDescriptors = {};
+
+    beforeEach(() => {
+      savedDescriptors.visibilityState = Object.getOwnPropertyDescriptor(document, 'visibilityState');
+      savedDescriptors.activeElement = Object.getOwnPropertyDescriptor(document, 'activeElement');
+    });
+
+    afterEach(() => {
+      for (const [prop, desc] of Object.entries(savedDescriptors)) {
+        if (desc) {
+          Object.defineProperty(document, prop, desc);
+        } else {
+          delete document[prop];
+        }
+      }
+    });
+
     it('clears stuck hoveredLink and resumes scroll on tab return', () => {
       revealCreditsPanel(panel, scrollContent, defaultConfig);
       const scrollTl = gsapMockState.lastTimeline;
