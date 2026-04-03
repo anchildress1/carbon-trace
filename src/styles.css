@@ -572,9 +572,9 @@ body {
 
 .credits-heading {
   font-family: 'Lora', serif;
-  font-weight: 300;
+  font-weight: 400;
   color: rgba(232, 200, 120, 0.7);
-  font-size: clamp(0.7rem, 1.4vw, 0.9rem);
+  font-size: clamp(0.75rem, 1.4vw, 0.9rem);
   letter-spacing: 0.25em;
   text-transform: uppercase;
   margin-bottom: 1em;
