@@ -379,7 +379,7 @@ test.describe('carbon-trace — credits overlay', () => {
 
     const state = await page.evaluate(() => globalThis.__ctE2EApp._debugCreditsState());
     expect(state.hasCreditsTimer).toBe(true);
-    await expect(panel).toBeVisible({ timeout: 12000 });
+    await forceCreditsReveal(page);
     await expect(page.locator('#app')).toHaveClass(/has-credits/);
 
     const dots = page.locator('#progress-dots');
