@@ -254,6 +254,12 @@ export function resolveCueEnters(cues, opts) {
 
 // --- Internal cue playback ---
 
+// Returns the ambient entry that crossfadeAmbientCue should replace.
+// Only matches state === 'playing' — an entry in 'fading-out' is already
+// being managed by a prior crossfade's unload timer and must not be
+// re-adopted. cancelAudioCues must NOT set state to 'fading-out' on
+// preserved entries, or this lookup will silently miss the active ambient
+// and the old howl will never be unloaded.
 function findActiveAmbient() {
   for (const [, entry] of activeCues) {
     if (entry.type === 'ambient' && entry.state === 'playing') return entry;
@@ -533,6 +539,7 @@ export function scheduleAudioCues(cues, opts = {}) {
 
 export function cancelAudioCues(opts = {}) {
   const preserveAmbient = opts.preserveAmbient === true;
+  const ambientFadeMs = opts.ambientFadeMs || 0;
   isAudioPaused = false;
   disconnectAnalyserSource();
   for (const [id, entry] of activeCues.entries()) {
@@ -544,6 +551,15 @@ export function cancelAudioCues(opts = {}) {
       (entry.state === 'playing' || entry.state === 'fading-out');
     if (keepAmbient) {
       entry.timer = null;
+      // Start a volume pre-fade so the ambient doesn't play at full volume
+      // through the visual transition. DO NOT change entry.state here —
+      // the entry must stay 'playing' so that findActiveAmbient() can still
+      // locate it when crossfadeAmbientCue runs for the incoming scene.
+      // crossfadeAmbientCue reads howl.volume() and fades from whatever
+      // level the pre-fade has reached, so the handoff is seamless.
+      if (ambientFadeMs > 0 && entry.state === 'playing') {
+        entry.howl.fade(entry.howl.volume(), 0, ambientFadeMs);
+      }
       continue;
     }
     entry.howl?._crossfadeCleanup?.();

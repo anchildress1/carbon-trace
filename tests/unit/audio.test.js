@@ -340,6 +340,49 @@ describe('audio.js — unified cue API (ADR-005)', () => {
       expect(ambientHowl.unload).not.toHaveBeenCalled();
       expect(narrationHowl.unload).toHaveBeenCalled();
     });
+
+    it('starts fading preserved ambient when ambientFadeMs is provided', () => {
+      const ambientCue = makeCue({ id: 'ambient-1', type: 'ambient', src: 'ambient.mp3' });
+      scheduleAudioCues([ambientCue]);
+
+      const ambientHowl = Howl.mock.results[0].value;
+      ambientHowl.volume.mockReturnValue(0.4);
+      vi.clearAllMocks();
+
+      cancelAudioCues({ preserveAmbient: true, ambientFadeMs: 1200 });
+
+      expect(ambientHowl.unload).not.toHaveBeenCalled();
+      expect(ambientHowl.fade).toHaveBeenCalledWith(0.4, 0, 1200);
+    });
+
+    it('keeps entry state as playing so crossfade can find it', () => {
+      const ambientCue = makeCue({ id: 'ambient-1', type: 'ambient', src: 'ambient.mp3' });
+      scheduleAudioCues([ambientCue]);
+      vi.clearAllMocks();
+
+      cancelAudioCues({ preserveAmbient: true, ambientFadeMs: 1200 });
+
+      // Schedule a new ambient — crossfadeAmbientCue must find the old one.
+      // If the entry state were 'fading-out', findActiveAmbient() would miss it
+      // and the old howl would never be unloaded.
+      const newAmbientCue = makeCue({ id: 'ambient-1', type: 'ambient', src: 'new-ambient.mp3' });
+      scheduleAudioCues([newAmbientCue], { crossfadeDurationMs: 800 });
+
+      const oldHowl = Howl.mock.results[0].value;
+      expect(oldHowl.fade).toHaveBeenCalled();
+    });
+
+    it('does not fade preserved ambient when ambientFadeMs is 0', () => {
+      const ambientCue = makeCue({ id: 'ambient-1', type: 'ambient', src: 'ambient.mp3' });
+      scheduleAudioCues([ambientCue]);
+
+      const ambientHowl = Howl.mock.results[0].value;
+      vi.clearAllMocks();
+
+      cancelAudioCues({ preserveAmbient: true, ambientFadeMs: 0 });
+
+      expect(ambientHowl.fade).not.toHaveBeenCalled();
+    });
   });
 
   describe('pauseAudioCues / resumeAudioCues', () => {

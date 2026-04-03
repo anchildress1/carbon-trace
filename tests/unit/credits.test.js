@@ -611,6 +611,94 @@ describe('credits.js', () => {
     });
   });
 
+  // -- visibilitychange reconciliation --
+
+  describe('visibilitychange reconciles stale hover/focus after tab switch', () => {
+    const savedDescriptors = {};
+
+    beforeEach(() => {
+      savedDescriptors.visibilityState = Object.getOwnPropertyDescriptor(document, 'visibilityState');
+      savedDescriptors.activeElement = Object.getOwnPropertyDescriptor(document, 'activeElement');
+    });
+
+    afterEach(() => {
+      for (const [prop, desc] of Object.entries(savedDescriptors)) {
+        if (desc) {
+          Object.defineProperty(document, prop, desc);
+        } else {
+          delete document[prop];
+        }
+      }
+    });
+
+    it('clears stuck hoveredLink and resumes scroll on tab return', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      const scrollTl = gsapMockState.lastTimeline;
+
+      // Simulate: hover a link, then tab away (pointerout never fires)
+      const link = scrollContent.querySelector('a');
+      link.dispatchEvent(new Event('pointerover', { bubbles: true }));
+      expect(scrollTl.pause).toHaveBeenCalled();
+
+      scrollTl.play.mockClear();
+
+      // Tab returns — visibilitychange fires
+      Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+
+      vi.advanceTimersByTime(2000);
+      expect(scrollTl.play).toHaveBeenCalled();
+    });
+
+    it('keeps focusedLink if a link is still focused on tab return', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      const scrollTl = gsapMockState.lastTimeline;
+
+      const link = scrollContent.querySelector('a');
+      link.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+
+      scrollTl.play.mockClear();
+
+      // Simulate tab return with the link still focused
+      Object.defineProperty(document, 'activeElement', { value: link, configurable: true });
+      Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+
+      vi.advanceTimersByTime(5000);
+      expect(scrollTl.play).not.toHaveBeenCalled();
+    });
+
+    it('ignores visibilitychange when state is hidden', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      const scrollTl = gsapMockState.lastTimeline;
+
+      const link = scrollContent.querySelector('a');
+      link.dispatchEvent(new Event('pointerover', { bubbles: true }));
+
+      scrollTl.play.mockClear();
+
+      Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+
+      vi.advanceTimersByTime(5000);
+      expect(scrollTl.play).not.toHaveBeenCalled();
+    });
+
+    it('removes visibilitychange listener on cleanup', () => {
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      cleanupCredits(panel);
+
+      const spy = vi.spyOn(document, 'removeEventListener');
+      // Already cleaned up — verify by checking no handler leaks
+      // Re-reveal and re-clean to capture the removeEventListener call
+      revealCreditsPanel(panel, scrollContent, defaultConfig);
+      cleanupCredits(panel);
+
+      expect(spy).toHaveBeenCalledWith('visibilitychange', expect.any(Function));
+      spy.mockRestore();
+    });
+  });
+
   // -- pointermove idle detection --
 
   describe('pointermove pauses scroll during movement, resumes on idle', () => {

@@ -27,6 +27,7 @@ let focusinHandler = null;
 let focusoutHandler = null;
 let motionQuery = null;
 let motionHandler = null;
+let visibilityHandler = null;
 
 function clearScrollTransform(scrollContentEl) {
   if (!scrollContentEl) return;
@@ -209,6 +210,23 @@ function attachScrollListeners(panelEl, scrollContentEl, config) {
     }
   };
 
+  // Reconcile stale hover/focus state after a tab switch. Clicking a link
+  // opens a new tab, which sets hoveredLink = true and focusedLink. The
+  // corresponding pointerout/focusout events may never fire because the
+  // browser deactivated the tab before dispatching them. When the user
+  // returns, pointer position is unknowable so hoveredLink must be cleared.
+  // Focus is verifiable via document.activeElement.
+  visibilityHandler = () => {
+    if (document.visibilityState !== 'visible') return;
+    hoveredLink = false;
+    const activeInPanel =
+      panelEl.contains(document.activeElement) && document.activeElement.closest('a, button');
+    focusedLink = activeInPanel ? document.activeElement : null;
+    if (!isPaused && !focusedLink) {
+      scheduleScrollResume(config.resumeDelay);
+    }
+  };
+
   panelEl.addEventListener('wheel', wheelHandler, { passive: false });
   panelEl.addEventListener('touchstart', touchstartHandler, { passive: true });
   panelEl.addEventListener('touchmove', touchmoveHandler, { passive: false });
@@ -219,6 +237,7 @@ function attachScrollListeners(panelEl, scrollContentEl, config) {
   panelEl.addEventListener('pointermove', pointermoveHandler);
   panelEl.addEventListener('pointerover', pointeroverHandler);
   panelEl.addEventListener('pointerout', pointeroutHandler);
+  document.addEventListener('visibilitychange', visibilityHandler);
 }
 
 function scheduleScrollResume(delay) {
@@ -265,6 +284,10 @@ function removeScrollListeners(panelEl) {
   if (pointeroverHandler) {
     panelEl.removeEventListener('pointerover', pointeroverHandler);
     pointeroverHandler = null;
+  }
+  if (visibilityHandler) {
+    document.removeEventListener('visibilitychange', visibilityHandler);
+    visibilityHandler = null;
   }
   if (pointeroutHandler) {
     panelEl.removeEventListener('pointerout', pointeroutHandler);
