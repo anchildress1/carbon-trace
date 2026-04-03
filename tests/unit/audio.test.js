@@ -1071,7 +1071,13 @@ describe('audio.js — buffer recovery paths', () => {
       vi.advanceTimersByTime(4000);
     }
 
-    // reloadFromPosition calls node.play() to restart after reset
+    // reloadFromPosition defers play() until canplay fires (seek-after-reload fix)
+    const canPlayCall = mockNode.addEventListener.mock.calls.find(
+      ([event]) => event === 'canplay',
+    );
+    expect(canPlayCall).toBeDefined();
+    canPlayCall[1](); // simulate canplay — now play() is called
+
     expect(mockNode.play).toHaveBeenCalled();
   });
 
@@ -1098,6 +1104,66 @@ describe('audio.js — buffer recovery paths', () => {
 
     expect(warnSpy).toHaveBeenCalledWith('Buffer recovery play() failed:', 'play blocked');
     expect(mockNode.removeEventListener).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('calls onRecoveryFailed when reloadFromPosition play() fails after canplay', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const onRecoveryFailed = vi.fn();
+    onNarrationBufferChange(vi.fn());
+    scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn(), onRecoveryFailed });
+
+    const waitingCall = mockNode.addEventListener.mock.calls.find(
+      ([event]) => event === 'waiting',
+    );
+
+    mockNode.buffered.length = 1;
+    mockNode.buffered.end.mockReturnValue(5);
+    mockNode.currentTime = 4;
+    mockNode.src = 'test.m4a';
+    waitingCall[1]();
+
+    // 4 checks with no progress → reloadFromPosition registers canplay listener
+    for (let i = 0; i < 4; i++) {
+      vi.advanceTimersByTime(4000);
+    }
+
+    const canPlayCall = mockNode.addEventListener.mock.calls.find(
+      ([event]) => event === 'canplay',
+    );
+    expect(canPlayCall).toBeDefined();
+
+    // play() rejects after canplay fires
+    mockNode.play.mockRejectedValueOnce(new Error('blocked'));
+    canPlayCall[1]();
+    await Promise.resolve();
+
+    expect(warnSpy).toHaveBeenCalledWith('Buffer recovery play() failed:', 'blocked');
+    expect(onRecoveryFailed).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('calls onRecoveryFailed when buffer-progress play() fails', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const onRecoveryFailed = vi.fn();
+    onNarrationBufferChange(vi.fn());
+    scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn(), onRecoveryFailed });
+
+    const waitingCall = mockNode.addEventListener.mock.calls.find(
+      ([event]) => event === 'waiting',
+    );
+    waitingCall[1]();
+
+    mockNode.play.mockRejectedValueOnce(new Error('play blocked'));
+    mockNode.buffered.length = 1;
+    mockNode.buffered.end.mockReturnValue(8);
+    mockNode.currentTime = 0;
+    mockNode.duration = 60;
+
+    vi.advanceTimersByTime(4000);
+    await Promise.resolve();
+
+    expect(onRecoveryFailed).toHaveBeenCalled();
     warnSpy.mockRestore();
   });
 });
