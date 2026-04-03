@@ -44,6 +44,7 @@ body {
   aspect-ratio: 16 / 9;
   position: relative;
   overflow: hidden;
+  container-type: inline-size;
 }
 
 /* Loading screen — circuit trace emergence */
@@ -297,7 +298,7 @@ body {
   font-family: 'Lora', Georgia, serif;
   font-style: italic;
   font-weight: 400;
-  font-size: clamp(1rem, 2.5vw, 1.75rem);
+  font-size: clamp(1rem, 2.5cqw, 1.75rem);
   line-height: 1.7;
   letter-spacing: 0.03em;
   text-align: center;
@@ -511,6 +512,13 @@ body {
   border: 0;
 }
 
+/* Hide progress dots while credits are visible (ADR-011 §010.14).
+   visibility:hidden preserves layout so control buttons do not shift. */
+#app.has-credits .progress-dots {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* Credits overlay — frosted glass panel with feathered edges (ADR-011) */
 #credits-panel {
   position: absolute;
@@ -624,7 +632,7 @@ body {
 /* Small viewports: scale narration text to avoid overlapping controls */
 @media (max-width: 480px) {
   .narration-line {
-    font-size: clamp(0.8rem, 2vw, 1rem);
+    font-size: clamp(0.8rem, 2cqw, 1rem);
     line-height: 1.5;
   }
 
