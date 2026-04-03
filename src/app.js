@@ -313,9 +313,14 @@ function makeNarrationEndCallback(app, frame, holdAfterNarration) {
       app.creditsRevealTimer = new PausableTimer(() => {
         if (gen !== app.generation) return;
         app.creditsRevealTimer = null;
-        revealCreditsPanel(app.els.creditsPanel, app.els.creditsScrollContent, frame.credits, {
-          reducedMotion: prefersReducedMotion(),
-        });
+        try {
+          revealCreditsPanel(app.els.creditsPanel, app.els.creditsScrollContent, frame.credits, {
+            reducedMotion: prefersReducedMotion(),
+          });
+          app.els.appEl.classList.add('has-credits');
+        } catch (err) {
+          console.error('[app] Failed to reveal credits panel:', err);
+        }
       }, holdAfterNarration);
     }
   };
@@ -707,7 +712,13 @@ function cleanupCurrentScene(app, opts = {}) {
 
   app.creditsRevealTimer?.cancel();
   app.creditsRevealTimer = null;
-  cleanupCredits(app.els.creditsPanel);
+  try {
+    cleanupCredits(app.els.creditsPanel);
+  } catch (err) {
+    console.error('[app] Failed to cleanup credits panel:', err);
+  } finally {
+    app.els.appEl.classList.remove('has-credits');
+  }
 
   clearCaptionElements(app.captionEntries);
   try {
@@ -1215,6 +1226,7 @@ function initApp(app) {
 
 export function createApp() {
   const requiredIds = [
+    'app',
     'loading-screen',
     'scene-stage',
     'scene-canvas',
@@ -1275,6 +1287,7 @@ export function createApp() {
     projectMaxCaptionMs: computeProjectMaxCaptionMs(frames),
     imageCache: new Map(),
     els: {
+      appEl: document.getElementById('app'),
       loadingScreen: document.getElementById('loading-screen'),
       sceneStage: document.getElementById('scene-stage'),
       sceneCanvas: document.getElementById('scene-canvas'),
@@ -1338,6 +1351,7 @@ export function createApp() {
         revealCreditsPanel(app.els.creditsPanel, app.els.creditsScrollContent, frame.credits, {
           reducedMotion: prefersReducedMotion(),
         });
+        app.els.appEl.classList.add('has-credits');
       },
       _debugCreditsState: () => ({
         currentIndex: app.currentIndex,

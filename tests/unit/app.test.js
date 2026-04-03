@@ -3663,6 +3663,206 @@ describe('app.js', () => {
       // revealCreditsPanel should NOT have been called (generation guard)
       expect(revealCreditsPanel).not.toHaveBeenCalled();
     });
+
+    // -- has-credits class (ADR-011 §010.14) --
+
+    describe('has-credits class lifecycle', () => {
+      it('adds has-credits to #app when credits panel is revealed', async () => {
+        await navigateToCredits(app);
+
+        const onEnd = scheduleAudioCues.mock.calls.at(-1)[1].onNarrationEnd;
+        onEnd();
+        vi.advanceTimersByTime(2000);
+
+        expect(document.getElementById('app').classList.contains('has-credits')).toBe(true);
+      });
+
+      it('has-credits is absent before the reveal timer fires', async () => {
+        await navigateToCredits(app);
+
+        // Narration ends but hold timer has not elapsed yet
+        const onEnd = scheduleAudioCues.mock.calls.at(-1)[1].onNarrationEnd;
+        onEnd();
+
+        expect(document.getElementById('app').classList.contains('has-credits')).toBe(false);
+      });
+
+      it('has-credits is absent before narration ends', async () => {
+        await navigateToCredits(app);
+
+        expect(document.getElementById('app').classList.contains('has-credits')).toBe(false);
+      });
+
+      it('removes has-credits from #app when navigating away from credits', async () => {
+        await navigateToCredits(app);
+
+        const onEnd = scheduleAudioCues.mock.calls.at(-1)[1].onNarrationEnd;
+        onEnd();
+        vi.advanceTimersByTime(2000);
+
+        expect(document.getElementById('app').classList.contains('has-credits')).toBe(true);
+
+        loadEffectsScene.mockResolvedValue(true);
+        loadImage.mockResolvedValue(new Image());
+        document.getElementById('btn-prev').click();
+        await flush();
+
+        expect(document.getElementById('app').classList.contains('has-credits')).toBe(false);
+      });
+
+      it('removes has-credits from #app on replay', async () => {
+        await navigateToCredits(app);
+
+        const onEnd = scheduleAudioCues.mock.calls.at(-1)[1].onNarrationEnd;
+        onEnd();
+        vi.advanceTimersByTime(2000);
+
+        expect(document.getElementById('app').classList.contains('has-credits')).toBe(true);
+
+        loadEffectsScene.mockResolvedValue(true);
+        loadImage.mockResolvedValue(new Image());
+        document.getElementById('btn-replay').click();
+        await flush();
+
+        expect(document.getElementById('app').classList.contains('has-credits')).toBe(false);
+      });
+
+      it('removal is idempotent — safe when has-credits was never added', async () => {
+        await navigateToCredits(app);
+
+        // Navigate away before reveal timer fires — class was never added
+        loadEffectsScene.mockResolvedValue(true);
+        loadImage.mockResolvedValue(new Image());
+        document.getElementById('btn-prev').click();
+        await flush();
+
+        expect(document.getElementById('app').classList.contains('has-credits')).toBe(false);
+      });
+
+      it('does not add has-credits when generation guard blocks the timer', async () => {
+        await navigateToCredits(app);
+
+        const onEnd = scheduleAudioCues.mock.calls.at(-1)[1].onNarrationEnd;
+        onEnd(); // starts the hold timer
+
+        // Navigate away before timer fires — generation increments, timer is cancelled
+        loadEffectsScene.mockResolvedValue(true);
+        loadImage.mockResolvedValue(new Image());
+        document.getElementById('btn-prev').click();
+        await flush();
+
+        // Advance past the hold duration — stale timer cannot fire due to generation guard
+        vi.advanceTimersByTime(5000);
+
+        expect(document.getElementById('app').classList.contains('has-credits')).toBe(false);
+      });
+
+      it('adds has-credits after pause → resume → timer fires', async () => {
+        await navigateToCredits(app);
+
+        const onEnd = scheduleAudioCues.mock.calls.at(-1)[1].onNarrationEnd;
+        onEnd(); // starts hold timer
+
+        // Pause before timer fires — timer pauses
+        app.togglePause();
+        vi.advanceTimersByTime(2000);
+        // Timer was paused — class must not be set
+        expect(document.getElementById('app').classList.contains('has-credits')).toBe(false);
+
+        // Resume — timer resumes, fires after remaining hold time
+        app.togglePause();
+        vi.advanceTimersByTime(2000);
+
+        expect(document.getElementById('app').classList.contains('has-credits')).toBe(true);
+      });
+
+      it('has-credits absent immediately after replay with timer still pending', async () => {
+        await navigateToCredits(app);
+
+        const onEnd = scheduleAudioCues.mock.calls.at(-1)[1].onNarrationEnd;
+        onEnd(); // starts hold timer — class not yet added
+
+        // Replay before timer fires
+        loadEffectsScene.mockResolvedValue(true);
+        loadImage.mockResolvedValue(new Image());
+        document.getElementById('btn-replay').click();
+        await flush();
+
+        // cleanupCurrentScene cancelled the timer; class was never added so removal is a no-op
+        expect(document.getElementById('app').classList.contains('has-credits')).toBe(false);
+      });
+
+      it('has-credits absent after replay while paused (credits already revealed)', async () => {
+        await navigateToCredits(app);
+
+        const onEnd = scheduleAudioCues.mock.calls.at(-1)[1].onNarrationEnd;
+        onEnd();
+        vi.advanceTimersByTime(2000); // reveal fires → has-credits added
+        expect(document.getElementById('app').classList.contains('has-credits')).toBe(true);
+
+        app.togglePause();
+
+        loadEffectsScene.mockResolvedValue(true);
+        loadImage.mockResolvedValue(new Image());
+        document.getElementById('btn-replay').click();
+        await flush();
+
+        expect(document.getElementById('app').classList.contains('has-credits')).toBe(false);
+      });
+
+      it('adds has-credits when reducedMotion is active', async () => {
+        // matchMedia already returns { matches: false } from beforeEach — override to true
+        globalThis.matchMedia = vi.fn().mockReturnValue({ matches: true });
+
+        await navigateToCredits(app);
+
+        const onEnd = scheduleAudioCues.mock.calls.at(-1)[1].onNarrationEnd;
+        onEnd();
+        vi.advanceTimersByTime(2000);
+
+        expect(document.getElementById('app').classList.contains('has-credits')).toBe(true);
+      });
+
+      it('double onNarrationEnd call does not add has-credits prematurely', async () => {
+        await navigateToCredits(app);
+
+        const onEnd = scheduleAudioCues.mock.calls.at(-1)[1].onNarrationEnd;
+        onEnd(); // first call — creates timer
+        onEnd(); // second call — guard (!app.creditsRevealTimer) prevents second timer
+
+        // Timer still pending — class must not be set yet
+        expect(document.getElementById('app').classList.contains('has-credits')).toBe(false);
+
+        vi.advanceTimersByTime(2000);
+
+        // Timer fired exactly once — class added exactly once
+        expect(document.getElementById('app').classList.contains('has-credits')).toBe(true);
+        expect(revealCreditsPanel).toHaveBeenCalledTimes(1);
+      });
+
+      it('has-credits removed when cleanupCredits throws — finally block ensures removal', async () => {
+        await navigateToCredits(app);
+
+        const onEnd = scheduleAudioCues.mock.calls.at(-1)[1].onNarrationEnd;
+        onEnd();
+        vi.advanceTimersByTime(2000); // class added
+
+        expect(document.getElementById('app').classList.contains('has-credits')).toBe(true);
+
+        // Make cleanupCredits throw on next call
+        cleanupCredits.mockImplementationOnce(() => {
+          throw new Error('cleanup failure');
+        });
+
+        loadEffectsScene.mockResolvedValue(true);
+        loadImage.mockResolvedValue(new Image());
+        document.getElementById('btn-prev').click();
+        await flush();
+
+        // finally block must have removed the class despite the throw
+        expect(document.getElementById('app').classList.contains('has-credits')).toBe(false);
+      });
+    });
   });
 
   // ── shimmer integration ───────────────────────────────────────────
