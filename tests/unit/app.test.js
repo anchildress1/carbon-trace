@@ -3935,7 +3935,7 @@ describe('app.js', () => {
         expect.any(Error),
       );
       // App continues to function despite shimmer init failure
-      expect(app.getState()).toBeTruthy();
+      expect(app.getState()).toBe('PAUSED');
       consoleSpy.mockRestore();
     });
 

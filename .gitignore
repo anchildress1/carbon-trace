@@ -12,6 +12,7 @@ coverage/
 playwright-report/
 playwright-results/
 test-results/
+.playwright-mcp/
 
 # Lighthouse
 .lighthouseci/
@@ -38,6 +39,8 @@ Thumbs.db
 
 # Logs
 *.log
+audit-*.png
+verify-*.png
 
 # Profiling traces (large binary artifacts, regenerated on demand)
 /profiling/

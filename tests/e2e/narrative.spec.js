@@ -368,6 +368,25 @@ test.describe('carbon-trace — credits overlay', () => {
     await expect(panel).toBeVisible({ timeout: 5000 });
   });
 
+  test('progress dots are hidden while credits are visible', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    const creditsFrameIndex = TOTAL_FRAMES - 1;
+    await jumpToFrameByDot(page, creditsFrameIndex);
+
+    const panel = page.locator('#credits-panel');
+    await expect(panel).toBeHidden();
+    await dispatchNarrationEnded(page);
+
+    const state = await page.evaluate(() => globalThis.__ctE2EApp._debugCreditsState());
+    expect(state.hasCreditsTimer).toBe(true);
+    await expect(panel).toBeVisible({ timeout: 12000 });
+    await expect(page.locator('#app')).toHaveClass(/has-credits/);
+
+    const dots = page.locator('#progress-dots');
+    await expect(dots).toHaveCSS('visibility', 'hidden');
+    await expect(dots).toHaveCSS('pointer-events', 'none');
+  });
+
   test('credits auto-scroll pauses on focused link and resumes after focus leaves', async ({
     page,
   }) => {
