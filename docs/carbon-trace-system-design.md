@@ -246,7 +246,6 @@ Renders visible circuit traces with traveling glow dots on a dedicated `<canvas 
 ### credits.js (ADR-011 — credits overlay)
 
 ```
-initCreditsContent(el)                          → populate credits HTML from static import
 revealCreditsPanel(panel, scroll, config, opts) → fade-in + GSAP auto-scroll timeline
 cleanupCredits(panel)                           → kill timelines, cancel timers, hide panel
 pauseCreditsScroll() / resumeCreditsScroll()    → pause/resume scroll timeline
