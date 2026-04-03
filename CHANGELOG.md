@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/anchildress1/carbon-trace/compare/v1.0.0...v1.0.1) (2026-04-03)
+
+
+### Bug Fixes
+
+* small-screen rendering, a11y contrast, and port conflict fixes ([#62](https://github.com/anchildress1/carbon-trace/issues/62)) ([8ae51e3](https://github.com/anchildress1/carbon-trace/commit/8ae51e3099e439b9e70ff7883a3dfd848168cd34))
+
 ## [1.0.0](https://github.com/anchildress1/carbon-trace/compare/v0.0.9...v1.0.0) (2026-04-03)
 
 
