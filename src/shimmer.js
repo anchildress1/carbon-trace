@@ -602,7 +602,7 @@ export function pause() {
 
 export function resume() {
   paused = false;
-  if (walkMap) {
+  if (walkMap && !rafId) {
     rafId = requestAnimationFrame(tick);
   }
 }
