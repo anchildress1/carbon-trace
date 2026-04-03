@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.0.0](https://github.com/anchildress1/carbon-trace/compare/v0.0.9...v1.0.0) (2026-04-03)
+
+
+### Bug Fixes
+
+* ambient audio bleed during transitions and credits scroll stall ([#59](https://github.com/anchildress1/carbon-trace/issues/59)) ([1e2490a](https://github.com/anchildress1/carbon-trace/commit/1e2490a85680321637f3db791ec83b1669757386))
+
+
+### Miscellaneous Chores
+
+* release 1.0.0 ([4ab48b8](https://github.com/anchildress1/carbon-trace/commit/4ab48b80bb0438c8378a562d25dae96c9a84a2c7))
+
 ## [0.0.9](https://github.com/anchildress1/carbon-trace/compare/v0.0.8...v0.0.9) (2026-04-03)
 
 
