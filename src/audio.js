@@ -15,6 +15,7 @@ let bufferChangeCallback = null;
 let narrationBuffering = false;
 let bufferCheckTimer = null;
 let bufferEventCleanup = null;
+let pendingCanPlayCleanup = null;
 
 // Audio-reactive analyser state (ADR-008)
 // Uses Howler.ctx (AudioContext) — an internal Howler.js property,
@@ -44,6 +45,10 @@ function cleanupBufferMonitoring() {
     bufferEventCleanup();
     bufferEventCleanup = null;
   }
+  if (pendingCanPlayCleanup) {
+    pendingCanPlayCleanup();
+    pendingCanPlayCleanup = null;
+  }
   if (narrationBuffering) {
     narrationBuffering = false;
     bufferChangeCallback?.(false);
@@ -56,12 +61,16 @@ function nudgeStall(node) {
 }
 
 function reloadFromPosition(node, onRecoveryFailed) {
+  pendingCanPlayCleanup?.();
+  pendingCanPlayCleanup = null;
+
   const time = node.currentTime;
   const src = node.src;
   node.src = '';
   node.src = src;
   const onCanPlay = () => {
     node.removeEventListener('canplay', onCanPlay);
+    pendingCanPlayCleanup = null;
     node.currentTime = time;
     if (!isAudioPaused) {
       node.play().catch((err) => {
@@ -71,6 +80,7 @@ function reloadFromPosition(node, onRecoveryFailed) {
       });
     }
   };
+  pendingCanPlayCleanup = () => node.removeEventListener('canplay', onCanPlay);
   node.addEventListener('canplay', onCanPlay);
 }
 

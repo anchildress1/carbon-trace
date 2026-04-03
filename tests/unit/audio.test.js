@@ -1081,6 +1081,44 @@ describe('audio.js — buffer recovery paths', () => {
     expect(mockNode.play).toHaveBeenCalled();
   });
 
+  it('evicts pending canplay listener before registering a new one on repeated reload', () => {
+    onNarrationBufferChange(vi.fn());
+    scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn() });
+
+    const waitingCall = mockNode.addEventListener.mock.calls.find(
+      ([event]) => event === 'waiting',
+    );
+
+    mockNode.buffered.length = 1;
+    mockNode.buffered.end.mockReturnValue(5);
+    mockNode.currentTime = 4;
+    mockNode.src = 'test.m4a';
+    waitingCall[1]();
+
+    // First 4 stall checks → first reloadFromPosition, registers canplay #1
+    for (let i = 0; i < 4; i++) {
+      vi.advanceTimersByTime(4000);
+    }
+
+    const firstCanPlayCalls = mockNode.addEventListener.mock.calls.filter(
+      ([event]) => event === 'canplay',
+    );
+    expect(firstCanPlayCalls).toHaveLength(1);
+
+    // 4 more stall checks → second reloadFromPosition, should evict canplay #1 first
+    for (let i = 0; i < 4; i++) {
+      vi.advanceTimersByTime(4000);
+    }
+
+    // The first canplay handler should have been removed before the second was added
+    const removeCanPlayCalls = mockNode.removeEventListener.mock.calls.filter(
+      ([event]) => event === 'canplay',
+    );
+    expect(removeCanPlayCalls.length).toBeGreaterThanOrEqual(1);
+    // The removed handler should be the first one registered
+    expect(removeCanPlayCalls[0][1]).toBe(firstCanPlayCalls[0][1]);
+  });
+
   it('buffer recovery play failure cleans up monitoring', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     onNarrationBufferChange(vi.fn());
