@@ -2,7 +2,22 @@ import { spawn } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium } from '@playwright/test';
 
-const PREVIEW_URL = 'http://127.0.0.1:4173';
+const previewPortEnv = process.env.PERF_PREVIEW_PORT;
+const previewPort = previewPortEnv === undefined ? 4173 : Number.parseInt(previewPortEnv, 10);
+
+if (previewPortEnv !== undefined && !/^\d+$/.test(previewPortEnv)) {
+  throw new Error(
+    `Invalid PERF_PREVIEW_PORT value: "${previewPortEnv}". Expected an integer between 1 and 65535.`,
+  );
+}
+
+if (!Number.isInteger(previewPort) || previewPort < 1 || previewPort > 65535) {
+  throw new Error(
+    `Invalid PERF_PREVIEW_PORT value: "${previewPortEnv}". Expected an integer between 1 and 65535.`,
+  );
+}
+
+const PREVIEW_URL = `http://127.0.0.1:${previewPort}`;
 const PREVIEW_ARGS = [
   'exec',
   'vite',
@@ -10,7 +25,7 @@ const PREVIEW_ARGS = [
   '--host',
   '127.0.0.1',
   '--port',
-  '4173',
+  String(previewPort),
   '--strictPort',
 ];
 
@@ -125,17 +140,23 @@ attachSignalHandlers();
 
 try {
   const chromePath = chromium.executablePath();
-  await runCommand('pnpm', ['perf:lighthouse:desktop'], { CHROME_PATH: chromePath });
-  await runCommand('pnpm', ['perf:lighthouse:mobile'], { CHROME_PATH: chromePath });
+  const perfEnv = {
+    CHROME_PATH: chromePath,
+    PERF_PREVIEW_PORT: String(previewPort),
+  };
+  await runCommand('pnpm', ['perf:lighthouse:desktop'], perfEnv);
+  await runCommand('pnpm', ['perf:lighthouse:mobile'], perfEnv);
 
   startPreviewServer();
   await waitForPreviewServer();
 
   await runCommand('pnpm', ['perf:baseline'], {
     PERF_EXTERNAL_SERVER: '1',
+    PERF_PREVIEW_PORT: String(previewPort),
   });
   await runCommand('pnpm', ['perf:runtime'], {
     PERF_EXTERNAL_SERVER: '1',
+    PERF_PREVIEW_PORT: String(previewPort),
   });
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));

@@ -1071,8 +1071,52 @@ describe('audio.js — buffer recovery paths', () => {
       vi.advanceTimersByTime(4000);
     }
 
-    // reloadFromPosition calls node.play() to restart after reset
+    // reloadFromPosition defers play() until canplay fires (seek-after-reload fix)
+    const canPlayCall = mockNode.addEventListener.mock.calls.find(
+      ([event]) => event === 'canplay',
+    );
+    expect(canPlayCall).toBeDefined();
+    canPlayCall[1](); // simulate canplay — now play() is called
+
     expect(mockNode.play).toHaveBeenCalled();
+  });
+
+  it('evicts pending canplay listener before registering a new one on repeated reload', () => {
+    onNarrationBufferChange(vi.fn());
+    scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn() });
+
+    const waitingCall = mockNode.addEventListener.mock.calls.find(
+      ([event]) => event === 'waiting',
+    );
+
+    mockNode.buffered.length = 1;
+    mockNode.buffered.end.mockReturnValue(5);
+    mockNode.currentTime = 4;
+    mockNode.src = 'test.m4a';
+    waitingCall[1]();
+
+    // First 4 stall checks → first reloadFromPosition, registers canplay #1
+    for (let i = 0; i < 4; i++) {
+      vi.advanceTimersByTime(4000);
+    }
+
+    const firstCanPlayCalls = mockNode.addEventListener.mock.calls.filter(
+      ([event]) => event === 'canplay',
+    );
+    expect(firstCanPlayCalls).toHaveLength(1);
+
+    // 4 more stall checks → second reloadFromPosition, should evict canplay #1 first
+    for (let i = 0; i < 4; i++) {
+      vi.advanceTimersByTime(4000);
+    }
+
+    // The first canplay handler should have been removed before the second was added
+    const removeCanPlayCalls = mockNode.removeEventListener.mock.calls.filter(
+      ([event]) => event === 'canplay',
+    );
+    expect(removeCanPlayCalls.length).toBeGreaterThanOrEqual(1);
+    // The removed handler should be the first one registered
+    expect(removeCanPlayCalls[0][1]).toBe(firstCanPlayCalls[0][1]);
   });
 
   it('buffer recovery play failure cleans up monitoring', async () => {
@@ -1098,6 +1142,66 @@ describe('audio.js — buffer recovery paths', () => {
 
     expect(warnSpy).toHaveBeenCalledWith('Buffer recovery play() failed:', 'play blocked');
     expect(mockNode.removeEventListener).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('calls onRecoveryFailed when reloadFromPosition play() fails after canplay', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const onRecoveryFailed = vi.fn();
+    onNarrationBufferChange(vi.fn());
+    scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn(), onRecoveryFailed });
+
+    const waitingCall = mockNode.addEventListener.mock.calls.find(
+      ([event]) => event === 'waiting',
+    );
+
+    mockNode.buffered.length = 1;
+    mockNode.buffered.end.mockReturnValue(5);
+    mockNode.currentTime = 4;
+    mockNode.src = 'test.m4a';
+    waitingCall[1]();
+
+    // 4 checks with no progress → reloadFromPosition registers canplay listener
+    for (let i = 0; i < 4; i++) {
+      vi.advanceTimersByTime(4000);
+    }
+
+    const canPlayCall = mockNode.addEventListener.mock.calls.find(
+      ([event]) => event === 'canplay',
+    );
+    expect(canPlayCall).toBeDefined();
+
+    // play() rejects after canplay fires
+    mockNode.play.mockRejectedValueOnce(new Error('blocked'));
+    canPlayCall[1]();
+    await Promise.resolve();
+
+    expect(warnSpy).toHaveBeenCalledWith('Buffer recovery play() failed:', 'blocked');
+    expect(onRecoveryFailed).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('calls onRecoveryFailed when buffer-progress play() fails', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const onRecoveryFailed = vi.fn();
+    onNarrationBufferChange(vi.fn());
+    scheduleAudioCues([makeCue()], { onNarrationEnd: vi.fn(), onRecoveryFailed });
+
+    const waitingCall = mockNode.addEventListener.mock.calls.find(
+      ([event]) => event === 'waiting',
+    );
+    waitingCall[1]();
+
+    mockNode.play.mockRejectedValueOnce(new Error('play blocked'));
+    mockNode.buffered.length = 1;
+    mockNode.buffered.end.mockReturnValue(8);
+    mockNode.currentTime = 0;
+    mockNode.duration = 60;
+
+    vi.advanceTimersByTime(4000);
+    await Promise.resolve();
+
+    expect(onRecoveryFailed).toHaveBeenCalled();
     warnSpy.mockRestore();
   });
 });

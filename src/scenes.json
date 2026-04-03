@@ -1049,7 +1049,7 @@
           "type": "ambient",
           "src": "assets/audio/ambient/06-storage-sing-a6ebcb14.m4a",
           "enter": 0,
-          "volume": 0.15,
+          "volume": 0.1,
           "loop": true,
           "fadeIn": 1500
         }

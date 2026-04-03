@@ -556,3 +556,75 @@ Nav back + return = restart?                      │ Yes
 - Latest run result: `2 passed, 0 skipped`
 
 **Note:** Physical Safari/Pixel hardware spot-checks are still useful before final release, but the ADR's previously unchecked regression targets now have automated coverage in repo.
+
+---
+
+## 010.14 Addendum: Small-Screen Rendering Fixes (April 3, 2026)
+
+**Status:** Accepted
+**Author:** Ashley Childress (@anchildress1)
+
+Two small-screen rendering defects were identified after initial implementation:
+
+1. **Ghost drift text font size mismatch** — `font-size: clamp(1rem, 2.5vw, 1.75rem)` on `.narration-line` used `vw` (viewport width). The `#app` container is sized by `width: min(100%, calc(100vh * 16/9))`, so its width diverges from `100vw` whenever the viewport aspect ratio departs from 16:9 (portrait phones, landscape phones, etc.). Text positions (`left: x%`, `top: y%`) are container-relative, but font size was viewport-relative — a mismatched coordinate space. On a portrait phone (390×844px), `#app` is 390×219px and `2.5vw` clamps up to `1rem` = 16px, which is disproportionately large in a 219px-tall frame.
+
+2. **Progress dots rendered over credits panel** — `.overlay-controls` at `z-index: 10` paints above `#credits-panel` at `z-index: 7`. On small screens the controls (≈100px tall, starting 3% from bottom) overlap deeply into the credits panel area since `inset: 8% 12%` gives only 8% clearance at the bottom — as little as 17px on a 219px-tall portrait phone frame.
+
+### 010.14.1 Fixes Applied
+
+**Ghost drift text — CSS container queries:**
+
+`container-type: inline-size` added to `#app`. Narration font-size changed from `vw` to `cqw` (container query width units):
+
+```css
+#app {
+  container-type: inline-size;  /* establishes inline-size containment context */
+}
+
+.narration-line {
+  font-size: clamp(1rem, 2.5cqw, 1.75rem);  /* was: 2.5vw */
+}
+
+/* @media (max-width: 480px) override */
+.narration-line {
+  font-size: clamp(0.8rem, 2cqw, 1rem);  /* was: 2vw */
+}
+```
+
+`cqw` resolves against the nearest container with `container-type: inline-size` — in this case `#app` itself. Font size now scales proportionally with the visual frame at every viewport size, matching the coordinate space used by `left: x%` / `top: y%` positioning.
+
+**Adding `container-type: inline-size` does not affect layout:** `#app` is already sized by explicit `width` and `aspect-ratio` rules and has `overflow: hidden`. The `inline-size` containment implies `contain: inline-size layout style`, which is compatible with all child elements since no child intrinsically sizes `#app`.
+
+Browser support: Chrome 105+ (Aug 2022), Firefox 110+ (Feb 2023), Safari 16+ (Sep 2022) — all within the project's supported browser baseline.
+
+**Progress dots — `has-credits` CSS class:**
+
+§010.7.5 specified progress dots as visible on the credits frame. This deviates from that decision.
+
+**Deviation rationale:** The credits frame is terminal. The dots' primary function is positional navigation context ("you are at frame N of N") — on the terminal frame, forward navigation is blocked and back navigation remains available via the dedicated back button. Hiding the dots removes the visual intrusion without degrading functional access. The deviation is limited to dot visibility; all other controls (play/pause, replay, mute, captions, back) remain visible and interactive during credits.
+
+**Mechanism:** `app.js` adds `has-credits` to `#app` when `revealCreditsPanel()` fires; removes it in `cleanupCurrentScene()` when `cleanupCredits()` is called. CSS hides the dot row:
+
+```css
+#app.has-credits .progress-dots {
+  visibility: hidden;
+  pointer-events: none;
+}
+```
+
+`visibility: hidden` (not `display: none`) preserves the dots' layout space so the control buttons row does not shift position when credits appear.
+
+### 010.14.2 Updated §010.7.5 Button State
+
+```
+ELEMENT          │ VISIBLE │ ENABLED │ BEHAVIOR
+─────────────────┼─────────┼─────────┼──────────────────────────────
+Progress dots    │ No      │ n/a     │ Hidden via has-credits class.
+                 │         │         │ Back-nav available via btn-prev.
+Back button      │ Yes     │ Yes     │ Navigate to frame 10.
+Forward button   │ Yes     │ No      │ Disabled — CREDITS state blocks.
+Play/Pause       │ Yes     │ Yes     │ Freezes EVERYTHING.
+Replay button    │ Yes     │ Yes     │ Replays narration. Credits re-triggered.
+Mute button      │ Yes     │ Yes     │ Mutes all audio.
+Captions button  │ Yes     │ Yes     │ Frame 11 HAS captions.
+```

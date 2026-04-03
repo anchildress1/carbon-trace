@@ -32,6 +32,7 @@ let disposableTextures = [];
 let loadGeneration = 0;
 let isPaused = false;
 let initPromise = null;
+let audioReactiveErrorLogged = false;
 let lifecycleToken = 0;
 let centeredEffects = []; // effects with normalized center → pixel conversion
 
@@ -302,18 +303,26 @@ function processAudioReactive(dt) {
       if (state.trigger) applyTrigger(state, energy, dt);
     }
   } catch (err) {
-    console.error('Audio-reactive modulation failed:', err);
+    if (!audioReactiveErrorLogged) {
+      audioReactiveErrorLogged = true;
+      console.error('Audio-reactive modulation failed:', err);
+    }
   }
 }
 
 function tickerUpdate(ticker) {
   const dt = ticker.deltaMS / 1000;
+  const badEffects = [];
   for (const effect of activeEffects) {
     try {
       effect.update(dt);
     } catch (err) {
-      console.error('Effect update failed:', err);
+      console.error('Effect update failed — evicting:', err);
+      badEffects.push(effect);
     }
+  }
+  for (const effect of badEffects) {
+    activeEffects.splice(activeEffects.indexOf(effect), 1);
   }
   processAudioReactive(dt);
 }
@@ -623,6 +632,7 @@ export function clearAll() {
   audioReactiveState = [];
   arAnalyser = null;
   fftData = null;
+  audioReactiveErrorLogged = false;
   cleanupAnalysisElement();
 
   if (!webglAvailable || !pixiApp) return;

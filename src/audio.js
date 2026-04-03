@@ -15,6 +15,7 @@ let bufferChangeCallback = null;
 let narrationBuffering = false;
 let bufferCheckTimer = null;
 let bufferEventCleanup = null;
+let pendingCanPlayCleanup = null;
 
 // Audio-reactive analyser state (ADR-008)
 // Uses Howler.ctx (AudioContext) — an internal Howler.js property,
@@ -44,6 +45,10 @@ function cleanupBufferMonitoring() {
     bufferEventCleanup();
     bufferEventCleanup = null;
   }
+  if (pendingCanPlayCleanup) {
+    pendingCanPlayCleanup();
+    pendingCanPlayCleanup = null;
+  }
   if (narrationBuffering) {
     narrationBuffering = false;
     bufferChangeCallback?.(false);
@@ -55,21 +60,31 @@ function nudgeStall(node) {
   node.currentTime = pos;
 }
 
-function reloadFromPosition(node) {
+function reloadFromPosition(node, onRecoveryFailed) {
+  pendingCanPlayCleanup?.();
+  pendingCanPlayCleanup = null;
+
   const time = node.currentTime;
   const src = node.src;
   node.src = '';
   node.src = src;
-  node.currentTime = time;
-  if (!isAudioPaused) {
-    node.play().catch((err) => {
-      console.warn('Buffer recovery play() failed:', err.message);
-      cleanupBufferMonitoring();
-    });
-  }
+  const onCanPlay = () => {
+    node.removeEventListener('canplay', onCanPlay);
+    pendingCanPlayCleanup = null;
+    node.currentTime = time;
+    if (!isAudioPaused) {
+      node.play().catch((err) => {
+        console.warn('Buffer recovery play() failed:', err.message);
+        cleanupBufferMonitoring();
+        onRecoveryFailed?.();
+      });
+    }
+  };
+  pendingCanPlayCleanup = () => node.removeEventListener('canplay', onCanPlay);
+  node.addEventListener('canplay', onCanPlay);
 }
 
-function checkBufferProgress(node, state, onExhaustion) {
+function checkBufferProgress(node, state, onExhaustion, onRecoveryFailed) {
   if (!narrationBuffering) {
     clearInterval(bufferCheckTimer);
     bufferCheckTimer = null;
@@ -88,6 +103,7 @@ function checkBufferProgress(node, state, onExhaustion) {
         node.play().catch((err) => {
           console.warn('Buffer recovery play() failed:', err.message);
           cleanupBufferMonitoring();
+          onRecoveryFailed?.();
         });
       }
     }
@@ -103,20 +119,23 @@ function checkBufferProgress(node, state, onExhaustion) {
         onExhaustion?.();
         return;
       }
-      reloadFromPosition(node);
+      reloadFromPosition(node, onRecoveryFailed);
       state.stallChecks = 0;
     }
   }
 }
 
-function handleWaiting(node, state, onExhaustion) {
+function handleWaiting(node, state, onExhaustion, onRecoveryFailed) {
   if (narrationBuffering) return;
   narrationBuffering = true;
   bufferChangeCallback?.(true);
 
   state.stallChecks = 0;
   state.lastBufferedEnd = getBufferedEnd(node);
-  bufferCheckTimer = setInterval(() => checkBufferProgress(node, state, onExhaustion), 4000);
+  bufferCheckTimer = setInterval(
+    () => checkBufferProgress(node, state, onExhaustion, onRecoveryFailed),
+    4000,
+  );
 }
 
 function handlePlaying() {
@@ -139,7 +158,7 @@ function monitorNarrationBuffer(howl, opts) {
 
     const state = { lastBufferedEnd: 0, stallChecks: 0, recoveryAttempts: 0 };
 
-    const onWaiting = () => handleWaiting(node, state, opts?.onExhaustion);
+    const onWaiting = () => handleWaiting(node, state, opts?.onExhaustion, opts?.onRecoveryFailed);
     const onPlaying = () => handlePlaying();
 
     node.addEventListener('waiting', onWaiting);
@@ -209,6 +228,7 @@ function buildCueDurations(cues, opts) {
 
 function tryResolveAnchor(cue, resolvedEnters, durations) {
   if (resolvedEnters.has(cue.id)) return false;
+  if (!cue.enter || typeof cue.enter !== 'object') return false;
   const refEnter = resolvedEnters.get(cue.enter.ref);
   if (refEnter === undefined) return false;
   if (durations.has(cue.enter.ref)) {
@@ -303,7 +323,7 @@ function playCue(cue) {
   return howl;
 }
 
-function crossfadeAmbientCue(cue, crossfadeDurationMs) {
+function crossfadeAmbientCue(cue, crossfadeDurationMs, newEntry) {
   const oldEntry = findActiveAmbient();
   const oldHowl = oldEntry?.howl;
   const oldVolume = oldHowl?.volume() ?? 0;
@@ -345,10 +365,9 @@ function crossfadeAmbientCue(cue, crossfadeDurationMs) {
       oldHowl.fade(oldHowl.volume(), oldVolume, 200);
     }
     // Mark the entry as failed so pauseAudioCues/resumeAudioCues skip it
-    const entry = activeCues.get(cue.id);
-    if (entry && entry.howl === newHowl) {
-      entry.howl = null;
-      entry.state = 'error';
+    if (newEntry && newEntry.howl === newHowl) {
+      newEntry.howl = null;
+      newEntry.state = 'error';
     }
   };
 
@@ -429,6 +448,7 @@ function wireNarrationEnd(entry, cue, opts) {
       entry.howl?.unload();
       safeEnd();
     },
+    onRecoveryFailed: opts?.onRecoveryFailed,
   });
 }
 
@@ -515,7 +535,7 @@ export function scheduleAudioCues(cues, opts = {}) {
     const startCue = () => {
       entry.timer = null;
       if (cue.type === 'ambient') {
-        entry.howl = crossfadeAmbientCue(cue, crossfadeDurationMs);
+        entry.howl = crossfadeAmbientCue(cue, crossfadeDurationMs, entry);
       } else {
         entry.howl = playCue(cue);
       }

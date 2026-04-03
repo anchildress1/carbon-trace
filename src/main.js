@@ -30,8 +30,7 @@ if (!globalThis.__carbonTraceInitialized) {
         globalThis.__ctE2EApp = app;
       }
     } catch (err) {
-      // eslint-disable-next-line no-console -- Explicitly requested startup failure telemetry.
-      console.log('[carbon-trace] startup_failed', sanitizeStartupError(err));
+      console.error('[carbon-trace] startup_failed', sanitizeStartupError(err));
       const loading = document.getElementById('loading-screen');
       if (loading) {
         loading.textContent = 'Unable to start experience. Please refresh.';
