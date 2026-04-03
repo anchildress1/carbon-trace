@@ -43,8 +43,13 @@ export function buildNarrationTimeline(lines, container, opts = {}) {
     });
 
     if (reducedMotion) {
-      tl.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: 'none' }, line.enter / 1000);
-      tl.to(el, { opacity: 0, duration: 0.3, ease: 'none' }, line.exit / 1000);
+      tl.fromTo(
+        el,
+        { opacity: 0 },
+        { opacity: 1, duration: 0.7, ease: 'power1.out' },
+        line.enter / 1000,
+      );
+      tl.to(el, { opacity: 0, duration: 0.7, ease: 'power1.in' }, line.exit / 1000);
     } else {
       tl.fromTo(
         el,

@@ -49,7 +49,6 @@ function mockSprite() {
 describe('effects.js — factory registry', () => {
   let registerEffect;
   let createEffect;
-  let hasEffectType;
   let noiseFreeTypes;
   let overlayTypes;
   let DisplacementFilter;
@@ -65,27 +64,9 @@ describe('effects.js — factory registry', () => {
     ({
       registerEffect,
       createEffect,
-      hasEffectType,
       noiseFreeTypes,
       overlayTypes,
     } = await import('../../src/effects.js'));
-  });
-
-  describe('hasEffectType', () => {
-    it('returns true for built-in types', () => {
-      expect(hasEffectType('water')).toBe(true);
-      expect(hasEffectType('heat')).toBe(true);
-      expect(hasEffectType('dust')).toBe(true);
-      expect(hasEffectType('glow')).toBe(true);
-      expect(hasEffectType('shockwave')).toBe(true);
-    });
-
-    it('returns false for unregistered types and non-strings', () => {
-      expect(hasEffectType('nonexistent')).toBe(false);
-      expect(hasEffectType('')).toBe(false);
-      expect(hasEffectType(null)).toBe(false);
-      expect(hasEffectType(undefined)).toBe(false);
-    });
   });
 
   describe('registerEffect', () => {

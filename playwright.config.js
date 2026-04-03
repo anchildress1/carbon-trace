@@ -1,6 +1,20 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const isCI = !!process.env.CI;
+const previewPortEnv = process.env.PLAYWRIGHT_PREVIEW_PORT;
+const previewPort = previewPortEnv === undefined ? 4174 : Number.parseInt(previewPortEnv, 10);
+
+if (previewPortEnv !== undefined && !/^\d+$/.test(previewPortEnv)) {
+  throw new Error(
+    `Invalid PLAYWRIGHT_PREVIEW_PORT value: "${previewPortEnv}". Expected an integer between 1 and 65535.`,
+  );
+}
+
+if (!Number.isInteger(previewPort) || previewPort < 1 || previewPort > 65535) {
+  throw new Error(
+    `Invalid PLAYWRIGHT_PREVIEW_PORT value: "${previewPortEnv}". Expected an integer between 1 and 65535.`,
+  );
+}
 
 export default defineConfig({
   testDir: 'tests/e2e',
@@ -12,14 +26,13 @@ export default defineConfig({
   retries: isCI ? 2 : 0,
   workers: isCI ? 1 : undefined,
   use: {
-    baseURL: 'http://localhost:4173',
+    baseURL: `http://localhost:${previewPort}`,
     headless: true,
     trace: 'on-first-retry',
   },
   webServer: {
-    command:
-      'VITE_E2E=1 pnpm exec vite build && BROWSER=none pnpm exec vite preview --host localhost --port 4173 --strictPort',
-    port: 4173,
+    command: `VITE_E2E=1 pnpm exec vite build && BROWSER=none pnpm exec vite preview --host localhost --port ${previewPort} --strictPort`,
+    port: previewPort,
     reuseExistingServer: false,
   },
   projects: [

@@ -515,15 +515,16 @@ body {
 #credits-panel {
   position: absolute;
   inset: 8% 12%;
-  overflow: hidden;
+  overflow: clip;
+  contain: paint;
   cursor: default;
   opacity: 0;
-  mask-image: linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, black 8%, black 97%, transparent 100%);
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent 0%,
-    black 10%,
-    black 90%,
+    black 8%,
+    black 97%,
     transparent 100%
   );
   z-index: 7;
@@ -647,7 +648,7 @@ body {
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .narration-line {
-    transition: opacity 0.3s ease;
+    transition: opacity 0.7s ease;
   }
 
   .caption-text {
@@ -690,6 +691,7 @@ body {
   }
 
   #credits-panel {
+    overflow-x: hidden;
     overflow-y: auto;
     opacity: 1;
     mask-image: none;

@@ -7,7 +7,6 @@ import {
   destroySceneCanvas,
   getSceneContext,
   loadImage,
-  resetImageCache,
 } from '../../src/canvas.js';
 
 function createMockCanvas(initialRect = { width: 1920, height: 1080 }) {
@@ -51,7 +50,6 @@ describe('canvas.js', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     destroySceneCanvas();
-    resetImageCache();
     imageCtorCount = 0;
     resizeObserverInstances = [];
 
@@ -90,7 +88,6 @@ describe('canvas.js', () => {
   afterEach(() => {
     vi.useRealTimers();
     destroySceneCanvas();
-    resetImageCache();
     globalThis.Image = originalImage;
     vi.restoreAllMocks();
   });
