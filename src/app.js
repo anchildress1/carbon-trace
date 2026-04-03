@@ -373,6 +373,10 @@ function scheduleFrameAudio(app, frame) {
     maxNarrationDurationMs,
     crossfadeDurationMs: 800,
     audioDurations: app.audioDurations,
+    onRecoveryFailed: () => {
+      app.textTimeline?.kill();
+      app.textTimeline = null;
+    },
   });
 }
 
@@ -754,6 +758,7 @@ function doHardJump(app, toIndex, toFrame) {
   const prevFrame = app.frames[prevIndex];
   app.currentIndex = toIndex;
   app.deferFrameAudioUntilResume = true;
+  app.pendingPause = false;
   try {
     showFrame(app, toIndex);
     app.state = frameState(toFrame);
@@ -777,6 +782,7 @@ function doClickJump(app, toIndex, toFrame, prevFrame) {
     console.error('Error during scene transition:', err);
     app.currentIndex = prevIndex;
     app.state = frameState(prevFrame);
+    doPause(app);
     return;
   }
   if (app.pendingPause) {
