@@ -693,11 +693,12 @@ function completePendingNav(app) {
 
 function cleanupCurrentScene(app, opts = {}) {
   const preserveAmbient = opts.preserveAmbient === true;
+  const ambientFadeMs = opts.ambientFadeMs || 0;
   app.generation++;
   clearAutoAdvance(app);
   cancelPendingLoad();
   disconnectAnalyserSource();
-  cancelAudioCues({ preserveAmbient });
+  cancelAudioCues({ preserveAmbient, ambientFadeMs });
 
   if (app.analysisStartTimer) {
     app.analysisStartTimer.cancel();
@@ -837,8 +838,11 @@ function transition(app, toIndex) {
   app.els.sceneStage.classList.remove('buffering');
   app.els.loadingScreen.hidden = true;
 
+  const transitionConfig = toFrame.transition || scenesData.meta.defaultTransition;
+
   cleanupCurrentScene(app, {
     preserveAmbient: !wasPaused && targetHasAmbientCue,
+    ambientFadeMs: transitionConfig.duration,
   });
 
   // Hard jump: instant cut when navigating while paused.
@@ -867,7 +871,6 @@ function transition(app, toIndex) {
     return;
   }
 
-  const transitionConfig = toFrame.transition || scenesData.meta.defaultTransition;
   const halfDuration = transitionConfig.duration / 2000;
 
   gsap.to(app.els.sceneStage, {

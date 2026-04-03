@@ -1145,6 +1145,7 @@ describe('app.js', () => {
       await flush();
 
       expect(cancelAudioCues).toHaveBeenCalledWith(expect.objectContaining({ preserveAmbient: true }));
+      expect(cancelAudioCues).toHaveBeenCalledWith(expect.objectContaining({ ambientFadeMs: expect.any(Number) }));
     });
 
     it('fully cancels audio when target scene has no ambient cue', async () => {

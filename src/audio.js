@@ -533,6 +533,7 @@ export function scheduleAudioCues(cues, opts = {}) {
 
 export function cancelAudioCues(opts = {}) {
   const preserveAmbient = opts.preserveAmbient === true;
+  const ambientFadeMs = opts.ambientFadeMs || 0;
   isAudioPaused = false;
   disconnectAnalyserSource();
   for (const [id, entry] of activeCues.entries()) {
@@ -544,6 +545,13 @@ export function cancelAudioCues(opts = {}) {
       (entry.state === 'playing' || entry.state === 'fading-out');
     if (keepAmbient) {
       entry.timer = null;
+      // Begin fading the preserved ambient during the visual transition so it
+      // doesn't play at full volume through the fade. crossfadeAmbientCue will
+      // replace this fade when the new scene's ambient starts.
+      if (ambientFadeMs > 0 && entry.state === 'playing') {
+        entry.howl.fade(entry.howl.volume(), 0, ambientFadeMs);
+        entry.state = 'fading-out';
+      }
       continue;
     }
     entry.howl?._crossfadeCleanup?.();
