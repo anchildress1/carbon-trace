@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.9](https://github.com/anchildress1/carbon-trace/compare/v0.0.8...v0.0.9) (2026-04-03)
+
+
+### Bug Fixes
+
+* sync caption timeline start with narration playback ([#57](https://github.com/anchildress1/carbon-trace/issues/57)) ([f3e3961](https://github.com/anchildress1/carbon-trace/commit/f3e39610fa2be2eb9a58c396e860b4bb9ab167b5))
+
 ## [0.0.8](https://github.com/anchildress1/carbon-trace/compare/v0.0.7...v0.0.8) (2026-04-02)
 
 
