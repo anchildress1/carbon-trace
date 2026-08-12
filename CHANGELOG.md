@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/anchildress1/carbon-trace/compare/v1.0.1...v1.0.2) (2026-08-12)
+
+
+### Bug Fixes
+
+* **ci:** align codeql-action versions and use build-mode none for JS/TS ([#92](https://github.com/anchildress1/carbon-trace/issues/92)) ([819265f](https://github.com/anchildress1/carbon-trace/commit/819265f6c246f3085050b21c2b32d907a6b4c4a9))
+
 ## [1.0.1](https://github.com/anchildress1/carbon-trace/compare/v1.0.0...v1.0.1) (2026-04-03)
 
 
