@@ -24,14 +24,14 @@ describe('overlay.js', () => {
     it('creates the correct number of dots', () => {
       initOverlay(10);
 
-      expect(dotsContainer.children.length).toBe(10);
+      expect(dotsContainer.children).toHaveLength(10);
     });
 
     it('creates dots with progress-dot class', () => {
       initOverlay(5);
 
       const dots = dotsContainer.querySelectorAll('.progress-dot');
-      expect(dots.length).toBe(5);
+      expect(dots).toHaveLength(5);
     });
 
     it('sets aria-label on each dot', () => {
@@ -56,13 +56,13 @@ describe('overlay.js', () => {
       initOverlay(5);
       initOverlay(3);
 
-      expect(dotsContainer.children.length).toBe(3);
+      expect(dotsContainer.children).toHaveLength(3);
     });
 
     it('handles zero scenes', () => {
       initOverlay(0);
 
-      expect(dotsContainer.children.length).toBe(0);
+      expect(dotsContainer.children).toHaveLength(0);
     });
 
     it('calls onDotClick with scene index when dot is clicked', () => {
@@ -86,7 +86,7 @@ describe('overlay.js', () => {
       dotsContainer.remove();
 
       expect(() => initOverlay(5)).not.toThrow();
-      expect(document.querySelectorAll('.progress-dot').length).toBe(0);
+      expect(document.querySelectorAll('.progress-dot')).toHaveLength(0);
     });
 
     it('creates dots without click handler when onDotClick is omitted and keeps roving state', () => {
@@ -126,7 +126,7 @@ describe('overlay.js', () => {
       updateProgress(0);
 
       const activeDots = dotsContainer.querySelectorAll('.active');
-      expect(activeDots.length).toBe(0);
+      expect(activeDots).toHaveLength(0);
     });
 
     it('marks all dots active when at last scene', () => {
@@ -134,7 +134,7 @@ describe('overlay.js', () => {
       updateProgress(3);
 
       const activeDots = dotsContainer.querySelectorAll('.active');
-      expect(activeDots.length).toBe(3);
+      expect(activeDots).toHaveLength(3);
     });
 
     it('sets aria-current="step" on the current dot', () => {
@@ -165,7 +165,7 @@ describe('overlay.js', () => {
       updateProgress(0);
 
       const current = dotsContainer.querySelectorAll('[aria-current]');
-      expect(current.length).toBe(0);
+      expect(current).toHaveLength(0);
     });
 
     it('skips work when updateProgress receives the same scene index twice', () => {
@@ -195,14 +195,14 @@ describe('overlay.js', () => {
       initOverlay(3);
       expect(() => updateProgress(-2)).not.toThrow();
       const activeDots = dotsContainer.querySelectorAll('.active');
-      expect(activeDots.length).toBe(0);
+      expect(activeDots).toHaveLength(0);
     });
   });
 
   describe('updateProgress — edge cases', () => {
     it('handles being called before initOverlay without mutating DOM state', () => {
       expect(() => updateProgress(3)).not.toThrow();
-      expect(document.querySelectorAll('.progress-dot').length).toBe(0);
+      expect(document.querySelectorAll('.progress-dot')).toHaveLength(0);
     });
 
     it('handles sceneIndex beyond total dot count', () => {
@@ -210,7 +210,7 @@ describe('overlay.js', () => {
       updateProgress(10);
 
       const activeDots = dotsContainer.querySelectorAll('.active');
-      expect(activeDots.length).toBe(3);
+      expect(activeDots).toHaveLength(3);
     });
   });
 

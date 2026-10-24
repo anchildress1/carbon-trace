@@ -36,31 +36,15 @@ describe('handleKeydown', () => {
   // ── handled keys ───────────────────────────────────────────────────
 
   describe('handled keys from non-button focus', () => {
-    it('Space dispatches togglePause', () => {
-      const e = makeEvent(' ');
+    it.each([
+      ['Space', ' ', 'togglePause'],
+      ['Enter', 'Enter', 'advance'],
+      ['ArrowRight', 'ArrowRight', 'advance'],
+      ['ArrowLeft', 'ArrowLeft', 'retreat'],
+    ])('%s dispatches its mapped action', (_label, key, action) => {
+      const e = makeEvent(key);
       expect(handleKeydown(e, handler)).toBe(true);
-      expect(handler).toHaveBeenCalledWith('togglePause');
-      expect(e.preventDefault).toHaveBeenCalled();
-    });
-
-    it('Enter dispatches advance', () => {
-      const e = makeEvent('Enter');
-      expect(handleKeydown(e, handler)).toBe(true);
-      expect(handler).toHaveBeenCalledWith('advance');
-      expect(e.preventDefault).toHaveBeenCalled();
-    });
-
-    it('ArrowRight dispatches advance', () => {
-      const e = makeEvent('ArrowRight');
-      expect(handleKeydown(e, handler)).toBe(true);
-      expect(handler).toHaveBeenCalledWith('advance');
-      expect(e.preventDefault).toHaveBeenCalled();
-    });
-
-    it('ArrowLeft dispatches retreat', () => {
-      const e = makeEvent('ArrowLeft');
-      expect(handleKeydown(e, handler)).toBe(true);
-      expect(handler).toHaveBeenCalledWith('retreat');
+      expect(handler).toHaveBeenCalledWith(action);
       expect(e.preventDefault).toHaveBeenCalled();
     });
 
@@ -107,25 +91,15 @@ describe('handleKeydown', () => {
   });
 
   describe('button guard — Arrow keys and Escape still fire on buttons', () => {
-    it('ArrowRight on button still fires', () => {
+    it.each([
+      ['ArrowRight', 'advance'],
+      ['ArrowLeft', 'retreat'],
+      ['Escape', 'pause'],
+    ])('%s on button still fires', (key, action) => {
       const btn = makeButton();
-      const e = makeEvent('ArrowRight', btn);
+      const e = makeEvent(key, btn);
       expect(handleKeydown(e, handler)).toBe(true);
-      expect(handler).toHaveBeenCalledWith('advance');
-    });
-
-    it('ArrowLeft on button still fires', () => {
-      const btn = makeButton();
-      const e = makeEvent('ArrowLeft', btn);
-      expect(handleKeydown(e, handler)).toBe(true);
-      expect(handler).toHaveBeenCalledWith('retreat');
-    });
-
-    it('Escape on button still fires', () => {
-      const btn = makeButton();
-      const e = makeEvent('Escape', btn);
-      expect(handleKeydown(e, handler)).toBe(true);
-      expect(handler).toHaveBeenCalledWith('pause');
+      expect(handler).toHaveBeenCalledWith(action);
     });
   });
 
