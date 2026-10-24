@@ -17,14 +17,15 @@ if (!Number.isInteger(previewPort) || previewPort < 1 || previewPort > 65535) {
   );
 }
 
+// Use the full browser so WebGL profiles use available hardware acceleration.
 const projects = [
   {
     name: 'chromium',
-    use: { ...devices['Desktop Chrome'] },
+    use: { ...devices['Desktop Chrome'], channel: 'chromium' },
   },
   {
     name: 'mobile-chrome',
-    use: { ...devices['Pixel 5'] },
+    use: { ...devices['Pixel 5'], channel: 'chromium' },
   },
 ];
 

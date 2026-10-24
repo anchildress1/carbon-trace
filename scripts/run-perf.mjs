@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { setTimeout as delay } from 'node:timers/promises';
+import { preview } from 'vite';
 import { chromium } from '@playwright/test';
 
 const previewPortEnv = process.env.PERF_PREVIEW_PORT;
@@ -17,57 +17,16 @@ if (!Number.isInteger(previewPort) || previewPort < 1 || previewPort > 65535) {
   );
 }
 
-const PREVIEW_URL = `http://127.0.0.1:${previewPort}`;
-const PREVIEW_ARGS = [
-  'exec',
-  'vite',
-  'preview',
-  '--host',
-  '127.0.0.1',
-  '--port',
-  String(previewPort),
-  '--strictPort',
-];
-
-let previewProcess = null;
-
+let previewServer = null;
 let isStopping = false;
 
-async function waitForPreviewServer(timeoutMs = 45_000) {
-  if (!previewProcess) {
-    throw new Error('Preview server has not been started.');
-  }
-  const startedAt = Date.now();
-
-  while (Date.now() - startedAt < timeoutMs) {
-    if (previewProcess.exitCode !== null) {
-      throw new Error('Preview server exited before it was ready.');
-    }
-
-    try {
-      const response = await fetch(PREVIEW_URL, { method: 'GET' });
-      if (response.ok) {
-        return;
-      }
-    } catch {
-      // Keep waiting while the server boots.
-    }
-
-    await delay(500);
-  }
-
-  throw new Error(`Timed out waiting for preview server at ${PREVIEW_URL}.`);
-}
-
-function startPreviewServer() {
-  if (previewProcess) {
-    return;
-  }
-  previewProcess = spawn('pnpm', PREVIEW_ARGS, {
-    stdio: 'inherit',
-    env: {
-      ...process.env,
-      BROWSER: 'none',
+async function startPreviewServer() {
+  previewServer = await preview({
+    preview: {
+      host: '127.0.0.1',
+      port: previewPort,
+      strictPort: true,
+      open: false,
     },
   });
 }
@@ -101,22 +60,8 @@ async function stopPreviewServer() {
   }
   isStopping = true;
 
-  if (!previewProcess || previewProcess.exitCode !== null) {
-    return;
-  }
-
-  previewProcess.kill('SIGTERM');
-
-  const stopDeadlineMs = 5_000;
-  const stopStartedAt = Date.now();
-  while (previewProcess.exitCode === null && Date.now() - stopStartedAt < stopDeadlineMs) {
-    await delay(100);
-  }
-
-  if (previewProcess.exitCode === null) {
-    previewProcess.kill('SIGKILL');
-  }
-  previewProcess = null;
+  await previewServer?.close();
+  previewServer = null;
 }
 
 function attachSignalHandlers() {
@@ -147,8 +92,7 @@ try {
   await runCommand('pnpm', ['perf:lighthouse:desktop'], perfEnv);
   await runCommand('pnpm', ['perf:lighthouse:mobile'], perfEnv);
 
-  startPreviewServer();
-  await waitForPreviewServer();
+  await startPreviewServer();
 
   await runCommand('pnpm', ['perf:baseline'], {
     PERF_EXTERNAL_SERVER: '1',

@@ -109,7 +109,7 @@ describe('captions.js', () => {
   describe('syncCaptionsToTime', () => {
     it('handles empty entries array', () => {
       syncCaptionsToTime([], 1.0, container);
-      expect(container.children.length).toBe(0);
+      expect(container.children).toHaveLength(0);
     });
 
     it('shows captions active at the given time', () => {
@@ -121,7 +121,7 @@ describe('captions.js', () => {
 
       syncCaptionsToTime(entries, 1.8, container);
 
-      expect(container.children.length).toBe(2);
+      expect(container.children).toHaveLength(2);
       expect(container.children[0].textContent).toBe('Early');
       expect(container.children[1].textContent).toBe('Mid');
       expect(entries[0].el).not.toBeNull();
@@ -134,7 +134,7 @@ describe('captions.js', () => {
 
       syncCaptionsToTime(entries, 0, container);
 
-      expect(container.children.length).toBe(0);
+      expect(container.children).toHaveLength(0);
     });
 
     it('shows no captions when time is past all entries', () => {
@@ -142,7 +142,7 @@ describe('captions.js', () => {
 
       syncCaptionsToTime(entries, 3, container);
 
-      expect(container.children.length).toBe(0);
+      expect(container.children).toHaveLength(0);
     });
 
     it('clears existing caption elements before syncing', () => {
@@ -153,7 +153,7 @@ describe('captions.js', () => {
       syncCaptionsToTime(entries, 1, container);
 
       // Old element removed, new one created
-      expect(container.children.length).toBe(1);
+      expect(container.children).toHaveLength(1);
       expect(container.children[0].textContent).toBe('Active');
       expect(entries[0].el).toBe(container.children[0]);
     });
@@ -164,7 +164,7 @@ describe('captions.js', () => {
 
       syncCaptionsToTime(entries, 1, container);
 
-      expect(container.children.length).toBe(1);
+      expect(container.children).toHaveLength(1);
       expect(container.children[0].textContent).toBe('Detached');
       expect(entries[0].el).toBe(container.children[0]);
     });
@@ -192,7 +192,7 @@ describe('captions.js', () => {
       syncCaptionsToTime(entries, 1, container);
 
       expect(container.children[0].textContent).toBe('<b>bold</b>');
-      expect(container.children[0].children.length).toBe(0);
+      expect(container.children[0].children).toHaveLength(0);
     });
 
     it('includes caption at exact startSec boundary', () => {
@@ -200,7 +200,7 @@ describe('captions.js', () => {
 
       syncCaptionsToTime(entries, 2, container);
 
-      expect(container.children.length).toBe(1);
+      expect(container.children).toHaveLength(1);
     });
 
     it('excludes caption at exact endSec boundary', () => {
@@ -208,7 +208,7 @@ describe('captions.js', () => {
 
       syncCaptionsToTime(entries, 2, container);
 
-      expect(container.children.length).toBe(0);
+      expect(container.children).toHaveLength(0);
     });
   });
 
@@ -226,7 +226,7 @@ describe('captions.js', () => {
 
       clearCaptionElements(entries);
 
-      expect(container.children.length).toBe(0);
+      expect(container.children).toHaveLength(0);
       expect(entries[0].el).toBeNull();
       expect(entries[1].el).toBeNull();
     });

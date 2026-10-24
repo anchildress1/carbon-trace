@@ -238,7 +238,7 @@ describe('shimmer.js', () => {
       mockCtx.drawImage.mockClear();
       lastTick(1000);
       // 1 traceImage + 3 dots × 2 sprites each = 7
-      expect(mockCtx.drawImage.mock.calls.length).toBe(1 + 3 * 2);
+      expect(mockCtx.drawImage.mock.calls).toHaveLength(1 + 3 * 2);
     });
 
     it('spawns zero dots when dotCount is 0', async () => {
@@ -465,7 +465,7 @@ describe('shimmer.js', () => {
       tick(1000);
 
       // 1 traceImage + 2 dots × 2 sprites (glow + core) = 5 drawImage calls
-      expect(mockCtx.drawImage.mock.calls.length).toBe(1 + 2 * 2);
+      expect(mockCtx.drawImage.mock.calls).toHaveLength(1 + 2 * 2);
     });
 
     it('returns early without drawing when opacity is 0', async () => {
@@ -762,7 +762,7 @@ describe('shimmer.js', () => {
 
       // All 3 dots should spawn at the only walkable position and render
       // 1 traceImage + 3 dots × 2 sprites = 7 drawImage calls
-      expect(mockCtx.drawImage.mock.calls.length).toBe(1 + 3 * 2);
+      expect(mockCtx.drawImage.mock.calls).toHaveLength(1 + 3 * 2);
     });
 
     it('handles mask with no walkable pixels', async () => {
