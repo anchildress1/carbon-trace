@@ -7,9 +7,9 @@
   "author": "Ashley Childress",
   "license": "SEE LICENSE IN LICENSE",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --configLoader native",
     "build": "vite build --configLoader native",
-    "preview": "vite preview",
+    "preview": "vite preview --configLoader native",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "e2e": "playwright test",
@@ -24,7 +24,7 @@
     "perf:baseline:chromium": "playwright test -c playwright.perf.config.js --project=chromium tests/perf/baseline-profiles.chromium.spec.js",
     "perf:baseline": "pnpm perf:baseline:shared && pnpm perf:baseline:chromium",
     "perf:runtime": "playwright test -c playwright.perf.config.js tests/perf/runtime-flow.spec.js",
-    "perf:runtime:adr11": "VITE_E2E=1 pnpm exec vite build && PERF_INCLUDE_WEBKIT=1 playwright test -c playwright.perf.config.js --project=webkit tests/perf/adr11-credits.webkit.spec.js && PERF_INCLUDE_WEBKIT=1 playwright test -c playwright.perf.config.js --project=chromium tests/perf/adr11-credits.chromium.spec.js",
+    "perf:runtime:adr11": "VITE_E2E=1 pnpm exec vite build --configLoader native && PERF_INCLUDE_WEBKIT=1 playwright test -c playwright.perf.config.js --project=webkit tests/perf/adr11-credits.webkit.spec.js && PERF_INCLUDE_WEBKIT=1 playwright test -c playwright.perf.config.js --project=chromium tests/perf/adr11-credits.chromium.spec.js",
     "perf": "node scripts/run-perf.mjs"
   },
   "dependencies": {

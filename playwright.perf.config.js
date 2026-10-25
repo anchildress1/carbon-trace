@@ -49,7 +49,7 @@ export default defineConfig({
     ? {}
     : {
         webServer: {
-          command: `BROWSER=none pnpm exec vite preview --host localhost --port ${previewPort} --strictPort`,
+          command: `BROWSER=none pnpm exec vite preview --configLoader native --host localhost --port ${previewPort} --strictPort`,
           port: previewPort,
           reuseExistingServer: !process.env.CI,
         },
