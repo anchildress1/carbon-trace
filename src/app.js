@@ -382,9 +382,7 @@ function scheduleFrameAudio(app, frame) {
   });
 }
 
-function startFramePlayback(app, frame) {
-  if (app.deferFrameAudioUntilResume) return;
-
+function startFrameAudio(app, frame) {
   try {
     scheduleFrameAudio(app, frame);
     if (frame.effects?.analyserCueId) {
@@ -394,6 +392,12 @@ function startFramePlayback(app, frame) {
   } catch (err) {
     console.error('Frame audio failed:', err);
   }
+}
+
+function startFramePlayback(app, frame) {
+  if (app.deferFrameAudioUntilResume) return;
+
+  startFrameAudio(app, frame);
   // Audio failure must not stop narration text or the auto-advance chain.
   app.textTimeline?.play(0);
   setupAutoAdvance(app);
@@ -407,11 +411,7 @@ function resumeDeferredFrameAudio(app, { cancelExisting = false } = {}) {
     cancelAudioCues();
   }
   const frame = app.frames[app.currentIndex];
-  scheduleFrameAudio(app, frame);
-  if (frame.effects?.analyserCueId) {
-    const analyser = getAnalyserNode();
-    if (analyser) wireAnalysisAudio(app, frame, analyser);
-  }
+  startFrameAudio(app, frame);
   return true;
 }
 
@@ -842,6 +842,8 @@ function landOnFrame(app, toFrame) {
       startFramePlayback(app, toFrame);
     }
     manageFocusAfterTransition(app);
+  } catch (err) {
+    console.error('Error completing scene transition:', err);
   } finally {
     completePendingNav(app);
   }

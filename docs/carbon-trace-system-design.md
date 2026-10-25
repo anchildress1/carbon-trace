@@ -513,7 +513,7 @@ land on frame      ░░░░░░░░░░░░░░░░░░░░�
 Transition uses GSAP opacity fade on the `#scene-stage` container — NOT offscreen canvas compositing. The container fades to 0, frame content swaps, container fades back to 1. Simpler than v4's planned offscreen approach, works correctly with DOM overlay.
 `showFrame()` is render/setup only; `startFramePlayback()` runs on `landOnFrame()` so audio, narration text, and captions share one start boundary after fade and overlay readiness waits.
 
-**Image wait:** If the target frame's image isn't cached, a debounced spinner appears after 300ms. Preload-ahead usually prevents this. Image-load failures clear the spinner and land on the documented fallback. Rejected landing callbacks are logged, and queued navigation is completed even if focus handling throws. Audio scheduling failures are logged without stopping narration text or the auto-advance chain.
+**Image wait:** If the target frame's image isn't cached, a debounced spinner appears after 300ms. Preload-ahead usually prevents this. Image-load failures clear the spinner and land on the documented fallback. Landing callback failures are logged for cached images, image waits, and deferred animation completions; queued navigation completes even if focus handling throws. Audio scheduling failures during initial playback or deferred resume are logged without stopping narration text, effects, controls, or the auto-advance chain.
 
 ### 5.4 hardJump(toIndex) — paused
 
