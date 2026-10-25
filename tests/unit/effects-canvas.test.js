@@ -511,7 +511,7 @@ describe('effects-canvas.js — PixiJS lifecycle', () => {
       // no separate maskSprite or Container masking.
       // Sprite calls: no noise sprite (glow is noise-free), one effectSprite.
       const spriteInstances = Sprite.mock.instances;
-      expect(spriteInstances.length).toBe(1);
+      expect(spriteInstances).toHaveLength(1);
       const effectSprite = spriteInstances[0];
       expect(effectSprite.tint).toBe(0xffee33);
       expect(effectSprite.filters).toEqual([{ enabled: true }]);

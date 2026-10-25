@@ -51,7 +51,7 @@ describe('text.js', () => {
     it('appends element to container', () => {
       createLineElement('Test', container, { x: 50, y: 50 });
 
-      expect(container.children.length).toBe(1);
+      expect(container.children).toHaveLength(1);
     });
 
     it('handles empty string', () => {
@@ -64,7 +64,7 @@ describe('text.js', () => {
       const el = createLineElement('<b>bold</b> & "quoted"', container, { x: 50, y: 50 });
 
       expect(el.textContent).toBe('<b>bold</b> & "quoted"');
-      expect(el.children.length).toBe(0);
+      expect(el.children).toHaveLength(0);
     });
 
     it('appends multiple elements sequentially', () => {
@@ -72,7 +72,7 @@ describe('text.js', () => {
       createLineElement('Second', container, { x: 20, y: 20 });
       createLineElement('Third', container, { x: 30, y: 30 });
 
-      expect(container.children.length).toBe(3);
+      expect(container.children).toHaveLength(3);
       expect(container.children[2].textContent).toBe('Third');
     });
 
@@ -138,7 +138,7 @@ describe('text.js', () => {
       const { timeline: tl } = buildNarrationTimeline(withPositions(lines), container);
 
       expect(gsap.timeline).toHaveBeenCalledWith({ paused: true });
-      expect(container.children.length).toBe(2);
+      expect(container.children).toHaveLength(2);
       expect(tl.fromTo).toHaveBeenCalledTimes(2);
       expect(tl.to).toHaveBeenCalledTimes(2);
     });
@@ -181,13 +181,13 @@ describe('text.js', () => {
       const lines = [{ text: 'New line', enter: 0, exit: 1000 }];
       buildNarrationTimeline(withPositions(lines), container);
 
-      expect(container.children.length).toBe(1);
+      expect(container.children).toHaveLength(1);
     });
 
     it('handles empty lines array', () => {
       const { timeline: tl } = buildNarrationTimeline([], container);
 
-      expect(container.children.length).toBe(0);
+      expect(container.children).toHaveLength(0);
       expect(tl.fromTo).not.toHaveBeenCalled();
     });
 
@@ -280,7 +280,7 @@ describe('text.js', () => {
 
       const { timeline: tl } = buildNarrationTimeline(withPositions(lines), container);
 
-      expect(container.children.length).toBe(2);
+      expect(container.children).toHaveLength(2);
       expect(tl.fromTo).toHaveBeenCalledTimes(2);
       expect(errorSpy).toHaveBeenCalledWith(
         'Narration line 1 has invalid enter/exit timing:',
@@ -295,7 +295,7 @@ describe('text.js', () => {
 
       const { timeline: tl } = buildNarrationTimeline(withPositions(lines), container);
 
-      expect(container.children.length).toBe(0);
+      expect(container.children).toHaveLength(0);
       expect(tl.fromTo).not.toHaveBeenCalled();
       expect(errorSpy).toHaveBeenCalled();
       errorSpy.mockRestore();
@@ -307,7 +307,7 @@ describe('text.js', () => {
 
       buildNarrationTimeline(withPositions(lines), container);
 
-      expect(container.children.length).toBe(0);
+      expect(container.children).toHaveLength(0);
       expect(errorSpy).toHaveBeenCalled();
       errorSpy.mockRestore();
     });
@@ -407,13 +407,13 @@ describe('text.js', () => {
       showCallback();
 
       // Should not create a DOM element because isCaptionEnabled returns false
-      expect(captionContainer.children.length).toBe(0);
+      expect(captionContainer.children).toHaveLength(0);
 
       // Now enable
       isEnabled.mockReturnValue(true);
       showCallback();
 
-      expect(captionContainer.children.length).toBe(1);
+      expect(captionContainer.children).toHaveLength(1);
       expect(captionContainer.children[0].textContent).toBe('Gated');
     });
 
@@ -430,7 +430,7 @@ describe('text.js', () => {
       const showCallback = tl.call.mock.calls[0][0];
       showCallback();
 
-      expect(captionContainer.children.length).toBe(1);
+      expect(captionContainer.children).toHaveLength(1);
       expect(captionContainer.children[0].textContent).toBe('Ungated');
     });
 
@@ -448,13 +448,13 @@ describe('text.js', () => {
       // Execute show callback
       const showCallback = tl.call.mock.calls[0][0];
       showCallback();
-      expect(captionContainer.children.length).toBe(1);
+      expect(captionContainer.children).toHaveLength(1);
       expect(captionEntries[0].el).not.toBeNull();
 
       // Execute hide callback
       const hideCallback = tl.call.mock.calls[1][0];
       hideCallback();
-      expect(captionContainer.children.length).toBe(0);
+      expect(captionContainer.children).toHaveLength(0);
       expect(captionEntries[0].el).toBeNull();
     });
 
@@ -489,10 +489,10 @@ describe('text.js', () => {
       const showCallback = tl.call.mock.calls[0][0];
       showCallback();
       const firstEl = captionEntries[0].el;
-      expect(captionContainer.children.length).toBe(1);
+      expect(captionContainer.children).toHaveLength(1);
 
       showCallback();
-      expect(captionContainer.children.length).toBe(1);
+      expect(captionContainer.children).toHaveLength(1);
       expect(captionEntries[0].el).not.toBe(firstEl);
       expect(firstEl.isConnected).toBe(false);
     });
@@ -533,7 +533,7 @@ describe('text.js', () => {
 
       clearNarrationLayer(container);
 
-      expect(container.children.length).toBe(0);
+      expect(container.children).toHaveLength(0);
     });
 
     it('kills GSAP tweens on children collection', () => {
@@ -548,7 +548,7 @@ describe('text.js', () => {
     it('handles empty container', () => {
       clearNarrationLayer(container);
 
-      expect(container.children.length).toBe(0);
+      expect(container.children).toHaveLength(0);
     });
   });
 });

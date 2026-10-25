@@ -1842,14 +1842,14 @@ describe('app.js', () => {
       await flush();
 
       // Effects haven't resolved yet — fade-in tween should not exist
-      expect(onCompletes.length).toBe(1);
+      expect(onCompletes).toHaveLength(1);
 
       // Resolve effects — fadeIn can proceed
       resolveEffects();
       await flush();
 
       // Now the fade-in tween should have been created
-      expect(onCompletes.length).toBe(2);
+      expect(onCompletes).toHaveLength(2);
     });
   });
 
