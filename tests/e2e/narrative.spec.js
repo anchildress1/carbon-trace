@@ -92,6 +92,29 @@ test.describe('carbon-trace narrative', () => {
     await expect(sceneStage).toBeVisible({ timeout: 15000 });
   });
 
+  test('hidden application elements override component display and restore it when shown', async ({ page }) => {
+    await page.waitForSelector('#loading-prompt:not([hidden])', { timeout: 15000 });
+    const displays = await page.evaluate(() => {
+      const ids = ['loading-screen', 'loading-prompt', 'scene-stage', 'transition-loader', 'overlay-controls', 'credits-panel'];
+      return ids.map((id) => {
+        const element = document.getElementById(id);
+        const wasHidden = element.hidden;
+        element.hidden = true;
+        const hiddenDisplay = getComputedStyle(element).display;
+        element.hidden = false;
+        const shownDisplay = getComputedStyle(element).display;
+        element.hidden = wasHidden;
+        return { id, hiddenDisplay, shownDisplay };
+      });
+    });
+    expect(displays).toEqual([
+      ...['loading-screen', 'loading-prompt', 'scene-stage', 'transition-loader', 'overlay-controls'].map((id) => ({
+        id, hiddenDisplay: 'none', shownDisplay: 'flex',
+      })),
+      { id: 'credits-panel', hiddenDisplay: 'none', shownDisplay: 'block' },
+    ]);
+  });
+
   test('displays progress dots for narrative scenes', async ({ page }) => {
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
 

@@ -211,8 +211,10 @@ async function preloadFirstFrameImage(app) {
   }
 }
 
-async function preloadBackgroundImages(app) {
-  for (const frame of app.frames.slice(1)) {
+function preloadBackgroundImages(app) {
+  // Chain each load after the previous frame to preserve scene priority.
+  return app.frames.slice(1).reduce(async (previous, frame) => {
+    await previous;
     if (frame.image && !app.imageCache.has(frame.image)) {
       try {
         const img = await loadImage(frame.image);
@@ -221,7 +223,7 @@ async function preloadBackgroundImages(app) {
         console.warn(`Background image preload failed for ${frame.image}:`, err);
       }
     }
-  }
+  }, Promise.resolve());
 }
 
 function getHoldAfterNarration(frame) {
@@ -383,11 +385,16 @@ function scheduleFrameAudio(app, frame) {
 function startFramePlayback(app, frame) {
   if (app.deferFrameAudioUntilResume) return;
 
-  scheduleFrameAudio(app, frame);
-  if (frame.effects?.analyserCueId) {
-    const analyser = getAnalyserNode();
-    if (analyser) wireAnalysisAudio(app, frame, analyser);
+  try {
+    scheduleFrameAudio(app, frame);
+    if (frame.effects?.analyserCueId) {
+      const analyser = getAnalyserNode();
+      if (analyser) wireAnalysisAudio(app, frame, analyser);
+    }
+  } catch (err) {
+    console.error('Frame audio failed:', err);
   }
+  // Audio failure must not stop narration text or the auto-advance chain.
   app.textTimeline?.play(0);
   setupAutoAdvance(app);
 }
@@ -799,7 +806,9 @@ function doClickJump(app, toIndex, toFrame, prevFrame) {
 // Calls fn() immediately if the frame's image is cached, otherwise waits for it.
 function whenImageReady(app, frame, fn) {
   if (frame.image && !app.imageCache.has(frame.image)) {
-    waitForImage(app, frame.image).then(fn);
+    waitForImage(app, frame.image)
+      .then(fn)
+      .catch((err) => console.error('Error completing scene transition:', err));
   } else {
     fn();
   }
@@ -824,15 +833,18 @@ function proceedWithFrame(app, toIndex) {
 // Completes landing on toFrame after a successful proceedWithFrame.
 function landOnFrame(app, toFrame) {
   app.state = frameState(toFrame);
-  if (app.pendingPause) {
-    app.pendingPause = false;
-    app.deferFrameAudioUntilResume = true;
-    doPause(app);
-  } else {
-    startFramePlayback(app, toFrame);
+  try {
+    if (app.pendingPause) {
+      app.pendingPause = false;
+      app.deferFrameAudioUntilResume = true;
+      doPause(app);
+    } else {
+      startFramePlayback(app, toFrame);
+    }
+    manageFocusAfterTransition(app);
+  } finally {
+    completePendingNav(app);
   }
-  manageFocusAfterTransition(app);
-  completePendingNav(app);
 }
 
 function transition(app, toIndex) {
@@ -1097,6 +1109,18 @@ function toggleCaptions(app) {
   }
 }
 
+function initOverlays(app) {
+  startEffectsLoad();
+  initEffectsCanvas(app.els.effectsCanvas).catch((err) =>
+    console.error('Effects canvas init failed:', err),
+  );
+  try {
+    initShimmer(app.els.traceOverlay);
+  } catch (err) {
+    console.error('Shimmer init failed:', err);
+  }
+}
+
 function initApp(app) {
   initSceneCanvas(app.els.sceneCanvas);
 
@@ -1143,15 +1167,7 @@ function initApp(app) {
       // have no overlays, so starting these now (while the user reads the
       // prompt) avoids TBT on the critical path while ensuring they are
       // ready before the user advances to frame 1.
-      startEffectsLoad();
-      initEffectsCanvas(app.els.effectsCanvas).catch((err) =>
-        console.error('Effects canvas init failed:', err),
-      );
-      try {
-        initShimmer(app.els.traceOverlay);
-      } catch (err) {
-        console.error('Shimmer init failed:', err);
-      }
+      initOverlays(app);
 
       app.state = State.SCENE_ACTIVE;
       doPause(app);

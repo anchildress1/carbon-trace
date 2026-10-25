@@ -1609,6 +1609,125 @@ describe('app.js', () => {
     });
   });
 
+  describe('image readiness failures', () => {
+    it.each([false, true])('lands on fallback after image rejection (reduced motion: %s)', async (reducedMotion) => {
+      globalThis.matchMedia.mockReturnValue({ matches: reducedMotion });
+      loadImage.mockRejectedValue(new Error('image unavailable'));
+      app = createApp();
+      await flush();
+      app.togglePause();
+      vi.clearAllMocks();
+      const warnSpy = vi.spyOn(console, 'warn');
+
+      app.advance();
+      await flush();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Image load failed during transition: scene-01.webp',
+        expect.objectContaining({ message: 'image unavailable' }),
+      );
+      expect(drawFallback).toHaveBeenCalled();
+      expect(app.getState()).toBe('SCENE_ACTIVE');
+      expect(document.getElementById('transition-loader').hidden).toBe(true);
+      expect(scheduleAudioCues).toHaveBeenCalledWith(scenesData.frames[1].audioCues, expect.any(Object));
+      app.togglePause();
+      expect(app.getState()).toBe('PAUSED');
+      warnSpy.mockRestore();
+    });
+
+    it('continues text playback and auto-advance when frame audio scheduling throws', async () => {
+      globalThis.matchMedia.mockReturnValue({ matches: true });
+      loadImage.mockRejectedValue(new Error('uncached'));
+      app = createApp();
+      await flush();
+      app.togglePause();
+      const failure = new Error('Audio scheduling failed');
+      scheduleAudioCues.mockImplementationOnce(() => { throw failure; });
+      const errorSpy = vi.spyOn(console, 'error');
+      try {
+        app.advance();
+        await flush();
+        expect(errorSpy).toHaveBeenCalledWith('Frame audio failed:', failure);
+        expect(app.getState()).toBe('SCENE_ACTIVE');
+        expect(document.getElementById('transition-loader').hidden).toBe(true);
+        const sceneTimeline = buildNarrationTimeline.mock.results.at(-1).value.timeline;
+        expect(sceneTimeline.play).toHaveBeenCalledWith(0);
+        // Scene-01 uses its 2s caption cap + 500ms enter + 2s hold.
+        await vi.advanceTimersByTimeAsync(4500);
+        expect(app.getState()).toBe('SCENE_ACTIVE');
+        expect(document.getElementById('btn-replay').disabled).toBe(true);
+        expect(scheduleAudioCues).toHaveBeenLastCalledWith(null, expect.any(Object));
+      } finally {
+        errorSpy.mockRestore();
+      }
+    });
+
+    it('handles a rejected landing callback and completes navigation queued during the image wait', async () => {
+      globalThis.matchMedia.mockReturnValue({ matches: true });
+      loadImage.mockRejectedValue(new Error('uncached'));
+      app = createApp();
+      await flush();
+      app.togglePause();
+      let resolveImage;
+      loadImage.mockImplementationOnce(() => new Promise((resolve) => { resolveImage = resolve; }));
+      const failure = new Error('Focus unavailable');
+      const focusSpy = vi.spyOn(document.getElementById('btn-pause'), 'focus')
+        .mockImplementationOnce(() => { throw failure; });
+      const errorSpy = vi.spyOn(console, 'error');
+      try {
+        app.advance();
+        expect(app.getState()).toBe('TRANSITIONING');
+        const onDotClick = initOverlay.mock.calls[0][1];
+        onDotClick(3); // Queue scene-02 while scene-01 is waiting for its image.
+        resolveImage(new Image());
+        await flush();
+        expect(errorSpy).toHaveBeenCalledWith('Error completing scene transition:', failure);
+        expect(app.getState()).toBe('SCENE_ACTIVE');
+        expect(document.getElementById('transition-loader').hidden).toBe(true);
+        expect(document.getElementById('btn-replay').disabled).toBe(true);
+        expect(scheduleAudioCues).toHaveBeenLastCalledWith(null, expect.any(Object));
+        expect(focusSpy).toHaveBeenCalledTimes(2);
+      } finally {
+        focusSpy.mockRestore();
+        errorSpy.mockRestore();
+      }
+    });
+
+    it('loads background images sequentially, continuing after failure and skipping cached duplicates', async () => {
+      const originalFrames = scenesData.frames;
+      scenesData.frames = [
+        originalFrames[0],
+        { ...originalFrames[1], image: 'bad.webp' },
+        { ...originalFrames[2], image: 'good.webp' },
+        { ...originalFrames[2], image: 'good.webp' },
+      ];
+      const warnSpy = vi.spyOn(console, 'warn');
+      try {
+        loadImage.mockRejectedValue(new Error('initial preload failed'));
+        app = createApp();
+        await flush();
+        const pending = [];
+        loadImage.mockImplementation((src) => new Promise((resolve, reject) => {
+          pending.push({ src, resolve, reject });
+        }));
+        await vi.advanceTimersByTimeAsync(4000);
+        expect(pending.map(({ src }) => src)).toEqual(['bad.webp']);
+        const failure = new Error('background image failed');
+        pending[0].reject(failure);
+        await flush();
+        expect(pending.map(({ src }) => src)).toEqual(['bad.webp', 'good.webp']);
+        pending[1].resolve(new Image());
+        await flush();
+        expect(pending).toHaveLength(2);
+        expect(warnSpy).toHaveBeenCalledWith('Background image preload failed for bad.webp:', failure);
+        expect(app.getState()).toBe('PAUSED');
+      } finally {
+        scenesData.frames = originalFrames;
+        warnSpy.mockRestore();
+      }
+    });
+  });
+
   // ── non-blocking instant-cut navigation ─────────────────────────────
 
   describe('non-blocking instant-cut navigation', () => {
