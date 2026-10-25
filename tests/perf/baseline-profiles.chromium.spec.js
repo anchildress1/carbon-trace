@@ -12,6 +12,7 @@ import {
   injectLongTaskObserver,
   collectLongTasks,
   sampleRafStats,
+  droppedFramePercent,
   percentile,
 } from './helpers.js';
 import { PERF_GUARDRAILS, attachJson } from './baseline-profiles.shared.js';
@@ -19,6 +20,14 @@ import { PERF_GUARDRAILS, attachJson } from './baseline-profiles.shared.js';
 test.describe('baseline performance profiles (chromium)', () => {
   test('effects steady-state FPS on scene with water+glow', async ({ page }, testInfo) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
+    // Calibrate independently of application work so a uniformly slow scene
+    // cannot redefine its own expected cadence and hide a regression.
+    await page.goto('about:blank');
+    const idleStats = await sampleRafStats(page, 1500);
+    const expectedFrameMs = percentile(idleStats.intervalsMs, 0.5);
+    await attachJson(testInfo, 'idle-browser-cadence', idleStats);
+    expect(idleStats.averageFps).toBeGreaterThanOrEqual(PERF_GUARDRAILS.minAverageFps);
+    expect(percentile(idleStats.intervalsMs, 0.95)).toBeLessThan(PERF_GUARDRAILS.maxP95FrameMs);
     await page.goto('/');
     await page.waitForSelector('#scene-stage:not([hidden])', { timeout: 15000 });
     await dismissLoadingScreen(page);
@@ -32,20 +41,23 @@ test.describe('baseline performance profiles (chromium)', () => {
     // Let effects settle
     await page.waitForTimeout(1000);
 
-    const stats = await sampleRafStats(page, 3000);
+    const stats = await sampleRafStats(page, 3000, expectedFrameMs);
     const p95FrameMs = percentile(stats.intervalsMs, 0.95);
-    expect(stats.averageFps).toBeGreaterThanOrEqual(PERF_GUARDRAILS.minAverageFps);
-    expect(p95FrameMs).toBeLessThan(PERF_GUARDRAILS.maxP95FrameMs);
-    expect(stats.droppedFramePercent).toBeLessThan(PERF_GUARDRAILS.maxDroppedFramePercent);
 
     await attachJson(testInfo, 'effects-fps-profile', {
       scene: 'scene-05-rinse (water+glow)',
+      expectedFrameMs,
+      idleAverageFps: idleStats.averageFps,
+      intervalsMs: stats.intervalsMs,
       averageFps: stats.averageFps,
       p95FrameMs,
       droppedFramePercent: stats.droppedFramePercent,
       sampledDurationMs: stats.sampledDurationMs,
       totalFrames: stats.frames,
     });
+    expect(stats.averageFps).toBeGreaterThanOrEqual(PERF_GUARDRAILS.minAverageFps);
+    expect(p95FrameMs).toBeLessThan(PERF_GUARDRAILS.maxP95FrameMs);
+    expect(stats.droppedFramePercent).toBeLessThan(PERF_GUARDRAILS.maxDroppedFramePercent);
   });
 
   test('full navigation cycle memory', async ({ page }, testInfo) => {
@@ -101,5 +113,36 @@ test.describe('baseline performance profiles (chromium)', () => {
       totalLongTaskMs: longTasks.reduce((s, d) => s + d, 0),
       memoryInfo,
     });
+  });
+});
+
+test.describe('frame deadline measurement', () => {
+  for (const hz of [30, 60, 120]) {
+    const frameMs = 1000 / hz;
+    test(`accepts steady ${hz} Hz with timestamp jitter`, () => {
+      expect(droppedFramePercent([frameMs - 0.2, frameMs, frameMs + 0.2], frameMs)).toBe(0);
+    });
+    test(`detects missed deadlines at ${hz} Hz`, () => {
+      expect(droppedFramePercent([frameMs, frameMs * 2, frameMs * 4, frameMs], frameMs)).toBe(50);
+    });
+    test(`rejects sustained half-cadence rendering at ${hz} Hz`, () => {
+      const percent = droppedFramePercent(Array(20).fill(frameMs * 2), frameMs);
+      expect(percent).toBe(100);
+      expect(percent).toBeGreaterThanOrEqual(PERF_GUARDRAILS.maxDroppedFramePercent);
+    });
+  }
+  test('preserves the 60 Hz deadline boundary', () => {
+    expect(droppedFramePercent([24.9, 25, 25.1], 1000 / 60)).toBeCloseTo(100 / 3);
+  });
+  test('does not infer a slower cadence from the measured scene', () => {
+    expect(droppedFramePercent(Array(20).fill(1000 / 30), 1000 / 60)).toBe(100);
+  });
+  test('rejects missing or invalid measurements', () => {
+    for (const cadence of [0, -1, NaN, Infinity]) {
+      expect(() => droppedFramePercent([16.7], cadence)).toThrow();
+    }
+    for (const samples of [[], [0], [-1], [NaN], [Infinity]]) {
+      expect(() => droppedFramePercent(samples, 1000 / 60)).toThrow();
+    }
   });
 });

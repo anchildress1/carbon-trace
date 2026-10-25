@@ -134,8 +134,8 @@ export async function collectPaintMetrics(page) {
 /**
  * Sample rAF intervals for a given duration and return FPS statistics.
  */
-export async function sampleRafStats(page, sampleWindowMs) {
-  return page.evaluate(async (windowMs) => {
+export async function sampleRafStats(page, sampleWindowMs, expectedFrameMs = 1000 / 60) {
+  const stats = await page.evaluate(async (windowMs) => {
     const intervalsMs = [];
     const startedAt = performance.now();
     let previous = startedAt;
@@ -169,17 +169,34 @@ export async function sampleRafStats(page, sampleWindowMs) {
         ? 0
         : intervalsMs.reduce((total, ms) => total + ms, 0) / intervalsMs.length;
     const averageFps = averageIntervalMs > 0 ? 1000 / averageIntervalMs : 0;
-    const droppedFrames = intervalsMs.filter((ms) => ms > 25).length;
 
     return {
       sampledDurationMs,
       frames: intervalsMs.length,
       intervalsMs,
       averageFps,
-      droppedFramePercent:
-        intervalsMs.length === 0 ? 0 : (droppedFrames / intervalsMs.length) * 100,
     };
   }, sampleWindowMs);
+  return {
+    ...stats,
+    droppedFramePercent: droppedFramePercent(stats.intervalsMs, expectedFrameMs),
+  };
+}
+
+/**
+ * Percentage of callback intervals that miss their expected frame deadline.
+ * The 1.5-frame tolerance accommodates timestamp jitter. Use an independent
+ * idle-page cadence, never the loaded scene's cadence, to detect slow scenes.
+ */
+export function droppedFramePercent(intervalsMs, expectedFrameMs) {
+  if (!Number.isFinite(expectedFrameMs) || expectedFrameMs <= 0 || intervalsMs.length === 0) {
+    throw new Error('Frame statistics require a positive cadence and nonempty samples');
+  }
+  if (intervalsMs.some((ms) => !Number.isFinite(ms) || ms <= 0)) {
+    throw new Error('Frame intervals must be finite and positive');
+  }
+  const lateIntervals = intervalsMs.filter((ms) => ms > expectedFrameMs * 1.5).length;
+  return (lateIntervals / intervalsMs.length) * 100;
 }
 
 /**

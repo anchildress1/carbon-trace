@@ -133,12 +133,12 @@ The primary bottleneck was **LCP (Largest Contentful Paint) at 4.4s**, with 90% 
 
 ### Lighthouse Scores (after all optimizations)
 
-| Category       | Desktop | Mobile | Target | Status |
-| -------------- | ------- | ------ | ------ | ------ |
-| Performance    | 99%     | 86%    | Desktop ≥ 90%, Mobile ≥ 85% | Pass |
-| Accessibility  | 100%    | 100%   | = 100% | Pass   |
-| Best Practices | 100%    | 100%   | ≥ 95%  | Pass   |
-| SEO            | 100%    | 100%   | ≥ 90%  | Pass   |
+| Category       | Desktop | Mobile | Target                      | Status |
+| -------------- | ------- | ------ | --------------------------- | ------ |
+| Performance    | 99%     | 86%    | Desktop ≥ 90%, Mobile ≥ 85% | Pass   |
+| Accessibility  | 100%    | 100%   | = 100%                      | Pass   |
+| Best Practices | 100%    | 100%   | ≥ 95%                       | Pass   |
+| SEO            | 100%    | 100%   | ≥ 90%                       | Pass   |
 
 Mobile performance currently runs around 0.86 under simulated Slow 4G + 4x CPU throttle and passes the approved mobile-only CI gate of ≥0.85.
 
@@ -238,3 +238,20 @@ Both desktop and mobile Lighthouse are enforced in CI:
 - **Mobile:** `pnpm exec lhci autorun --config=.lighthouserc.mobile.json`
 
 Thresholds are intentionally split by platform: desktop enforces 90% performance while mobile enforces an approved temporary threshold of 85% performance. Both enforce 100% accessibility, 95% best practices, and 90% SEO. Reports are uploaded as CI artifacts for debugging regressions.
+
+### Frame cadence measurement correction (2026-10-25)
+
+The effects profile calibrates rAF cadence on `about:blank` in the same page
+before loading the application. A callback interval exceeding 1.5 times that
+independent median cadence counts as a missed deadline. The reported dropped
+frame percentage remains the percentage of callback intervals missing a deadline,
+not an estimate of how many display refreshes were skipped. The previous fixed
+25 ms cutoff assumed 60 Hz: steady 30 Hz scheduling incorrectly reported 100%
+drops on both unchanged main and a blank page.
+
+Calibration and the loaded scene must still meet the unchanged absolute FPS and
+p95 frame-time budgets. The scene cannot calibrate itself: a scene rendering at
+30 FPS against a 60 Hz control still reports 100% missed deadlines. This measures
+application regression relative to available browser scheduling; it does not
+certify the separate 60 FPS rendering target on a browser capped below 60 Hz.
+No OS settings, browser scheduling flags, or guardrail thresholds are changed.
