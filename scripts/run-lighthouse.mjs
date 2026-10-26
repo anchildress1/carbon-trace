@@ -23,7 +23,7 @@ if (!Number.isInteger(previewPort) || previewPort < 1 || previewPort > 65535) {
 const previewHost = '127.0.0.1';
 const previewUrl = `http://${previewHost}:${previewPort}`;
 const config = mode === 'desktop' ? '.lighthouserc.json' : '.lighthouserc.mobile.json';
-const startServerCommand = `BROWSER=none pnpm exec vite preview --host ${previewHost} --port ${previewPort} --strictPort`;
+const startServerCommand = `BROWSER=none pnpm exec vite preview --configLoader native --host ${previewHost} --port ${previewPort} --strictPort`;
 
 const args = [
   'exec',

@@ -301,6 +301,48 @@ describe('loader.js', () => {
       expect(onLoaded).toHaveBeenCalledTimes(1);
     });
 
+    it.each(['error', 'timeout'])('preserves one-at-a-time scene order after an audio %s', async (failure) => {
+      const requests = [];
+      globalThis.Audio = class MockAudio {
+        duration = 7;
+        set preload(_v) {}
+        set src(value) {
+          this._src = value;
+          if (value) requests.push(this);
+        }
+        get src() { return this._src; }
+      };
+      const onLoaded = vi.fn();
+      const frames = [
+        { audioCues: [{ src: 'first.m4a' }] },
+        { audioCues: [{ src: 'first.m4a' }, { src: 'second.m4a' }, { src: 'bad.m4a' }] },
+        { audioCues: null },
+        { audioCues: [{ src: 'third.m4a' }] },
+      ];
+      const warnSpy = vi.spyOn(console, 'warn');
+      const finished = preloadBackgroundAudio(frames, onLoaded);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(requests.map((audio) => audio.src)).toEqual(['second.m4a']);
+      requests[0].onloadedmetadata();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(requests).toHaveLength(2);
+      expect(requests[1].src).toBe('bad.m4a');
+      if (failure === 'error') requests[1].onerror();
+      await vi.advanceTimersByTimeAsync(failure === 'timeout' ? 5000 : 0);
+      expect(requests).toHaveLength(3);
+      expect(requests[2].src).toBe('third.m4a');
+      requests[2].onloadedmetadata();
+      await finished;
+      expect(onLoaded.mock.calls).toEqual([
+        [{ src: 'second.m4a', duration: 7 }],
+        [{ src: 'third.m4a', duration: 7 }],
+      ]);
+      expect(warnSpy).toHaveBeenCalledWith(failure === 'timeout'
+        ? 'Audio preload timed out: bad.m4a'
+        : 'Failed to preload audio: bad.m4a');
+      expect(requests.every((audio) => audio.src === '' && audio.onerror === null)).toBe(true);
+    });
+
     it('handles empty frames array', async () => {
       const onLoaded = vi.fn();
       await preloadBackgroundAudio([], onLoaded);

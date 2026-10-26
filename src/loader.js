@@ -60,16 +60,18 @@ export async function preloadBackgroundAudio(frames, onLoaded) {
   if (frames.length === 0) return;
   const firstFrameSrcs = new Set(audioSrcsFromEntry(frames[0]));
 
-  for (const frame of frames.slice(1)) {
-    for (const src of audioSrcsFromEntry(frame)) {
-      if (!firstFrameSrcs.has(src)) {
-        try {
-          const result = await preloadAudio(src);
-          onLoaded(result);
-        } catch (err) {
-          console.warn(err.message);
-        }
+  // A promise chain keeps one metadata request active at a time, in scene order.
+  return frames
+    .slice(1)
+    .flatMap(audioSrcsFromEntry)
+    .reduce(async (previous, src) => {
+      await previous;
+      if (firstFrameSrcs.has(src)) return;
+      try {
+        const result = await preloadAudio(src);
+        onLoaded(result);
+      } catch (err) {
+        console.warn(err.message);
       }
-    }
-  }
+    }, Promise.resolve());
 }

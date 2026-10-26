@@ -31,7 +31,7 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
-    command: `VITE_E2E=1 pnpm exec vite build && BROWSER=none pnpm exec vite preview --host localhost --port ${previewPort} --strictPort`,
+    command: `VITE_E2E=1 pnpm exec vite build --configLoader native && BROWSER=none pnpm exec vite preview --configLoader native --host localhost --port ${previewPort} --strictPort`,
     port: previewPort,
     reuseExistingServer: false,
   },

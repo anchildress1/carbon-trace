@@ -22,6 +22,8 @@ let isStopping = false;
 
 async function startPreviewServer() {
   previewServer = await preview({
+    // This plain-JavaScript config needs no intermediate config bundle.
+    configLoader: 'native',
     preview: {
       host: '127.0.0.1',
       port: previewPort,
